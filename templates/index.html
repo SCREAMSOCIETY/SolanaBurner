@@ -28,16 +28,25 @@
         </div>
         <div class="burn-form" id="burnForm" style="display: none">
             <div class="input-group">
-                <label for="tokenSelect">Select Token:</label>
-                <select id="tokenSelect" required>
-                    <option value="">Select a token</option>
+                <label for="assetType">Asset Type:</label>
+                <select id="assetType" required>
+                    <option value="">Select asset type</option>
+                    <option value="token">Tokens</option>
+                    <option value="nft">NFTs</option>
+                    <option value="vacant">Vacant Accounts</option>
                 </select>
             </div>
-            <div class="input-group">
+            <div id="assetSelectContainer" class="input-group" style="display: none">
+                <label for="assetSelect">Select Asset:</label>
+                <select id="assetSelect" required>
+                    <option value="">Select an asset</option>
+                </select>
+            </div>
+            <div id="amountContainer" class="input-group" style="display: none">
                 <label for="amount">Amount to Burn:</label>
                 <input type="number" id="amount" step="0.000001" min="0">
             </div>
-            <button type="submit" id="burnButton">Burn Tokens</button>
+            <button type="submit" id="burnButton">Burn Asset</button>
             <div id="statusMessage" class="status-message" style="display: none"></div>
         </div>
     </div>
@@ -51,27 +60,69 @@
             const burnForm = document.getElementById('burnForm');
             const burnButton = document.getElementById('burnButton');
             const statusMessage = document.getElementById('statusMessage');
-            const tokenSelect = document.getElementById('tokenSelect');
+            const assetType = document.getElementById('assetType');
+            const assetSelect = document.getElementById('assetSelect');
+            const assetSelectContainer = document.getElementById('assetSelectContainer');
+            const amountContainer = document.getElementById('amountContainer');
 
             let currentWallet = null;
+            let currentWalletAddress = null;
+            let assets = {};
 
-            // Fetch available tokens
-            fetch('/tokens')
-                .then(response => response.json())
-                .then(data => {
+            async function loadAssets() {
+                if (!currentWalletAddress) return;
+
+                try {
+                    const response = await fetch(`/assets?wallet=${currentWalletAddress}`);
+                    const data = await response.json();
                     if (data.success) {
-                        data.tokens.forEach(token => {
-                            const option = document.createElement('option');
-                            option.value = token.mint;
-                            option.textContent = `${token.name} (${token.symbol})`;
-                            tokenSelect.appendChild(option);
-                        });
+                        assets = data.assets;
+                        updateAssetSelect();
+                    } else {
+                        showError('Failed to load assets');
                     }
-                })
-                .catch(error => {
-                    console.error('Error fetching tokens:', error);
-                    showError('Failed to load available tokens');
-                });
+                } catch (error) {
+                    console.error('Error loading assets:', error);
+                    showError('Failed to load assets');
+                }
+            }
+
+            function updateAssetSelect() {
+                const selectedType = assetType.value;
+                assetSelect.innerHTML = '<option value="">Select an asset</option>';
+
+                if (!selectedType) {
+                    assetSelectContainer.style.display = 'none';
+                    amountContainer.style.display = 'none';
+                    return;
+                }
+
+                assetSelectContainer.style.display = 'block';
+                amountContainer.style.display = selectedType === 'token' ? 'block' : 'none';
+
+                if (selectedType === 'token') {
+                    assets.tokens.forEach(token => {
+                        const option = document.createElement('option');
+                        option.value = token.mint;
+                        option.textContent = `${token.name} (${token.symbol})`;
+                        assetSelect.appendChild(option);
+                    });
+                } else if (selectedType === 'nft') {
+                    assets.nfts.forEach(nft => {
+                        const option = document.createElement('option');
+                        option.value = nft.mint;
+                        option.textContent = nft.name;
+                        assetSelect.appendChild(option);
+                    });
+                } else if (selectedType === 'vacant') {
+                    assets.vacant_accounts.forEach(account => {
+                        const option = document.createElement('option');
+                        option.value = account.address;
+                        option.textContent = `${account.address.slice(0,6)}...${account.address.slice(-6)}`;
+                        assetSelect.appendChild(option);
+                    });
+                }
+            }
 
             async function connectPhantom() {
                 if (typeof window.solana === 'undefined') {
@@ -89,7 +140,9 @@
                     await window.solana.connect();
                     const publicKey = window.solana.publicKey.toString();
                     currentWallet = window.solana;
+                    currentWalletAddress = publicKey;
                     showConnected('Phantom', publicKey);
+                    await loadAssets();
                 } catch (err) {
                     console.error('Phantom connection error:', err);
                     showError('Failed to connect Phantom wallet. Please try again.');
@@ -107,7 +160,9 @@
                     const solflare = new window.SolflareWallet();
                     await solflare.connect();
                     currentWallet = solflare;
-                    showConnected('SolFlare', solflare.publicKey.toString());
+                    currentWalletAddress = solflare.publicKey.toString();
+                    showConnected('SolFlare', currentWalletAddress);
+                    await loadAssets();
                 } catch (err) {
                     console.error('SolFlare connection error:', err);
                     showError('Failed to connect SolFlare wallet. Please try again.');
@@ -137,17 +192,19 @@
 
             connectPhantomBtn.addEventListener('click', connectPhantom);
             connectSolflareBtn.addEventListener('click', connectSolflare);
+            assetType.addEventListener('change', updateAssetSelect);
 
             burnButton.addEventListener('click', async () => {
+                const selectedType = assetType.value;
+                const selectedAsset = assetSelect.value;
                 const amount = document.getElementById('amount').value;
-                const tokenMint = tokenSelect.value;
 
-                if (!tokenMint) {
-                    showError('Please select a token');
+                if (!selectedType || !selectedAsset) {
+                    showError('Please select an asset');
                     return;
                 }
 
-                if (!amount || amount <= 0) {
+                if (selectedType === 'token' && (!amount || parseFloat(amount) <= 0)) {
                     showError('Please enter a valid amount');
                     return;
                 }
@@ -158,20 +215,29 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ amount, tokenMint }),
+                        body: JSON.stringify({
+                            assetType: selectedType,
+                            assetId: selectedAsset,
+                            amount: selectedType === 'token' ? amount : null
+                        }),
                     });
                     const data = await response.json();
 
                     if (data.success) {
                         showSuccess(data.message);
-                        document.getElementById('amount').value = '';
-                        tokenSelect.value = '';
+                        assetType.value = '';
+                        assetSelect.value = '';
+                        if (selectedType === 'token') {
+                            document.getElementById('amount').value = '';
+                        }
+                        updateAssetSelect();
+                        await loadAssets();
                     } else {
                         showError(data.message);
                     }
                 } catch (err) {
                     console.error('Burn transaction error:', err);
-                    showError('Failed to burn tokens. Please try again.');
+                    showError('Failed to burn asset. Please try again.');
                 }
             });
         });

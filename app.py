@@ -8,78 +8,111 @@ load_dotenv()
 app = Flask(__name__)
 solana_client = Client("https://api.mainnet-beta.solana.com")
 
-# Mock token data for demonstration
-# In a real implementation, this would come from Solana network
-AVAILABLE_TOKENS = [
-    {
-        "symbol": "SOL",
-        "name": "Solana",
-        "mint": "So11111111111111111111111111111111111111112",
-        "decimals": 9
-    },
-    {
-        "symbol": "USDC",
-        "name": "USD Coin",
-        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        "decimals": 6
-    },
-    {
-        "symbol": "RAY",
-        "name": "Raydium",
-        "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-        "decimals": 6
-    }
-]
+# Asset types for demonstration
+ASSET_TYPES = {
+    "tokens": [
+        {
+            "symbol": "SOL",
+            "name": "Solana",
+            "mint": "So11111111111111111111111111111111111111112",
+            "decimals": 9,
+            "type": "token"
+        },
+        {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "decimals": 6,
+            "type": "token"
+        }
+    ],
+    "nfts": [],  # Will be populated from user's wallet
+    "vacant_accounts": []  # Will be populated from user's wallet
+}
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/tokens', methods=['GET'])
-def get_tokens():
-    return jsonify({
-        'success': True,
-        'tokens': AVAILABLE_TOKENS
-    })
-
-@app.route('/burn', methods=['POST'])
-def burn_tokens():
-    data = request.json
-    amount = data.get('amount')
-    token_mint = data.get('tokenMint')
-
-    if not amount or not token_mint:
+@app.route('/assets', methods=['GET'])
+def get_assets():
+    wallet_address = request.args.get('wallet')
+    if not wallet_address:
         return jsonify({
             'success': False,
-            'message': 'Amount and token mint are required'
+            'message': 'Wallet address is required'
         }), 400
 
     try:
-        amount = float(amount)
-        if amount <= 0:
-            return jsonify({
-                'success': False,
-                'message': 'Amount must be greater than 0'
-            }), 400
-
-        # Find token details
-        token = next((t for t in AVAILABLE_TOKENS if t['mint'] == token_mint), None)
-        if not token:
-            return jsonify({
-                'success': False,
-                'message': 'Invalid token mint address'
-            }), 400
-
-        # Mock implementation for now
-        # In real implementation, we would:
-        # 1. Create burn transaction for specific token
-        # 2. Sign transaction
-        # 3. Send transaction
+        # In a real implementation, we would:
+        # 1. Fetch NFTs owned by the wallet
+        # 2. Check for vacant accounts
+        # 3. Get token balances
         return jsonify({
             'success': True,
-            'message': f'Successfully burned {amount} {token["symbol"]} tokens'
+            'assets': ASSET_TYPES
         })
-    except ValueError:
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/burn', methods=['POST'])
+def burn_assets():
+    data = request.json
+    asset_type = data.get('assetType')
+    asset_id = data.get('assetId')
+    amount = data.get('amount')
+
+    if not all([asset_type, asset_id]):
+        return jsonify({
+            'success': False,
+            'message': 'Asset type and ID are required'
+        }), 400
+
+    try:
+        if asset_type == 'token':
+            if not amount or float(amount) <= 0:
+                return jsonify({
+                    'success': False,
+                    'message': 'Amount must be greater than 0'
+                }), 400
+
+            # Mock implementation for tokens
+            token = next((t for t in ASSET_TYPES['tokens'] if t['mint'] == asset_id), None)
+            if not token:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid token mint address'
+                }), 400
+
+            return jsonify({
+                'success': True,
+                'message': f'Successfully burned {amount} {token["symbol"]} tokens'
+            })
+
+        elif asset_type == 'nft':
+            # Mock implementation for NFTs
+            return jsonify({
+                'success': True,
+                'message': f'Successfully burned NFT {asset_id}'
+            })
+
+        elif asset_type == 'vacant':
+            # Mock implementation for vacant accounts
+            return jsonify({
+                'success': True,
+                'message': f'Successfully claimed rent from account {asset_id}'
+            })
+
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid asset type'
+            }), 400
+
+    except ValueError as e:
         return jsonify({
             'success': False,
             'message': 'Invalid amount format'

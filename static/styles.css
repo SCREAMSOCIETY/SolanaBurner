@@ -85,16 +85,6 @@ h1 {
     font-size: 1.1rem;
 }
 
-.input-group input {
-    width: 100%;
-    padding: 0.8rem;
-    border: 2px solid var(--primary-color);
-    background-color: transparent;
-    color: var(--text-color);
-    border-radius: 6px;
-    font-size: 1.1rem;
-}
-
 .input-group select,
 .input-group input {
     width: 100%;
