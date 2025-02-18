@@ -50,18 +50,13 @@
         const splToken = window.splToken;
 
         document.addEventListener('DOMContentLoaded', async function() {
-            // Verify SPL Token library
-            console.log('Checking SPL Token library:', {
-                windowSplToken: !!window.splToken,
-                windowSplTokenLib: !!window.spl_token,
-                localSplToken: !!splToken
+            // Verify libraries are loaded
+            console.log('Checking libraries:', {
+                solanaWeb3: !!window.solanaWeb3,
+                phantom: !!window.solana,
+                phantomIsPhantom: window.solana?.isPhantom,
+                splToken: !!splToken
             });
-
-            if (!splToken) {
-                console.error('SPL Token library failed to load');
-                showError('Failed to initialize token burning functionality. Please refresh the page.');
-                return;
-            }
 
             const connectPhantomBtn = document.getElementById('connectPhantom');
             const walletStatus = document.getElementById('walletStatus');
@@ -91,29 +86,46 @@
             }
 
             function getConnection() {
-                const network = networkSelect.value;
-                const endpoint = network === 'devnet' 
-                    ? 'https://api.devnet.solana.com'
-                    : '{{ rpc_endpoint }}';
+                try {
+                    const network = networkSelect.value;
+                    const endpoint = network === 'devnet' 
+                        ? 'https://api.devnet.solana.com'
+                        : '{{ rpc_endpoint }}';
 
-                console.log(`Connecting to ${endpoint}`);
-                return new solanaWeb3.Connection(endpoint, 'confirmed');
+                    console.log(`Creating connection to ${endpoint}`);
+                    return new solanaWeb3.Connection(endpoint, 'confirmed');
+                } catch (err) {
+                    console.error('Error creating connection:', err);
+                    throw err;
+                }
             }
 
             async function connectPhantom() {
-                if (!window.solana || !window.solana.isPhantom) {
+                console.log('Starting Phantom wallet connection...');
+
+                if (!window.solana) {
+                    console.error('Phantom not found');
                     showError('Please install the Phantom wallet extension');
                     window.open('https://phantom.app/', '_blank');
                     return;
                 }
 
+                if (!window.solana.isPhantom) {
+                    console.error('Not a Phantom wallet');
+                    showError('Please install the Phantom wallet extension');
+                    return;
+                }
+
                 try {
-                    await window.solana.connect();
-                    const publicKey = window.solana.publicKey.toString();
+                    console.log('Requesting wallet connection...');
+                    const resp = await window.solana.connect();
+                    console.log('Connection response:', resp);
+
+                    const publicKey = resp.publicKey.toString();
+                    console.log('Connected to wallet:', publicKey);
+
                     currentWallet = window.solana;
                     connection = getConnection();
-
-                    console.log('Connected to wallet:', publicKey);
 
                     // Update UI
                     connectPhantomBtn.style.display = 'none';
@@ -321,7 +333,13 @@
             }
 
             // Event Listeners
-            connectPhantomBtn.addEventListener('click', connectPhantom);
+            connectPhantomBtn.addEventListener('click', () => {
+                console.log('Connect button clicked');
+                connectPhantom().catch(err => {
+                    console.error('Connection error:', err);
+                    showError('Failed to connect: ' + err.message);
+                });
+            });
 
             networkSelect.addEventListener('change', async () => {
                 if (currentWallet && currentWallet.publicKey) {
