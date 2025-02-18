@@ -4,9 +4,8 @@
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <!-- Load the libraries in the correct order -->
+    <!-- Only load Web3.js -->
     <script src="https://unpkg.com/@solana/web3.js@1.73.0/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.2.0/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -29,7 +28,6 @@
         </div>
         <div id="statusMessage" style="display: none;" class="status-message"></div>
 
-        <!-- Assets Container -->
         <div id="assetsContainer" class="assets-container" style="display: none;">
             <h2>Your Assets</h2>
             <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
@@ -42,16 +40,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log("Initializing wallet handler...");
 
-            // Verify SPL Token library is loaded
-            const checkSPLToken = () => {
-                if (!window.SplToken) {
-                    console.error('SPL Token library not found in window.SplToken');
-                    showError('Failed to initialize token burning functionality. Please refresh the page.');
-                    return false;
-                }
-                console.log('SPL Token library loaded:', window.SplToken);
-                return true;
-            };
+            const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
             const connectButton = document.getElementById('connectButton');
             const walletInfo = document.getElementById('walletInfo');
@@ -95,7 +84,6 @@
             }
 
             async function burnToken(mint, amount, decimals) {
-                if (!checkSPLToken()) return false;
                 showLoading();
                 errorMessage.style.display = 'none';
 
@@ -108,28 +96,30 @@
 
                     const mintPubkey = new solanaWeb3.PublicKey(mint);
                     const walletPubkey = currentWallet.publicKey;
-
-                    console.log('Creating burn instruction...');
                     const rawAmount = Math.floor(amount * Math.pow(10, decimals));
 
-                    const associatedTokenAddress = await window.SplToken.Token.getAssociatedTokenAddress(
-                        mintPubkey,
-                        walletPubkey,
-                        false,
-                        window.SplToken.TOKEN_PROGRAM_ID,
-                        window.SplToken.ASSOCIATED_TOKEN_PROGRAM_ID
+                    // Create the token account address
+                    const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
+                        [
+                            walletPubkey.toBuffer(),
+                            TOKEN_PROGRAM_ID.toBuffer(),
+                            mintPubkey.toBuffer(),
+                        ],
+                        new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
                     );
 
-                    const burnInstruction = window.SplToken.Token.createBurnInstruction(
-                        window.SplToken.TOKEN_PROGRAM_ID,
-                        associatedTokenAddress,
-                        mintPubkey,
-                        walletPubkey,
-                        [],
-                        rawAmount
-                    );
+                    // Create the burn instruction
+                    const burnIx = new solanaWeb3.TransactionInstruction({
+                        keys: [
+                            { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
+                            { pubkey: mintPubkey, isSigner: false, isWritable: true },
+                            { pubkey: walletPubkey, isSigner: true, isWritable: false },
+                        ],
+                        programId: TOKEN_PROGRAM_ID,
+                        data: Buffer.from([17, ...new Uint8Array(rawAmount.toString(16).match(/.{1,2}/g).map(byte => parseInt(byte, 16)))])
+                    });
 
-                    const transaction = new solanaWeb3.Transaction().add(burnInstruction);
+                    const transaction = new solanaWeb3.Transaction().add(burnIx);
                     transaction.feePayer = walletPubkey;
 
                     const { blockhash } = await connection.getRecentBlockhash();
@@ -300,9 +290,6 @@
                 showStatus('Wallet already connected');
                 loadAssets(publicKey);
             }
-
-            // Initial check for SPL Token library
-            checkSPLToken();
         });
     </script>
 </body>
