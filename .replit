@@ -1,4 +1,4 @@
-modules = ["rust"]
+modules = ["rust", "python-3.11"]
 
 [nix]
 channel = "stable-24_05"
@@ -27,11 +27,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "trunk serve --port 8080"
+args = "trunk serve --port 8080 --public-url / --address 0.0.0.0 --verbose"
 waitForPort = 8080
 
 [deployment]
-run = ["sh", "-c", "trunk serve --port 8080"]
+run = ["sh", "-c", "trunk serve --port 8080 --public-url / --address 0.0.0.0 --verbose"]
 
 [[ports]]
 localPort = 8080
