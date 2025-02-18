@@ -5,7 +5,7 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.1.8/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.3.7/lib/index.iife.js"></script>
 </head>
 <body>
     <div class="container">
@@ -51,6 +51,7 @@
 
             let currentWallet = null;
             let connection = null;
+            const SPL_TOKEN = window.SplToken;
 
             function showStatus(message, isError = false) {
                 statusMessage.textContent = message;
@@ -86,17 +87,17 @@
                 try {
                     console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
 
-                    // Create connection if not exists
                     if (!connection) {
                         connection = getConnection();
                     }
 
-                    // Convert mint string to PublicKey
                     const mintPubkey = new solanaWeb3.PublicKey(mint);
                     const walletPubkey = currentWallet.publicKey;
 
                     // Get associated token account
-                    const associatedTokenAddress = await splToken.getAssociatedTokenAddress(
+                    const associatedTokenAddress = await SPL_TOKEN.Token.getAssociatedTokenAddress(
+                        SPL_TOKEN.ASSOCIATED_TOKEN_PROGRAM_ID,
+                        SPL_TOKEN.TOKEN_PROGRAM_ID,
                         mintPubkey,
                         walletPubkey
                     );
@@ -105,29 +106,27 @@
                     const rawAmount = Math.floor(amount * Math.pow(10, decimals));
 
                     // Create burn instruction
-                    const burnInstruction = splToken.createBurnInstruction(
+                    const burnIx = SPL_TOKEN.Token.createBurnInstruction(
+                        SPL_TOKEN.TOKEN_PROGRAM_ID,
                         associatedTokenAddress,
                         mintPubkey,
                         walletPubkey,
+                        [],
                         rawAmount
                     );
 
-                    // Create transaction
-                    const transaction = new solanaWeb3.Transaction().add(burnInstruction);
+                    const transaction = new solanaWeb3.Transaction().add(burnIx);
                     transaction.feePayer = walletPubkey;
 
-                    // Get recent blockhash
                     const { blockhash } = await connection.getRecentBlockhash();
                     transaction.recentBlockhash = blockhash;
 
-                    // Sign and send transaction
                     const signed = await currentWallet.signTransaction(transaction);
                     const signature = await connection.sendRawTransaction(signed.serialize());
 
                     console.log('Transaction sent:', signature);
                     showStatus(`Transaction sent: ${signature}`);
 
-                    // Wait for confirmation
                     const confirmation = await connection.confirmTransaction(signature);
 
                     if (confirmation.value.err) {
@@ -135,8 +134,6 @@
                     }
 
                     showStatus(`Successfully burned ${amount} tokens`);
-
-                    // Refresh assets after successful burn
                     await loadAssets(currentWallet.publicKey.toString());
 
                     return true;
