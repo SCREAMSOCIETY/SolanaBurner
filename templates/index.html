@@ -108,47 +108,53 @@
                     // Create connection
                     connection = getConnection();
 
+                    // Convert mint string to PublicKey
+                    const mintPubkey = new solanaWeb3.PublicKey(mint);
+                    console.log('Mint public key:', mintPubkey.toString());
+
                     // Convert amount to raw amount with decimals
-                    const rawAmount = amount * Math.pow(10, decimals);
+                    const rawAmount = Math.floor(amount * Math.pow(10, decimals));
+                    console.log('Raw amount to burn:', rawAmount);
 
-                    // Get token account
-                    const tokenAccounts = await connection.getTokenAccountsByOwner(
-                        currentWallet.publicKey,
-                        { mint: new solanaWeb3.PublicKey(mint) }
+                    // Get associated token account
+                    const associatedTokenAddress = await splToken.getAssociatedTokenAddress(
+                        mintPubkey,
+                        currentWallet.publicKey
                     );
-
-                    if (tokenAccounts.value.length === 0) {
-                        throw new Error('Token account not found');
-                    }
-
-                    const tokenAccountAddress = tokenAccounts.value[0].pubkey;
+                    console.log('Associated token address:', associatedTokenAddress.toString());
 
                     // Create burn instruction
                     const burnInstruction = splToken.createBurnInstruction(
-                        tokenAccountAddress,
-                        new solanaWeb3.PublicKey(mint),
+                        associatedTokenAddress,
+                        mintPubkey,
                         currentWallet.publicKey,
-                        rawAmount,
-                        []
+                        rawAmount
                     );
 
                     // Create transaction
-                    const transaction = new solanaWeb3.Transaction().add(burnInstruction);
+                    const transaction = new solanaWeb3.Transaction();
+                    transaction.add(burnInstruction);
                     transaction.feePayer = currentWallet.publicKey;
-                    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
 
-                    // Request signing from wallet
+                    // Get recent blockhash
+                    const blockhash = await connection.getRecentBlockhash();
+                    transaction.recentBlockhash = blockhash.blockhash;
+
                     try {
+                        // Request signing from wallet
                         const signed = await currentWallet.signTransaction(transaction);
+                        console.log('Transaction signed successfully');
 
                         // Send transaction
                         const signature = await connection.sendRawTransaction(signed.serialize());
-                        console.log('Burn transaction sent:', signature);
+                        console.log('Transaction sent:', signature);
 
                         // Wait for confirmation
                         const confirmation = await connection.confirmTransaction(signature);
+                        console.log('Transaction confirmation:', confirmation);
+
                         if (confirmation.value.err) {
-                            throw new Error('Transaction failed');
+                            throw new Error('Transaction failed to confirm');
                         }
 
                         // Show success message with explorer link
@@ -165,6 +171,7 @@
                         await loadAssets(currentWallet.publicKey.toString());
                         return true;
                     } catch (err) {
+                        console.error('Transaction error:', err);
                         if (err.message.includes('User rejected')) {
                             throw new Error('Transaction rejected by user');
                         }
