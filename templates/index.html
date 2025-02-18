@@ -4,18 +4,11 @@
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <!-- Load Solana Web3 and SPL Token -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.1.8/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <div class="nav-header">
-            <button id="backButton" class="back-button" style="display: none;">
-                <span class="back-arrow">←</span> Back
-            </button>
-            <h1>Solana Token Burner</h1>
-        </div>
+        <h1>Solana Token Burner</h1>
         <div class="network-selector">
             <select id="networkSelect" class="network-select">
                 <option value="devnet">Devnet</option>
@@ -23,194 +16,73 @@
             </select>
         </div>
         <div class="wallet-section">
-            <button class="connect-button" id="connectPhantom">
+            <button id="connectButton" class="connect-button">
                 <img src="{{ url_for('static', filename='phantom.svg') }}" alt="Phantom" class="wallet-icon">
                 Connect Phantom
             </button>
-            <div class="connected-status" id="walletStatus" style="display: none">
-                <div>Connected to Phantom</div>
-                <div class="wallet-address" id="walletAddress"></div>
+            <div id="walletInfo" class="connected-status" style="display: none;">
+                <div>Wallet Connected</div>
+                <div id="walletAddress" class="wallet-address"></div>
             </div>
         </div>
-        <div id="assetsContainer" class="assets-container" style="display: none">
-            <div class="loading-message" id="loadingMessage" style="display: none">Loading assets...</div>
-            <div class="error-message" id="errorMessage" style="display: none"></div>
-            <div id="assetsContent"></div>
-        </div>
+        <div id="statusMessage" style="display: none;" class="status-message"></div>
     </div>
 
     <script>
-        class PhantomWallet {
-            constructor() {
-                this.provider = null;
-                this.connection = null;
-                this.publicKey = null;
+        document.addEventListener('DOMContentLoaded', function() {
+            const connectButton = document.getElementById('connectButton');
+            const walletInfo = document.getElementById('walletInfo');
+            const walletAddress = document.getElementById('walletAddress');
+            const statusMessage = document.getElementById('statusMessage');
 
-                // DOM elements
-                this.connectButton = document.getElementById('connectPhantom');
-                this.walletStatus = document.getElementById('walletStatus');
-                this.walletAddress = document.getElementById('walletAddress');
-                this.errorMessage = document.getElementById('errorMessage');
-                this.loadingMessage = document.getElementById('loadingMessage');
-                this.assetsContainer = document.getElementById('assetsContainer');
-                this.networkSelect = document.getElementById('networkSelect');
-
-                // Bind methods
-                this.connect = this.connect.bind(this);
-                this.disconnect = this.disconnect.bind(this);
-                this.initializeWallet = this.initializeWallet.bind(this);
-
-                // Initialize
-                this.initializeWallet();
+            function showStatus(message, isError = false) {
+                statusMessage.textContent = message;
+                statusMessage.style.display = 'block';
+                statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
+                console.log(`Status: ${message}`);
             }
 
-            // Initialize wallet and set up event listeners
-            async initializeWallet() {
-                if (typeof window !== 'undefined') {
-                    if ('solana' in window) {
-                        const provider = window.solana;
-                        if (provider.isPhantom) {
-                            this.provider = provider;
-                            console.log('Phantom wallet found');
-
-                            // Setup listeners
-                            this.provider.on('connect', () => this.handleConnect());
-                            this.provider.on('disconnect', () => this.handleDisconnect());
-                            this.provider.on('accountChanged', () => this.handleAccountChanged());
-
-                            // Check if already connected
-                            if (this.provider.isConnected) {
-                                this.handleConnect();
-                            }
-                        } else {
-                            console.log('Phantom wallet not found');
-                        }
-                    }
-                }
-
-                // Add click listener to connect button
-                this.connectButton.addEventListener('click', this.connect);
-            }
-
-            // Connect to wallet
-            async connect() {
-                this.showLoading('Connecting to wallet...');
+            async function connectWallet() {
                 try {
-                    if (!this.provider) {
-                        throw new Error('Phantom wallet not installed');
-                    }
-
-                    // Request connection
-                    await this.provider.connect();
-
-                } catch (error) {
-                    console.error('Connection error:', error);
-                    if (error.message.includes('not installed')) {
+                    if (!window.solana) {
+                        showStatus('Phantom wallet not found. Please install Phantom.', true);
                         window.open('https://phantom.app/', '_blank');
+                        return;
                     }
-                    this.showError(`Failed to connect: ${error.message}`);
-                } finally {
-                    this.hideLoading();
-                }
-            }
 
-            // Handle successful connection
-            async handleConnect() {
-                try {
-                    if (this.provider.publicKey) {
-                        this.publicKey = this.provider.publicKey;
-                        const address = this.publicKey.toString();
+                    if (!window.solana.isPhantom) {
+                        showStatus('Please install Phantom wallet', true);
+                        return;
+                    }
+
+                    showStatus('Connecting to Phantom...');
+                    const resp = await window.solana.connect();
+
+                    if (resp.publicKey) {
+                        const address = resp.publicKey.toString();
                         console.log('Connected to wallet:', address);
 
-                        // Update UI
-                        this.connectButton.style.display = 'none';
-                        this.walletStatus.style.display = 'block';
-                        this.walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
-                        this.assetsContainer.style.display = 'block';
-
-                        // Initialize connection
-                        const endpoint = this.networkSelect.value === 'devnet' 
-                            ? 'https://api.devnet.solana.com'
-                            : '{{ rpc_endpoint }}';
-                        this.connection = new solanaWeb3.Connection(endpoint);
-
-                        // Load assets
-                        await this.loadAssets();
+                        connectButton.style.display = 'none';
+                        walletInfo.style.display = 'block';
+                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                        showStatus('Wallet connected successfully');
                     }
                 } catch (error) {
-                    console.error('Error in handleConnect:', error);
-                    this.showError(error.message);
+                    console.error('Connection error:', error);
+                    showStatus(`Failed to connect: ${error.message}`, true);
                 }
             }
 
-            // Handle disconnection
-            handleDisconnect() {
-                console.log('Wallet disconnected');
-                this.publicKey = null;
-                this.connection = null;
+            connectButton.addEventListener('click', connectWallet);
 
-                // Update UI
-                this.connectButton.style.display = 'block';
-                this.walletStatus.style.display = 'none';
-                this.assetsContainer.style.display = 'none';
+            // Check if wallet is already connected
+            if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
+                const publicKey = window.solana.publicKey.toString();
+                connectButton.style.display = 'none';
+                walletInfo.style.display = 'block';
+                walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
+                showStatus('Wallet already connected');
             }
-
-            // Handle account change
-            handleAccountChanged() {
-                console.log('Account changed, refreshing...');
-                window.location.reload();
-            }
-
-            // Utility functions
-            showError(message) {
-                this.errorMessage.textContent = message;
-                this.errorMessage.style.display = 'block';
-                this.loadingMessage.style.display = 'none';
-            }
-
-            showLoading(message = 'Loading...') {
-                this.loadingMessage.textContent = message;
-                this.loadingMessage.style.display = 'block';
-                this.errorMessage.style.display = 'none';
-            }
-
-            hideLoading() {
-                this.loadingMessage.style.display = 'none';
-            }
-
-            // Asset loading
-            async loadAssets() {
-                if (!this.publicKey) return;
-
-                this.showLoading('Loading your assets...');
-                try {
-                    const response = await fetch(`/assets?wallet=${this.publicKey.toString()}`);
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.message || 'Failed to load assets');
-                    }
-
-                    // Update UI with assets
-                    const assetsContent = document.getElementById('assetsContent');
-                    assetsContent.innerHTML = ''; // Clear existing content
-
-                    // Add assets display logic here
-                    console.log('Assets loaded:', data);
-
-                } catch (error) {
-                    console.error('Error loading assets:', error);
-                    this.showError(`Failed to load assets: ${error.message}`);
-                } finally {
-                    this.hideLoading();
-                }
-            }
-        }
-
-        // Initialize wallet handler when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('Initializing wallet handler...');
-            window.phantomWallet = new PhantomWallet();
         });
     </script>
 </body>
