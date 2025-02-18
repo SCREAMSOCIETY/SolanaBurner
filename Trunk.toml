@@ -1,8 +1,9 @@
 [build]
 target = "index.html"
-release = false
 dist = "dist"
 public_url = "/"
+filehash = false
+release = false
 
 [watch]
 watch = ["src", "index.html", "styles.css"]

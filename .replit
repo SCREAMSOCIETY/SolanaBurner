@@ -27,11 +27,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "trunk serve --port 8080 --public-url / --address 0.0.0.0 --verbose"
+args = "trunk serve --port 8080 --public-url / --address 0.0.0.0"
 waitForPort = 8080
 
 [deployment]
-run = ["sh", "-c", "trunk serve --port 8080 --public-url / --address 0.0.0.0 --verbose"]
+run = ["sh", "-c", "trunk serve --port 8080 --public-url / --address 0.0.0.0"]
 
 [[ports]]
 localPort = 8080
