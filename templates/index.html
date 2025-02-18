@@ -5,6 +5,7 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.1.8/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -26,6 +27,14 @@
             </div>
         </div>
         <div id="statusMessage" style="display: none;" class="status-message"></div>
+
+        <!-- Assets Container -->
+        <div id="assetsContainer" class="assets-container" style="display: none;">
+            <h2>Your Assets</h2>
+            <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            <div id="assetsGrid" class="assets-grid"></div>
+        </div>
     </div>
 
     <script>
@@ -34,12 +43,82 @@
             const walletInfo = document.getElementById('walletInfo');
             const walletAddress = document.getElementById('walletAddress');
             const statusMessage = document.getElementById('statusMessage');
+            const assetsContainer = document.getElementById('assetsContainer');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const assetsGrid = document.getElementById('assetsGrid');
+            const networkSelect = document.getElementById('networkSelect');
+
+            let currentWallet = null;
 
             function showStatus(message, isError = false) {
                 statusMessage.textContent = message;
                 statusMessage.style.display = 'block';
                 statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
                 console.log(`Status: ${message}`);
+            }
+
+            function showLoading(show = true) {
+                loadingMessage.style.display = show ? 'block' : 'none';
+                if (show) {
+                    errorMessage.style.display = 'none';
+                }
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                loadingMessage.style.display = 'none';
+            }
+
+            async function loadAssets(publicKey) {
+                showLoading(true);
+                assetsGrid.style.display = 'none';
+
+                try {
+                    const response = await fetch(`/assets?wallet=${publicKey}`);
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to fetch assets');
+                    }
+
+                    const assets = data.assets;
+                    assetsGrid.innerHTML = '';
+
+                    if (!assets.tokens || assets.tokens.length === 0) {
+                        assetsGrid.innerHTML = `
+                            <div class="no-assets">
+                                <p>No tokens found in your wallet</p>
+                            </div>
+                        `;
+                    } else {
+                        assets.tokens.forEach(token => {
+                            const tokenCard = document.createElement('div');
+                            tokenCard.className = 'asset-card';
+
+                            const displayName = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
+
+                            tokenCard.innerHTML = `
+                                <h4>${displayName}</h4>
+                                <p>Symbol: ${token.symbol || 'Unknown'}</p>
+                                <p>Amount: ${token.amount}</p>
+                                <a href="${token.explorer_url}" target="_blank" class="explorer-link">
+                                    View on Explorer
+                                </a>
+                            `;
+
+                            assetsGrid.appendChild(tokenCard);
+                        });
+                    }
+
+                    showLoading(false);
+                    assetsGrid.style.display = 'block';
+
+                } catch (error) {
+                    console.error('Error loading assets:', error);
+                    showError(`Failed to load assets: ${error.message}`);
+                }
             }
 
             async function connectWallet() {
@@ -61,11 +140,17 @@
                     if (resp.publicKey) {
                         const address = resp.publicKey.toString();
                         console.log('Connected to wallet:', address);
+                        currentWallet = window.solana;
 
                         connectButton.style.display = 'none';
                         walletInfo.style.display = 'block';
                         walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                        assetsContainer.style.display = 'block';
+
                         showStatus('Wallet connected successfully');
+
+                        // Load assets after successful connection
+                        await loadAssets(address);
                     }
                 } catch (error) {
                     console.error('Connection error:', error);
@@ -75,13 +160,25 @@
 
             connectButton.addEventListener('click', connectWallet);
 
+            // Network change handler
+            networkSelect.addEventListener('change', async () => {
+                if (currentWallet && currentWallet.publicKey) {
+                    await loadAssets(currentWallet.publicKey.toString());
+                }
+            });
+
             // Check if wallet is already connected
             if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
                 const publicKey = window.solana.publicKey.toString();
+                currentWallet = window.solana;
+
                 connectButton.style.display = 'none';
                 walletInfo.style.display = 'block';
                 walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
+                assetsContainer.style.display = 'block';
+
                 showStatus('Wallet already connected');
+                loadAssets(publicKey);
             }
         });
     </script>
