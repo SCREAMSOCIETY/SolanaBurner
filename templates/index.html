@@ -5,7 +5,11 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.3.9/lib/index.iife.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.1.8/lib/index.iife.min.js"></script>
+    <script>
+        // Ensure SPL Token is available globally
+        window.splToken = window.spl_token;
+    </script>
 </head>
 <body>
     <div class="container">
@@ -43,10 +47,21 @@
 
     <script>
         // Initialize SPL Token library
-        const splToken = window.SplToken;
+        const splToken = window.splToken;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('SPL Token library loaded:', !!splToken);
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Verify SPL Token library is loaded
+            console.log('Checking SPL Token library:', {
+                windowSplToken: !!window.splToken,
+                windowSplTokenLib: !!window.spl_token,
+                localSplToken: !!splToken
+            });
+
+            if (!splToken) {
+                console.error('SPL Token library failed to load');
+                showError('Failed to initialize token burning functionality. Please refresh the page.');
+                return;
+            }
 
             const connectPhantomBtn = document.getElementById('connectPhantom');
             const walletStatus = document.getElementById('walletStatus');
@@ -61,35 +76,6 @@
             let currentWallet = null;
             let connection = null;
 
-            // Back button functionality
-            backButton.addEventListener('click', () => {
-                // Reset view to initial state
-                assetsContainer.style.display = 'none';
-                walletStatus.style.display = 'none';
-                connectPhantomBtn.style.display = 'block';
-                backButton.style.display = 'none';
-
-                // Disconnect wallet if connected
-                if (currentWallet && currentWallet.disconnect) {
-                    try {
-                        currentWallet.disconnect();
-                    } catch (err) {
-                        console.error('Error disconnecting wallet:', err);
-                    }
-                }
-                currentWallet = null;
-            });
-
-            function getConnection() {
-                const network = networkSelect.value;
-                const endpoint = network === 'devnet' 
-                    ? 'https://api.devnet.solana.com'
-                    : '{{ rpc_endpoint }}';
-
-                console.log(`Connecting to ${endpoint}`);
-                return new solanaWeb3.Connection(endpoint, 'confirmed');
-            }
-
             function showError(message) {
                 console.error('Error:', message);
                 errorMessage.textContent = message;
@@ -102,6 +88,16 @@
                 loadingMessage.style.display = 'block';
                 errorMessage.style.display = 'none';
                 assetsGrid.style.display = 'none';
+            }
+
+            function getConnection() {
+                const network = networkSelect.value;
+                const endpoint = network === 'devnet' 
+                    ? 'https://api.devnet.solana.com'
+                    : '{{ rpc_endpoint }}';
+
+                console.log(`Connecting to ${endpoint}`);
+                return new solanaWeb3.Connection(endpoint, 'confirmed');
             }
 
             async function burnToken(mint, amount, decimals) {
@@ -199,10 +195,6 @@
             async function loadAssets(publicKey) {
                 showLoading();
                 try {
-                    console.log('Creating connection...');
-                    connection = getConnection();
-
-                    console.log('Fetching token accounts...');
                     const response = await fetch(`/assets?wallet=${publicKey}`);
                     const data = await response.json();
 
@@ -332,6 +324,25 @@
                 if (currentWallet && currentWallet.publicKey) {
                     await loadAssets(currentWallet.publicKey.toString());
                 }
+            });
+
+            // Back button functionality
+            backButton.addEventListener('click', () => {
+                // Reset view to initial state
+                assetsContainer.style.display = 'none';
+                walletStatus.style.display = 'none';
+                connectPhantomBtn.style.display = 'block';
+                backButton.style.display = 'none';
+
+                // Disconnect wallet if connected
+                if (currentWallet && currentWallet.disconnect) {
+                    try {
+                        currentWallet.disconnect();
+                    } catch (err) {
+                        console.error('Error disconnecting wallet:', err);
+                    }
+                }
+                currentWallet = null;
             });
         });
     </script>
