@@ -13,180 +13,120 @@
             Network: {{ network|upper }}
         </div>
         <div class="wallet-section">
-            <div id="walletButtons" class="wallet-buttons">
-                <button class="connect-button" id="connectPhantom">
-                    <img src="{{ url_for('static', filename='phantom.svg') }}" alt="Phantom" class="wallet-icon">
-                    Connect Phantom
-                </button>
-            </div>
+            <button class="connect-button" id="connectPhantom">
+                <img src="{{ url_for('static', filename='phantom.svg') }}" alt="Phantom" class="wallet-icon">
+                Connect Phantom
+            </button>
             <div class="connected-status" id="walletStatus" style="display: none">
-                <div>Connected to <span id="walletProvider"></span></div>
+                <div>Connected to Phantom</div>
                 <div class="wallet-address" id="walletAddress"></div>
             </div>
         </div>
-        <div class="burn-form" id="burnForm" style="display: none">
-            <div class="input-group">
-                <label for="assetType">Asset Type:</label>
-                <select id="assetType" required>
-                    <option value="">Select asset type</option>
-                    <option value="token">Tokens</option>
-                    <option value="nft">NFTs</option>
-                    <option value="vacant">Vacant Accounts</option>
-                </select>
+        <div id="assetsContainer" class="assets-container" style="display: none">
+            <h2>Your Assets</h2>
+            <div class="loading-message" id="loadingMessage">Loading your assets...</div>
+            <div class="error-message" id="errorMessage" style="display: none"></div>
+            <div class="assets-grid" id="assetsGrid" style="display: none">
+                <!-- Assets will be inserted here -->
             </div>
-            <div id="assetSelectContainer" class="input-group" style="display: none">
-                <label for="assetSelect">Select Asset:</label>
-                <select id="assetSelect" required>
-                    <option value="">Select an asset</option>
-                </select>
-            </div>
-            <div id="assetInfo" class="asset-info" style="display: none">
-                <div class="token-icon">
-                    <img id="tokenIcon" src="" alt="Token Icon" style="display: none">
-                </div>
-                <div class="token-details">
-                    <p id="tokenName"></p>
-                    <p id="tokenSymbol"></p>
-                    <a id="explorerLink" href="" target="_blank" rel="noopener noreferrer">View on Solscan</a>
-                </div>
-            </div>
-            <div id="amountContainer" class="input-group" style="display: none">
-                <label for="amount">Amount to Burn:</label>
-                <input type="number" id="amount" step="any" min="0">
-            </div>
-            <button type="submit" id="burnButton" disabled>Burn Asset</button>
-            <div id="statusMessage" class="status-message" style="display: none"></div>
         </div>
     </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const connectPhantomBtn = document.getElementById('connectPhantom');
             const walletStatus = document.getElementById('walletStatus');
-            const walletProvider = document.getElementById('walletProvider');
             const walletAddress = document.getElementById('walletAddress');
-            const burnForm = document.getElementById('burnForm');
-            const burnButton = document.getElementById('burnButton');
-            const statusMessage = document.getElementById('statusMessage');
-            const assetType = document.getElementById('assetType');
-            const assetSelect = document.getElementById('assetSelect');
-            const assetSelectContainer = document.getElementById('assetSelectContainer');
-            const amountContainer = document.getElementById('amountContainer');
-            const assetInfo = document.getElementById('assetInfo');
-            const tokenIcon = document.getElementById('tokenIcon');
-            const tokenName = document.getElementById('tokenName');
-            const tokenSymbol = document.getElementById('tokenSymbol');
-            const explorerLink = document.getElementById('explorerLink');
+            const assetsContainer = document.getElementById('assetsContainer');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const assetsGrid = document.getElementById('assetsGrid');
 
             let currentWallet = null;
-            let currentWalletAddress = null;
-            let assets = {};
 
-            async function loadAssets() {
-                if (!currentWalletAddress) return;
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                loadingMessage.style.display = 'none';
+                assetsGrid.style.display = 'none';
+            }
 
-                burnButton.disabled = true;
-                showMessage('Loading assets...', 'info');
+            function showLoading() {
+                loadingMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+                assetsGrid.style.display = 'none';
+            }
 
+            async function loadAssets(address) {
+                showLoading();
                 try {
-                    const response = await fetch(`/assets?wallet=${currentWalletAddress}`);
+                    const response = await fetch(`/assets?wallet=${address}`);
                     const data = await response.json();
 
-                    if (data.success) {
-                        assets = data.assets;
-                        updateAssetSelect();
-                        statusMessage.style.display = 'none';
-                        burnButton.disabled = false;
-                    } else {
-                        showError('Failed to load assets: ' + data.message);
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to load assets');
                     }
+
+                    const assets = data.assets;
+                    assetsGrid.innerHTML = ''; // Clear existing assets
+
+                    // Display tokens
+                    if (assets.tokens && assets.tokens.length > 0) {
+                        const tokenSection = document.createElement('div');
+                        tokenSection.className = 'asset-section';
+                        tokenSection.innerHTML = '<h3>Tokens</h3>';
+                        assets.tokens.forEach(token => {
+                            const tokenCard = document.createElement('div');
+                            tokenCard.className = 'asset-card';
+                            tokenCard.innerHTML = `
+                                <h4>${token.name || 'Unknown Token'}</h4>
+                                <p>Amount: ${token.amount}</p>
+                                <button class="burn-button" data-type="token" data-id="${token.mint}">
+                                    Burn Token
+                                </button>
+                            `;
+                            tokenSection.appendChild(tokenCard);
+                        });
+                        assetsGrid.appendChild(tokenSection);
+                    }
+
+                    // Display NFTs
+                    if (assets.nfts && assets.nfts.length > 0) {
+                        const nftSection = document.createElement('div');
+                        nftSection.className = 'asset-section';
+                        nftSection.innerHTML = '<h3>NFTs</h3>';
+                        assets.nfts.forEach(nft => {
+                            const nftCard = document.createElement('div');
+                            nftCard.className = 'asset-card';
+                            nftCard.innerHTML = `
+                                <h4>${nft.name}</h4>
+                                <button class="burn-button" data-type="nft" data-id="${nft.mint}">
+                                    Burn NFT
+                                </button>
+                            `;
+                            nftSection.appendChild(nftCard);
+                        });
+                        assetsGrid.appendChild(nftSection);
+                    }
+
+                    // Show no assets message if none found
+                    if (!assetsGrid.children.length) {
+                        assetsGrid.innerHTML = '<p class="no-assets">No assets found in your wallet</p>';
+                    }
+
+                    loadingMessage.style.display = 'none';
+                    errorMessage.style.display = 'none';
+                    assetsGrid.style.display = 'block';
+
                 } catch (error) {
-                    console.error('Error loading assets:', error);
-                    showError('Failed to load assets. Please try again.');
-                }
-            }
-
-            function updateAssetInfo(asset) {
-                if (!asset) {
-                    assetInfo.style.display = 'none';
-                    return;
-                }
-
-                assetInfo.style.display = 'block';
-
-                // Update token icon if available
-                if (asset.icon) {
-                    tokenIcon.src = asset.icon;
-                    tokenIcon.style.display = 'block';
-                } else {
-                    tokenIcon.style.display = 'none';
-                }
-
-                // Update token details
-                tokenName.textContent = asset.name || 'Unknown Token';
-                tokenSymbol.textContent = asset.symbol ? `(${asset.symbol})` : '';
-
-                // Update explorer link
-                if (asset.explorer_url) {
-                    explorerLink.href = asset.explorer_url;
-                    explorerLink.style.display = 'block';
-                } else {
-                    explorerLink.style.display = 'none';
-                }
-            }
-
-            function updateAssetSelect() {
-                const selectedType = assetType.value;
-                assetSelect.innerHTML = '<option value="">Select an asset</option>';
-
-                if (!selectedType) {
-                    assetSelectContainer.style.display = 'none';
-                    amountContainer.style.display = 'none';
-                    assetInfo.style.display = 'none';
-                    return;
-                }
-
-                assetSelectContainer.style.display = 'block';
-                amountContainer.style.display = selectedType === 'token' ? 'block' : 'none';
-
-                const assetList = assets[selectedType === 'token' ? 'tokens' : 
-                                      selectedType === 'nft' ? 'nfts' : 'vacant_accounts'] || [];
-
-                if (assetList.length === 0) {
-                    const option = document.createElement('option');
-                    option.value = "";
-                    option.textContent = `No ${selectedType}s found`;
-                    assetSelect.appendChild(option);
-                    burnButton.disabled = true;
-                    assetInfo.style.display = 'none';
-                } else {
-                    assetList.forEach(asset => {
-                        const option = document.createElement('option');
-                        option.value = asset.mint || asset.address;
-                        option.setAttribute('data-asset', JSON.stringify(asset));
-
-                        if (selectedType === 'token') {
-                            option.textContent = `${asset.name || asset.symbol || 'Unknown Token'} (${asset.amount})`;
-                        } else if (selectedType === 'nft') {
-                            option.textContent = asset.name;
-                        } else {
-                            option.textContent = `Account: ${asset.address.slice(0,6)}...${asset.address.slice(-6)}`;
-                        }
-
-                        assetSelect.appendChild(option);
-                    });
-                    burnButton.disabled = false;
+                    showError(error.message);
                 }
             }
 
             async function connectPhantom() {
-                if (typeof window.solana === 'undefined') {
-                    showError('Phantom wallet extension is not installed. Please install it from phantom.app');
-                    window.open('https://phantom.app/', '_blank');
-                    return;
-                }
-
-                if (!window.solana.isPhantom) {
+                if (!window.solana || !window.solana.isPhantom) {
                     showError('Please install the Phantom wallet extension');
+                    window.open('https://phantom.app/', '_blank');
                     return;
                 }
 
@@ -194,106 +134,54 @@
                     await window.solana.connect();
                     const publicKey = window.solana.publicKey.toString();
                     currentWallet = window.solana;
-                    currentWalletAddress = publicKey;
-                    showConnected('Phantom', publicKey);
-                    await loadAssets();
+
+                    // Update UI
+                    connectPhantomBtn.style.display = 'none';
+                    walletStatus.style.display = 'block';
+                    walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
+                    assetsContainer.style.display = 'block';
+
+                    // Load assets
+                    await loadAssets(publicKey);
+
                 } catch (err) {
-                    console.error('Phantom connection error:', err);
                     showError('Failed to connect Phantom wallet. Please try again.');
+                    console.error('Phantom connection error:', err);
                 }
             }
 
-            function showConnected(provider, publicKey) {
-                connectPhantomBtn.style.display = 'none';
-                walletStatus.style.display = 'block';
-                burnForm.style.display = 'block';
-                walletProvider.textContent = provider;
-                walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
-            }
-
-            function showMessage(message, type) {
-                statusMessage.style.display = 'block';
-                statusMessage.textContent = message;
-                statusMessage.className = `status-message ${type}`;
-            }
-
-            function showError(message) {
-                showMessage(message, 'error');
-            }
-
-            function showSuccess(message) {
-                showMessage(message, 'success');
-            }
-
+            // Event Listeners
             connectPhantomBtn.addEventListener('click', connectPhantom);
 
-            assetType.addEventListener('change', () => {
-                updateAssetSelect();
-                updateAssetInfo(null);
-            });
+            // Handle burn button clicks
+            assetsGrid.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('burn-button')) {
+                    const type = e.target.dataset.type;
+                    const id = e.target.dataset.id;
+                    const card = e.target.closest('.asset-card');
 
-            assetSelect.addEventListener('change', () => {
-                const selected = assetSelect.selectedOptions[0];
-                if (selected && selected.value) {
-                    const asset = JSON.parse(selected.getAttribute('data-asset'));
-                    updateAssetInfo(asset);
-                    burnButton.disabled = false;
-                } else {
-                    updateAssetInfo(null);
-                    burnButton.disabled = true;
-                }
-            });
+                    try {
+                        const response = await fetch('/burn', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                assetType: type,
+                                assetId: id
+                            }),
+                        });
 
-            burnButton.addEventListener('click', async () => {
-                const selectedType = assetType.value;
-                const selectedAsset = assetSelect.value;
-                const amount = document.getElementById('amount').value;
-
-                if (!selectedType || !selectedAsset) {
-                    showError('Please select an asset');
-                    return;
-                }
-
-                if (selectedType === 'token' && (!amount || parseFloat(amount) <= 0)) {
-                    showError('Please enter a valid amount');
-                    return;
-                }
-
-                burnButton.disabled = true;
-                showMessage('Processing transaction...', 'info');
-
-                try {
-                    const response = await fetch('/burn', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            assetType: selectedType,
-                            assetId: selectedAsset,
-                            amount: selectedType === 'token' ? amount : null
-                        }),
-                    });
-                    const data = await response.json();
-
-                    if (data.success) {
-                        showSuccess(data.message);
-                        assetType.value = '';
-                        assetSelect.value = '';
-                        if (selectedType === 'token') {
-                            document.getElementById('amount').value = '';
+                        const data = await response.json();
+                        if (data.success) {
+                            card.classList.add('burned');
+                            setTimeout(() => card.remove(), 1000);
+                        } else {
+                            throw new Error(data.message);
                         }
-                        updateAssetSelect();
-                        updateAssetInfo(null);
-                        await loadAssets();
-                    } else {
-                        showError(data.message);
+                    } catch (error) {
+                        showError(`Failed to burn asset: ${error.message}`);
                     }
-                } catch (err) {
-                    console.error('Burn transaction error:', err);
-                    showError('Failed to burn asset. Please try again.');
-                } finally {
-                    burnButton.disabled = false;
                 }
             });
         });

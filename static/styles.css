@@ -4,6 +4,7 @@
     --text-color: #FFFFFF;
     --error-color: #FF4646;
     --success-color: #14F195;
+    --card-background: rgba(255, 255, 255, 0.1);
 }
 
 body {
@@ -15,7 +16,7 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
     text-align: center;
@@ -27,15 +28,31 @@ h1 {
     color: var(--primary-color);
 }
 
-.wallet-section {
-    margin-bottom: 2rem;
+h2 {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-color);
 }
 
-.wallet-buttons {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
+h3 {
+    font-size: 1.5rem;
     margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+.network-badge {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.wallet-section {
+    margin-bottom: 2rem;
 }
 
 .connect-button {
@@ -67,129 +84,89 @@ h1 {
     padding: 1rem;
 }
 
-.burn-form {
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 2rem;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-}
-
-.input-group {
-    margin-bottom: 1.5rem;
-}
-
-.input-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-size: 1.1rem;
-}
-
-.input-group select,
-.input-group input {
-    width: 100%;
-    padding: 0.8rem;
-    border: 2px solid var(--primary-color);
-    background-color: transparent;
-    color: var(--text-color);
-    border-radius: 6px;
-    font-size: 1.1rem;
-}
-
-.input-group select {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 0.7rem top 50%;
-    background-size: 1.5rem auto;
-    cursor: pointer;
-}
-
-.input-group select option {
-    background-color: var(--background-color);
-    color: var(--text-color);
-}
-
-.asset-info {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: left;
-}
-
-.token-icon {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 1rem;
-}
-
-.token-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: 50%;
-}
-
-.token-details {
-    text-align: center;
-}
-
-.token-details p {
-    margin: 0.5rem 0;
-}
-
-.token-details a {
-    color: var(--primary-color);
-    text-decoration: none;
+.wallet-address {
     font-size: 0.9rem;
-    display: inline-block;
+    opacity: 0.8;
     margin-top: 0.5rem;
 }
 
-.token-details a:hover {
-    text-decoration: underline;
+.assets-container {
+    max-width: 800px;
+    margin: 0 auto;
 }
 
-button[type="submit"] {
-    background-color: var(--primary-color);
+.loading-message {
+    color: var(--text-color);
+    font-size: 1.1rem;
+    margin: 2rem 0;
+}
+
+.error-message {
+    color: var(--error-color);
+    font-size: 1.1rem;
+    margin: 2rem 0;
+    padding: 1rem;
+    background-color: rgba(255, 70, 70, 0.1);
+    border-radius: 8px;
+}
+
+.assets-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.asset-section {
+    text-align: left;
+}
+
+.asset-section h3 {
+    margin-bottom: 1rem;
+}
+
+.asset-card {
+    background-color: var(--card-background);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.asset-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.2rem;
+}
+
+.asset-card p {
+    margin: 0.5rem 0;
+    opacity: 0.8;
+}
+
+.burn-button {
+    background-color: var(--error-color);
     color: var(--text-color);
     border: none;
-    padding: 1rem 2rem;
-    border-radius: 8px;
-    font-size: 1.1rem;
-    cursor: pointer;
-    width: 100%;
-    transition: opacity 0.2s;
-}
-
-button[type="submit"]:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.status-message {
-    margin-top: 1rem;
-    padding: 1rem;
+    padding: 0.8rem 1.5rem;
     border-radius: 6px;
-    background-color: rgba(255, 255, 255, 0.1);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    margin-top: 1rem;
 }
 
-.error {
-    color: var(--error-color);
+.burn-button:hover {
+    opacity: 0.9;
 }
 
-.success {
-    color: var(--success-color);
+.asset-card.burned {
+    transform: scale(0.9);
+    opacity: 0;
 }
 
-.network-badge {
-    background-color: var(--primary-color);
+.no-assets {
+    text-align: center;
     color: var(--text-color);
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    display: inline-block;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-    text-transform: uppercase;
+    opacity: 0.6;
+    font-size: 1.1rem;
+    margin: 2rem 0;
 }
