@@ -5,7 +5,6 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solflare-wallet/sdk@latest/dist/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -14,14 +13,10 @@
             Network: {{ network|upper }}
         </div>
         <div class="wallet-section">
-            <div class="wallet-buttons">
+            <div id="walletButtons" class="wallet-buttons">
                 <button class="connect-button" id="connectPhantom">
                     <img src="{{ url_for('static', filename='phantom.svg') }}" alt="Phantom" class="wallet-icon">
                     Connect Phantom
-                </button>
-                <button class="connect-button" id="connectSolflare">
-                    <img src="{{ url_for('static', filename='solflare.svg') }}" alt="SolFlare" class="wallet-icon">
-                    Connect SolFlare
                 </button>
             </div>
             <div class="connected-status" id="walletStatus" style="display: none">
@@ -47,16 +42,15 @@
             </div>
             <div id="amountContainer" class="input-group" style="display: none">
                 <label for="amount">Amount to Burn:</label>
-                <input type="number" id="amount" step="0.000001" min="0">
+                <input type="number" id="amount" step="any" min="0">
             </div>
-            <button type="submit" id="burnButton">Burn Asset</button>
+            <button type="submit" id="burnButton" disabled>Burn Asset</button>
             <div id="statusMessage" class="status-message" style="display: none"></div>
         </div>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const connectPhantomBtn = document.getElementById('connectPhantom');
-            const connectSolflareBtn = document.getElementById('connectSolflare');
             const walletStatus = document.getElementById('walletStatus');
             const walletProvider = document.getElementById('walletProvider');
             const walletAddress = document.getElementById('walletAddress');
@@ -75,18 +69,24 @@
             async function loadAssets() {
                 if (!currentWalletAddress) return;
 
+                burnButton.disabled = true;
+                showMessage('Loading assets...', 'info');
+
                 try {
                     const response = await fetch(`/assets?wallet=${currentWalletAddress}`);
                     const data = await response.json();
+
                     if (data.success) {
                         assets = data.assets;
                         updateAssetSelect();
+                        statusMessage.style.display = 'none';
+                        burnButton.disabled = false;
                     } else {
-                        showError('Failed to load assets');
+                        showError('Failed to load assets: ' + data.message);
                     }
                 } catch (error) {
                     console.error('Error loading assets:', error);
-                    showError('Failed to load assets');
+                    showError('Failed to load assets. Please try again.');
                 }
             }
 
@@ -103,27 +103,31 @@
                 assetSelectContainer.style.display = 'block';
                 amountContainer.style.display = selectedType === 'token' ? 'block' : 'none';
 
-                if (selectedType === 'token') {
-                    assets.tokens.forEach(token => {
+                const assetList = assets[selectedType === 'token' ? 'tokens' : 
+                                      selectedType === 'nft' ? 'nfts' : 'vacant_accounts'] || [];
+
+                if (assetList.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = "";
+                    option.textContent = `No ${selectedType}s found`;
+                    assetSelect.appendChild(option);
+                    burnButton.disabled = true;
+                } else {
+                    assetList.forEach(asset => {
                         const option = document.createElement('option');
-                        option.value = token.mint;
-                        option.textContent = `${token.name} (${token.symbol})`;
+                        option.value = asset.mint || asset.address;
+
+                        if (selectedType === 'token') {
+                            option.textContent = `${asset.name} (${asset.amount})`;
+                        } else if (selectedType === 'nft') {
+                            option.textContent = asset.name;
+                        } else {
+                            option.textContent = `Account: ${asset.address.slice(0,6)}...${asset.address.slice(-6)}`;
+                        }
+
                         assetSelect.appendChild(option);
                     });
-                } else if (selectedType === 'nft') {
-                    assets.nfts.forEach(nft => {
-                        const option = document.createElement('option');
-                        option.value = nft.mint;
-                        option.textContent = nft.name;
-                        assetSelect.appendChild(option);
-                    });
-                } else if (selectedType === 'vacant') {
-                    assets.vacant_accounts.forEach(account => {
-                        const option = document.createElement('option');
-                        option.value = account.address;
-                        option.textContent = `${account.address.slice(0,6)}...${account.address.slice(-6)}`;
-                        assetSelect.appendChild(option);
-                    });
+                    burnButton.disabled = false;
                 }
             }
 
@@ -152,50 +156,33 @@
                 }
             }
 
-            async function connectSolflare() {
-                if (typeof window.SolflareWallet === 'undefined') {
-                    showError('SolFlare wallet extension is not installed. Please install it from solflare.com');
-                    window.open('https://solflare.com/', '_blank');
-                    return;
-                }
-
-                try {
-                    const solflare = new window.SolflareWallet();
-                    await solflare.connect();
-                    currentWallet = solflare;
-                    currentWalletAddress = solflare.publicKey.toString();
-                    showConnected('SolFlare', currentWalletAddress);
-                    await loadAssets();
-                } catch (err) {
-                    console.error('SolFlare connection error:', err);
-                    showError('Failed to connect SolFlare wallet. Please try again.');
-                }
-            }
-
             function showConnected(provider, publicKey) {
                 connectPhantomBtn.style.display = 'none';
-                connectSolflareBtn.style.display = 'none';
                 walletStatus.style.display = 'block';
                 burnForm.style.display = 'block';
                 walletProvider.textContent = provider;
                 walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
             }
 
-            function showError(message) {
+            function showMessage(message, type) {
                 statusMessage.style.display = 'block';
                 statusMessage.textContent = message;
-                statusMessage.className = 'status-message error';
+                statusMessage.className = `status-message ${type}`;
+            }
+
+            function showError(message) {
+                showMessage(message, 'error');
             }
 
             function showSuccess(message) {
-                statusMessage.style.display = 'block';
-                statusMessage.textContent = message;
-                statusMessage.className = 'status-message success';
+                showMessage(message, 'success');
             }
 
             connectPhantomBtn.addEventListener('click', connectPhantom);
-            connectSolflareBtn.addEventListener('click', connectSolflare);
             assetType.addEventListener('change', updateAssetSelect);
+            assetSelect.addEventListener('change', () => {
+                burnButton.disabled = !assetSelect.value;
+            });
 
             burnButton.addEventListener('click', async () => {
                 const selectedType = assetType.value;
@@ -211,6 +198,9 @@
                     showError('Please enter a valid amount');
                     return;
                 }
+
+                burnButton.disabled = true;
+                showMessage('Processing transaction...', 'info');
 
                 try {
                     const response = await fetch('/burn', {
@@ -241,6 +231,8 @@
                 } catch (err) {
                     console.error('Burn transaction error:', err);
                     showError('Failed to burn asset. Please try again.');
+                } finally {
+                    burnButton.disabled = false;
                 }
             });
         });
