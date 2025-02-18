@@ -5,6 +5,8 @@ from solana.publickey import PublicKey
 from asgiref.sync import async_to_sync
 import os
 from dotenv import load_dotenv
+import httpx
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,6 +18,26 @@ app = Flask(__name__)
 # Switch to mainnet for production
 NETWORK = "mainnet"  # Update network information
 RPC_ENDPOINT = "https://api.mainnet-beta.solana.com"
+SOLSCAN_API_URL = "https://public-api.solscan.io"
+
+async def get_token_metadata(mint_address):
+    """Fetch token metadata from Solscan API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SOLSCAN_API_URL}/token/meta", 
+                                      params={"tokenAddress": mint_address})
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'symbol': data.get('symbol', 'Unknown'),
+                    'name': data.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
+                    'icon': data.get('icon', ''),
+                    'website': data.get('website', ''),
+                    'explorer_url': f"https://solscan.io/token/{mint_address}"
+                }
+    except Exception as e:
+        logger.error(f"Error fetching token metadata: {str(e)}")
+    return None
 
 @app.route('/')
 def index():
@@ -45,21 +67,15 @@ def get_assets():
                     {'programId': PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')}
                 )
                 logger.debug(f"Found {len(token_accounts.value) if token_accounts.value else 0} token accounts")
-                logger.debug(f"Token accounts data: {token_accounts.value}")
 
                 tokens = []
                 nfts = []
+                metadata_tasks = []
 
                 for account in token_accounts.value:
                     try:
-                        # Log the raw account data for debugging
-                        logger.debug(f"Processing account: {account}")
-
                         parsed_data = account['account']['data']['parsed']
-                        logger.debug(f"Parsed data: {parsed_data}")
-
                         if 'info' not in parsed_data:
-                            logger.warning(f"No 'info' in parsed data for account")
                             continue
 
                         token_info = parsed_data['info']
@@ -67,53 +83,59 @@ def get_assets():
                         token_amount = token_info.get('tokenAmount')
 
                         if not mint or not token_amount:
-                            logger.warning(f"Missing mint or token amount for account")
                             continue
 
                         amount = float(token_amount['amount']) / (10 ** token_amount['decimals'])
 
                         if amount > 0:
+                            metadata_tasks.append(get_token_metadata(mint))
                             if token_amount['decimals'] == 0 and token_amount['amount'] == '1':
-                                # This is likely an NFT
                                 nfts.append({
                                     'mint': mint,
                                     'name': f'NFT {mint[:4]}...{mint[-4:]}',
-                                    'type': 'nft'
+                                    'type': 'nft',
+                                    'explorer_url': f"https://solscan.io/token/{mint}"
                                 })
                             else:
-                                # This is a token
                                 tokens.append({
                                     'mint': mint,
                                     'amount': amount,
                                     'decimals': token_amount['decimals'],
-                                    'name': f'Token {mint[:4]}...{mint[-4:]}',
                                     'type': 'token'
                                 })
+
                     except Exception as e:
                         logger.error(f"Error processing token account: {str(e)}")
-                        logger.exception("Full exception trace")
                         continue
 
-                # Get vacant accounts (accounts with 0 SOL that can be closed)
+                # Fetch metadata for all tokens
+                token_metadata = await asyncio.gather(*metadata_tasks)
+
+                # Update tokens with metadata
+                for i, token in enumerate(tokens):
+                    if i < len(token_metadata) and token_metadata[i]:
+                        token.update(token_metadata[i])
+
+                # Get vacant accounts
                 vacant_response = await async_client.get_program_accounts(
                     pubkey,
                     encoding='jsonParsed',
-                    filters=[{'dataSize': 0}]  # Only get accounts with no data
+                    filters=[{'dataSize': 0}]
                 )
                 logger.debug(f"Found {len(vacant_response.value) if vacant_response.value else 0} vacant accounts")
 
                 vacant_accounts = [{
                     'address': str(account.pubkey),
-                    'type': 'vacant'
+                    'type': 'vacant',
+                    'explorer_url': f"https://solscan.io/account/{str(account.pubkey)}"
                 } for account in vacant_response.value]
-
-                await async_client.close()
 
                 return {
                     'tokens': tokens,
                     'nfts': nfts,
                     'vacant_accounts': vacant_accounts
                 }
+
             except Exception as e:
                 logger.error(f"Error in fetch_assets: {str(e)}")
                 logger.exception("Full exception trace")

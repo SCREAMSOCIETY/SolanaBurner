@@ -110,6 +110,47 @@ h1 {
     color: var(--text-color);
 }
 
+.asset-info {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.token-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+}
+
+.token-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+}
+
+.token-details {
+    text-align: center;
+}
+
+.token-details p {
+    margin: 0.5rem 0;
+}
+
+.token-details a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.token-details a:hover {
+    text-decoration: underline;
+}
+
 button[type="submit"] {
     background-color: var(--primary-color);
     color: var(--text-color);

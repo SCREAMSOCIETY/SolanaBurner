@@ -40,6 +40,16 @@
                     <option value="">Select an asset</option>
                 </select>
             </div>
+            <div id="assetInfo" class="asset-info" style="display: none">
+                <div class="token-icon">
+                    <img id="tokenIcon" src="" alt="Token Icon" style="display: none">
+                </div>
+                <div class="token-details">
+                    <p id="tokenName"></p>
+                    <p id="tokenSymbol"></p>
+                    <a id="explorerLink" href="" target="_blank" rel="noopener noreferrer">View on Solscan</a>
+                </div>
+            </div>
             <div id="amountContainer" class="input-group" style="display: none">
                 <label for="amount">Amount to Burn:</label>
                 <input type="number" id="amount" step="any" min="0">
@@ -61,6 +71,11 @@
             const assetSelect = document.getElementById('assetSelect');
             const assetSelectContainer = document.getElementById('assetSelectContainer');
             const amountContainer = document.getElementById('amountContainer');
+            const assetInfo = document.getElementById('assetInfo');
+            const tokenIcon = document.getElementById('tokenIcon');
+            const tokenName = document.getElementById('tokenName');
+            const tokenSymbol = document.getElementById('tokenSymbol');
+            const explorerLink = document.getElementById('explorerLink');
 
             let currentWallet = null;
             let currentWalletAddress = null;
@@ -90,6 +105,35 @@
                 }
             }
 
+            function updateAssetInfo(asset) {
+                if (!asset) {
+                    assetInfo.style.display = 'none';
+                    return;
+                }
+
+                assetInfo.style.display = 'block';
+
+                // Update token icon if available
+                if (asset.icon) {
+                    tokenIcon.src = asset.icon;
+                    tokenIcon.style.display = 'block';
+                } else {
+                    tokenIcon.style.display = 'none';
+                }
+
+                // Update token details
+                tokenName.textContent = asset.name || 'Unknown Token';
+                tokenSymbol.textContent = asset.symbol ? `(${asset.symbol})` : '';
+
+                // Update explorer link
+                if (asset.explorer_url) {
+                    explorerLink.href = asset.explorer_url;
+                    explorerLink.style.display = 'block';
+                } else {
+                    explorerLink.style.display = 'none';
+                }
+            }
+
             function updateAssetSelect() {
                 const selectedType = assetType.value;
                 assetSelect.innerHTML = '<option value="">Select an asset</option>';
@@ -97,6 +141,7 @@
                 if (!selectedType) {
                     assetSelectContainer.style.display = 'none';
                     amountContainer.style.display = 'none';
+                    assetInfo.style.display = 'none';
                     return;
                 }
 
@@ -112,13 +157,15 @@
                     option.textContent = `No ${selectedType}s found`;
                     assetSelect.appendChild(option);
                     burnButton.disabled = true;
+                    assetInfo.style.display = 'none';
                 } else {
                     assetList.forEach(asset => {
                         const option = document.createElement('option');
                         option.value = asset.mint || asset.address;
+                        option.setAttribute('data-asset', JSON.stringify(asset));
 
                         if (selectedType === 'token') {
-                            option.textContent = `${asset.name} (${asset.amount})`;
+                            option.textContent = `${asset.name || asset.symbol || 'Unknown Token'} (${asset.amount})`;
                         } else if (selectedType === 'nft') {
                             option.textContent = asset.name;
                         } else {
@@ -179,9 +226,22 @@
             }
 
             connectPhantomBtn.addEventListener('click', connectPhantom);
-            assetType.addEventListener('change', updateAssetSelect);
+
+            assetType.addEventListener('change', () => {
+                updateAssetSelect();
+                updateAssetInfo(null);
+            });
+
             assetSelect.addEventListener('change', () => {
-                burnButton.disabled = !assetSelect.value;
+                const selected = assetSelect.selectedOptions[0];
+                if (selected && selected.value) {
+                    const asset = JSON.parse(selected.getAttribute('data-asset'));
+                    updateAssetInfo(asset);
+                    burnButton.disabled = false;
+                } else {
+                    updateAssetInfo(null);
+                    burnButton.disabled = true;
+                }
             });
 
             burnButton.addEventListener('click', async () => {
@@ -224,6 +284,7 @@
                             document.getElementById('amount').value = '';
                         }
                         updateAssetSelect();
+                        updateAssetInfo(null);
                         await loadAssets();
                     } else {
                         showError(data.message);

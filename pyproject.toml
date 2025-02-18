@@ -8,6 +8,7 @@ dependencies = [
     "flask>=3.1.0",
     "flask-login>=0.6.3",
     "flask-wtf>=1.2.2",
+    "httpx>=0.23.3",
     "oauthlib>=3.2.2",
     "python-dotenv>=1.0.1",
     "solana==0.25.1",
