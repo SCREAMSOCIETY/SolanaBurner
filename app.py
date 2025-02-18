@@ -2,6 +2,8 @@ import logging
 from flask import Flask, render_template, request, jsonify
 from solana.rpc.async_api import AsyncClient
 from solana.publickey import PublicKey
+from solana.rpc.commitment import Confirmed
+from solana.rpc.types import TokenAccountOpts
 from asgiref.sync import async_to_sync
 import os
 from dotenv import load_dotenv
@@ -55,17 +57,24 @@ def get_assets():
     try:
         async def fetch_assets():
             logger.debug(f"Fetching assets for wallet: {wallet_address}")
-            async_client = AsyncClient(RPC_ENDPOINT)
+            async_client = AsyncClient(RPC_ENDPOINT, commitment=Confirmed)
 
             try:
                 pubkey = PublicKey(wallet_address)
                 logger.debug("Successfully created PublicKey object")
 
-                # Get token accounts
+                # Create proper TokenAccountOpts
+                opts = TokenAccountOpts(
+                    program_id=PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                )
+
+                # Get token accounts with proper configuration
                 token_accounts = await async_client.get_token_accounts_by_owner(
                     pubkey,
-                    {'programId': PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')}
+                    opts,
+                    commitment=Confirmed
                 )
+
                 logger.debug(f"Found {len(token_accounts.value) if token_accounts.value else 0} token accounts")
 
                 tokens = []
@@ -74,7 +83,7 @@ def get_assets():
 
                 for account in token_accounts.value:
                     try:
-                        parsed_data = account['account']['data']['parsed']
+                        parsed_data = account.account.data['parsed']
                         if 'info' not in parsed_data:
                             continue
 
@@ -106,6 +115,7 @@ def get_assets():
 
                     except Exception as e:
                         logger.error(f"Error processing token account: {str(e)}")
+                        logger.exception("Full exception trace")
                         continue
 
                 # Fetch metadata for all tokens
@@ -119,9 +129,11 @@ def get_assets():
                 # Get vacant accounts
                 vacant_response = await async_client.get_program_accounts(
                     pubkey,
+                    commitment=Confirmed,
                     encoding='jsonParsed',
                     filters=[{'dataSize': 0}]
                 )
+
                 logger.debug(f"Found {len(vacant_response.value) if vacant_response.value else 0} vacant accounts")
 
                 vacant_accounts = [{
