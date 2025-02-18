@@ -108,6 +108,14 @@
                         new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
                     );
 
+                    // Create burn instruction data using Uint8Array
+                    const dataLayout = new Uint8Array(9);
+                    dataLayout[0] = 8; // Burn instruction
+                    const amountBytes = new Uint8Array(8);
+                    const view = new DataView(amountBytes.buffer);
+                    view.setBigUint64(0, BigInt(rawAmount), true);
+                    dataLayout.set(amountBytes, 1);
+
                     // Create the burn instruction
                     const burnIx = new solanaWeb3.TransactionInstruction({
                         keys: [
@@ -116,7 +124,7 @@
                             { pubkey: walletPubkey, isSigner: true, isWritable: false },
                         ],
                         programId: TOKEN_PROGRAM_ID,
-                        data: Buffer.from([17, ...new Uint8Array(rawAmount.toString(16).match(/.{1,2}/g).map(byte => parseInt(byte, 16)))])
+                        data: dataLayout
                     });
 
                     const transaction = new solanaWeb3.Transaction().add(burnIx);
