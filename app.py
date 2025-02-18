@@ -59,7 +59,7 @@ async def get_token_metadata(mint_address):
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
-async def fetch_assets():
+async def fetch_assets(wallet_address):
     logger.debug(f"Starting to fetch assets")
     async_client = AsyncClient(RPC_ENDPOINT, commitment=Confirmed)
 
@@ -172,7 +172,7 @@ def get_assets():
         return jsonify({'success': False, 'message': 'Wallet address is required'}), 400
 
     try:
-        assets = async_to_sync(fetch_assets)()
+        assets = async_to_sync(fetch_assets)(wallet_address)
         logger.debug(f"Final assets structure: {json.dumps(assets, indent=2)}")
         return jsonify({
             'success': True,
