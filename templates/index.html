@@ -5,14 +5,24 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solflare-wallet/sdk@latest/dist/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Solana Token Burner</h1>
         <div class="wallet-section">
-            <button class="connect-button" id="connectWallet">Connect Phantom</button>
+            <div class="wallet-buttons">
+                <button class="connect-button" id="connectPhantom">
+                    <img src="{{ url_for('static', filename='phantom.svg') }}" alt="Phantom" class="wallet-icon">
+                    Connect Phantom
+                </button>
+                <button class="connect-button" id="connectSolflare">
+                    <img src="{{ url_for('static', filename='solflare.svg') }}" alt="SolFlare" class="wallet-icon">
+                    Connect SolFlare
+                </button>
+            </div>
             <div class="connected-status" id="walletStatus" style="display: none">
-                <div>Wallet Connected</div>
+                <div>Connected to <span id="walletProvider"></span></div>
                 <div class="wallet-address" id="walletAddress"></div>
             </div>
         </div>
@@ -33,13 +43,17 @@
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const connectButton = document.getElementById('connectWallet');
+            const connectPhantomBtn = document.getElementById('connectPhantom');
+            const connectSolflareBtn = document.getElementById('connectSolflare');
             const walletStatus = document.getElementById('walletStatus');
+            const walletProvider = document.getElementById('walletProvider');
             const walletAddress = document.getElementById('walletAddress');
             const burnForm = document.getElementById('burnForm');
             const burnButton = document.getElementById('burnButton');
             const statusMessage = document.getElementById('statusMessage');
             const tokenSelect = document.getElementById('tokenSelect');
+
+            let currentWallet = null;
 
             // Fetch available tokens
             fetch('/tokens')
@@ -58,33 +72,58 @@
                     console.error('Error fetching tokens:', error);
                 });
 
-            connectButton.addEventListener('click', async () => {
+            async function connectPhantom() {
                 try {
+                    if (!window.solana || !window.solana.isPhantom) {
+                        throw new Error('Phantom wallet not installed');
+                    }
                     const resp = await window.solana.connect();
-                    connectButton.style.display = 'none';
-                    walletStatus.style.display = 'block';
-                    burnForm.style.display = 'block';
-                    const pubKey = resp.publicKey.toString();
-                    walletAddress.textContent = `Address: ${pubKey.slice(0,6)}...${pubKey.slice(-6)}`;
+                    currentWallet = window.solana;
+                    showConnected('Phantom', resp.publicKey.toString());
                 } catch (err) {
-                    statusMessage.textContent = 'Failed to connect wallet';
-                    statusMessage.className = 'status-message error';
+                    showError('Failed to connect Phantom wallet');
                 }
-            });
+            }
+
+            async function connectSolflare() {
+                try {
+                    const solflare = new window.SolflareWallet();
+                    await solflare.connect();
+                    currentWallet = solflare;
+                    showConnected('SolFlare', solflare.publicKey.toString());
+                } catch (err) {
+                    showError('Failed to connect SolFlare wallet');
+                }
+            }
+
+            function showConnected(provider, publicKey) {
+                connectPhantomBtn.style.display = 'none';
+                connectSolflareBtn.style.display = 'none';
+                walletStatus.style.display = 'block';
+                burnForm.style.display = 'block';
+                walletProvider.textContent = provider;
+                walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
+            }
+
+            function showError(message) {
+                statusMessage.textContent = message;
+                statusMessage.className = 'status-message error';
+            }
+
+            connectPhantomBtn.addEventListener('click', connectPhantom);
+            connectSolflareBtn.addEventListener('click', connectSolflare);
 
             burnButton.addEventListener('click', async () => {
                 const amount = document.getElementById('amount').value;
                 const tokenMint = tokenSelect.value;
 
                 if (!tokenMint) {
-                    statusMessage.textContent = 'Please select a token';
-                    statusMessage.className = 'status-message error';
+                    showError('Please select a token');
                     return;
                 }
 
                 if (!amount || amount <= 0) {
-                    statusMessage.textContent = 'Please enter a valid amount';
-                    statusMessage.className = 'status-message error';
+                    showError('Please enter a valid amount');
                     return;
                 }
 
@@ -105,8 +144,7 @@
                         tokenSelect.value = '';
                     }
                 } catch (err) {
-                    statusMessage.textContent = 'Failed to burn tokens';
-                    statusMessage.className = 'status-message error';
+                    showError('Failed to burn tokens');
                 }
             });
         });

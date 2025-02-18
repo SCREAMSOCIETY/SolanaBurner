@@ -31,6 +31,13 @@ h1 {
     margin-bottom: 2rem;
 }
 
+.wallet-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
 .connect-button {
     background-color: var(--primary-color);
     color: var(--text-color);
@@ -40,6 +47,14 @@ h1 {
     font-size: 1.1rem;
     cursor: pointer;
     transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.wallet-icon {
+    width: 24px;
+    height: 24px;
 }
 
 .connect-button:hover {
