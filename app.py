@@ -50,10 +50,12 @@ def decode_account_data(data):
         elif isinstance(data, list) and len(data) > 0:
             decoded = base64.b64decode(data[0])
         else:
-            return None  # Handle cases where data is not a string or list
+            logger.error(f"Invalid data format: {type(data)}")
+            return None
 
         # Log the decoded data for debugging
-        logger.debug(f"Decoded account data length: {len(decoded)}")
+        logger.debug(f"Decoded account data length: {len(decoded)} bytes")
+        logger.debug(f"Raw decoded data: {decoded.hex()}")
         return decoded
     except Exception as e:
         logger.error(f"Error decoding account data: {str(e)}")
@@ -97,6 +99,7 @@ def get_assets():
                 metadata_tasks = []
 
                 if hasattr(response, 'value'):
+                    logger.debug(f"Found {len(response.value)} token accounts")
                     for account in response.value:
                         try:
                             logger.debug(f"Processing account: {account}")
@@ -111,12 +114,12 @@ def get_assets():
                             # Extract mint address from decoded data (bytes 0-32)
                             mint_bytes = decoded[0:32]
                             mint = str(PublicKey(mint_bytes))
+                            logger.debug(f"Extracted mint address: {mint}")
 
                             # Extract amount from decoded data (bytes 64-72)
                             amount_bytes = decoded[64:72]
                             amount = int.from_bytes(amount_bytes, byteorder='little')
-
-                            logger.debug(f"Extracted mint: {mint}, amount: {amount}")
+                            logger.debug(f"Extracted amount: {amount}")
 
                             if amount > 0:
                                 metadata_tasks.append(get_token_metadata(mint))
@@ -126,6 +129,7 @@ def get_assets():
                                     'decimals': 9,
                                     'type': 'token'
                                 })
+                                logger.debug(f"Added token with mint {mint} and amount {amount}")
 
                         except Exception as e:
                             logger.error(f"Error processing token account: {str(e)}")
@@ -141,6 +145,7 @@ def get_assets():
                         for i, token in enumerate(tokens):
                             if i < len(token_metadata) and token_metadata[i]:
                                 token.update(token_metadata[i])
+                                logger.debug(f"Updated token {token['mint']} with metadata")
                     else:
                         logger.warning("No valid tokens found to fetch metadata for")
 
