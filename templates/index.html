@@ -54,7 +54,7 @@
                 const network = networkSelect.value;
                 const endpoint = network === 'devnet' 
                     ? 'https://api.devnet.solana.com'
-                    : 'https://api.mainnet-beta.solana.com';
+                    : '{{ rpc_endpoint }}'; // Use QuickNode RPC URL for mainnet
 
                 console.log(`Connecting to ${endpoint}`);
                 return new solanaWeb3.Connection(endpoint, 'confirmed');

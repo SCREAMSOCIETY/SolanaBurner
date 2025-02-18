@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
-# Switch to mainnet for production
-NETWORK = "mainnet"  # Update network information
-RPC_ENDPOINT = "https://api.mainnet-beta.solana.com"
+# Get RPC endpoint from environment variables
+RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL', 'https://api.devnet.solana.com')
 SOLSCAN_API_URL = "https://public-api.solscan.io"
 
 async def get_token_metadata(mint_address):
@@ -62,7 +61,8 @@ def decode_account_data(data):
 
 @app.route('/')
 def index():
-    return render_template('index.html', network=NETWORK)
+    # Pass the RPC endpoint to the template
+    return render_template('index.html', rpc_endpoint=RPC_ENDPOINT)
 
 @app.route('/assets', methods=['GET'])
 def get_assets():
