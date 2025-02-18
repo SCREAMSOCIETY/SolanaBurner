@@ -81,44 +81,37 @@
                     connection = getConnection();
 
                     console.log('Fetching token accounts...');
-                    const tokenAccounts = await connection.getTokenAccountsByOwner(
-                        new solanaWeb3.PublicKey(publicKey),
-                        {
-                            programId: new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-                        }
-                    );
+                    const response = await fetch(`/assets?wallet=${publicKey}`);
+                    const data = await response.json();
 
-                    console.log('Token accounts:', tokenAccounts);
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to fetch assets');
+                    }
+
+                    console.log('Assets data:', data);
 
                     assetsGrid.innerHTML = '';
                     const tokenSection = document.createElement('div');
                     tokenSection.className = 'asset-section';
                     tokenSection.innerHTML = '<h3>Tokens</h3>';
 
-                    if (tokenAccounts.value.length === 0) {
-                        assetsGrid.innerHTML = '<p class="no-assets">No assets found in your wallet</p>';
+                    const assets = data.assets;
+                    if (!assets.tokens || assets.tokens.length === 0) {
+                        assetsGrid.innerHTML = '<p class="no-assets">No tokens found in your wallet</p>';
                     } else {
-                        tokenAccounts.value.forEach(account => {
-                            try {
-                                const accountData = splToken.AccountLayout.decode(account.account.data);
-                                const amount = Number(accountData.amount);
-                                const decimals = 9; // Most tokens use 9 decimals
-
-                                if (amount > 0) {
-                                    const tokenCard = document.createElement('div');
-                                    tokenCard.className = 'asset-card';
-                                    tokenCard.innerHTML = `
-                                        <h4>Token</h4>
-                                        <p>Amount: ${amount / Math.pow(10, decimals)}</p>
-                                        <button class="burn-button" data-type="token" data-id="${account.pubkey.toString()}">
-                                            Burn Token
-                                        </button>
-                                    `;
-                                    tokenSection.appendChild(tokenCard);
-                                }
-                            } catch (decodeError) {
-                                console.error('Error decoding account:', decodeError);
-                            }
+                        assets.tokens.forEach(token => {
+                            const tokenCard = document.createElement('div');
+                            tokenCard.className = 'asset-card';
+                            tokenCard.innerHTML = `
+                                <h4>${token.name || 'Unknown Token'}</h4>
+                                <p>Symbol: ${token.symbol || 'N/A'}</p>
+                                <p>Amount: ${token.amount}</p>
+                                ${token.icon ? `<img src="${token.icon}" alt="${token.symbol}" class="token-icon"/>` : ''}
+                                <button class="burn-button" data-type="token" data-id="${token.mint}">
+                                    Burn Token
+                                </button>
+                            `;
+                            tokenSection.appendChild(tokenCard);
                         });
                         assetsGrid.appendChild(tokenSection);
                     }
