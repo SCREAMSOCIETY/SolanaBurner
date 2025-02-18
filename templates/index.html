@@ -50,7 +50,7 @@
         const splToken = window.splToken;
 
         document.addEventListener('DOMContentLoaded', async function() {
-            // Verify SPL Token library is loaded
+            // Verify SPL Token library
             console.log('Checking SPL Token library:', {
                 windowSplToken: !!window.splToken,
                 windowSplTokenLib: !!window.spl_token,
@@ -98,6 +98,37 @@
 
                 console.log(`Connecting to ${endpoint}`);
                 return new solanaWeb3.Connection(endpoint, 'confirmed');
+            }
+
+            async function connectPhantom() {
+                if (!window.solana || !window.solana.isPhantom) {
+                    showError('Please install the Phantom wallet extension');
+                    window.open('https://phantom.app/', '_blank');
+                    return;
+                }
+
+                try {
+                    await window.solana.connect();
+                    const publicKey = window.solana.publicKey.toString();
+                    currentWallet = window.solana;
+                    connection = getConnection();
+
+                    console.log('Connected to wallet:', publicKey);
+
+                    // Update UI
+                    connectPhantomBtn.style.display = 'none';
+                    walletStatus.style.display = 'block';
+                    walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
+                    assetsContainer.style.display = 'block';
+                    backButton.style.display = 'block';
+
+                    // Load assets
+                    await loadAssets(publicKey);
+
+                } catch (err) {
+                    console.error('Phantom connection error:', err);
+                    showError('Failed to connect Phantom wallet. Please try again.');
+                }
             }
 
             async function burnToken(mint, amount, decimals) {
@@ -216,7 +247,6 @@
                                 <p>No tokens found in your wallet</p>
                                 <p class="debug-info">Network: ${networkSelect.value}</p>
                                 <p class="debug-info">Wallet: ${currentWallet.publicKey.toString()}</p>
-                                <p class="debug-info">RPC Status: ${connection ? 'Connected' : 'Not Connected'}</p>
                             </div>
                         `;
                     } else {
@@ -290,38 +320,12 @@
                 }
             }
 
-            async function connectPhantom() {
-                if (!window.solana || !window.solana.isPhantom) {
-                    showError('Please install the Phantom wallet extension');
-                    window.open('https://phantom.app/', '_blank');
-                    return;
-                }
-
-                try {
-                    await window.solana.connect();
-                    const publicKey = window.solana.publicKey.toString();
-                    currentWallet = window.solana;
-
-                    // Update UI
-                    connectPhantomBtn.style.display = 'none';
-                    walletStatus.style.display = 'block';
-                    walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
-                    assetsContainer.style.display = 'block';
-                    backButton.style.display = 'block';
-
-                    // Load assets
-                    await loadAssets(publicKey);
-
-                } catch (err) {
-                    showError('Failed to connect Phantom wallet. Please try again.');
-                    console.error('Phantom connection error:', err);
-                }
-            }
-
             // Event Listeners
             connectPhantomBtn.addEventListener('click', connectPhantom);
+
             networkSelect.addEventListener('change', async () => {
                 if (currentWallet && currentWallet.publicKey) {
+                    connection = getConnection();
                     await loadAssets(currentWallet.publicKey.toString());
                 }
             });
@@ -343,6 +347,7 @@
                     }
                 }
                 currentWallet = null;
+                connection = null;
             });
         });
     </script>
