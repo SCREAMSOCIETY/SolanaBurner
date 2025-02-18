@@ -60,14 +60,16 @@ async def get_token_metadata(mint_address):
     }
 
 async def fetch_assets(wallet_address):
-    logger.debug(f"Starting to fetch assets")
+    """Fetch assets for a given wallet address"""
+    logger.debug(f"Starting to fetch assets for wallet: {wallet_address}")
+    logger.debug(f"Using RPC endpoint: {RPC_ENDPOINT}")
     async_client = AsyncClient(RPC_ENDPOINT, commitment=Confirmed)
 
     try:
         pubkey = PublicKey(wallet_address)
         logger.debug(f"Fetching token accounts for {wallet_address}")
 
-        # Get token accounts
+        # Get token accounts with detailed logging
         response = await async_client.get_token_accounts_by_owner(
             pubkey,
             TokenAccountOpts(
@@ -91,7 +93,7 @@ async def fetch_assets(wallet_address):
                         logger.warning("Could not decode account data")
                         continue
 
-                    # Extract mint and amount
+                    # Extract mint and amount with detailed logging
                     mint_bytes = decoded[0:32]
                     mint = str(PublicKey(mint_bytes))
                     logger.debug(f"Extracted mint address: {mint}")
@@ -100,6 +102,7 @@ async def fetch_assets(wallet_address):
                     amount = int.from_bytes(amount_bytes, byteorder='little')
                     logger.debug(f"Raw amount: {amount}")
 
+                    # Only include tokens with non-zero balances
                     if amount > 0:
                         metadata_tasks.append(get_token_metadata(mint))
                         tokens.append({
@@ -129,9 +132,12 @@ async def fetch_assets(wallet_address):
                         token.update(metadata)
                         token['amount'] = raw_amount / (10 ** decimals)
                         logger.debug(f"Processed token {token['mint']}: {token['amount']} {token['symbol']}")
+                    else:
+                        logger.warning(f"No metadata found for token {token['mint']}")
             else:
                 logger.warning("No valid tokens found to fetch metadata for")
 
+        logger.debug(f"Final tokens list: {tokens}")
         return {'tokens': tokens, 'nfts': []}
 
     except Exception as e:
