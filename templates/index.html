@@ -5,6 +5,7 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.3.9/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -43,6 +44,7 @@
             const assetsGrid = document.getElementById('assetsGrid');
 
             let currentWallet = null;
+            const connection = new solanaWeb3.Connection('https://api.mainnet-beta.solana.com');
 
             function showError(message) {
                 errorMessage.textContent = message;
@@ -57,61 +59,45 @@
                 assetsGrid.style.display = 'none';
             }
 
-            async function loadAssets(address) {
+            async function loadAssets(publicKey) {
                 showLoading();
                 try {
-                    const response = await fetch(`/assets?wallet=${address}`);
-                    const data = await response.json();
+                    const tokenAccounts = await connection.getTokenAccountsByOwner(
+                        new solanaWeb3.PublicKey(publicKey),
+                        {
+                            programId: new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                        }
+                    );
 
-                    if (!data.success) {
-                        throw new Error(data.message || 'Failed to load assets');
-                    }
-
-                    const assets = data.assets;
                     assetsGrid.innerHTML = ''; // Clear existing assets
+                    const tokenSection = document.createElement('div');
+                    tokenSection.className = 'asset-section';
+                    tokenSection.innerHTML = '<h3>Tokens</h3>';
 
-                    // Display tokens
-                    if (assets.tokens && assets.tokens.length > 0) {
-                        const tokenSection = document.createElement('div');
-                        tokenSection.className = 'asset-section';
-                        tokenSection.innerHTML = '<h3>Tokens</h3>';
-                        assets.tokens.forEach(token => {
-                            const tokenCard = document.createElement('div');
-                            tokenCard.className = 'asset-card';
-                            tokenCard.innerHTML = `
-                                <h4>${token.name || 'Unknown Token'}</h4>
-                                <p>Amount: ${token.amount}</p>
-                                <button class="burn-button" data-type="token" data-id="${token.mint}">
-                                    Burn Token
-                                </button>
-                            `;
-                            tokenSection.appendChild(tokenCard);
+                    console.log('Token accounts:', tokenAccounts);
+
+                    if (tokenAccounts.value.length === 0) {
+                        assetsGrid.innerHTML = '<p class="no-assets">No assets found in your wallet</p>';
+                    } else {
+                        tokenAccounts.value.forEach(account => {
+                            const accountData = splToken.AccountLayout.decode(account.account.data);
+                            const amount = Number(accountData.amount);
+                            const decimals = 9; // Most tokens use 9 decimals
+
+                            if (amount > 0) {
+                                const tokenCard = document.createElement('div');
+                                tokenCard.className = 'asset-card';
+                                tokenCard.innerHTML = `
+                                    <h4>Token</h4>
+                                    <p>Amount: ${amount / Math.pow(10, decimals)}</p>
+                                    <button class="burn-button" data-type="token" data-id="${account.pubkey.toString()}">
+                                        Burn Token
+                                    </button>
+                                `;
+                                tokenSection.appendChild(tokenCard);
+                            }
                         });
                         assetsGrid.appendChild(tokenSection);
-                    }
-
-                    // Display NFTs
-                    if (assets.nfts && assets.nfts.length > 0) {
-                        const nftSection = document.createElement('div');
-                        nftSection.className = 'asset-section';
-                        nftSection.innerHTML = '<h3>NFTs</h3>';
-                        assets.nfts.forEach(nft => {
-                            const nftCard = document.createElement('div');
-                            nftCard.className = 'asset-card';
-                            nftCard.innerHTML = `
-                                <h4>${nft.name}</h4>
-                                <button class="burn-button" data-type="nft" data-id="${nft.mint}">
-                                    Burn NFT
-                                </button>
-                            `;
-                            nftSection.appendChild(nftCard);
-                        });
-                        assetsGrid.appendChild(nftSection);
-                    }
-
-                    // Show no assets message if none found
-                    if (!assetsGrid.children.length) {
-                        assetsGrid.innerHTML = '<p class="no-assets">No assets found in your wallet</p>';
                     }
 
                     loadingMessage.style.display = 'none';
@@ -119,7 +105,8 @@
                     assetsGrid.style.display = 'block';
 
                 } catch (error) {
-                    showError(error.message);
+                    console.error('Error loading assets:', error);
+                    showError(`Failed to load assets: ${error.message}`);
                 }
             }
 
