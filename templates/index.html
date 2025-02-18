@@ -135,7 +135,7 @@
                     transaction.feePayer = walletPubkey;
 
                     console.log('Getting recent blockhash...');
-                    const { blockhash } = await connection.getRecentBlockhash('confirmed');
+                    const { blockhash } = await connection.getLatestBlockhash('confirmed');
                     console.log('Got blockhash:', blockhash);
                     transaction.recentBlockhash = blockhash;
 
