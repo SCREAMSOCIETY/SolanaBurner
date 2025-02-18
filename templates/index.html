@@ -105,36 +105,71 @@
                     errorMessage.style.display = 'none';
                     console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
 
-                    const response = await fetch('/burn', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            assetType: 'token',
-                            assetId: mint,
-                            amount: amount,
-                            decimals: decimals
-                        }),
-                    });
+                    // Create connection
+                    connection = getConnection();
 
-                    const data = await response.json();
-                    console.log('Burn response:', data);
+                    // Convert amount to raw amount with decimals
+                    const rawAmount = amount * Math.pow(10, decimals);
 
-                    if (!data.success) {
-                        throw new Error(data.message || 'Failed to burn token');
+                    // Get token account
+                    const tokenAccounts = await connection.getTokenAccountsByOwner(
+                        currentWallet.publicKey,
+                        { mint: new solanaWeb3.PublicKey(mint) }
+                    );
+
+                    if (tokenAccounts.value.length === 0) {
+                        throw new Error('Token account not found');
                     }
 
-                    // Show success message
-                    const successMsg = document.createElement('div');
-                    successMsg.className = 'status-message success';
-                    successMsg.textContent = `Successfully initiated burn of ${amount} tokens`;
-                    errorMessage.before(successMsg);
-                    setTimeout(() => successMsg.remove(), 5000);
+                    const tokenAccountAddress = tokenAccounts.value[0].pubkey;
 
-                    // Refresh token list after successful burn
-                    await loadAssets(currentWallet.publicKey.toString());
-                    return true;
+                    // Create burn instruction
+                    const burnInstruction = splToken.createBurnInstruction(
+                        tokenAccountAddress,
+                        new solanaWeb3.PublicKey(mint),
+                        currentWallet.publicKey,
+                        rawAmount,
+                        []
+                    );
+
+                    // Create transaction
+                    const transaction = new solanaWeb3.Transaction().add(burnInstruction);
+                    transaction.feePayer = currentWallet.publicKey;
+                    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+
+                    // Request signing from wallet
+                    try {
+                        const signed = await currentWallet.signTransaction(transaction);
+
+                        // Send transaction
+                        const signature = await connection.sendRawTransaction(signed.serialize());
+                        console.log('Burn transaction sent:', signature);
+
+                        // Wait for confirmation
+                        const confirmation = await connection.confirmTransaction(signature);
+                        if (confirmation.value.err) {
+                            throw new Error('Transaction failed');
+                        }
+
+                        // Show success message with explorer link
+                        const network = networkSelect.value;
+                        const explorerUrl = `https://explorer.solana.com/tx/${signature}${network === 'devnet' ? '?cluster=devnet' : ''}`;
+                        const successMsg = document.createElement('div');
+                        successMsg.className = 'status-message success';
+                        successMsg.innerHTML = `Successfully burned ${amount} tokens. 
+                            <a href="${explorerUrl}" target="_blank" class="explorer-link">View transaction</a>`;
+                        errorMessage.before(successMsg);
+                        setTimeout(() => successMsg.remove(), 10000);
+
+                        // Refresh token list
+                        await loadAssets(currentWallet.publicKey.toString());
+                        return true;
+                    } catch (err) {
+                        if (err.message.includes('User rejected')) {
+                            throw new Error('Transaction rejected by user');
+                        }
+                        throw err;
+                    }
                 } catch (error) {
                     console.error('Burn error:', error);
                     showError(`Failed to burn token: ${error.message}`);
