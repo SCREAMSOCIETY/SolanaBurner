@@ -59,17 +59,41 @@ async def get_token_metadata(mint_address):
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
+async def decode_token_account(account):
+    """Decode token account data with detailed logging"""
+    try:
+        account_data = account.account.data
+        decoded = decode_account_data(account_data)
+
+        if not decoded:
+            logger.warning("Could not decode account data")
+            return None
+
+        # Extract mint address (first 32 bytes)
+        mint_bytes = decoded[0:32]
+        mint = str(PublicKey(mint_bytes))
+
+        # Extract amount (bytes 64-72)
+        amount_bytes = decoded[64:72]
+        amount = int.from_bytes(amount_bytes, byteorder='little')
+
+        logger.info(f"Decoded token account - Mint: {mint}, Amount: {amount}")
+        return {'mint': mint, 'amount': amount}
+    except Exception as e:
+        logger.error(f"Error decoding token account: {str(e)}")
+        return None
+
 async def fetch_assets(wallet_address):
     """Fetch assets for a given wallet address"""
-    logger.debug(f"Starting to fetch assets for wallet: {wallet_address}")
-    logger.debug(f"Using RPC endpoint: {RPC_ENDPOINT}")
+    logger.info(f"Starting to fetch assets for wallet: {wallet_address}")
+    logger.info(f"Using RPC endpoint: {RPC_ENDPOINT}")
+
     async_client = AsyncClient(RPC_ENDPOINT, commitment=Confirmed)
 
     try:
         pubkey = PublicKey(wallet_address)
-        logger.debug(f"Fetching token accounts for {wallet_address}")
+        logger.info(f"Fetching token accounts for {wallet_address}")
 
-        # Get token accounts with detailed logging
         response = await async_client.get_token_accounts_by_owner(
             pubkey,
             TokenAccountOpts(
@@ -77,64 +101,37 @@ async def fetch_assets(wallet_address):
             )
         )
 
-        logger.debug(f"Raw RPC response: {response}")
+        logger.info(f"Found {len(response.value) if hasattr(response, 'value') else 0} token accounts")
         tokens = []
         metadata_tasks = []
 
         if hasattr(response, 'value'):
-            logger.debug(f"Found {len(response.value)} token accounts")
             for account in response.value:
-                try:
-                    logger.debug(f"Processing account: {account}")
-                    account_data = account.account.data
-                    decoded = decode_account_data(account_data)
-
-                    if not decoded:
-                        logger.warning("Could not decode account data")
-                        continue
-
-                    # Extract mint and amount with detailed logging
-                    mint_bytes = decoded[0:32]
-                    mint = str(PublicKey(mint_bytes))
-                    logger.debug(f"Extracted mint address: {mint}")
-
-                    amount_bytes = decoded[64:72]
-                    amount = int.from_bytes(amount_bytes, byteorder='little')
-                    logger.debug(f"Raw amount: {amount}")
-
-                    # Remove the amount > 0 check temporarily to see all tokens
-                    metadata_tasks.append(get_token_metadata(mint))
+                token_data = await decode_token_account(account)
+                if token_data:
+                    metadata_tasks.append(get_token_metadata(token_data['mint']))
                     tokens.append({
-                        'mint': mint,
-                        'raw_amount': amount,
+                        'mint': token_data['mint'],
+                        'raw_amount': token_data['amount'],
                         'type': 'token'
                     })
-                    logger.debug(f"Added token: {mint} with raw amount: {amount}")
+                    logger.info(f"Added token: {token_data['mint']} with amount: {token_data['amount']}")
 
-                except Exception as e:
-                    logger.error(f"Error processing token account: {str(e)}")
-                    logger.exception("Full stack trace")
-                    continue
-
-            # Fetch metadata for all tokens
             if metadata_tasks:
-                logger.debug(f"Fetching metadata for {len(metadata_tasks)} tokens")
+                logger.info(f"Fetching metadata for {len(metadata_tasks)} tokens")
                 token_metadata = await asyncio.gather(*metadata_tasks)
 
-                # Update tokens with metadata and calculate correct amounts
                 for i, token in enumerate(tokens):
                     if i < len(token_metadata) and token_metadata[i]:
                         metadata = token_metadata[i]
                         decimals = metadata.get('decimals', 9)
-                        raw_amount = token.pop('raw_amount', 0)  # Remove raw_amount from token dict
+                        raw_amount = token.pop('raw_amount', 0)
 
                         token.update(metadata)
                         token['amount'] = raw_amount / (10 ** decimals)
-                        logger.debug(f"Processed token {token['mint']}: {token['amount']} {token['symbol']}")
-                    else:
-                        logger.warning(f"No metadata found for token {token['mint']}")
+                        logger.info(f"Processed token {token['mint']}: {token['amount']} {token['symbol']}")
 
-        logger.debug(f"Final tokens list: {tokens}")
+        logger.info(f"Final tokens list: {json.dumps(tokens, indent=2)}")
         return {'tokens': tokens, 'nfts': []}
 
     except Exception as e:
@@ -176,7 +173,7 @@ def get_assets():
 
     try:
         assets = async_to_sync(fetch_assets)(wallet_address)
-        logger.debug(f"Final assets structure: {json.dumps(assets, indent=2)}")
+        logger.info(f"Final assets structure: {json.dumps(assets, indent=2)}")
         return jsonify({
             'success': True,
             'assets': assets
