@@ -4,12 +4,9 @@
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Load Solana Web3 and SPL Token -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <script src="https://unpkg.com/@solana/spl-token@0.1.8/lib/index.iife.min.js"></script>
-    <script>
-        // Ensure SPL Token is available globally
-        window.splToken = window.spl_token;
-    </script>
 </head>
 <body>
     <div class="container">
@@ -36,326 +33,184 @@
             </div>
         </div>
         <div id="assetsContainer" class="assets-container" style="display: none">
-            <h2>Your Assets</h2>
-            <div class="loading-message" id="loadingMessage">Loading your assets...</div>
+            <div class="loading-message" id="loadingMessage" style="display: none">Loading assets...</div>
             <div class="error-message" id="errorMessage" style="display: none"></div>
-            <div class="assets-grid" id="assetsGrid" style="display: none">
-                <!-- Assets will be inserted here -->
-            </div>
+            <div id="assetsContent"></div>
         </div>
     </div>
 
     <script>
-        // Initialize SPL Token library
-        const splToken = window.splToken;
+        class PhantomWallet {
+            constructor() {
+                this.provider = null;
+                this.connection = null;
+                this.publicKey = null;
 
-        document.addEventListener('DOMContentLoaded', async function() {
-            // Verify libraries are loaded
-            console.log('Checking libraries:', {
-                solanaWeb3: !!window.solanaWeb3,
-                phantom: !!window.solana,
-                phantomIsPhantom: window.solana?.isPhantom,
-                splToken: !!splToken
-            });
+                // DOM elements
+                this.connectButton = document.getElementById('connectPhantom');
+                this.walletStatus = document.getElementById('walletStatus');
+                this.walletAddress = document.getElementById('walletAddress');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.loadingMessage = document.getElementById('loadingMessage');
+                this.assetsContainer = document.getElementById('assetsContainer');
+                this.networkSelect = document.getElementById('networkSelect');
 
-            const connectPhantomBtn = document.getElementById('connectPhantom');
-            const walletStatus = document.getElementById('walletStatus');
-            const walletAddress = document.getElementById('walletAddress');
-            const assetsContainer = document.getElementById('assetsContainer');
-            const loadingMessage = document.getElementById('loadingMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            const assetsGrid = document.getElementById('assetsGrid');
-            const networkSelect = document.getElementById('networkSelect');
-            const backButton = document.getElementById('backButton');
+                // Bind methods
+                this.connect = this.connect.bind(this);
+                this.disconnect = this.disconnect.bind(this);
+                this.initializeWallet = this.initializeWallet.bind(this);
 
-            let currentWallet = null;
-            let connection = null;
-
-            function showError(message) {
-                console.error('Error:', message);
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-                loadingMessage.style.display = 'none';
-                assetsGrid.style.display = 'none';
+                // Initialize
+                this.initializeWallet();
             }
 
-            function showLoading() {
-                loadingMessage.style.display = 'block';
-                errorMessage.style.display = 'none';
-                assetsGrid.style.display = 'none';
-            }
+            // Initialize wallet and set up event listeners
+            async initializeWallet() {
+                if (typeof window !== 'undefined') {
+                    if ('solana' in window) {
+                        const provider = window.solana;
+                        if (provider.isPhantom) {
+                            this.provider = provider;
+                            console.log('Phantom wallet found');
 
-            function getConnection() {
-                try {
-                    const network = networkSelect.value;
-                    const endpoint = network === 'devnet' 
-                        ? 'https://api.devnet.solana.com'
-                        : '{{ rpc_endpoint }}';
+                            // Setup listeners
+                            this.provider.on('connect', () => this.handleConnect());
+                            this.provider.on('disconnect', () => this.handleDisconnect());
+                            this.provider.on('accountChanged', () => this.handleAccountChanged());
 
-                    console.log(`Creating connection to ${endpoint}`);
-                    return new solanaWeb3.Connection(endpoint, 'confirmed');
-                } catch (err) {
-                    console.error('Error creating connection:', err);
-                    throw err;
-                }
-            }
-
-            async function connectPhantom() {
-                console.log('Starting Phantom wallet connection...');
-
-                if (!window.solana) {
-                    console.error('Phantom not found');
-                    showError('Please install the Phantom wallet extension');
-                    window.open('https://phantom.app/', '_blank');
-                    return;
-                }
-
-                try {
-                    console.log('Requesting wallet connection...');
-                    const resp = await window.solana.connect();
-                    console.log('Connection response:', resp);
-
-                    const publicKey = resp.publicKey.toString();
-                    console.log('Connected to wallet:', publicKey);
-
-                    currentWallet = window.solana;
-                    connection = getConnection();
-
-                    // Update UI
-                    connectPhantomBtn.style.display = 'none';
-                    walletStatus.style.display = 'block';
-                    walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
-                    assetsContainer.style.display = 'block';
-                    backButton.style.display = 'block';
-
-                    // Load assets
-                    await loadAssets(publicKey);
-
-                } catch (err) {
-                    console.error('Phantom connection error:', err);
-                    showError('Failed to connect Phantom wallet. Please try again.');
-                }
-            }
-
-            async function burnToken(mint, amount, decimals) {
-                try {
-                    showLoading();
-                    errorMessage.style.display = 'none';
-                    console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
-
-                    // Create connection
-                    connection = getConnection();
-
-                    // Convert mint string to PublicKey
-                    const mintPubkey = new solanaWeb3.PublicKey(mint);
-                    console.log('Mint public key:', mintPubkey.toString());
-
-                    // Convert amount to raw amount with decimals
-                    const rawAmount = Math.floor(amount * Math.pow(10, decimals));
-                    console.log('Raw amount to burn:', rawAmount);
-
-                    // Get associated token account
-                    const associatedTokenAddress = await splToken.getAssociatedTokenAddress(
-                        mintPubkey,
-                        currentWallet.publicKey
-                    );
-                    console.log('Associated token address:', associatedTokenAddress.toString());
-
-                    // Create burn instruction
-                    const burnInstruction = splToken.createBurnInstruction(
-                        associatedTokenAddress,
-                        mintPubkey,
-                        currentWallet.publicKey,
-                        rawAmount
-                    );
-
-                    // Create transaction
-                    const transaction = new solanaWeb3.Transaction();
-                    transaction.add(burnInstruction);
-                    transaction.feePayer = currentWallet.publicKey;
-
-                    // Get recent blockhash
-                    const blockhash = await connection.getRecentBlockhash();
-                    transaction.recentBlockhash = blockhash.blockhash;
-
-                    try {
-                        // Request signing from wallet
-                        const signed = await currentWallet.signTransaction(transaction);
-                        console.log('Transaction signed successfully');
-
-                        // Send transaction
-                        const signature = await connection.sendRawTransaction(signed.serialize());
-                        console.log('Transaction sent:', signature);
-
-                        // Wait for confirmation
-                        const confirmation = await connection.confirmTransaction(signature);
-                        console.log('Transaction confirmation:', confirmation);
-
-                        if (confirmation.value.err) {
-                            throw new Error('Transaction failed to confirm');
+                            // Check if already connected
+                            if (this.provider.isConnected) {
+                                this.handleConnect();
+                            }
+                        } else {
+                            console.log('Phantom wallet not found');
                         }
+                    }
+                }
 
-                        // Show success message with explorer link
-                        const network = networkSelect.value;
-                        const explorerUrl = `https://explorer.solana.com/tx/${signature}${network === 'devnet' ? '?cluster=devnet' : ''}`;
-                        const successMsg = document.createElement('div');
-                        successMsg.className = 'status-message success';
-                        successMsg.innerHTML = `Successfully burned ${amount} tokens. 
-                            <a href="${explorerUrl}" target="_blank" class="explorer-link">View transaction</a>`;
-                        errorMessage.before(successMsg);
-                        setTimeout(() => successMsg.remove(), 10000);
+                // Add click listener to connect button
+                this.connectButton.addEventListener('click', this.connect);
+            }
 
-                        // Refresh token list
-                        await loadAssets(currentWallet.publicKey.toString());
-                        return true;
-                    } catch (err) {
-                        console.error('Transaction error:', err);
-                        if (err.message.includes('User rejected')) {
-                            throw new Error('Transaction rejected by user');
-                        }
-                        throw err;
+            // Connect to wallet
+            async connect() {
+                this.showLoading('Connecting to wallet...');
+                try {
+                    if (!this.provider) {
+                        throw new Error('Phantom wallet not installed');
+                    }
+
+                    // Request connection
+                    await this.provider.connect();
+
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    if (error.message.includes('not installed')) {
+                        window.open('https://phantom.app/', '_blank');
+                    }
+                    this.showError(`Failed to connect: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            // Handle successful connection
+            async handleConnect() {
+                try {
+                    if (this.provider.publicKey) {
+                        this.publicKey = this.provider.publicKey;
+                        const address = this.publicKey.toString();
+                        console.log('Connected to wallet:', address);
+
+                        // Update UI
+                        this.connectButton.style.display = 'none';
+                        this.walletStatus.style.display = 'block';
+                        this.walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                        this.assetsContainer.style.display = 'block';
+
+                        // Initialize connection
+                        const endpoint = this.networkSelect.value === 'devnet' 
+                            ? 'https://api.devnet.solana.com'
+                            : '{{ rpc_endpoint }}';
+                        this.connection = new solanaWeb3.Connection(endpoint);
+
+                        // Load assets
+                        await this.loadAssets();
                     }
                 } catch (error) {
-                    console.error('Burn error:', error);
-                    showError(`Failed to burn token: ${error.message}`);
-                    return false;
-                } finally {
-                    loadingMessage.style.display = 'none';
+                    console.error('Error in handleConnect:', error);
+                    this.showError(error.message);
                 }
             }
 
-            async function loadAssets(publicKey) {
-                showLoading();
+            // Handle disconnection
+            handleDisconnect() {
+                console.log('Wallet disconnected');
+                this.publicKey = null;
+                this.connection = null;
+
+                // Update UI
+                this.connectButton.style.display = 'block';
+                this.walletStatus.style.display = 'none';
+                this.assetsContainer.style.display = 'none';
+            }
+
+            // Handle account change
+            handleAccountChanged() {
+                console.log('Account changed, refreshing...');
+                window.location.reload();
+            }
+
+            // Utility functions
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+                this.loadingMessage.style.display = 'none';
+            }
+
+            showLoading(message = 'Loading...') {
+                this.loadingMessage.textContent = message;
+                this.loadingMessage.style.display = 'block';
+                this.errorMessage.style.display = 'none';
+            }
+
+            hideLoading() {
+                this.loadingMessage.style.display = 'none';
+            }
+
+            // Asset loading
+            async loadAssets() {
+                if (!this.publicKey) return;
+
+                this.showLoading('Loading your assets...');
                 try {
-                    const response = await fetch(`/assets?wallet=${publicKey}`);
+                    const response = await fetch(`/assets?wallet=${this.publicKey.toString()}`);
                     const data = await response.json();
 
                     if (!data.success) {
-                        throw new Error(data.message || 'Failed to fetch assets');
+                        throw new Error(data.message || 'Failed to load assets');
                     }
 
-                    console.log('Assets data:', data);
+                    // Update UI with assets
+                    const assetsContent = document.getElementById('assetsContent');
+                    assetsContent.innerHTML = ''; // Clear existing content
 
-                    assetsGrid.innerHTML = '';
-                    const tokenSection = document.createElement('div');
-                    tokenSection.className = 'asset-section';
-                    tokenSection.innerHTML = '<h3>Tokens</h3>';
-
-                    const assets = data.assets;
-                    if (!assets.tokens || assets.tokens.length === 0) {
-                        assetsGrid.innerHTML = `
-                            <div class="no-assets">
-                                <p>No tokens found in your wallet</p>
-                                <p class="debug-info">Network: ${networkSelect.value}</p>
-                                <p class="debug-info">Wallet: ${currentWallet.publicKey.toString()}</p>
-                            </div>
-                        `;
-                    } else {
-                        console.log('Processing tokens:', assets.tokens);
-                        assets.tokens.forEach(token => {
-                            const tokenCard = document.createElement('div');
-                            tokenCard.className = 'asset-card';
-                            const displayName = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
-                            const displaySymbol = token.symbol || 'Unknown';
-
-                            tokenCard.innerHTML = `
-                                <h4>${displayName}</h4>
-                                <p>Symbol: ${displaySymbol}</p>
-                                <p>Amount: ${token.amount}</p>
-                                <p class="token-address">
-                                    <a href="${token.explorer_url}" target="_blank" class="explorer-link">
-                                        View on Explorer
-                                    </a>
-                                </p>
-                                ${token.icon ? `<img src="${token.icon}" alt="${displaySymbol}" class="token-icon"/>` : ''}
-                                <div class="burn-controls">
-                                    <input type="number" 
-                                           class="burn-amount" 
-                                           placeholder="Amount to burn" 
-                                           min="0" 
-                                           max="${token.amount}"
-                                           step="0.000001"/>
-                                    <button class="burn-button" 
-                                            data-mint="${token.mint}"
-                                            data-decimals="${token.decimals || 9}">
-                                        Burn Token
-                                    </button>
-                                </div>
-                            `;
-
-                            // Add burn button event listener
-                            const burnButton = tokenCard.querySelector('.burn-button');
-                            const burnInput = tokenCard.querySelector('.burn-amount');
-
-                            burnButton.addEventListener('click', async () => {
-                                const amount = parseFloat(burnInput.value);
-                                if (!amount || amount <= 0 || amount > token.amount) {
-                                    showError('Please enter a valid amount to burn');
-                                    return;
-                                }
-
-                                const success = await burnToken(
-                                    burnButton.dataset.mint,
-                                    amount,
-                                    parseInt(burnButton.dataset.decimals)
-                                );
-
-                                if (success) {
-                                    tokenCard.classList.add('burned');
-                                    setTimeout(() => loadAssets(currentWallet.publicKey.toString()), 1000);
-                                }
-                            });
-
-                            tokenSection.appendChild(tokenCard);
-                        });
-                        assetsGrid.appendChild(tokenSection);
-                    }
-
-                    loadingMessage.style.display = 'none';
-                    errorMessage.style.display = 'none';
-                    assetsGrid.style.display = 'block';
+                    // Add assets display logic here
+                    console.log('Assets loaded:', data);
 
                 } catch (error) {
                     console.error('Error loading assets:', error);
-                    showError(`Failed to load assets: ${error.message}`);
+                    this.showError(`Failed to load assets: ${error.message}`);
+                } finally {
+                    this.hideLoading();
                 }
             }
+        }
 
-            // Event Listeners
-            connectPhantomBtn.addEventListener('click', () => {
-                console.log('Connect button clicked');
-                connectPhantom().catch(err => {
-                    console.error('Connection error:', err);
-                    showError('Failed to connect: ' + err.message);
-                });
-            });
-
-            networkSelect.addEventListener('change', async () => {
-                if (currentWallet && currentWallet.publicKey) {
-                    connection = getConnection();
-                    await loadAssets(currentWallet.publicKey.toString());
-                }
-            });
-
-            // Back button functionality
-            backButton.addEventListener('click', () => {
-                // Reset view to initial state
-                assetsContainer.style.display = 'none';
-                walletStatus.style.display = 'none';
-                connectPhantomBtn.style.display = 'block';
-                backButton.style.display = 'none';
-
-                // Disconnect wallet if connected
-                if (currentWallet && currentWallet.disconnect) {
-                    try {
-                        currentWallet.disconnect();
-                    } catch (err) {
-                        console.error('Error disconnecting wallet:', err);
-                    }
-                }
-                currentWallet = null;
-                connection = null;
-            });
+        // Initialize wallet handler when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing wallet handler...');
+            window.phantomWallet = new PhantomWallet();
         });
     </script>
 </body>
