@@ -102,8 +102,19 @@
                                 <p>No tokens found in your wallet</p>
                                 <p class="debug-info">Network: ${networkSelect.value}</p>
                                 <p class="debug-info">Wallet: ${currentWallet.publicKey.toString()}</p>
+                                <p class="debug-info">RPC Status: ${connection ? 'Connected' : 'Not Connected'}</p>
                             </div>
                         `;
+                        
+                        //<script> tags added here
+                        const debugScript = document.createElement('script');
+                        debugScript.textContent = `
+                            console.log('Network:', networkSelect.value);
+                            console.log('Wallet:', currentWallet.publicKey.toString());
+                            console.log('Connection:', connection);
+                        `;
+                        assetsGrid.appendChild(debugScript);
+
                     } else {
                         console.log('Processing tokens:', assets.tokens);
                         assets.tokens.forEach(token => {

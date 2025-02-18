@@ -102,15 +102,14 @@ async def fetch_assets(wallet_address):
                     amount = int.from_bytes(amount_bytes, byteorder='little')
                     logger.debug(f"Raw amount: {amount}")
 
-                    # Only include tokens with non-zero balances
-                    if amount > 0:
-                        metadata_tasks.append(get_token_metadata(mint))
-                        tokens.append({
-                            'mint': mint,
-                            'raw_amount': amount,  # Store raw amount to calculate with correct decimals later
-                            'type': 'token'
-                        })
-                        logger.debug(f"Added token: {mint} with raw amount: {amount}")
+                    # Remove the amount > 0 check temporarily to see all tokens
+                    metadata_tasks.append(get_token_metadata(mint))
+                    tokens.append({
+                        'mint': mint,
+                        'raw_amount': amount,
+                        'type': 'token'
+                    })
+                    logger.debug(f"Added token: {mint} with raw amount: {amount}")
 
                 except Exception as e:
                     logger.error(f"Error processing token account: {str(e)}")
@@ -134,8 +133,6 @@ async def fetch_assets(wallet_address):
                         logger.debug(f"Processed token {token['mint']}: {token['amount']} {token['symbol']}")
                     else:
                         logger.warning(f"No metadata found for token {token['mint']}")
-            else:
-                logger.warning("No valid tokens found to fetch metadata for")
 
         logger.debug(f"Final tokens list: {tokens}")
         return {'tokens': tokens, 'nfts': []}
