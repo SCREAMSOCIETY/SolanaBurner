@@ -107,37 +107,34 @@ def get_assets():
 
                         # Handle parsed data
                         parsed_data = account_data.get('data', {})
-                        if isinstance(parsed_data, dict):
-                            parsed_info = parsed_data.get('parsed', {}).get('info', {})
-                        else:
-                            # If data is not parsed, skip this account
-                            continue
+                        if isinstance(parsed_data, list) and len(parsed_data) > 0:
+                            # Handle base64 encoded data
+                            decoded = decode_account_data(parsed_data)
+                            if decoded:
+                                logger.debug(f"Successfully decoded account data: {decoded}")
+                                # Extract mint address from decoded data (bytes 0-32)
+                                mint = decoded[0:32].hex()
+                                # Extract amount from decoded data (bytes 64-72)
+                                amount_bytes = decoded[64:72]
+                                amount = int.from_bytes(amount_bytes, byteorder='little')
+                                decimals = 9  # Default for most SPL tokens
 
-                        # Extract token information
-                        mint = parsed_info.get('mint')
-                        token_amount = parsed_info.get('tokenAmount', {})
-
-                        if not mint or not token_amount:
-                            continue
-
-                        amount = float(token_amount.get('amount', '0')) / (10 ** token_amount.get('decimals', 0))
-
-                        if amount > 0:
-                            metadata_tasks.append(get_token_metadata(mint))
-                            if token_amount.get('decimals', 0) == 0 and token_amount.get('amount', '0') == '1':
-                                nfts.append({
-                                    'mint': mint,
-                                    'name': f'NFT {mint[:4]}...{mint[-4:]}',
-                                    'type': 'nft',
-                                    'explorer_url': f"https://solscan.io/token/{mint}"
-                                })
-                            else:
-                                tokens.append({
-                                    'mint': mint,
-                                    'amount': amount,
-                                    'decimals': token_amount.get('decimals', 0),
-                                    'type': 'token'
-                                })
+                                if amount > 0:
+                                    metadata_tasks.append(get_token_metadata(mint))
+                                    if decimals == 0 and amount == 1:
+                                        nfts.append({
+                                            'mint': mint,
+                                            'name': f'NFT {mint[:4]}...{mint[-4:]}',
+                                            'type': 'nft',
+                                            'explorer_url': f"https://solscan.io/token/{mint}"
+                                        })
+                                    else:
+                                        tokens.append({
+                                            'mint': mint,
+                                            'amount': amount / (10 ** decimals),
+                                            'decimals': decimals,
+                                            'type': 'token'
+                                        })
 
                     except Exception as e:
                         logger.error(f"Error processing token account: {str(e)}")
