@@ -92,56 +92,57 @@ def get_assets():
 
                 logger.debug(f"Raw token accounts response: {response}")
 
-                if not response or not hasattr(response, 'value'):
-                    logger.error("No token accounts found or invalid response structure")
-                    return {'tokens': [], 'nfts': [], 'vacant_accounts': []}
-
                 tokens = []
                 nfts = []
                 metadata_tasks = []
 
-                for account in response.value:
-                    try:
-                        logger.debug(f"Processing account: {account}")
-                        account_data = account.account.data
+                if hasattr(response, 'value'):
+                    for account in response.value:
+                        try:
+                            logger.debug(f"Processing account: {account}")
+                            account_data = account.account.data
 
-                        # Handle base64 encoded data
-                        decoded = decode_account_data(account_data)
+                            # Handle base64 encoded data
+                            decoded = decode_account_data(account_data)
+                            if not decoded:
+                                logger.warning(f"Could not decode account data for {account.pubkey}")
+                                continue
 
-                        if decoded:
                             # Extract mint address from decoded data (bytes 0-32)
                             mint_bytes = decoded[0:32]
-                            mint = ''.join(format(x, '02x') for x in mint_bytes)
+                            mint = str(PublicKey(mint_bytes))
 
                             # Extract amount from decoded data (bytes 64-72)
                             amount_bytes = decoded[64:72]
                             amount = int.from_bytes(amount_bytes, byteorder='little')
-                            decimals = 9  # Default for most SPL tokens
 
-                            logger.debug(f"Extracted mint: {mint}, amount: {amount}, decimals: {decimals}")
+                            logger.debug(f"Extracted mint: {mint}, amount: {amount}")
 
                             if amount > 0:
                                 metadata_tasks.append(get_token_metadata(mint))
                                 tokens.append({
                                     'mint': mint,
-                                    'amount': amount / (10 ** decimals),
-                                    'decimals': decimals,
+                                    'amount': amount / (10 ** 9),  # Most tokens use 9 decimals
+                                    'decimals': 9,
                                     'type': 'token'
                                 })
 
-                    except Exception as e:
-                        logger.error(f"Error processing token account: {str(e)}")
-                        logger.exception("Full exception trace")
-                        continue
+                        except Exception as e:
+                            logger.error(f"Error processing token account: {str(e)}")
+                            logger.exception("Full exception trace")
+                            continue
 
-                # Fetch metadata for all tokens
-                logger.debug(f"Fetching metadata for {len(metadata_tasks)} tokens")
-                token_metadata = await asyncio.gather(*metadata_tasks)
+                    # Fetch metadata for all tokens
+                    if metadata_tasks:
+                        logger.debug(f"Fetching metadata for {len(metadata_tasks)} tokens")
+                        token_metadata = await asyncio.gather(*metadata_tasks)
 
-                # Update tokens with metadata
-                for i, token in enumerate(tokens):
-                    if i < len(token_metadata) and token_metadata[i]:
-                        token.update(token_metadata[i])
+                        # Update tokens with metadata
+                        for i, token in enumerate(tokens):
+                            if i < len(token_metadata) and token_metadata[i]:
+                                token.update(token_metadata[i])
+                    else:
+                        logger.warning("No valid tokens found to fetch metadata for")
 
                 assets = {
                     'tokens': tokens,
