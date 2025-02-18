@@ -80,7 +80,11 @@
                 const endpoint = networkSelect.value === 'devnet' 
                     ? 'https://api.devnet.solana.com'
                     : '{{ rpc_endpoint }}';
-                return new solanaWeb3.Connection(endpoint, 'confirmed');
+                console.log('Using RPC endpoint:', endpoint);
+                return new solanaWeb3.Connection(endpoint, {
+                    commitment: 'confirmed',
+                    wsEndpoint: false
+                });
             }
 
             async function burnToken(mint, amount, decimals) {
@@ -130,7 +134,9 @@
                     const transaction = new solanaWeb3.Transaction().add(burnIx);
                     transaction.feePayer = walletPubkey;
 
-                    const { blockhash } = await connection.getRecentBlockhash();
+                    console.log('Getting recent blockhash...');
+                    const { blockhash } = await connection.getRecentBlockhash('confirmed');
+                    console.log('Got blockhash:', blockhash);
                     transaction.recentBlockhash = blockhash;
 
                     console.log('Sending transaction for signature...');
