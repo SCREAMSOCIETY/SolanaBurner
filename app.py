@@ -46,9 +46,15 @@ async def get_token_metadata(mint_address):
 def decode_account_data(data):
     """Decode base64 account data"""
     try:
-        decoded = base64.b64decode(data[0])
+        if isinstance(data, str):
+            decoded = base64.b64decode(data)
+        elif isinstance(data, list) and len(data) > 0:
+            decoded = base64.b64decode(data[0])
+        else:
+            return None  # Handle cases where data is not a string or list
+
         # Log the decoded data for debugging
-        logger.debug(f"Decoded account data: {decoded.hex()}")
+        logger.debug(f"Decoded account data length: {len(decoded)}")
         return decoded
     except Exception as e:
         logger.error(f"Error decoding account data: {str(e)}")
@@ -96,47 +102,32 @@ def get_assets():
 
                 for account in response.value:
                     try:
-                        # Log the raw account data for debugging
                         logger.debug(f"Processing account: {account}")
+                        account_data = account.account.data
 
-                        # Extract account data
-                        if hasattr(account, 'account'):
-                            account_data = account.account
-                        else:
-                            account_data = account.get('account', {})
+                        # Handle base64 encoded data
+                        decoded = decode_account_data(account_data)
 
-                        # Handle parsed data
-                        parsed_data = account_data.get('data', {})
-                        if isinstance(parsed_data, list) and len(parsed_data) > 0:
-                            # Handle base64 encoded data
-                            decoded = decode_account_data(parsed_data)
-                            if decoded:
-                                logger.debug(f"Successfully decoded account data: {decoded.hex()}")
-                                # Extract mint address from decoded data (bytes 0-32)
-                                mint = decoded[0:32].hex()
-                                # Extract amount from decoded data (bytes 64-72)
-                                amount_bytes = decoded[64:72]
-                                amount = int.from_bytes(amount_bytes, byteorder='little')
-                                decimals = 9  # Default for most SPL tokens
+                        if decoded:
+                            # Extract mint address from decoded data (bytes 0-32)
+                            mint_bytes = decoded[0:32]
+                            mint = ''.join(format(x, '02x') for x in mint_bytes)
 
-                                logger.debug(f"Extracted mint: {mint}, amount: {amount}, decimals: {decimals}")
+                            # Extract amount from decoded data (bytes 64-72)
+                            amount_bytes = decoded[64:72]
+                            amount = int.from_bytes(amount_bytes, byteorder='little')
+                            decimals = 9  # Default for most SPL tokens
 
-                                if amount > 0:
-                                    metadata_tasks.append(get_token_metadata(mint))
-                                    if decimals == 0 and amount == 1:
-                                        nfts.append({
-                                            'mint': mint,
-                                            'name': f'NFT {mint[:4]}...{mint[-4:]}',
-                                            'type': 'nft',
-                                            'explorer_url': f"https://solscan.io/token/{mint}"
-                                        })
-                                    else:
-                                        tokens.append({
-                                            'mint': mint,
-                                            'amount': amount / (10 ** decimals),
-                                            'decimals': decimals,
-                                            'type': 'token'
-                                        })
+                            logger.debug(f"Extracted mint: {mint}, amount: {amount}, decimals: {decimals}")
+
+                            if amount > 0:
+                                metadata_tasks.append(get_token_metadata(mint))
+                                tokens.append({
+                                    'mint': mint,
+                                    'amount': amount / (10 ** decimals),
+                                    'decimals': decimals,
+                                    'type': 'token'
+                                })
 
                     except Exception as e:
                         logger.error(f"Error processing token account: {str(e)}")
@@ -152,30 +143,13 @@ def get_assets():
                     if i < len(token_metadata) and token_metadata[i]:
                         token.update(token_metadata[i])
 
-                # Get vacant accounts
-                vacant_response = await async_client.get_program_accounts(
-                    pubkey,
-                    commitment=Confirmed,
-                    encoding='jsonParsed',
-                    filters=[{'dataSize': 0}]
-                )
-
-                logger.debug(f"Vacant accounts response: {vacant_response}")
-
-                vacant_accounts = []
-                if hasattr(vacant_response, 'value'):
-                    vacant_accounts = [{
-                        'address': str(account.pubkey),
-                        'type': 'vacant',
-                        'explorer_url': f"https://solscan.io/account/{str(account.pubkey)}"
-                    } for account in vacant_response.value]
-
                 assets = {
                     'tokens': tokens,
                     'nfts': nfts,
-                    'vacant_accounts': vacant_accounts
+                    'vacant_accounts': []
                 }
-                logger.debug(f"Returning assets: {json.dumps(assets, indent=2)}")
+
+                logger.debug(f"Final assets structure: {json.dumps(assets, indent=2)}")
                 return assets
 
             except Exception as e:
