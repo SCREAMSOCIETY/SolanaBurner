@@ -5,7 +5,7 @@
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.3.9/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.3.9/lib/index.iife.js"></script>
 </head>
 <body>
     <div class="container">
@@ -42,7 +42,12 @@
     </div>
 
     <script>
+        // Initialize SPL Token library
+        const splToken = window.SplToken;
+
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('SPL Token library loaded:', !!splToken);
+
             const connectPhantomBtn = document.getElementById('connectPhantom');
             const walletStatus = document.getElementById('walletStatus');
             const walletAddress = document.getElementById('walletAddress');
@@ -104,6 +109,11 @@
                     showLoading();
                     errorMessage.style.display = 'none';
                     console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
+
+                    // Verify SPL Token library is loaded
+                    if (!splToken) {
+                        throw new Error('SPL Token library not loaded');
+                    }
 
                     // Create connection
                     connection = getConnection();
