@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-solana_client = Client("https://api.mainnet-beta.solana.com")
+# Change to devnet for testing
+solana_client = Client("https://api.devnet.solana.com")
+NETWORK = "devnet"  # Add network information
 
 # Asset types for demonstration
 ASSET_TYPES = {
@@ -32,7 +34,7 @@ ASSET_TYPES = {
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', network=NETWORK)
 
 @app.route('/assets', methods=['GET'])
 def get_assets():
