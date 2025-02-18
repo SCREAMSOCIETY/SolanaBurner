@@ -19,6 +19,9 @@ SOLANA_EXPLORER_API = "https://api.explorer.solana.com/v1"
 
 async def make_rpc_call(method, params):
     """Make a direct RPC call to Solana"""
+    logger.info(f"Making RPC call to endpoint: {RPC_ENDPOINT}")
+    logger.info(f"Method: {method}")
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
