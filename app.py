@@ -45,34 +45,53 @@ def get_assets():
                     {'programId': PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')}
                 )
                 logger.debug(f"Found {len(token_accounts.value) if token_accounts.value else 0} token accounts")
+                logger.debug(f"Token accounts data: {token_accounts.value}")
 
                 tokens = []
                 nfts = []
 
                 for account in token_accounts.value:
                     try:
-                        token_data = account.account.data.parsed['info']
-                        token_amount = float(token_data['tokenAmount']['amount']) / (10 ** token_data['tokenAmount']['decimals'])
+                        # Log the raw account data for debugging
+                        logger.debug(f"Processing account: {account}")
 
-                        if token_amount > 0:
-                            if token_data['tokenAmount']['decimals'] == 0 and token_data['tokenAmount']['amount'] == '1':
+                        parsed_data = account['account']['data']['parsed']
+                        logger.debug(f"Parsed data: {parsed_data}")
+
+                        if 'info' not in parsed_data:
+                            logger.warning(f"No 'info' in parsed data for account")
+                            continue
+
+                        token_info = parsed_data['info']
+                        mint = token_info.get('mint')
+                        token_amount = token_info.get('tokenAmount')
+
+                        if not mint or not token_amount:
+                            logger.warning(f"Missing mint or token amount for account")
+                            continue
+
+                        amount = float(token_amount['amount']) / (10 ** token_amount['decimals'])
+
+                        if amount > 0:
+                            if token_amount['decimals'] == 0 and token_amount['amount'] == '1':
                                 # This is likely an NFT
                                 nfts.append({
-                                    'mint': token_data['mint'],
-                                    'name': f'NFT {token_data["mint"][:4]}...{token_data["mint"][-4:]}',
+                                    'mint': mint,
+                                    'name': f'NFT {mint[:4]}...{mint[-4:]}',
                                     'type': 'nft'
                                 })
                             else:
                                 # This is a token
                                 tokens.append({
-                                    'mint': token_data['mint'],
-                                    'amount': token_amount,
-                                    'decimals': token_data['tokenAmount']['decimals'],
-                                    'name': f'Token {token_data["mint"][:4]}...{token_data["mint"][-4:]}',
+                                    'mint': mint,
+                                    'amount': amount,
+                                    'decimals': token_amount['decimals'],
+                                    'name': f'Token {mint[:4]}...{mint[-4:]}',
                                     'type': 'token'
                                 })
-                    except (KeyError, AttributeError) as e:
+                    except Exception as e:
                         logger.error(f"Error processing token account: {str(e)}")
+                        logger.exception("Full exception trace")
                         continue
 
                 # Get vacant accounts (accounts with 0 SOL that can be closed)
@@ -97,6 +116,7 @@ def get_assets():
                 }
             except Exception as e:
                 logger.error(f"Error in fetch_assets: {str(e)}")
+                logger.exception("Full exception trace")
                 raise
             finally:
                 await async_client.close()
@@ -109,6 +129,7 @@ def get_assets():
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
+        logger.exception("Full exception trace")
         return jsonify({
             'success': False,
             'message': str(e)
@@ -165,6 +186,7 @@ def burn_assets():
         }), 400
     except Exception as e:
         logger.error(f"Error in burn_assets: {str(e)}")
+        logger.exception("Full exception trace")
         return jsonify({
             'success': False,
             'message': str(e)
