@@ -1,40 +1,50 @@
 import logging
 from flask import Flask, render_template, request, jsonify
-from solana.rpc.async_api import AsyncClient
-from solana.publickey import PublicKey
-from solana.rpc.commitment import Confirmed
-from solana.rpc.types import TokenAccountOpts
-from asgiref.sync import async_to_sync
-import os
-from dotenv import load_dotenv
 import httpx
 import asyncio
 import base64
 import json
+import os
+from dotenv import load_dotenv
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 app = Flask(__name__)
-# Get RPC endpoint from environment variables
 RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL', 'https://api.devnet.solana.com')
 SOLANA_EXPLORER_API = "https://api.explorer.solana.com/v1"
+
+async def make_rpc_call(method, params):
+    """Make a direct RPC call to Solana"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                RPC_ENDPOINT,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": method,
+                    "params": params
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"RPC call failed: {str(e)}")
+            raise
 
 async def get_token_metadata(mint_address):
     """Fetch token metadata from Solana Explorer API"""
     try:
-        logger.debug(f"Fetching metadata for token: {mint_address}")
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{SOLANA_EXPLORER_API}/token-metadata/{mint_address}",
                 timeout=10.0
             )
-
-            logger.debug(f"Solana Explorer API response status: {response.status_code}")
-            logger.debug(f"Solana Explorer API response: {response.text}")
 
             if response.status_code == 200:
                 data = response.json()
@@ -45,11 +55,8 @@ async def get_token_metadata(mint_address):
                     'decimals': data.get('decimals', 9),
                     'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                 }
-            else:
-                logger.warning(f"Failed to fetch metadata from Solana Explorer. Status: {response.status_code}")
     except Exception as e:
         logger.error(f"Error fetching token metadata: {str(e)}")
-        logger.exception("Full exception trace")
 
     return {
         'symbol': 'Unknown',
@@ -59,63 +66,49 @@ async def get_token_metadata(mint_address):
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
-async def decode_token_account(account):
-    """Decode token account data with detailed logging"""
-    try:
-        account_data = account.account.data
-        decoded = decode_account_data(account_data)
-
-        if not decoded:
-            logger.warning("Could not decode account data")
-            return None
-
-        # Extract mint address (first 32 bytes)
-        mint_bytes = decoded[0:32]
-        mint = str(PublicKey(mint_bytes))
-
-        # Extract amount (bytes 64-72)
-        amount_bytes = decoded[64:72]
-        amount = int.from_bytes(amount_bytes, byteorder='little')
-
-        logger.info(f"Decoded token account - Mint: {mint}, Amount: {amount}")
-        return {'mint': mint, 'amount': amount}
-    except Exception as e:
-        logger.error(f"Error decoding token account: {str(e)}")
-        return None
-
 async def fetch_assets(wallet_address):
-    """Fetch assets for a given wallet address"""
-    logger.info(f"Starting to fetch assets for wallet: {wallet_address}")
-    logger.info(f"Using RPC endpoint: {RPC_ENDPOINT}")
-
-    async_client = AsyncClient(RPC_ENDPOINT, commitment=Confirmed)
+    """Fetch assets using direct RPC calls"""
+    logger.info(f"Fetching assets for wallet: {wallet_address}")
 
     try:
-        pubkey = PublicKey(wallet_address)
-        logger.info(f"Fetching token accounts for {wallet_address}")
-
-        response = await async_client.get_token_accounts_by_owner(
-            pubkey,
-            TokenAccountOpts(
-                program_id=PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-            )
+        # Get all token accounts
+        token_accounts_response = await make_rpc_call(
+            "getTokenAccountsByOwner",
+            [
+                wallet_address,
+                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+                {"encoding": "jsonParsed"}
+            ]
         )
 
-        logger.info(f"Found {len(response.value) if hasattr(response, 'value') else 0} token accounts")
+        logger.info(f"Token accounts response: {json.dumps(token_accounts_response, indent=2)}")
+
         tokens = []
         metadata_tasks = []
 
-        if hasattr(response, 'value'):
-            for account in response.value:
-                token_data = await decode_token_account(account)
-                if token_data:
-                    metadata_tasks.append(get_token_metadata(token_data['mint']))
-                    tokens.append({
-                        'mint': token_data['mint'],
-                        'raw_amount': token_data['amount'],
-                        'type': 'token'
-                    })
-                    logger.info(f"Added token: {token_data['mint']} with amount: {token_data['amount']}")
+        if "result" in token_accounts_response:
+            accounts = token_accounts_response["result"]["value"]
+            logger.info(f"Found {len(accounts)} token accounts")
+
+            for account in accounts:
+                try:
+                    parsed_data = account["account"]["data"]["parsed"]["info"]
+                    mint = parsed_data["mint"]
+                    amount = int(parsed_data["tokenAmount"]["amount"])
+                    decimals = parsed_data["tokenAmount"]["decimals"]
+
+                    if amount > 0:
+                        metadata_tasks.append(get_token_metadata(mint))
+                        tokens.append({
+                            'mint': mint,
+                            'raw_amount': amount,
+                            'decimals': decimals,
+                            'type': 'token'
+                        })
+                        logger.info(f"Added token: {mint} with amount: {amount}")
+                except Exception as e:
+                    logger.error(f"Error processing token account: {str(e)}")
+                    continue
 
             if metadata_tasks:
                 logger.info(f"Fetching metadata for {len(metadata_tasks)} tokens")
@@ -124,8 +117,8 @@ async def fetch_assets(wallet_address):
                 for i, token in enumerate(tokens):
                     if i < len(token_metadata) and token_metadata[i]:
                         metadata = token_metadata[i]
-                        decimals = metadata.get('decimals', 9)
                         raw_amount = token.pop('raw_amount', 0)
+                        decimals = token.pop('decimals', 9)
 
                         token.update(metadata)
                         token['amount'] = raw_amount / (10 ** decimals)
@@ -138,31 +131,9 @@ async def fetch_assets(wallet_address):
         logger.error(f"Error in fetch_assets: {str(e)}")
         logger.exception("Full stack trace")
         raise
-    finally:
-        await async_client.close()
-
-def decode_account_data(data):
-    """Decode base64 account data"""
-    try:
-        if isinstance(data, str):
-            decoded = base64.b64decode(data)
-        elif isinstance(data, list) and len(data) > 0:
-            decoded = base64.b64decode(data[0])
-        else:
-            logger.error(f"Invalid data format: {type(data)}")
-            return None
-
-        # Log the decoded data for debugging
-        logger.debug(f"Decoded account data length: {len(decoded)} bytes")
-        logger.debug(f"Raw decoded data: {decoded.hex()}")
-        return decoded
-    except Exception as e:
-        logger.error(f"Error decoding account data: {str(e)}")
-        return None
 
 @app.route('/')
 def index():
-    # Pass the RPC endpoint to the template
     return render_template('index.html', rpc_endpoint=RPC_ENDPOINT)
 
 @app.route('/assets', methods=['GET'])
@@ -172,8 +143,11 @@ def get_assets():
         return jsonify({'success': False, 'message': 'Wallet address is required'}), 400
 
     try:
-        assets = async_to_sync(fetch_assets)(wallet_address)
-        logger.info(f"Final assets structure: {json.dumps(assets, indent=2)}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        assets = loop.run_until_complete(fetch_assets(wallet_address))
+        loop.close()
+
         return jsonify({
             'success': True,
             'assets': assets
