@@ -18,6 +18,12 @@
         </div>
         <div class="burn-form" id="burnForm" style="display: none">
             <div class="input-group">
+                <label for="tokenSelect">Select Token:</label>
+                <select id="tokenSelect" required>
+                    <option value="">Select a token</option>
+                </select>
+            </div>
+            <div class="input-group">
                 <label for="amount">Amount to Burn:</label>
                 <input type="number" id="amount" step="0.000001" min="0">
             </div>
@@ -33,7 +39,25 @@
             const burnForm = document.getElementById('burnForm');
             const burnButton = document.getElementById('burnButton');
             const statusMessage = document.getElementById('statusMessage');
-            
+            const tokenSelect = document.getElementById('tokenSelect');
+
+            // Fetch available tokens
+            fetch('/tokens')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        data.tokens.forEach(token => {
+                            const option = document.createElement('option');
+                            option.value = token.mint;
+                            option.textContent = `${token.name} (${token.symbol})`;
+                            tokenSelect.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching tokens:', error);
+                });
+
             connectButton.addEventListener('click', async () => {
                 try {
                     const resp = await window.solana.connect();
@@ -50,23 +74,36 @@
 
             burnButton.addEventListener('click', async () => {
                 const amount = document.getElementById('amount').value;
+                const tokenMint = tokenSelect.value;
+
+                if (!tokenMint) {
+                    statusMessage.textContent = 'Please select a token';
+                    statusMessage.className = 'status-message error';
+                    return;
+                }
+
                 if (!amount || amount <= 0) {
                     statusMessage.textContent = 'Please enter a valid amount';
                     statusMessage.className = 'status-message error';
                     return;
                 }
-                
+
                 try {
                     const response = await fetch('/burn', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ amount }),
+                        body: JSON.stringify({ amount, tokenMint }),
                     });
                     const data = await response.json();
                     statusMessage.textContent = data.message;
                     statusMessage.className = `status-message ${data.success ? 'success' : 'error'}`;
+
+                    if (data.success) {
+                        document.getElementById('amount').value = '';
+                        tokenSelect.value = '';
+                    }
                 } catch (err) {
                     statusMessage.textContent = 'Failed to burn tokens';
                     statusMessage.className = 'status-message error';

@@ -80,6 +80,31 @@ h1 {
     font-size: 1.1rem;
 }
 
+.input-group select,
+.input-group input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid var(--primary-color);
+    background-color: transparent;
+    color: var(--text-color);
+    border-radius: 6px;
+    font-size: 1.1rem;
+}
+
+.input-group select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem top 50%;
+    background-size: 1.5rem auto;
+    cursor: pointer;
+}
+
+.input-group select option {
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
 button[type="submit"] {
     background-color: var(--primary-color);
     color: var(--text-color);
