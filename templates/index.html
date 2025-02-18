@@ -99,19 +99,27 @@
                     if (!assets.tokens || assets.tokens.length === 0) {
                         assetsGrid.innerHTML = '<p class="no-assets">No tokens found in your wallet</p>';
                     } else {
+                        console.log('Processing tokens:', assets.tokens);
                         assets.tokens.forEach(token => {
                             const tokenCard = document.createElement('div');
                             tokenCard.className = 'asset-card';
+
+                            // Always show mint address for debugging
+                            const displayName = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
+                            const displaySymbol = token.symbol || 'Unknown';
+
                             tokenCard.innerHTML = `
-                                <h4>${token.name || 'Unknown Token'}</h4>
-                                <p>Symbol: ${token.symbol || 'N/A'}</p>
+                                <h4>${displayName}</h4>
+                                <p>Symbol: ${displaySymbol}</p>
                                 <p>Amount: ${token.amount}</p>
-                                ${token.icon ? `<img src="${token.icon}" alt="${token.symbol}" class="token-icon"/>` : ''}
+                                <p class="token-address">Address: ${token.mint}</p>
+                                ${token.icon ? `<img src="${token.icon}" alt="${displaySymbol}" class="token-icon"/>` : ''}
                                 <button class="burn-button" data-type="token" data-id="${token.mint}">
                                     Burn Token
                                 </button>
                             `;
                             tokenSection.appendChild(tokenCard);
+                            console.log('Added token card for:', token.mint);
                         });
                         assetsGrid.appendChild(tokenSection);
                     }

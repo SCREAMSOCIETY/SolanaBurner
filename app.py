@@ -26,9 +26,15 @@ SOLSCAN_API_URL = "https://public-api.solscan.io"
 async def get_token_metadata(mint_address):
     """Fetch token metadata from Solscan API"""
     try:
+        logger.debug(f"Fetching metadata for token: {mint_address}")
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{SOLSCAN_API_URL}/token/meta", 
-                                      params={"tokenAddress": mint_address})
+                                    params={"tokenAddress": mint_address},
+                                    timeout=10.0)
+
+            logger.debug(f"Solscan API response status: {response.status_code}")
+            logger.debug(f"Solscan API response: {response.text}")
+
             if response.status_code == 200:
                 data = response.json()
                 return {
@@ -38,9 +44,20 @@ async def get_token_metadata(mint_address):
                     'website': data.get('website', ''),
                     'explorer_url': f"https://solscan.io/token/{mint_address}"
                 }
+            else:
+                logger.warning(f"Failed to fetch metadata from Solscan. Status: {response.status_code}")
     except Exception as e:
         logger.error(f"Error fetching token metadata: {str(e)}")
-    return None
+        logger.exception("Full exception trace")
+
+    # Return basic metadata if Solscan fails
+    return {
+        'symbol': 'Unknown',
+        'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
+        'icon': '',
+        'website': '',
+        'explorer_url': f"https://solscan.io/token/{mint_address}"
+    }
 
 def decode_account_data(data):
     """Decode base64 account data"""
