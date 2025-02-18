@@ -170,3 +170,36 @@ h3 {
     font-size: 1.1rem;
     margin: 2rem 0;
 }
+
+/* Add these styles to the existing CSS file */
+.network-selector {
+    margin-bottom: 2rem;
+}
+
+.network-select {
+    background-color: var(--card-background);
+    color: var(--text-color);
+    border: 2px solid var(--primary-color);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem top 50%;
+    background-size: 1.5rem auto;
+    min-width: 150px;
+}
+
+.network-select:focus {
+    outline: none;
+    border-color: var(--success-color);
+}
+
+.network-select option {
+    background-color: var(--background-color);
+    color: var(--text-color);
+}

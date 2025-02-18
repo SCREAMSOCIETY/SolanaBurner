@@ -10,8 +10,11 @@
 <body>
     <div class="container">
         <h1>Solana Token Burner</h1>
-        <div class="network-badge">
-            Network: {{ network|upper }}
+        <div class="network-selector">
+            <select id="networkSelect" class="network-select">
+                <option value="devnet">Devnet</option>
+                <option value="mainnet">Mainnet Beta</option>
+            </select>
         </div>
         <div class="wallet-section">
             <button class="connect-button" id="connectPhantom">
@@ -42,9 +45,18 @@
             const loadingMessage = document.getElementById('loadingMessage');
             const errorMessage = document.getElementById('errorMessage');
             const assetsGrid = document.getElementById('assetsGrid');
+            const networkSelect = document.getElementById('networkSelect');
 
             let currentWallet = null;
-            const connection = new solanaWeb3.Connection('https://api.mainnet-beta.solana.com');
+            let connection = null;
+
+            function getConnection() {
+                const network = networkSelect.value;
+                const endpoint = network === 'devnet' 
+                    ? 'https://api.devnet.solana.com'
+                    : 'https://solana-mainnet.g.alchemy.com/v2/demo'; // Using Alchemy's demo endpoint
+                return new solanaWeb3.Connection(endpoint);
+            }
 
             function showError(message) {
                 errorMessage.textContent = message;
@@ -62,6 +74,7 @@
             async function loadAssets(publicKey) {
                 showLoading();
                 try {
+                    connection = getConnection();
                     const tokenAccounts = await connection.getTokenAccountsByOwner(
                         new solanaWeb3.PublicKey(publicKey),
                         {
@@ -69,12 +82,10 @@
                         }
                     );
 
-                    assetsGrid.innerHTML = ''; // Clear existing assets
+                    assetsGrid.innerHTML = '';
                     const tokenSection = document.createElement('div');
                     tokenSection.className = 'asset-section';
                     tokenSection.innerHTML = '<h3>Tokens</h3>';
-
-                    console.log('Token accounts:', tokenAccounts);
 
                     if (tokenAccounts.value.length === 0) {
                         assetsGrid.innerHTML = '<p class="no-assets">No assets found in your wallet</p>';
@@ -139,6 +150,11 @@
 
             // Event Listeners
             connectPhantomBtn.addEventListener('click', connectPhantom);
+            networkSelect.addEventListener('change', async () => {
+                if (currentWallet && currentWallet.publicKey) {
+                    await loadAssets(currentWallet.publicKey.toString());
+                }
+            });
 
             // Handle burn button clicks
             assetsGrid.addEventListener('click', async (e) => {
