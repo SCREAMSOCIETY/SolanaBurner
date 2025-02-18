@@ -110,12 +110,6 @@
                     return;
                 }
 
-                if (!window.solana.isPhantom) {
-                    console.error('Not a Phantom wallet');
-                    showError('Please install the Phantom wallet extension');
-                    return;
-                }
-
                 try {
                     console.log('Requesting wallet connection...');
                     const resp = await window.solana.connect();
@@ -148,11 +142,6 @@
                     showLoading();
                     errorMessage.style.display = 'none';
                     console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
-
-                    // Verify SPL Token library is loaded
-                    if (!splToken) {
-                        throw new Error('SPL Token library not loaded');
-                    }
 
                     // Create connection
                     connection = getConnection();
