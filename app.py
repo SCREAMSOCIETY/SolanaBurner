@@ -9,6 +9,8 @@ import os
 from dotenv import load_dotenv
 import httpx
 import asyncio
+import base64
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -41,6 +43,17 @@ async def get_token_metadata(mint_address):
         logger.error(f"Error fetching token metadata: {str(e)}")
     return None
 
+def decode_account_data(data):
+    """Decode base64 account data"""
+    try:
+        decoded = base64.b64decode(data[0])
+        # Log the decoded data for debugging
+        logger.debug(f"Decoded account data: {decoded.hex()}")
+        return decoded
+    except Exception as e:
+        logger.error(f"Error decoding account data: {str(e)}")
+        return None
+
 @app.route('/')
 def index():
     return render_template('index.html', network=NETWORK)
@@ -63,42 +76,55 @@ def get_assets():
                 pubkey = PublicKey(wallet_address)
                 logger.debug("Successfully created PublicKey object")
 
-                # Create proper TokenAccountOpts
-                opts = TokenAccountOpts(
-                    program_id=PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-                )
-
                 # Get token accounts with proper configuration
-                token_accounts = await async_client.get_token_accounts_by_owner(
+                response = await async_client.get_token_accounts_by_owner(
                     pubkey,
-                    opts,
-                    commitment=Confirmed
+                    TokenAccountOpts(
+                        program_id=PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                    ),
+                    encoding="jsonParsed"
                 )
 
-                logger.debug(f"Found {len(token_accounts.value) if token_accounts.value else 0} token accounts")
+                logger.debug(f"Raw token accounts response: {response}")
+
+                if not response or not hasattr(response, 'value'):
+                    logger.error("No token accounts found or invalid response structure")
+                    return {'tokens': [], 'nfts': [], 'vacant_accounts': []}
 
                 tokens = []
                 nfts = []
                 metadata_tasks = []
 
-                for account in token_accounts.value:
+                for account in response.value:
                     try:
-                        parsed_data = account.account.data['parsed']
-                        if 'info' not in parsed_data:
+                        logger.debug(f"Processing account: {account}")
+
+                        # Extract account data
+                        if hasattr(account, 'account'):
+                            account_data = account.account
+                        else:
+                            account_data = account.get('account', {})
+
+                        # Handle parsed data
+                        parsed_data = account_data.get('data', {})
+                        if isinstance(parsed_data, dict):
+                            parsed_info = parsed_data.get('parsed', {}).get('info', {})
+                        else:
+                            # If data is not parsed, skip this account
                             continue
 
-                        token_info = parsed_data['info']
-                        mint = token_info.get('mint')
-                        token_amount = token_info.get('tokenAmount')
+                        # Extract token information
+                        mint = parsed_info.get('mint')
+                        token_amount = parsed_info.get('tokenAmount', {})
 
                         if not mint or not token_amount:
                             continue
 
-                        amount = float(token_amount['amount']) / (10 ** token_amount['decimals'])
+                        amount = float(token_amount.get('amount', '0')) / (10 ** token_amount.get('decimals', 0))
 
                         if amount > 0:
                             metadata_tasks.append(get_token_metadata(mint))
-                            if token_amount['decimals'] == 0 and token_amount['amount'] == '1':
+                            if token_amount.get('decimals', 0) == 0 and token_amount.get('amount', '0') == '1':
                                 nfts.append({
                                     'mint': mint,
                                     'name': f'NFT {mint[:4]}...{mint[-4:]}',
@@ -109,7 +135,7 @@ def get_assets():
                                 tokens.append({
                                     'mint': mint,
                                     'amount': amount,
-                                    'decimals': token_amount['decimals'],
+                                    'decimals': token_amount.get('decimals', 0),
                                     'type': 'token'
                                 })
 
@@ -134,13 +160,15 @@ def get_assets():
                     filters=[{'dataSize': 0}]
                 )
 
-                logger.debug(f"Found {len(vacant_response.value) if vacant_response.value else 0} vacant accounts")
+                logger.debug(f"Vacant accounts response: {vacant_response}")
 
-                vacant_accounts = [{
-                    'address': str(account.pubkey),
-                    'type': 'vacant',
-                    'explorer_url': f"https://solscan.io/account/{str(account.pubkey)}"
-                } for account in vacant_response.value]
+                vacant_accounts = []
+                if hasattr(vacant_response, 'value'):
+                    vacant_accounts = [{
+                        'address': str(account.pubkey),
+                        'type': 'vacant',
+                        'explorer_url': f"https://solscan.io/account/{str(account.pubkey)}"
+                    } for account in vacant_response.value]
 
                 return {
                     'tokens': tokens,
