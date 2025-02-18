@@ -169,6 +169,7 @@ def burn_assets():
     asset_type = data.get('assetType')
     asset_id = data.get('assetId')
     amount = data.get('amount')
+    decimals = data.get('decimals', 9)
 
     if not all([asset_type, asset_id]):
         return jsonify({
@@ -184,21 +185,20 @@ def burn_assets():
                     'message': 'Amount must be greater than 0'
                 }), 400
 
-            return jsonify({
-                'success': True,
-                'message': f'Successfully burned {amount} tokens'
-            })
+            # Log the burn request
+            logger.info(f"Processing burn request for token {asset_id}")
+            logger.info(f"Amount: {amount}, Decimals: {decimals}")
 
-        elif asset_type == 'nft':
+            # Here we would typically interact with Solana to burn the tokens
+            # For now, we're just simulating success
             return jsonify({
                 'success': True,
-                'message': f'Successfully burned NFT {asset_id}'
-            })
-
-        elif asset_type == 'vacant':
-            return jsonify({
-                'success': True,
-                'message': f'Successfully claimed rent from account {asset_id}'
+                'message': f'Successfully initiated burn of {amount} tokens',
+                'details': {
+                    'mint': asset_id,
+                    'amount': amount,
+                    'decimals': decimals
+                }
             })
 
         else:
@@ -208,6 +208,7 @@ def burn_assets():
             }), 400
 
     except ValueError as e:
+        logger.error(f"Invalid amount format: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Invalid amount format'

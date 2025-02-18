@@ -9,7 +9,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>Solana Token Burner</h1>
+        <div class="nav-header">
+            <button id="backButton" class="back-button" style="display: none;">
+                <span class="back-arrow">←</span> Back
+            </button>
+            <h1>Solana Token Burner</h1>
+        </div>
         <div class="network-selector">
             <select id="networkSelect" class="network-select">
                 <option value="devnet">Devnet</option>
@@ -46,15 +51,35 @@
             const errorMessage = document.getElementById('errorMessage');
             const assetsGrid = document.getElementById('assetsGrid');
             const networkSelect = document.getElementById('networkSelect');
+            const backButton = document.getElementById('backButton');
 
             let currentWallet = null;
             let connection = null;
+
+            // Back button functionality
+            backButton.addEventListener('click', () => {
+                // Reset view to initial state
+                assetsContainer.style.display = 'none';
+                walletStatus.style.display = 'none';
+                connectPhantomBtn.style.display = 'block';
+                backButton.style.display = 'none';
+
+                // Disconnect wallet if connected
+                if (currentWallet && currentWallet.disconnect) {
+                    try {
+                        currentWallet.disconnect();
+                    } catch (err) {
+                        console.error('Error disconnecting wallet:', err);
+                    }
+                }
+                currentWallet = null;
+            });
 
             function getConnection() {
                 const network = networkSelect.value;
                 const endpoint = network === 'devnet' 
                     ? 'https://api.devnet.solana.com'
-                    : '{{ rpc_endpoint }}'; // Use QuickNode RPC URL for mainnet
+                    : '{{ rpc_endpoint }}';
 
                 console.log(`Connecting to ${endpoint}`);
                 return new solanaWeb3.Connection(endpoint, 'confirmed');
@@ -72,6 +97,38 @@
                 loadingMessage.style.display = 'block';
                 errorMessage.style.display = 'none';
                 assetsGrid.style.display = 'none';
+            }
+
+            async function burnToken(mint, amount, decimals) {
+                try {
+                    showLoading();
+                    connection = getConnection();
+
+                    const response = await fetch('/burn', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            assetType: 'token',
+                            assetId: mint,
+                            amount: amount,
+                            decimals: decimals
+                        }),
+                    });
+
+                    const data = await response.json();
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to burn token');
+                    }
+
+                    // Refresh token list after successful burn
+                    await loadAssets(currentWallet.publicKey.toString());
+                    return true;
+                } catch (error) {
+                    showError(`Failed to burn token: ${error.message}`);
+                    return false;
+                }
             }
 
             async function loadAssets(publicKey) {
@@ -105,22 +162,11 @@
                                 <p class="debug-info">RPC Status: ${connection ? 'Connected' : 'Not Connected'}</p>
                             </div>
                         `;
-                        
-                        //<script> tags added here
-                        const debugScript = document.createElement('script');
-                        debugScript.textContent = `
-                            console.log('Network:', networkSelect.value);
-                            console.log('Wallet:', currentWallet.publicKey.toString());
-                            console.log('Connection:', connection);
-                        `;
-                        assetsGrid.appendChild(debugScript);
-
                     } else {
                         console.log('Processing tokens:', assets.tokens);
                         assets.tokens.forEach(token => {
                             const tokenCard = document.createElement('div');
                             tokenCard.className = 'asset-card';
-
                             const displayName = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
                             const displaySymbol = token.symbol || 'Unknown';
 
@@ -134,12 +180,45 @@
                                     </a>
                                 </p>
                                 ${token.icon ? `<img src="${token.icon}" alt="${displaySymbol}" class="token-icon"/>` : ''}
-                                <button class="burn-button" data-type="token" data-id="${token.mint}">
-                                    Burn Token
-                                </button>
+                                <div class="burn-controls">
+                                    <input type="number" 
+                                           class="burn-amount" 
+                                           placeholder="Amount to burn" 
+                                           min="0" 
+                                           max="${token.amount}"
+                                           step="0.000001"/>
+                                    <button class="burn-button" 
+                                            data-mint="${token.mint}"
+                                            data-decimals="${token.decimals || 9}">
+                                        Burn Token
+                                    </button>
+                                </div>
                             `;
+
+                            // Add burn button event listener
+                            const burnButton = tokenCard.querySelector('.burn-button');
+                            const burnInput = tokenCard.querySelector('.burn-amount');
+
+                            burnButton.addEventListener('click', async () => {
+                                const amount = parseFloat(burnInput.value);
+                                if (!amount || amount <= 0 || amount > token.amount) {
+                                    showError('Please enter a valid amount to burn');
+                                    return;
+                                }
+
+                                const success = await burnToken(
+                                    burnButton.dataset.mint,
+                                    amount,
+                                    parseInt(burnButton.dataset.decimals)
+                                );
+
+                                if (success) {
+                                    tokenCard.classList.add('burned');
+                                    setTimeout(() => loadAssets(currentWallet.publicKey.toString()), 1000);
+                                }
+                            });
+
                             tokenSection.appendChild(tokenCard);
-                            console.log('Added token card for:', token.mint);
                         });
                         assetsGrid.appendChild(tokenSection);
                     }
@@ -171,6 +250,7 @@
                     walletStatus.style.display = 'block';
                     walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
                     assetsContainer.style.display = 'block';
+                    backButton.style.display = 'block';
 
                     // Load assets
                     await loadAssets(publicKey);
@@ -186,38 +266,6 @@
             networkSelect.addEventListener('change', async () => {
                 if (currentWallet && currentWallet.publicKey) {
                     await loadAssets(currentWallet.publicKey.toString());
-                }
-            });
-
-            // Handle burn button clicks
-            assetsGrid.addEventListener('click', async (e) => {
-                if (e.target.classList.contains('burn-button')) {
-                    const type = e.target.dataset.type;
-                    const id = e.target.dataset.id;
-                    const card = e.target.closest('.asset-card');
-
-                    try {
-                        const response = await fetch('/burn', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                assetType: type,
-                                assetId: id
-                            }),
-                        });
-
-                        const data = await response.json();
-                        if (data.success) {
-                            card.classList.add('burned');
-                            setTimeout(() => card.remove(), 1000);
-                        } else {
-                            throw new Error(data.message);
-                        }
-                    } catch (error) {
-                        showError(`Failed to burn asset: ${error.message}`);
-                    }
                 }
             });
         });
