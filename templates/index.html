@@ -38,7 +38,7 @@
                 <input type="number" id="amount" step="0.000001" min="0">
             </div>
             <button type="submit" id="burnButton">Burn Tokens</button>
-            <div class="status-message" id="statusMessage"></div>
+            <div id="statusMessage" class="status-message" style="display: none"></div>
         </div>
     </div>
     <script>
@@ -70,29 +70,47 @@
                 })
                 .catch(error => {
                     console.error('Error fetching tokens:', error);
+                    showError('Failed to load available tokens');
                 });
 
             async function connectPhantom() {
+                if (typeof window.solana === 'undefined') {
+                    showError('Phantom wallet extension is not installed. Please install it from phantom.app');
+                    window.open('https://phantom.app/', '_blank');
+                    return;
+                }
+
+                if (!window.solana.isPhantom) {
+                    showError('Please install the Phantom wallet extension');
+                    return;
+                }
+
                 try {
-                    if (!window.solana || !window.solana.isPhantom) {
-                        throw new Error('Phantom wallet not installed');
-                    }
-                    const resp = await window.solana.connect();
+                    await window.solana.connect();
+                    const publicKey = window.solana.publicKey.toString();
                     currentWallet = window.solana;
-                    showConnected('Phantom', resp.publicKey.toString());
+                    showConnected('Phantom', publicKey);
                 } catch (err) {
-                    showError('Failed to connect Phantom wallet');
+                    console.error('Phantom connection error:', err);
+                    showError('Failed to connect Phantom wallet. Please try again.');
                 }
             }
 
             async function connectSolflare() {
+                if (typeof window.SolflareWallet === 'undefined') {
+                    showError('SolFlare wallet extension is not installed. Please install it from solflare.com');
+                    window.open('https://solflare.com/', '_blank');
+                    return;
+                }
+
                 try {
                     const solflare = new window.SolflareWallet();
                     await solflare.connect();
                     currentWallet = solflare;
                     showConnected('SolFlare', solflare.publicKey.toString());
                 } catch (err) {
-                    showError('Failed to connect SolFlare wallet');
+                    console.error('SolFlare connection error:', err);
+                    showError('Failed to connect SolFlare wallet. Please try again.');
                 }
             }
 
@@ -106,8 +124,15 @@
             }
 
             function showError(message) {
+                statusMessage.style.display = 'block';
                 statusMessage.textContent = message;
                 statusMessage.className = 'status-message error';
+            }
+
+            function showSuccess(message) {
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = message;
+                statusMessage.className = 'status-message success';
             }
 
             connectPhantomBtn.addEventListener('click', connectPhantom);
@@ -136,15 +161,17 @@
                         body: JSON.stringify({ amount, tokenMint }),
                     });
                     const data = await response.json();
-                    statusMessage.textContent = data.message;
-                    statusMessage.className = `status-message ${data.success ? 'success' : 'error'}`;
 
                     if (data.success) {
+                        showSuccess(data.message);
                         document.getElementById('amount').value = '';
                         tokenSelect.value = '';
+                    } else {
+                        showError(data.message);
                     }
                 } catch (err) {
-                    showError('Failed to burn tokens');
+                    console.error('Burn transaction error:', err);
+                    showError('Failed to burn tokens. Please try again.');
                 }
             });
         });
