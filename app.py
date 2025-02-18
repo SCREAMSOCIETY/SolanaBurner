@@ -81,8 +81,7 @@ def get_assets():
                     pubkey,
                     TokenAccountOpts(
                         program_id=PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-                    ),
-                    encoding="jsonParsed"
+                    )
                 )
 
                 logger.debug(f"Raw token accounts response: {response}")
@@ -97,6 +96,7 @@ def get_assets():
 
                 for account in response.value:
                     try:
+                        # Log the raw account data for debugging
                         logger.debug(f"Processing account: {account}")
 
                         # Extract account data
