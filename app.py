@@ -21,19 +21,20 @@ load_dotenv()
 app = Flask(__name__)
 # Get RPC endpoint from environment variables
 RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL', 'https://api.devnet.solana.com')
-SOLSCAN_API_URL = "https://public-api.solscan.io"
+SOLANA_EXPLORER_API = "https://api.explorer.solana.com/v1"
 
 async def get_token_metadata(mint_address):
-    """Fetch token metadata from Solscan API"""
+    """Fetch token metadata from Solana Explorer API"""
     try:
         logger.debug(f"Fetching metadata for token: {mint_address}")
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SOLSCAN_API_URL}/token/meta", 
-                                    params={"tokenAddress": mint_address},
-                                    timeout=10.0)
+            response = await client.get(
+                f"{SOLANA_EXPLORER_API}/token-metadata/{mint_address}",
+                timeout=10.0
+            )
 
-            logger.debug(f"Solscan API response status: {response.status_code}")
-            logger.debug(f"Solscan API response: {response.text}")
+            logger.debug(f"Solana Explorer API response status: {response.status_code}")
+            logger.debug(f"Solana Explorer API response: {response.text}")
 
             if response.status_code == 200:
                 data = response.json()
@@ -41,22 +42,22 @@ async def get_token_metadata(mint_address):
                     'symbol': data.get('symbol', 'Unknown'),
                     'name': data.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
                     'icon': data.get('icon', ''),
-                    'website': data.get('website', ''),
-                    'explorer_url': f"https://solscan.io/token/{mint_address}"
+                    'decimals': data.get('decimals', 9),
+                    'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                 }
             else:
-                logger.warning(f"Failed to fetch metadata from Solscan. Status: {response.status_code}")
+                logger.warning(f"Failed to fetch metadata from Solana Explorer. Status: {response.status_code}")
     except Exception as e:
         logger.error(f"Error fetching token metadata: {str(e)}")
         logger.exception("Full exception trace")
 
-    # Return basic metadata if Solscan fails
+    # Return basic metadata if API fails
     return {
         'symbol': 'Unknown',
         'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
         'icon': '',
-        'website': '',
-        'explorer_url': f"https://solscan.io/token/{mint_address}"
+        'decimals': 9,
+        'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
 def decode_account_data(data):

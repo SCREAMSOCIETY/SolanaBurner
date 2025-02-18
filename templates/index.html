@@ -104,7 +104,6 @@
                             const tokenCard = document.createElement('div');
                             tokenCard.className = 'asset-card';
 
-                            // Always show mint address for debugging
                             const displayName = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
                             const displaySymbol = token.symbol || 'Unknown';
 
@@ -112,7 +111,11 @@
                                 <h4>${displayName}</h4>
                                 <p>Symbol: ${displaySymbol}</p>
                                 <p>Amount: ${token.amount}</p>
-                                <p class="token-address">Address: ${token.mint}</p>
+                                <p class="token-address">
+                                    <a href="${token.explorer_url}" target="_blank" class="explorer-link">
+                                        View on Explorer
+                                    </a>
+                                </p>
                                 ${token.icon ? `<img src="${token.icon}" alt="${displaySymbol}" class="token-icon"/>` : ''}
                                 <button class="burn-button" data-type="token" data-id="${token.mint}">
                                     Burn Token
