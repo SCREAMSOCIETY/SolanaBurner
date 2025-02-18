@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-# Change to devnet for testing
-solana_client = Client("https://api.devnet.solana.com")
-NETWORK = "devnet"  # Add network information
+# Switch to mainnet for production
+solana_client = Client("https://api.mainnet-beta.solana.com")
+NETWORK = "mainnet"  # Update network information
 
 # Asset types for demonstration
 ASSET_TYPES = {
