@@ -50,6 +50,7 @@
             const networkSelect = document.getElementById('networkSelect');
 
             let currentWallet = null;
+            let connection = null;
 
             function showStatus(message, isError = false) {
                 statusMessage.textContent = message;
@@ -69,6 +70,83 @@
                 errorMessage.textContent = message;
                 errorMessage.style.display = 'block';
                 loadingMessage.style.display = 'none';
+            }
+
+            function getConnection() {
+                const endpoint = networkSelect.value === 'devnet' 
+                    ? 'https://api.devnet.solana.com'
+                    : '{{ rpc_endpoint }}';
+                return new solanaWeb3.Connection(endpoint, 'confirmed');
+            }
+
+            async function burnToken(mint, amount, decimals) {
+                showLoading();
+                errorMessage.style.display = 'none';
+
+                try {
+                    console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
+
+                    // Create connection if not exists
+                    if (!connection) {
+                        connection = getConnection();
+                    }
+
+                    // Convert mint string to PublicKey
+                    const mintPubkey = new solanaWeb3.PublicKey(mint);
+                    const walletPubkey = currentWallet.publicKey;
+
+                    // Get associated token account
+                    const associatedTokenAddress = await splToken.getAssociatedTokenAddress(
+                        mintPubkey,
+                        walletPubkey
+                    );
+
+                    // Convert amount to raw amount with decimals
+                    const rawAmount = Math.floor(amount * Math.pow(10, decimals));
+
+                    // Create burn instruction
+                    const burnInstruction = splToken.createBurnInstruction(
+                        associatedTokenAddress,
+                        mintPubkey,
+                        walletPubkey,
+                        rawAmount
+                    );
+
+                    // Create transaction
+                    const transaction = new solanaWeb3.Transaction().add(burnInstruction);
+                    transaction.feePayer = walletPubkey;
+
+                    // Get recent blockhash
+                    const { blockhash } = await connection.getRecentBlockhash();
+                    transaction.recentBlockhash = blockhash;
+
+                    // Sign and send transaction
+                    const signed = await currentWallet.signTransaction(transaction);
+                    const signature = await connection.sendRawTransaction(signed.serialize());
+
+                    console.log('Transaction sent:', signature);
+                    showStatus(`Transaction sent: ${signature}`);
+
+                    // Wait for confirmation
+                    const confirmation = await connection.confirmTransaction(signature);
+
+                    if (confirmation.value.err) {
+                        throw new Error('Transaction failed to confirm');
+                    }
+
+                    showStatus(`Successfully burned ${amount} tokens`);
+
+                    // Refresh assets after successful burn
+                    await loadAssets(currentWallet.publicKey.toString());
+
+                    return true;
+                } catch (error) {
+                    console.error('Burn error:', error);
+                    showError(`Failed to burn token: ${error.message}`);
+                    return false;
+                } finally {
+                    showLoading(false);
+                }
             }
 
             async function loadAssets(publicKey) {
@@ -106,7 +184,38 @@
                                 <a href="${token.explorer_url}" target="_blank" class="explorer-link">
                                     View on Explorer
                                 </a>
+                                <div class="burn-controls">
+                                    <input type="number" 
+                                           class="burn-amount" 
+                                           placeholder="Amount to burn" 
+                                           min="0" 
+                                           max="${token.amount}"
+                                           step="0.000001"/>
+                                    <button class="burn-button" 
+                                            data-mint="${token.mint}"
+                                            data-decimals="${token.decimals || 9}">
+                                        Burn Token
+                                    </button>
+                                </div>
                             `;
+
+                            // Add burn button event listener
+                            const burnButton = tokenCard.querySelector('.burn-button');
+                            const burnInput = tokenCard.querySelector('.burn-amount');
+
+                            burnButton.addEventListener('click', async () => {
+                                const amount = parseFloat(burnInput.value);
+                                if (!amount || amount <= 0 || amount > token.amount) {
+                                    showError('Please enter a valid amount to burn');
+                                    return;
+                                }
+
+                                await burnToken(
+                                    burnButton.dataset.mint,
+                                    amount,
+                                    parseInt(burnButton.dataset.decimals)
+                                );
+                            });
 
                             assetsGrid.appendChild(tokenCard);
                         });
@@ -141,6 +250,7 @@
                         const address = resp.publicKey.toString();
                         console.log('Connected to wallet:', address);
                         currentWallet = window.solana;
+                        connection = getConnection();
 
                         connectButton.style.display = 'none';
                         walletInfo.style.display = 'block';
@@ -163,6 +273,7 @@
             // Network change handler
             networkSelect.addEventListener('change', async () => {
                 if (currentWallet && currentWallet.publicKey) {
+                    connection = getConnection();
                     await loadAssets(currentWallet.publicKey.toString());
                 }
             });
@@ -171,6 +282,7 @@
             if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
                 const publicKey = window.solana.publicKey.toString();
                 currentWallet = window.solana;
+                connection = getConnection();
 
                 connectButton.style.display = 'none';
                 walletInfo.style.display = 'block';
