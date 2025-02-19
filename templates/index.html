@@ -92,6 +92,7 @@
 
                 try {
                     console.log(`Attempting to burn ${amount} tokens from mint ${mint}`);
+                    console.log(`Token decimals: ${decimals}`);
 
                     if (!connection) {
                         connection = getConnection();
@@ -99,9 +100,16 @@
 
                     const mintPubkey = new solanaWeb3.PublicKey(mint);
                     const walletPubkey = currentWallet.publicKey;
-                    const rawAmount = Math.floor(amount * Math.pow(10, decimals));
 
-                    // Create the token account address
+                    // Convert amount to raw value based on decimals
+                    const rawAmount = Math.round(amount * Math.pow(10, decimals));
+                    console.log(`Raw amount to burn: ${rawAmount}`);
+
+                    if (rawAmount <= 0) {
+                        throw new Error('Amount must be greater than 0');
+                    }
+
+                    // Get the token account
                     const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
                         [
                             walletPubkey.toBuffer(),
@@ -111,7 +119,7 @@
                         new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
                     );
 
-                    // Create burn instruction data using Uint8Array
+                    // Create burn instruction data
                     const dataLayout = new Uint8Array(9);
                     dataLayout[0] = 8; // Burn instruction
                     const amountBytes = new Uint8Array(8);
@@ -119,7 +127,7 @@
                     view.setBigUint64(0, BigInt(rawAmount), true);
                     dataLayout.set(amountBytes, 1);
 
-                    // Create the burn instruction
+                    console.log('Creating burn instruction...');
                     const burnIx = new solanaWeb3.TransactionInstruction({
                         keys: [
                             { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
@@ -133,9 +141,8 @@
                     const transaction = new solanaWeb3.Transaction().add(burnIx);
                     transaction.feePayer = walletPubkey;
 
-                    console.log('Getting recent blockhash...');
+                    console.log('Getting latest blockhash...');
                     const { blockhash } = await connection.getLatestBlockhash('confirmed');
-                    console.log('Got blockhash:', blockhash);
                     transaction.recentBlockhash = blockhash;
 
                     console.log('Sending transaction for signature...');
@@ -146,7 +153,6 @@
                     showStatus(`Transaction sent: ${signature}`);
 
                     const confirmation = await connection.confirmTransaction(signature);
-
                     if (confirmation.value.err) {
                         throw new Error('Transaction failed to confirm');
                     }
@@ -203,12 +209,15 @@
                                     <input type="number" 
                                            class="burn-amount" 
                                            placeholder="Amount to burn" 
-                                           min="0" 
+                                           min="0.000001" 
                                            max="${token.amount}"
-                                           step="0.000001"/>
+                                           step="0.000001"
+                                           value=""
+                                           style="width: 200px;"/>
                                     <button class="burn-button" 
                                             data-mint="${token.mint}"
-                                            data-decimals="${token.decimals || 9}">
+                                            data-decimals="${token.decimals || 9}"
+                                            data-max="${token.amount}">
                                         Burn Token
                                     </button>
                                 </div>
@@ -219,16 +228,25 @@
 
                             burnButton.addEventListener('click', async () => {
                                 const amount = parseFloat(burnInput.value);
-                                if (!amount || amount <= 0 || amount > token.amount) {
-                                    showError('Please enter a valid amount to burn');
+                                const maxAmount = parseFloat(burnButton.dataset.max);
+
+                                if (!validateBurnAmount(burnInput, maxAmount)) {
                                     return;
                                 }
 
-                                await burnToken(
+                                if (!confirm(`Are you sure you want to burn ${amount} tokens? This action cannot be undone.`)) {
+                                    return;
+                                }
+
+                                const result = await burnToken(
                                     burnButton.dataset.mint,
                                     amount,
                                     parseInt(burnButton.dataset.decimals)
                                 );
+
+                                if (result) {
+                                    burnInput.value = ''; // Clear input after successful burn
+                                }
                             });
 
                             assetsGrid.appendChild(tokenCard);
@@ -304,6 +322,19 @@
                 loadAssets(publicKey);
             }
         });
+
+        function validateBurnAmount(input, maxAmount) {
+            const amount = parseFloat(input.value);
+            if (isNaN(amount) || amount <= 0) {
+                showError('Please enter a valid amount greater than 0');
+                return false;
+            }
+            if (amount > maxAmount) {
+                showError(`Amount cannot exceed ${maxAmount}`);
+                return false;
+            }
+            return true;
+        }
     </script>
 </body>
 </html>

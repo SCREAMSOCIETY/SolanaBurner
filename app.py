@@ -231,6 +231,6 @@ def burn_assets():
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8080))
+    port = int(os.getenv('PORT', 8081))  # Changed default port to 8081
     logger.info(f"Starting server on port {port}")
     app.run(host='0.0.0.0', port=port, debug=True)
