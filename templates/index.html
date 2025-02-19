@@ -29,9 +29,25 @@
 
         <div id="assetsContainer" class="assets-container" style="display: none;">
             <h2>Your Assets</h2>
+            <div class="tabs">
+                <button class="tab-button active" data-tab="tokens">Tokens</button>
+                <button class="tab-button" data-tab="nfts">NFTs</button>
+                <button class="tab-button" data-tab="cnfts">cNFTs</button>
+            </div>
             <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
             <div id="errorMessage" class="error-message" style="display: none;"></div>
-            <div id="assetsGrid" class="assets-grid"></div>
+
+            <div class="tab-content">
+                <div id="tokens" class="tab-panel active">
+                    <div class="assets-grid"></div>
+                </div>
+                <div id="nfts" class="tab-panel">
+                    <div class="assets-grid"></div>
+                </div>
+                <div id="cnfts" class="tab-panel">
+                    <div class="assets-grid"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -48,7 +64,6 @@
             const assetsContainer = document.getElementById('assetsContainer');
             const loadingMessage = document.getElementById('loadingMessage');
             const errorMessage = document.getElementById('errorMessage');
-            const assetsGrid = document.getElementById('assetsGrid');
             const networkSelect = document.getElementById('networkSelect');
 
             let currentWallet = null;
@@ -182,7 +197,9 @@
 
             async function loadAssets(publicKey) {
                 showLoading(true);
-                assetsGrid.style.display = 'none';
+                document.querySelectorAll('.assets-grid').forEach(grid => {
+                    grid.style.display = 'none';
+                });
 
                 try {
                     const response = await fetch(`/assets?wallet=${publicKey}`);
@@ -193,14 +210,18 @@
                     }
 
                     const assets = data.assets;
-                    assetsGrid.innerHTML = '';
+                    const assetTypes = {
+                        tokens: document.querySelector('#tokens .assets-grid'),
+                        nfts: document.querySelector('#nfts .assets-grid'),
+                        cnfts: document.querySelector('#cnfts .assets-grid')
+                    };
 
+                    // Clear all grids
+                    Object.values(assetTypes).forEach(grid => grid.innerHTML = '');
+
+                    // Handle tokens
                     if (!assets.tokens || assets.tokens.length === 0) {
-                        assetsGrid.innerHTML = `
-                            <div class="no-assets">
-                                <p>No tokens found in your wallet</p>
-                            </div>
-                        `;
+                        assetTypes.tokens.innerHTML = '<div class="no-assets"><p>No tokens found in your wallet</p></div>';
                     } else {
                         assets.tokens.forEach(token => {
                             const tokenCard = document.createElement('div');
@@ -259,12 +280,52 @@
                                 }
                             });
 
-                            assetsGrid.appendChild(tokenCard);
+                            assetTypes.tokens.appendChild(tokenCard);
+                        });
+                    }
+
+                    // Handle NFTs
+                    if (!assets.nfts || assets.nfts.length === 0) {
+                        assetTypes.nfts.innerHTML = '<div class="no-assets"><p>No NFTs found in your wallet</p></div>';
+                    } else {
+                        assets.nfts.forEach(nft => {
+                            const nftCard = document.createElement('div');
+                            nftCard.className = 'asset-card nft-card';
+                            nftCard.innerHTML = `
+                                <h4>${nft.name || 'Unnamed NFT'}</h4>
+                                <img src="${nft.image || ''}" alt="${nft.name}" class="nft-image"/>
+                                <p>${nft.description || ''}</p>
+                                <a href="${nft.explorer_url}" target="_blank" class="explorer-link">
+                                    View on Explorer
+                                </a>
+                            `;
+                            assetTypes.nfts.appendChild(nftCard);
+                        });
+                    }
+
+                    // Handle cNFTs
+                    if (!assets.cnfts || assets.cnfts.length === 0) {
+                        assetTypes.cnfts.innerHTML = '<div class="no-assets"><p>No cNFTs found in your wallet</p></div>';
+                    } else {
+                        assets.cnfts.forEach(cnft => {
+                            const cnftCard = document.createElement('div');
+                            cnftCard.className = 'asset-card cnft-card';
+                            cnftCard.innerHTML = `
+                                <h4>${cnft.name || 'Unnamed cNFT'}</h4>
+                                <img src="${cnft.image || ''}" alt="${cnft.name}" class="nft-image"/>
+                                <p>${cnft.description || ''}</p>
+                                <a href="${cnft.explorer_url}" target="_blank" class="explorer-link">
+                                    View on Explorer
+                                </a>
+                            `;
+                            assetTypes.cnfts.appendChild(cnftCard);
                         });
                     }
 
                     showLoading(false);
-                    assetsGrid.style.display = 'block';
+                    document.querySelectorAll('.assets-grid').forEach(grid => {
+                        grid.style.display = 'block';
+                    });
 
                 } catch (error) {
                     console.error('Error loading assets:', error);
@@ -331,6 +392,20 @@
                 showStatus('Wallet already connected');
                 loadAssets(publicKey);
             }
+
+            // Tab switching functionality
+            const tabs = document.querySelectorAll('.tab-button');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and panels
+                    tabs.forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+                    // Add active class to clicked tab and its panel
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab).classList.add('active');
+                });
+            });
         });
 
         function validateBurnAmount(input, maxAmount) {

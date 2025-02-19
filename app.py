@@ -3,9 +3,9 @@ from flask import Flask, render_template, request, jsonify
 import httpx
 import asyncio
 import base64
-import json
 import os
 from dotenv import load_dotenv
+import socket
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +16,21 @@ load_dotenv()
 app = Flask(__name__)
 RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL', 'https://api.devnet.solana.com')
 SOLANA_EXPLORER_API = "https://api.explorer.solana.com/v1"
+
+# Improved port selection logic
+def find_available_port(start_port=8080, max_attempts=10):
+    for i in range(max_attempts):
+        port = start_port + i
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.bind(('0.0.0.0', port))
+            return port
+        except OSError as e:
+            logger.warning(f"Port {port} is already in use. Trying next port.")
+            continue
+    logger.error(f"Could not find an available port after {max_attempts} attempts.")
+    return None
+
 
 async def make_rpc_call(method, params):
     """Make a direct RPC call to Solana"""
@@ -74,7 +89,7 @@ async def fetch_assets(wallet_address):
     logger.info(f"Fetching assets for wallet: {wallet_address}")
 
     try:
-        # Get all token accounts
+        # Get token accounts
         token_accounts_response = await make_rpc_call(
             "getTokenAccountsByOwner",
             [
@@ -84,9 +99,9 @@ async def fetch_assets(wallet_address):
             ]
         )
 
-        logger.info(f"Token accounts response: {json.dumps(token_accounts_response, indent=2)}")
-
         tokens = []
+        nfts = []
+        cnfts = []
         metadata_tasks = []
 
         if "result" in token_accounts_response:
@@ -101,34 +116,88 @@ async def fetch_assets(wallet_address):
                     decimals = parsed_data["tokenAmount"]["decimals"]
 
                     if amount > 0:
-                        metadata_tasks.append(get_token_metadata(mint))
-                        tokens.append({
-                            'mint': mint,
-                            'raw_amount': amount,
-                            'decimals': decimals,
-                            'type': 'token'
-                        })
-                        logger.info(f"Added token: {mint} with amount: {amount}")
+                        # If decimals is 0 and amount is 1, it's likely an NFT
+                        if decimals == 0 and amount == 1:
+                            metadata_tasks.append(get_token_metadata(mint))
+                            nfts.append({
+                                'mint': mint,
+                                'type': 'nft'
+                            })
+                        else:
+                            metadata_tasks.append(get_token_metadata(mint))
+                            tokens.append({
+                                'mint': mint,
+                                'raw_amount': amount,
+                                'decimals': decimals,
+                                'type': 'token'
+                            })
                 except Exception as e:
                     logger.error(f"Error processing token account: {str(e)}")
                     continue
 
-            if metadata_tasks:
-                logger.info(f"Fetching metadata for {len(metadata_tasks)} tokens")
-                token_metadata = await asyncio.gather(*metadata_tasks)
+        # Fetch cNFTs using getProgramAccounts
+        try:
+            cnft_accounts_response = await make_rpc_call(
+                "getProgramAccounts",
+                [
+                    "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY",  # Bubblegum program
+                    {
+                        "encoding": "base64",
+                        "filters": [
+                            {
+                                "memcmp": {
+                                    "offset": 32,
+                                    "bytes": wallet_address
+                                }
+                            }
+                        ]
+                    }
+                ]
+            )
 
-                for i, token in enumerate(tokens):
-                    if i < len(token_metadata) and token_metadata[i]:
-                        metadata = token_metadata[i]
-                        raw_amount = token.pop('raw_amount', 0)
-                        decimals = token.pop('decimals', 9)
+            if "result" in cnft_accounts_response:
+                for account in cnft_accounts_response["result"]:
+                    try:
+                        cnft_data = account["account"]["data"]
+                        # Add basic cNFT info, metadata would need to be fetched separately
+                        cnfts.append({
+                            'address': account["pubkey"],
+                            'type': 'cnft',
+                            'name': 'Compressed NFT',
+                            'explorer_url': f"https://explorer.solana.com/address/{account['pubkey']}"
+                        })
+                    except Exception as e:
+                        logger.error(f"Error processing cNFT account: {str(e)}")
+                        continue
 
-                        token.update(metadata)
-                        token['amount'] = raw_amount / (10 ** decimals)
-                        logger.info(f"Processed token {token['mint']}: {token['amount']} {token['symbol']}")
+        except Exception as e:
+            logger.error(f"Error fetching cNFTs: {str(e)}")
 
-        logger.info(f"Final tokens list: {json.dumps(tokens, indent=2)}")
-        return {'tokens': tokens, 'nfts': []}
+        if metadata_tasks:
+            logger.info(f"Fetching metadata for {len(metadata_tasks)} assets")
+            metadata_results = await asyncio.gather(*metadata_tasks)
+
+            # Process tokens metadata
+            for i, token in enumerate(tokens):
+                if i < len(metadata_results) and metadata_results[i]:
+                    metadata = metadata_results[i]
+                    raw_amount = token.pop('raw_amount', 0)
+                    decimals = token.pop('decimals', 9)
+
+                    token.update(metadata)
+                    token['amount'] = raw_amount / (10 ** decimals)
+
+            # Process NFTs metadata
+            for i, nft in enumerate(nfts):
+                if i < len(metadata_results) and metadata_results[i]:
+                    nft.update(metadata_results[i])
+
+        logger.info(f"Found {len(tokens)} tokens, {len(nfts)} NFTs, and {len(cnfts)} cNFTs")
+        return {
+            'tokens': tokens,
+            'nfts': nfts,
+            'cnfts': cnfts
+        }
 
     except Exception as e:
         logger.error(f"Error in fetch_assets: {str(e)}")
@@ -146,10 +215,7 @@ def get_assets():
         return jsonify({'success': False, 'message': 'Wallet address is required'}), 400
 
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        assets = loop.run_until_complete(fetch_assets(wallet_address))
-        loop.close()
+        assets = asyncio.run(fetch_assets(wallet_address))
 
         return jsonify({
             'success': True,
@@ -231,6 +297,14 @@ def burn_assets():
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8082))  
-    logger.info(f"Starting server on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    try:
+        # Use the improved port finding function
+        PORT = find_available_port()
+        if PORT is None:
+            exit(1)  # Exit with an error code if no port is found
+
+        logger.info(f"Starting server on port {PORT}")
+        app.run(host='0.0.0.0', port=PORT, debug=True)
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}")
+        raise
