@@ -8,7 +8,10 @@ import socket
 import os
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -29,21 +32,23 @@ def get_port():
         except ValueError:
             logger.warning(f"Invalid PORT environment variable: {replit_port}")
 
-    # Try to use the default development port
+    # Try to use port 8080
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(('0.0.0.0', 8080))
-        logger.info("Using default port 8080")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('0.0.0.0', 8080))
+        sock.close()
+        logger.info("Using port 8080")
         return 8080
     except OSError:
-        logger.warning("Default port 8080 is not available")
+        logger.warning("Port 8080 is not available")
 
-    # Fall back to finding a random available port
+    # Try alternative ports
     for port in range(8081, 8090):
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.bind(('0.0.0.0', port))
-            logger.info(f"Using alternative port: {port}")
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(('0.0.0.0', port))
+            sock.close()
+            logger.info(f"Using port {port}")
             return port
         except OSError:
             continue
@@ -140,7 +145,8 @@ async def fetch_assets(wallet_address):
                             metadata_tasks.append(get_token_metadata(mint))
                             nfts.append({
                                 'mint': mint,
-                                'type': 'nft'
+                                'type': 'nft',
+                                'explorer_url': f"https://explorer.solana.com/address/{mint}"
                             })
                         else:
                             metadata_tasks.append(get_token_metadata(mint))
@@ -148,13 +154,43 @@ async def fetch_assets(wallet_address):
                                 'mint': mint,
                                 'raw_amount': amount,
                                 'decimals': decimals,
-                                'type': 'token'
+                                'type': 'token',
+                                'explorer_url': f"https://explorer.solana.com/address/{mint}"
                             })
                 except Exception as e:
                     logger.error(f"Error processing token account: {str(e)}")
                     continue
 
-        # Fetch cNFTs using getProgramAccounts
+        # Process metadata for tokens and NFTs
+        if metadata_tasks:
+            logger.info(f"Fetching metadata for {len(metadata_tasks)} assets")
+            metadata_results = await asyncio.gather(*metadata_tasks, return_exceptions=True)
+
+            token_index = 0
+            nft_index = 0
+
+            for result in metadata_results:
+                if isinstance(result, Exception):
+                    logger.error(f"Error fetching metadata: {str(result)}")
+                    continue
+
+                try:
+                    if token_index < len(tokens):
+                        token = tokens[token_index]
+                        raw_amount = token.pop('raw_amount', 0)
+                        decimals = token.pop('decimals', 9)
+
+                        token.update(result)
+                        token['amount'] = float(raw_amount) / (10 ** decimals)
+                        token_index += 1
+                    elif nft_index < len(nfts):
+                        nfts[nft_index].update(result)
+                        nft_index += 1
+                except Exception as e:
+                    logger.error(f"Error processing metadata result: {str(e)}")
+                    continue
+
+        # Fetch cNFTs
         try:
             cnft_accounts_response = await make_rpc_call(
                 "getProgramAccounts",
@@ -177,12 +213,13 @@ async def fetch_assets(wallet_address):
             if "result" in cnft_accounts_response:
                 for account in cnft_accounts_response["result"]:
                     try:
-                        cnft_data = account["account"]["data"]
-                        # Add basic cNFT info, metadata would need to be fetched separately
+                        data = base64.b64decode(account["account"]["data"][0])
                         cnfts.append({
                             'address': account["pubkey"],
                             'type': 'cnft',
-                            'name': 'Compressed NFT',
+                            'name': f'cNFT {account["pubkey"][:4]}...{account["pubkey"][-4:]}',
+                            'description': 'A compressed NFT on Solana',
+                            'image': '',  # Add placeholder for image
                             'explorer_url': f"https://explorer.solana.com/address/{account['pubkey']}"
                         })
                     except Exception as e:
@@ -191,25 +228,6 @@ async def fetch_assets(wallet_address):
 
         except Exception as e:
             logger.error(f"Error fetching cNFTs: {str(e)}")
-
-        if metadata_tasks:
-            logger.info(f"Fetching metadata for {len(metadata_tasks)} assets")
-            metadata_results = await asyncio.gather(*metadata_tasks)
-
-            # Process tokens metadata
-            for i, token in enumerate(tokens):
-                if i < len(metadata_results) and metadata_results[i]:
-                    metadata = metadata_results[i]
-                    raw_amount = token.pop('raw_amount', 0)
-                    decimals = token.pop('decimals', 9)
-
-                    token.update(metadata)
-                    token['amount'] = raw_amount / (10 ** decimals)
-
-            # Process NFTs metadata
-            for i, nft in enumerate(nfts):
-                if i < len(metadata_results) and metadata_results[i]:
-                    nft.update(metadata_results[i])
 
         logger.info(f"Found {len(tokens)} tokens, {len(nfts)} NFTs, and {len(cnfts)} cNFTs")
         return {

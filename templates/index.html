@@ -39,13 +39,19 @@
 
             <div class="tab-content">
                 <div id="tokens" class="tab-panel active">
-                    <div class="assets-grid"></div>
+                    <div class="assets-grid">
+                        <!-- Token cards will be dynamically inserted here -->
+                    </div>
                 </div>
                 <div id="nfts" class="tab-panel">
-                    <div class="assets-grid"></div>
+                    <div class="assets-grid">
+                        <!-- NFT cards will be dynamically inserted here -->
+                    </div>
                 </div>
                 <div id="cnfts" class="tab-panel">
-                    <div class="assets-grid"></div>
+                    <div class="assets-grid">
+                        <!-- cNFT cards will be dynamically inserted here -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -198,6 +204,7 @@
             async function loadAssets(publicKey) {
                 showLoading(true);
                 document.querySelectorAll('.assets-grid').forEach(grid => {
+                    grid.innerHTML = ''; // Clear existing content
                     grid.style.display = 'none';
                 });
 
@@ -215,9 +222,6 @@
                         nfts: document.querySelector('#nfts .assets-grid'),
                         cnfts: document.querySelector('#cnfts .assets-grid')
                     };
-
-                    // Clear all grids
-                    Object.values(assetTypes).forEach(grid => grid.innerHTML = '');
 
                     // Handle tokens
                     if (!assets.tokens || assets.tokens.length === 0) {
@@ -324,7 +328,7 @@
 
                     showLoading(false);
                     document.querySelectorAll('.assets-grid').forEach(grid => {
-                        grid.style.display = 'block';
+                        grid.style.display = 'grid';
                     });
 
                 } catch (error) {
