@@ -3,9 +3,9 @@ from flask import Flask, render_template, request, jsonify
 import httpx
 import asyncio
 import base64
-import os
 from dotenv import load_dotenv
 import socket
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,20 +17,39 @@ app = Flask(__name__)
 RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL', 'https://api.devnet.solana.com')
 SOLANA_EXPLORER_API = "https://api.explorer.solana.com/v1"
 
-# Improved port selection logic
-def find_available_port(start_port=8080, max_attempts=10):
-    for i in range(max_attempts):
-        port = start_port + i
+def get_port():
+    """Get the port for the Flask application"""
+    # First check for Replit's PORT environment variable
+    replit_port = os.getenv("PORT")
+    if replit_port:
+        try:
+            port = int(replit_port)
+            logger.info(f"Using Replit PORT: {port}")
+            return port
+        except ValueError:
+            logger.warning(f"Invalid PORT environment variable: {replit_port}")
+
+    # Try to use the default development port
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(('0.0.0.0', 8080))
+        logger.info("Using default port 8080")
+        return 8080
+    except OSError:
+        logger.warning("Default port 8080 is not available")
+
+    # Fall back to finding a random available port
+    for port in range(8081, 8090):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.bind(('0.0.0.0', port))
+            logger.info(f"Using alternative port: {port}")
             return port
-        except OSError as e:
-            logger.warning(f"Port {port} is already in use. Trying next port.")
+        except OSError:
             continue
-    logger.error(f"Could not find an available port after {max_attempts} attempts.")
-    return None
 
+    logger.error("No available ports found")
+    return None
 
 async def make_rpc_call(method, params):
     """Make a direct RPC call to Solana"""
@@ -297,14 +316,10 @@ def burn_assets():
         }), 500
 
 if __name__ == '__main__':
-    try:
-        # Use the improved port finding function
-        PORT = find_available_port()
-        if PORT is None:
-            exit(1)  # Exit with an error code if no port is found
+    port = get_port()
+    if port is None:
+        logger.error("Could not find an available port. Exiting.")
+        exit(1)
 
-        logger.info(f"Starting server on port {PORT}")
-        app.run(host='0.0.0.0', port=PORT, debug=True)
-    except Exception as e:
-        logger.error(f"Failed to start server: {str(e)}")
-        raise
+    logger.info(f"Starting server on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=True)
