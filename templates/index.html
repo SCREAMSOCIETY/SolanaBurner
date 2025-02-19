@@ -102,10 +102,21 @@
                     const walletPubkey = currentWallet.publicKey;
 
                     // Convert amount to raw value based on decimals
-                    const rawAmount = Math.round(amount * Math.pow(10, decimals));
-                    console.log(`Raw amount to burn: ${rawAmount}`);
+                    console.log(`Burn request details:`);
+                    console.log(`- Input amount: ${amount}`);
+                    console.log(`- Token decimals: ${decimals}`);
 
-                    if (rawAmount <= 0) {
+                    // Using BigInt for precise decimal conversion with 6 decimals (standard for most Solana tokens)
+                    const effectiveDecimals = 6; // Override to 6 decimals as this is standard for most Solana tokens
+                    const multiplier = BigInt(10 ** effectiveDecimals);
+                    const rawAmount = BigInt(Math.round(amount * Number(multiplier)));
+
+                    console.log(`- Using effective decimals: ${effectiveDecimals}`);
+                    console.log(`- Multiplier: ${multiplier}`);
+                    console.log(`- Raw amount to burn: ${rawAmount}`);
+                    console.log(`- Final amount in tokens: ${Number(rawAmount) / Number(multiplier)}`);
+
+                    if (rawAmount <= BigInt(0)) {
                         throw new Error('Amount must be greater than 0');
                     }
 
@@ -119,15 +130,14 @@
                         new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
                     );
 
-                    // Create burn instruction data
+                    console.log('Creating burn instruction...');
                     const dataLayout = new Uint8Array(9);
                     dataLayout[0] = 8; // Burn instruction
                     const amountBytes = new Uint8Array(8);
                     const view = new DataView(amountBytes.buffer);
-                    view.setBigUint64(0, BigInt(rawAmount), true);
+                    view.setBigUint64(0, rawAmount, true);
                     dataLayout.set(amountBytes, 1);
 
-                    console.log('Creating burn instruction...');
                     const burnIx = new solanaWeb3.TransactionInstruction({
                         keys: [
                             { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
@@ -325,14 +335,19 @@
 
         function validateBurnAmount(input, maxAmount) {
             const amount = parseFloat(input.value);
+            console.log('Validating burn amount:', amount, 'max:', maxAmount);
+
             if (isNaN(amount) || amount <= 0) {
                 showError('Please enter a valid amount greater than 0');
                 return false;
             }
-            if (amount > maxAmount) {
+
+            // Use precise comparison for floating point
+            if (amount - maxAmount > Number.EPSILON) {
                 showError(`Amount cannot exceed ${maxAmount}`);
                 return false;
             }
+
             return true;
         }
     </script>
