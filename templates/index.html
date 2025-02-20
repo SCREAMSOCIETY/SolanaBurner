@@ -1,11 +1,16 @@
-;
-            padding: 1rem;
-        }
-
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Solana Token Burner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <style>
         .collection-section {
             background: rgba(153, 69, 255, 0.1);
             border-radius: 8px;
             padding: 1rem;
+            margin-bottom: 1rem;
         }
 
         .collection-header {
@@ -23,6 +28,153 @@
             gap: 1rem;
         }
     </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Solana Token Burner</h1>
+        <div class="wallet-section">
+            <button id="connectButton" class="connect-button">
+                <img src="{{ url_for('static', filename='phantom.svg') }}" alt="Phantom" class="wallet-icon">
+                Connect Phantom
+            </button>
+            <div id="walletInfo" class="connected-status" style="display: none;">
+                <div>Wallet Connected</div>
+                <div id="walletAddress" class="wallet-address"></div>
+            </div>
+        </div>
+        <div id="statusMessage" style="display: none;" class="status-message"></div>
+
+        <template id="token-card-template">
+            <div class="asset-card token-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select asset for burning">
+                </div>
+                <div class="token-header">
+                    <div class="token-icon-wrapper">
+                        <img class="token-icon" src="" alt="Token Icon" loading="lazy" />
+                    </div>
+                    <div class="token-info">
+                        <h4 class="token-name"></h4>
+                        <span class="token-symbol"></span>
+                    </div>
+                </div>
+                <div class="token-details">
+                    <div class="token-balance">
+                        <span class="balance-label">Balance:</span>
+                        <span class="balance-amount"></span>
+                    </div>
+                    <div class="token-supply">
+                        <span class="supply-label">Supply:</span>
+                        <span class="supply-amount"></span>
+                    </div>
+                    <div class="token-price">
+                        <span class="price-label">Price USD:</span>
+                        <span class="price-amount"></span>
+                    </div>
+                    <div class="token-volume">
+                        <span class="volume-label">24h Volume:</span>
+                        <span class="volume-amount"></span>
+                    </div>
+                </div>
+                <div class="token-actions">
+                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
+                    <button class="burn-button">Burn Token</button>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
+            </div>
+        </template>
+
+        <template id="nft-card-template">
+            <div class="asset-card nft-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select NFT for burning">
+                </div>
+                <div class="nft-image-wrapper">
+                    <img class="nft-image" src="" alt="NFT" loading="lazy" />
+                </div>
+                <div class="nft-info">
+                    <h4 class="nft-name"></h4>
+                    <p class="nft-collection"></p>
+                </div>
+                <div class="token-actions">
+                    <button class="burn-button">Burn NFT</button>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
+            </div>
+        </template>
+
+        <template id="cnft-card-template">
+            <div class="asset-card cnft-card">
+                <div class="cnft-image-wrapper">
+                    <img class="cnft-image" src="" alt="cNFT" loading="lazy" />
+                </div>
+                <div class="cnft-info">
+                    <h4 class="cnft-name"></h4>
+                    <p class="cnft-collection"></p>
+                </div>
+            </div>
+        </template>
+
+        <div id="assetsContainer" class="assets-container" style="display: none;">
+            <h2>Your Assets</h2>
+            <div class="tabs">
+                <button class="tab-button active" data-tab="tokens">Tokens</button>
+                <button class="tab-button" data-tab="nfts">NFTs</button>
+                <button class="tab-button" data-tab="cnfts">cNFTs</button>
+            </div>
+            <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+            <div class="bulk-actions-bar" style="display: none;">
+                <div class="selected-count">0 items selected</div>
+                <div class="bulk-actions">
+                    <button class="bulk-burn-button">Burn Selected</button>
+                    <button class="clear-selection">Clear Selection</button>
+                </div>
+            </div>
+
+            <div class="tab-content">
+                <div id="tokens" class="tab-panel active">
+                    <div class="assets-grid"></div>
+                </div>
+                <div id="nfts" class="tab-panel">
+                    <div class="collections-grid"></div>
+                </div>
+                <div id="cnfts" class="tab-panel">
+                    <div class="assets-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="achievementsContainer" class="achievements-container" style="display: none;">
+            <h2>Achievements</h2>
+            <div class="achievements-grid">
+            </div>
+        </div>
+
+        <template id="achievement-card-template">
+            <div class="achievement-card">
+                <div class="achievement-icon">
+                    <svg class="achievement-svg" viewBox="0 0 24 24" width="48" height="48">
+                    </svg>
+                </div>
+                <div class="achievement-info">
+                    <h3 class="achievement-title"></h3>
+                    <p class="achievement-description"></p>
+                </div>
+                <div class="achievement-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="progress-text"></span>
+                </div>
+            </div>
+        </template>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -742,7 +894,7 @@
                 card.querySelector('.achievement-description').textContent = achievement.description;
                 card.querySelector('.achievement-svg').innerHTML = `<path d="${achievement.icon}" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-                const progressPercent = (userProgress.progress / achievement.maxProgress) * 100;
+                const progressPercent = (userProgress.progress /achievement.maxProgress) * 100;
                 card.querySelector('.progress-fill').style.width = `${progressPercent}%`;
                 card.querySelector('.progress-text').textContent =
                     `${userProgress.progress}/${achievement.maxProgress}`;
