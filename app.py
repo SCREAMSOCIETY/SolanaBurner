@@ -171,8 +171,8 @@ async def fetch_assets(wallet_address):
                     decimals = parsed_data["tokenAmount"]["decimals"]
 
                     if amount > 0:
-                        # If decimals is 0 and amount is 1, it's definitely an NFT
                         if decimals == 0 and amount == 1:
+                            # This is a proper NFT with metadata
                             logger.info(f"Found NFT: {mint}")
                             metadata_tasks.append(get_token_metadata(mint))
                             nfts.append({
@@ -180,8 +180,8 @@ async def fetch_assets(wallet_address):
                                 'type': 'nft',
                                 'explorer_url': f"https://explorer.solana.com/address/{mint}"
                             })
-                        # Otherwise it's a fungible token
                         else:
+                            # This is a fungible token
                             logger.info(f"Found token: {mint} with amount {amount} and decimals {decimals}")
                             metadata_tasks.append(get_token_metadata(mint))
                             tokens.append({
@@ -210,6 +210,7 @@ async def fetch_assets(wallet_address):
 
                 try:
                     if token_index < len(tokens):
+                        # Process token metadata
                         token = tokens[token_index]
                         raw_amount = token.pop('raw_amount', 0)
                         decimals = token.pop('decimals', 9)
@@ -217,6 +218,7 @@ async def fetch_assets(wallet_address):
                         token['amount'] = float(raw_amount) / (10 ** decimals)
                         token_index += 1
                     elif nft_index < len(nfts):
+                        # Process NFT metadata
                         nfts[nft_index].update(result)
                         nft_index += 1
                 except Exception as e:
