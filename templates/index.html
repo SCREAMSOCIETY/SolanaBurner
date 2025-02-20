@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <title>Solana Asset Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Development React -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 </head>
 <body>
     <div id="root">
@@ -15,12 +18,20 @@
     <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}"></script>
 
     <script>
-        window.addEventListener('DOMContentLoaded', function() {
-            if (window.WalletProvider && typeof window.WalletProvider.render === 'function') {
+        window.addEventListener('load', function() {
+            try {
+                console.log('Initializing wallet provider...');
+                if (!window.WalletProvider) {
+                    throw new Error('WalletProvider not loaded');
+                }
+                if (typeof window.WalletProvider.render !== 'function') {
+                    throw new Error('WalletProvider.render is not a function');
+                }
                 window.WalletProvider.render();
-                console.log('WalletProvider initialized');
-            } else {
-                console.error('WalletProvider not loaded correctly');
+            } catch (error) {
+                console.error('Error initializing wallet:', error);
+                document.getElementById('root').innerHTML = 
+                    '<div style="color: red; padding: 20px;">Error loading wallet provider. Please check console for details.</div>';
             }
         });
     </script>

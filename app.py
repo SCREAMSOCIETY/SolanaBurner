@@ -507,28 +507,10 @@ def get_port():
         logger.info("Using port 8080")
         return 8080
     except OSError:
-        logger.warning("Port 8080 is not available")
-
-    # Try alternative ports
-    for port in range(8081, 8090):
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.bind(('0.0.0.0', port))
-            sock.close()
-            logger.info(f"Using port {port}")
-            return port
-        except OSError:
-            continue
-
-    logger.error("No available ports found")
-    return None
-
+        logger.error("Port 8080 is not available, using port 3000")
+        return 3000
 
 if __name__ == '__main__':
     port = get_port()
-    if port is None:
-        logger.error("Could not find an available port. Exiting.")
-        exit(1)
-
     logger.info(f"Starting server on port {port}")
     app.run(host='0.0.0.0', port=port, debug=True)

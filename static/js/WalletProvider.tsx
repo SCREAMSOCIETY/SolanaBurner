@@ -1,4 +1,5 @@
 import React, { FC, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import {
     ConnectionProvider,
@@ -15,18 +16,16 @@ import {
     WalletDisconnectButton
 } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
-import * as ReactDOM from 'react-dom/client';
 
 // Default styles that can be overridden by your app
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-const WalletProviderComponent: FC = () => {
+const App: FC = () => {
     // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
     const network = WalletAdapterNetwork.Mainnet;
 
     // You can also provide a custom RPC endpoint.
     const endpoint = process.env.QUICKNODE_RPC_URL || clusterApiUrl(network);
-    console.log('Using RPC endpoint:', endpoint);
 
     const wallets = useMemo(
         () => [
@@ -54,28 +53,31 @@ const WalletProviderComponent: FC = () => {
     );
 };
 
-// Create a self-contained initialization function
-const initializeWalletProvider = () => {
+declare global {
+    interface Window {
+        WalletProvider: {
+            render: () => void;
+        };
+    }
+}
+
+function initWalletProvider() {
+    console.log('Initializing WalletProvider...');
     const container = document.getElementById('root');
     if (!container) {
-        console.error('Root element not found');
-        return;
+        throw new Error('Root element not found');
     }
 
-    try {
-        const root = ReactDOM.createRoot(container);
-        root.render(
-            <React.StrictMode>
-                <WalletProviderComponent />
-            </React.StrictMode>
-        );
-        console.log('WalletProvider rendered successfully');
-    } catch (error) {
-        console.error('Failed to render WalletProvider:', error);
-    }
-};
+    const root = createRoot(container);
+    root.render(
+        <React.StrictMode>
+            <App />
+        </React.StrictMode>
+    );
+    console.log('WalletProvider initialized successfully');
+}
 
 // Export for webpack
-export { WalletProviderComponent, initializeWalletProvider };
-// Default export for UMD
-export default { render: initializeWalletProvider };
+window.WalletProvider = {
+    render: initWalletProvider
+};

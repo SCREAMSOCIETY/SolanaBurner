@@ -11,10 +11,8 @@ module.exports = {
     filename: '[name].js',
     library: {
       name: '[name]',
-      type: 'umd',
-      export: 'default'
-    },
-    globalObject: 'this'
+      type: 'window'
+    }
   },
   module: {
     rules: [
@@ -32,18 +30,17 @@ module.exports = {
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
     alias: {
-      '@': path.resolve(__dirname, 'static/js'),
-      'process': require.resolve('process/browser'),
+      '@': path.resolve(__dirname, 'static/js')
     },
     fallback: {
       "stream": require.resolve("stream-browserify"),
       "crypto": require.resolve("crypto-browserify"),
+      "http": require.resolve("stream-http"),
       "https": require.resolve("https-browserify"),
       "url": require.resolve("url/"),
       "zlib": require.resolve("browserify-zlib"),
       "buffer": require.resolve("buffer/"),
       "process": require.resolve("process/browser"),
-      "http": false,
       "vm": false,
       "assert": false,
       "path": false,
@@ -53,13 +50,18 @@ module.exports = {
   plugins: [
     new webpack.ProvidePlugin({
       process: 'process/browser',
-      Buffer: ['buffer', 'Buffer'],
-      React: 'react',
-      ReactDOM: 'react-dom'
+      Buffer: ['buffer', 'Buffer']
     }),
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify('development'),
       'process.env.QUICKNODE_RPC_URL': JSON.stringify(process.env.QUICKNODE_RPC_URL)
     })
-  ]
+  ],
+  externals: {
+    'react': 'React',
+    'react-dom': 'ReactDOM',
+    'react-dom/client': 'ReactDOM'
+  },
+  mode: 'development',
+  devtool: 'source-map'
 };
