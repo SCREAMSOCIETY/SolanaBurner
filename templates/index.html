@@ -4,52 +4,7 @@
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <!-- Load Solana Web3 first -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <style>
-        .collection-section {
-            background: rgba(153, 69, 255, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .collection-header {
-            color: #9945FF;
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #9945FF;
-        }
-
-        .collection-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1rem;
-        }
-        .domain-card {
-            background: rgba(153, 69, 255, 0.05);
-            border: 1px solid rgba(153, 69, 255, 0.2);
-        }
-
-        .domain-info {
-            padding: 1rem;
-            text-align: center;
-        }
-
-        .domain-name {
-            color: #9945FF;
-            font-size: 1.2rem;
-            margin: 0;
-        }
-
-        .domain-parent {
-            color: #666;
-            font-size: 0.9rem;
-            margin: 0.5rem 0 0;
-        }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -158,7 +113,6 @@
             <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
             <div id="errorMessage" class="error-message" style="display: none;"></div>
 
-            <!-- Moved bulk actions bar outside of tab panels -->
             <div class="bulk-actions-bar">
                 <div class="selected-count">0 items selected</div>
                 <div class="bulk-actions">
@@ -210,96 +164,58 @@
     </div>
 
     <script>
-        // Global variables
+        // Global variables with proper scoping
         let currentWallet = null;
         let connection = null;
-        const TOKEN_PROGRAM_ID = null; // Will be initialized after Solana loads
+        let TOKEN_PROGRAM_ID = null;
+        let selectedAssets = new Map();
 
-        // Wait for both DOM and Solana to be ready
-        function initializeWallet() {
-            console.log("Initializing wallet handler...");
+        // Initialize UI elements
+        const connectButton = document.getElementById('connectButton');
+        const walletInfo = document.getElementById('walletInfo');
+        const walletAddress = document.getElementById('walletAddress');
+        const statusMessage = document.getElementById('statusMessage');
+        const assetsContainer = document.getElementById('assetsContainer');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorMessage = document.getElementById('errorMessage');
 
-            if (!window.solanaWeb3) {
-                console.error("Solana Web3 not loaded yet");
-                setTimeout(initializeWallet, 100);
-                return;
+        function showStatus(message, isError = false) {
+            console.log(`Status: ${message}${isError ? ' (ERROR)' : ''}`);
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+            statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
+        }
+
+        // Wait for Solana Web3 to be ready
+        function waitForSolana(callback) {
+            if (window.solanaWeb3) {
+                console.log("Solana Web3 loaded, initializing...");
+                callback();
+            } else {
+                console.log("Waiting for Solana Web3 to load...");
+                setTimeout(() => waitForSolana(callback), 100);
             }
+        }
 
+        // Initialize wallet connection
+        async function initializeWallet() {
             try {
-                // Initialize Solana-specific constants
+                // Initialize Solana constants
                 TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
-                const connectButton = document.getElementById('connectButton');
-                const walletInfo = document.getElementById('walletInfo');
-                const walletAddress = document.getElementById('walletAddress');
-                const statusMessage = document.getElementById('statusMessage');
-                const assetsContainer = document.getElementById('assetsContainer');
-                const loadingMessage = document.getElementById('loadingMessage');
-                const errorMessage = document.getElementById('errorMessage');
+                // Add click handler for connect button
+                connectButton.addEventListener('click', connectWallet);
 
-                console.log("DOM elements initialized");
-
-                async function connectWallet() {
-                    try {
-                        console.log("Starting wallet connection process...");
-
-                        // Check if Phantom is installed
-                        if (!window.solana || !window.solana.isPhantom) {
-                            console.error("Phantom wallet not found");
-                            showStatus('Phantom wallet not found. Please install Phantom.', true);
-                            window.open('https://phantom.app/', '_blank');
-                            return;
-                        }
-
-                        showStatus('Connecting to Phantom...');
-                        console.log("Requesting wallet connection...");
-
-                        // Request connection
-                        const resp = await window.solana.connect();
-                        console.log("Connection response received:", resp);
-
-                        if (resp.publicKey) {
-                            const address = resp.publicKey.toString();
-                            console.log('Connected to wallet:', address);
-
-                            currentWallet = window.solana;
-                            connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
-
-                            connectButton.style.display = 'none';
-                            walletInfo.style.display = 'block';
-                            walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
-                            assetsContainer.style.display = 'block';
-
-                            showStatus('Wallet connected successfully');
-                            await loadAssets(address);
-                        }
-                    } catch (error) {
-                        console.error('Connection error:', error);
-                        showStatus(`Failed to connect: ${error.message}`, true);
-
-                        // Reset connection state
-                        currentWallet = null;
-                        connection = null;
-                        connectButton.style.display = 'block';
-                        walletInfo.style.display = 'none';
-                        assetsContainer.style.display = 'none';
-                    }
-                }
-
-                // Initialize connect button event listener
-                if (connectButton) {
-                    console.log("Setting up connect button listener");
-                    connectButton.addEventListener('click', connectWallet);
-                }
-
-                // Initialize wallet event listeners
+                // Setup wallet event listeners if Phantom is available
                 if (window.solana) {
-                    console.log("Setting up Solana wallet listeners");
+                    console.log("Setting up Phantom wallet listeners");
 
-                    window.solana.on('connect', () => {
-                        console.log('Wallet connected event received');
+                    window.solana.on('connect', async () => {
+                        console.log("Wallet connected event fired");
                         if (window.solana.publicKey) {
                             const address = window.solana.publicKey.toString();
+                            console.log(`Connected to wallet: ${address}`);
+
                             currentWallet = window.solana;
                             connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
 
@@ -309,12 +225,12 @@
                             assetsContainer.style.display = 'block';
 
                             showStatus('Connected to Phantom wallet');
-                            loadAssets(address);
+                            await loadAssets(address);
                         }
                     });
 
                     window.solana.on('disconnect', () => {
-                        console.log('Wallet disconnected event received');
+                        console.log("Wallet disconnected event fired");
                         currentWallet = null;
                         connection = null;
                         connectButton.style.display = 'block';
@@ -323,33 +239,66 @@
                         showStatus('Wallet disconnected');
                     });
 
-                    // Check if wallet is already connected
+                    // Check if already connected
                     if (window.solana.isPhantom && window.solana.isConnected) {
-                        console.log('Wallet is already connected, initializing...');
+                        console.log("Wallet already connected, initializing...");
                         connectWallet();
                     }
                 } else {
-                    console.error("Solana object not found in window");
+                    console.log("Phantom wallet not found");
+                    showStatus('Please install Phantom wallet', true);
                 }
-
             } catch (error) {
-                console.error("Error during wallet initialization:", error);
+                console.error("Wallet initialization error:", error);
+                showStatus(`Wallet initialization failed: ${error.message}`, true);
             }
         }
 
-        // Start initialization when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM Content Loaded, starting wallet initialization");
-            initializeWallet();
-        });
+        async function connectWallet() {
+            try {
+                console.log("Starting wallet connection...");
 
+                if (!window.solana || !window.solana.isPhantom) {
+                    console.error("Phantom wallet not found");
+                    showStatus('Please install Phantom wallet', true);
+                    window.open('https://phantom.app/', '_blank');
+                    return;
+                }
 
-        function showStatus(message, isError = false) {
-            statusMessage.textContent = message;
-            statusMessage.style.display = 'block';
-            statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
-            console.log(`Status: ${message}`);
+                showStatus('Connecting to Phantom...');
+                const resp = await window.solana.connect();
+                console.log("Connection response:", resp);
+
+                if (resp.publicKey) {
+                    const address = resp.publicKey.toString();
+                    currentWallet = window.solana;
+                    connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
+
+                    connectButton.style.display = 'none';
+                    walletInfo.style.display = 'block';
+                    walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                    assetsContainer.style.display = 'block';
+
+                    showStatus('Successfully connected to wallet');
+                    await loadAssets(address);
+                }
+            } catch (error) {
+                console.error("Connection error:", error);
+                showStatus(`Connection failed: ${error.message}`, true);
+
+                currentWallet = null;
+                connection = null;
+                connectButton.style.display = 'block';
+                walletInfo.style.display = 'none';
+                assetsContainer.style.display = 'none';
+            }
         }
+
+        // Start initialization when both DOM and Solana are ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM loaded, waiting for Solana Web3...");
+            waitForSolana(initializeWallet);
+        });
 
         function showLoading(show = true) {
             loadingMessage.style.display = show ? 'block' : 'none';
@@ -431,7 +380,6 @@
                 showError(`Failed to load assets: ${error.message}`);
             }
         }
-
 
 
         function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
@@ -823,7 +771,6 @@
         });
 
         // Add bulk selection state
-        let selectedAssets = new Map();
         function updateBulkActionsBar() {
             const count = selectedAssets.size;
             if (count > 0) {
@@ -947,7 +894,7 @@
                 // Remove burned assets from display
                 for (const [mint] of selectedAssets) {
                     const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
-                    if (card) {
+                    if (                    if (card) {
                         card.classList.add('burned');
                         setTimeout(() => {
                             card.remove();
