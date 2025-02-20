@@ -414,16 +414,18 @@
             const template = document.querySelector('#token-card-template');
             const card = template.content.cloneNode(true);
 
-            // Set token icon
+            // Set token icon with error handling
             const iconElem = card.querySelector('.token-icon');
-            iconElem.src = token.icon || 'default-token-icon.png';
+            iconElem.src = token.icon || "{{ url_for('static', filename='default-token-icon.svg') }}";
+            iconElem.onerror = function() {
+                this.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
+            };
 
-            // Set token info
+            // Rest of token card creation code remains the same
             card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
             card.querySelector('.token-symbol').textContent = token.symbol || 'Unknown';
-
-            // Set balance
             card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
+            card.querySelector('.explorer-link').href = token.explorer_url;
 
             // Set burn controls
             const burnInput = card.querySelector('.burn-amount');
@@ -434,9 +436,6 @@
             burnButton.dataset.mint = token.mint;
             burnButton.dataset.decimals = token.decimals;
 
-            // Set explorer link
-            card.querySelector('.explorer-link').href = token.explorer_url;
-
             return card;
         }
 
@@ -444,15 +443,15 @@
             const template = document.querySelector('#nft-card-template');
             const card = template.content.cloneNode(true);
 
-            // Set NFT image
+            // Set NFT image with error handling
             const imageElem = card.querySelector('.nft-image');
-            imageElem.src = nft.image || 'default-nft-image.png';
+            imageElem.src = nft.image || "{{ url_for('static', filename='default-nft-image.svg') }}";
+            imageElem.onerror = function() {
+                this.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
+            };
 
-            // Set NFT info
             card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
             card.querySelector('.nft-collection').textContent = nft.collection || '';
-
-            // Set explorer link
             card.querySelector('.explorer-link').href = nft.explorer_url;
 
             return card;
@@ -462,15 +461,15 @@
             const template = document.querySelector('#cnft-card-template');
             const card = template.content.cloneNode(true);
 
-            // Set cNFT image
+            // Set cNFT image with error handling
             const imageElem = card.querySelector('.cnft-image');
-            imageElem.src = cnft.image || 'default-cnft-image.png';
+            imageElem.src = cnft.image || "{{ url_for('static', filename='default-nft-image.svg') }}";
+            imageElem.onerror = function() {
+                this.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
+            };
 
-            // Set cNFT info
             card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
             card.querySelector('.cnft-collection').textContent = cnft.collection || '';
-
-            // Set explorer link
             card.querySelector('.explorer-link').href = cnft.explorer_url;
 
             return card;
