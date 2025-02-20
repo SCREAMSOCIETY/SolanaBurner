@@ -177,9 +177,14 @@
             const assetsContainer = document.getElementById('assetsContainer');
             const loadingMessage = document.getElementById('loadingMessage');
             const errorMessage = document.getElementById('errorMessage');
+            const bulkActionsBar = document.querySelector('.bulk-actions-bar');
+            const selectedCountDisplay = document.querySelector('.selected-count');
+            const bulkBurnButton = document.querySelector('.bulk-burn-button');
+            const clearSelectionButton = document.querySelector('.clear-selection');
 
             let currentWallet = null;
             let connection = null;
+            let selectedAssets = new Map();
 
             function showStatus(message, isError = false) {
                 statusMessage.textContent = message;
@@ -244,10 +249,6 @@
 
                         showStatus('Wallet connected successfully');
                         await loadAssets(address);
-
-                        // Trigger achievements
-                        updateAchievement('FIRST_CONNECTION');
-                        updateAchievement('ASSET_VIEWER');
                     }
                 } catch (error) {
                     console.error('Connection error:', error);
@@ -280,13 +281,6 @@
             }
 
             connectButton.addEventListener('click', connectWallet);
-
-            // Check if wallet is already connected
-            if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
-                console.log('Wallet already connected, reconnecting...');
-                connectWallet();
-            }
-
             function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
                 imgElement.classList.add('loading');
 
@@ -594,9 +588,6 @@
 
 
 
-
-
-
             function formatNumber(num) {
                 return new Intl.NumberFormat('en-US', {
                     minimumFractionDigits: 2,
@@ -708,12 +699,6 @@
             });
 
             // Add bulk selection state
-            let selectedAssets = new Map(); // Map of selected assets: mint -> {type, amount}
-            const bulkActionsBar = document.querySelector('.bulk-actions-bar');
-            const selectedCountDisplay = document.querySelector('.selected-count');
-            const bulkBurnButton = document.querySelector('.bulk-burn-button');
-            const clearSelectionButton = document.querySelector('.clear-selection');
-
             function updateBulkActionsBar() {
                 const count = selectedAssets.size;
                 if (count > 0) {
@@ -1056,15 +1041,15 @@
                 }
             }
 
-            // Initialize bulk burn functionality
-            const bulkBurnButton = document.querySelector('.bulk-burn-button');
-            if (bulkBurnButton) {
-                bulkBurnButton.addEventListener('click', burnSelectedAssets);
-            }
+            // Add event listeners for bulk action buttons
+            bulkBurnButton.addEventListener('click', burnSelectedAssets);
+            clearSelectionButton.addEventListener('click', clearSelection);
 
-            const clearSelectionButton = document.querySelector('.clear-selection');
-            if (clearSelectionButton) {
-                clearSelectionButton.addEventListener('click', clearSelection);
+
+            // Check if wallet is already connected
+            if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
+                console.log('Wallet already connected, reconnecting...');
+                connectWallet();
             }
 
             initializeAchievements();
