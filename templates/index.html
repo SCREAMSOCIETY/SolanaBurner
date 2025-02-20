@@ -10,19 +10,15 @@
         <!-- React will render here -->
     </div>
 
-    <!-- Development React -->
-    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-
     <!-- Load our React component -->
-    <script src="{{ url_for('static', filename='dist/WalletProvider.js') }}" type="module"></script>
-    <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}" type="module"></script>
+    <script src="{{ url_for('static', filename='dist/WalletProvider.js') }}"></script>
+    <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}"></script>
 
     <script>
-        // Initialize React app when the wallet provider is loaded
-        window.addEventListener('load', function() {
-            if (window.WalletProvider && window.WalletProvider.render) {
+        window.addEventListener('DOMContentLoaded', function() {
+            if (window.WalletProvider && typeof window.WalletProvider.render === 'function') {
                 window.WalletProvider.render();
+                console.log('WalletProvider initialized');
             } else {
                 console.error('WalletProvider not loaded correctly');
             }
