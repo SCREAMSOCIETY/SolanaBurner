@@ -6,6 +6,7 @@
     <!-- Load Solana Web3 first -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='js/cnft-handler.js') }}" type="module"></script>
 </head>
 <body>
     <div class="container">
@@ -194,6 +195,7 @@
         let wallet = null;
         let connection = null;
         let TOKEN_PROGRAM_ID = null;
+        let cnftHandler = null;
 
         // Initialize connection early
         const endpoint = '{{ rpc_endpoint }}';
@@ -245,6 +247,7 @@
 
                 // Set wallet reference
                 wallet = window.solana;
+                cnftHandler = new CNFTHandler(connection, wallet);
 
                 return true;
             } catch (error) {
@@ -291,6 +294,7 @@
                 wallet = null;
                 connection = null;
                 TOKEN_PROGRAM_ID = null;
+                cnftHandler = null;
 
                 // Reset UI
                 connectButton.style.display = 'block';
@@ -323,6 +327,7 @@
                     wallet = null;
                     connection = null;
                     TOKEN_PROGRAM_ID = null;
+                    cnftHandler = null;
                     connectButton.style.display = 'block';
                     walletInfo.style.display = 'none';
                     assetsContainer.style.display = 'none';
@@ -376,13 +381,19 @@
                 displayNFTs(assets.nfts);
 
                 const cnftsGrid = document.querySelector('#cnfts .assets-grid');
-                if (!assets.cnfts || assets.cnfts.length === 0) {
-                    cnftsGrid.innerHTML = '<div class="no-assets">No cNFTs found</div>';
-                } else {
-                    assets.cnfts.forEach(cnft => {
-                        const card = createCNFTCard(cnft);
-                        cnftsGrid.appendChild(card);
-                    });
+                try {
+                    const cnfts = await cnftHandler.fetchCNFTs(publicKey);
+                    if (!cnfts || cnfts.length === 0) {
+                        cnftsGrid.innerHTML = '<div class="no-assets">No cNFTs found</div>';
+                    } else {
+                        cnfts.forEach(cnft => {
+                            const card = createCNFTCard(cnft);
+                            cnftsGrid.appendChild(card);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error fetching cNFTs:', error);
+                    cnftsGrid.innerHTML = '<div class="error-message">Error loading cNFTs</div>';
                 }
 
                 const domainsGrid = document.querySelector('#domains .assets-grid');
@@ -622,7 +633,7 @@
 
                 try {
                     showLoading(true);
-                    const result = await burnToken(cnft.mint, 1, 0);
+                    const result = await burnToken(cnft.mint, 1, 0, cnft.proof); // Pass proof for cNFT
                     if (result) {
                         showStatus('cNFT burned successfully');
                         cardElement.classList.add('burned');
@@ -749,7 +760,7 @@
             return true;
         }
 
-        async function burnToken(mint, amount, decimals) {
+        async function burnToken(mint, amount, decimals, proof = null) {
             const mintPubkey = new solanaWeb3.PublicKey(mint);
             const walletPubkey = wallet.publicKey;
 
@@ -766,76 +777,100 @@
                     throw new Error('Amount must be greater than 0');
                 }
 
-                // Get the token account
-                const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
-                    [
-                        walletPubkey.toBuffer(),
-                        TOKEN_PROGRAM_ID.toBuffer(),
-                        mintPubkey.toBuffer(),
-                    ],
-                    new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
-                );
-
-                // Create burn instruction
-                const burnIx = createBurnInstruction(
-                    tokenAccountPubkey,
-                    mintPubkey,
-                    walletPubkey,
-                    rawAmount
-                );
-
-                // Check if we should close the account
-                const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
-                const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
-                const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
-
-                let instructions = [burnIx];
-                if (shouldClose) {
-                    // Add close instruction
-                    const closeIx = new solanaWeb3.TransactionInstruction({
-                        keys: [
-                            { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
-                            { pubkey: walletPubkey, isSigner: false, isWritable: true },
-                            { pubkey: walletPubkey, isSigner: true, isWritable: false },
-                        ],
-                        programId: TOKEN_PROGRAM_ID,
-                        data: new Uint8Array([9]) // Close account instruction
+                if (proof) {
+                    const burnIx = await cnftHandler.burnCNFT(mint, proof);
+                    let instructions = [burnIx];
+                    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                    const transaction = new solanaWeb3.Transaction();
+                    transaction.feePayer = walletPubkey;
+                    transaction.recentBlockhash = blockhash;
+                    transaction.lastValidBlockHeight = lastValidBlockHeight;
+                    instructions.forEach(ix => transaction.add(ix));
+                    const signedTx = await wallet.signTransaction(transaction);
+                    const signature = await connection.sendRawTransaction(signedTx.serialize());
+                    const confirmation = await connection.confirmTransaction({
+                        signature,
+                        blockhash,
+                        lastValidBlockHeight
                     });
-                    instructions.push(closeIx);
+                    if (confirmation.value.err) {
+                        throw new Error(`Transaction failed: ${confirmation.value.err}`);
+                    }
+                    return true;
+
+
+                } else {
+                    // Get the token account
+                    const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
+                        [
+                            walletPubkey.toBuffer(),
+                            TOKEN_PROGRAM_ID.toBuffer(),
+                            mintPubkey.toBuffer(),
+                        ],
+                        new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+                    );
+
+                    // Create burn instruction
+                    const burnIx = createBurnInstruction(
+                        tokenAccountPubkey,
+                        mintPubkey,
+                        walletPubkey,
+                        rawAmount
+                    );
+
+                    // Check if we should close the account
+                    const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+                    const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
+                    const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
+
+                    let instructions = [burnIx];
+                    if (shouldClose) {
+                        // Add close instruction
+                        const closeIx = new solanaWeb3.TransactionInstruction({
+                            keys: [
+                                { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
+                                { pubkey: walletPubkey, isSigner: false, isWritable: true },
+                                { pubkey: walletPubkey, isSigner: true, isWritable: false },
+                            ],
+                            programId: TOKEN_PROGRAM_ID,
+                            data: new Uint8Array([9]) // Close account instruction
+                        });
+                        instructions.push(closeIx);
+                    }
+
+                    // Get a fresh blockhash
+                    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                    console.log('Got blockhash:', blockhash, 'lastValidBlockHeight:', lastValidBlockHeight);
+
+                    // Create transaction with the fresh blockhash
+                    const transaction = new solanaWeb3.Transaction();
+                    transaction.feePayer = walletPubkey;
+                    transaction.recentBlockhash = blockhash;
+                    transaction.lastValidBlockHeight = lastValidBlockHeight;
+                    instructions.forEach(ix => transaction.add(ix));
+
+                    console.log('Transaction created, requesting signature...');
+                    // Sign and send transaction
+                    const signedTx = await wallet.signTransaction(transaction);
+                    console.log('Transaction signed, sending...');
+
+                    const signature = await connection.sendRawTransaction(signedTx.serialize());
+                    console.log('Transaction sent, signature:', signature);
+
+                    // Wait for confirmation
+                    const confirmation = await connection.confirmTransaction({
+                        signature,
+                        blockhash,
+                        lastValidBlockHeight
+                    });
+
+                    if (confirmation.value.err) {
+                        throw new Error(`Transaction failed: ${confirmation.value.err}`);
+                    }
+
+                    console.log('Transaction confirmed successfully');
+                    return true;
                 }
-
-                // Get a fresh blockhash
-                const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-                console.log('Got blockhash:', blockhash, 'lastValidBlockHeight:', lastValidBlockHeight);
-
-                // Create transaction with the fresh blockhash
-                const transaction = new solanaWeb3.Transaction();
-                transaction.feePayer = walletPubkey;
-                transaction.recentBlockhash = blockhash;
-                transaction.lastValidBlockHeight = lastValidBlockHeight;
-                instructions.forEach(ix => transaction.add(ix));
-
-                console.log('Transaction created, requesting signature...');
-                // Sign and send transaction
-                const signedTx = await wallet.signTransaction(transaction);
-                console.log('Transaction signed, sending...');
-
-                const signature = await connection.sendRawTransaction(signedTx.serialize());
-                console.log('Transaction sent, signature:', signature);
-
-                // Wait for confirmation
-                const confirmation = await connection.confirmTransaction({
-                    signature,
-                    blockhash,
-                    lastValidBlockHeight
-                });
-
-                if (confirmation.value.err) {
-                    throw new Error(`Transaction failed: ${confirmation.value.err}`);
-                }
-
-                console.log('Transaction confirmed successfully');
-                return true;
             } catch (error) {
                 console.error('Error in burnToken:', error);
                 throw error;
@@ -853,7 +888,7 @@
             return new solanaWeb3.TransactionInstruction({
                 keys: [
                     { pubkey: tokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: mint, isSigner: false, isWritable: true },
+                    { pubkey: mint, isSigner: false, isWritable:true },
                     { pubkey: owner, isSigner: true, isWritable: false },
                 ],
                 programId: TOKEN_PROGRAM_ID,
@@ -1020,7 +1055,7 @@
         }
 
         // Check if wallet is already connected
-        if (window.solana&& window.solana.isPhantom && window.solana.isConnected) {
+        if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
             console.log('Wallet already connected, reconnecting...');
             connectWallet();
         }

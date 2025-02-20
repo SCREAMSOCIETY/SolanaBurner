@@ -1,0 +1,17 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@metaplex-foundation/js": "^0.20.1",
+    "@metaplex-foundation/mpl-bubblegum": "^4.3.1",
+    "@solana/web3.js": "^1.98.0"
+  }
+}
