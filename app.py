@@ -320,12 +320,56 @@ async def get_cnft_metadata(address):
     }
 
 
+async def get_sol_domains(wallet_address):
+    """Fetch .sol domains owned by the wallet"""
+    logger.info(f"Fetching .sol domains for wallet: {wallet_address}")
+    try:
+        domains_response = await make_rpc_call(
+            "getProgramAccounts",
+            [
+                "58PwtjSDuFHuUkYjH9BYnnQKHfwo9reZhC2zMJv9JPkx",  # Name Service Program
+                {
+                    "encoding": "jsonParsed",
+                    "filters": [
+                        {
+                            "memcmp": {
+                                "offset": 32,  # Owner offset
+                                "bytes": wallet_address
+                            }
+                        }
+                    ]
+                }
+            ]
+        )
+
+        domains = []
+        if "result" in domains_response:
+            for account in domains_response["result"]:
+                try:
+                    domain_data = account["account"]["data"]["parsed"]
+                    domains.append({
+                        'name': domain_data.get('name', ''),
+                        'parent_name': domain_data.get('parentName', ''),
+                        'owner': wallet_address,
+                        'class': 'domain',
+                        'mint': account["pubkey"],
+                        'explorer_url': f"https://solscan.io/address/{account['pubkey']}"
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing domain account: {str(e)}")
+                    continue
+
+        return domains
+    except Exception as e:
+        logger.error(f"Error fetching .sol domains: {str(e)}")
+        return []
+
 async def fetch_assets(wallet_address):
-    """Fetch assets using direct RPC calls"""
+    """Enhanced fetch assets using optimized RPC calls"""
     logger.info(f"Fetching assets for wallet: {wallet_address}")
 
     try:
-        # Get token accounts
+        # Get token accounts with optimized filter
         token_accounts_response = await make_rpc_call(
             "getTokenAccountsByOwner",
             [
@@ -352,17 +396,15 @@ async def fetch_assets(wallet_address):
 
                     # Only process accounts with non-zero balance
                     if amount > 0:
-                        # First check if this is an NFT by looking for Metaplex metadata
+                        # Check if this is an NFT by looking for Metaplex metadata
                         is_nft_token = await is_nft(mint)
 
-                        # If it has Metaplex metadata and meets NFT criteria (decimals=0, amount=1)
                         if is_nft_token and decimals == 0 and amount == 1:
                             logger.info(f"Found NFT: {mint}")
                             nft_metadata = await get_token_metadata(mint)
                             if nft_metadata:
                                 nfts.append(nft_metadata)
                         else:
-                            # This is a regular token
                             logger.info(f"Found token: {mint}")
                             token_metadata = await get_token_metadata(mint)
                             if token_metadata:
@@ -373,7 +415,7 @@ async def fetch_assets(wallet_address):
                     logger.error(f"Error processing token account: {str(e)}")
                     continue
 
-        # Try to get cNFTs
+        # Fetch cNFTs
         try:
             logger.info("Fetching cNFTs...")
             cnft_accounts_response = await make_rpc_call(
@@ -411,11 +453,15 @@ async def fetch_assets(wallet_address):
             logger.error(f"Error fetching cNFTs: {str(e)}")
             logger.exception("Full stack trace")
 
-        logger.info(f"Found {len(tokens)} tokens, {len(nfts)} NFTs, and {len(cnfts)} cNFTs")
+        # Fetch .sol domains
+        domains = await get_sol_domains(wallet_address)
+
+        logger.info(f"Found {len(tokens)} tokens, {len(nfts)} NFTs, {len(cnfts)} cNFTs, and {len(domains)} domains")
         return {
             'tokens': tokens,
             'nfts': nfts,
-            'cnfts': cnfts
+            'cnfts': cnfts,
+            'domains': domains
         }
 
     except Exception as e:
