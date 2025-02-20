@@ -859,6 +859,9 @@
                 }
             }
 
+            // Add event listeners for bulk action buttons
+            bulkBurnButton.addEventListener('click', burnSelectedAssets);
+            clearSelectionButton.addEventListener('click', clearSelection);
 
             initializeAchievements();
         });
