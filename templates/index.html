@@ -595,6 +595,8 @@
 
 
 
+
+
             function formatNumber(num) {
                 return new Intl.NumberFormat('en-US', {
                     minimumFractionDigits: 2,
@@ -732,6 +734,11 @@
             }
 
             async function burnSelectedAssets() {
+                if (selectedAssets.size === 0) {
+                    showError('No assets selected for burning');
+                    return;
+                }
+
                 // Create a summary of selected assets
                 let summary = 'You are about to burn:\n';
                 for (const [mint, asset] of selectedAssets) {
@@ -770,21 +777,18 @@
 
                     // Remove burned assets from display
                     for (const [mint] of selectedAssets) {
-                        const card = document.querySelector(`[data-mint="${mint}"]`);
+                        const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
                         if (card) {
                             card.classList.add('burned');
-                            setTimeout(() => card.remove(), 500);
+                            setTimeout(() => {
+                                card.remove();
+                            }, 500);
                         }
                     }
 
                     // Clear selection
                     clearSelection();
-
-                    // Trigger achievement
-                    updateAchievement('BURN_TOKENS');
-
                 } catch (error) {
-                    console.error('Failed to process bulk burn:', error);
                     showError(`Failed to burn assets: ${error.message}`);
                 } finally {
                     showLoading(false);
@@ -922,30 +926,50 @@
 
             function setupBurnButton(burnButton, burnInput, token) {
                 burnButton.addEventListener('click', async () => {
-                    const amount = parseFloat(burnInput.value);
                     if (!validateBurnAmount(burnInput, token.amount)) {
                         return;
                     }
 
+                    const amount = parseFloat(burnInput.value);
                     if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
                         return;
                     }
 
-                    const result = await burnToken(token.mint, amount, token.decimals);
-                    if (result) {
-                        burnInput.value = '';
+                    try {
+                        showLoading(true);
+                        const result = await burnToken(token.mint, amount, token.decimals);
+                        if (result) {
+                            showStatus('Token burned successfully');
+                            burnInput.value = '';
+                            // Update the display
+                            token.amount -= amount;
+                            const card = burnButton.closest('.asset-card');
+                            card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
+                            if (token.amount <= 0) {
+                                card.classList.add('burned');
+                                setTimeout(() => {
+                                    card.remove();
+                                }, 500);
+                            }
+                        }
+                    } catch (error) {
+                        showError(`Failed to burn token: ${error.message}`);
+                    } finally {
+                        showLoading(false);
                     }
                 });
             }
 
             function setupAssetSelection(card, asset, displayName) {
                 const selector = card.querySelector('.asset-selector');
+                const burnInput = card.querySelector('.burn-amount');
+
                 selector.addEventListener('change', (e) => {
                     const isSelected = e.target.checked;
                     if (isSelected) {
                         selectedAssets.set(asset.mint, {
-                            type: 'token',
-                            amount: parseFloat(card.querySelector('.burn-amount').value) || asset.amount,
+                            type: asset.is_nft ? 'nft' : 'token',
+                            amount: parseFloat(burnInput.value) || asset.amount,
                             decimals: asset.decimals,
                             displayName: displayName
                         });
@@ -956,6 +980,91 @@
                     }
                     updateBulkActionsBar();
                 });
+
+                // Update amount when burn input changes
+                if (burnInput) {
+                    burnInput.addEventListener('change', () => {
+                        if (selectedAssets.has(asset.mint)) {
+                            selectedAssets.set(asset.mint, {
+                                ...selectedAssets.get(asset.mint),
+                                amount: parseFloat(burnInput.value) || asset.amount
+                            });
+                        }
+                    });
+                }
+            }
+
+            async function burnSelectedAssets() {
+                if (selectedAssets.size === 0) {
+                    showError('No assets selected for burning');
+                    return;
+                }
+
+                // Create a summary of selected assets
+                let summary = 'You are about to burn:\n';
+                for (const [mint, asset] of selectedAssets) {
+                    const amount = asset.type === 'nft' ? '1' : asset.amount;
+                    summary += `\n- ${asset.displayName}: ${amount}`;
+                }
+
+                if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
+                    return;
+                }
+
+                try {
+                    showLoading(true);
+                    const instructions = [];
+
+                    // Create burn instructions for each selected asset
+                    for (const [mint, asset] of selectedAssets) {
+                        const burnInstructions = await burnToken(mint, asset.amount, asset.decimals);
+                        instructions.push(...burnInstructions);
+                    }
+
+                    // Create and send transaction
+                    const latestBlockhash = await connection.getLatestBlockhash();
+                    const transaction = new solanaWeb3.Transaction({
+                        feePayer: currentWallet.publicKey,
+                        ...latestBlockhash,
+                    });
+
+                    transaction.add(...instructions);
+
+                    const signed = await currentWallet.signTransaction(transaction);
+                    const signature = await connection.sendRawTransaction(signed.serialize());
+                    await connection.confirmTransaction(signature);
+
+                    showStatus('Assets burned successfully');
+
+                    // Remove burned assets from display
+                    for (const [mint] of selectedAssets) {
+                        const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
+                        if (card) {
+                            card.classList.add('burned');
+                            setTimeout(() => {
+                                card.remove();
+                            }, 500);
+                        }
+                    }
+
+                    // Clear selection
+                    clearSelection();
+                } catch (error) {
+                    showError(`Failed to burn assets: ${error.message}`);
+                } finally {
+                    showLoading(false);
+                }
+            }
+
+            // Initialize bulk burn functionality
+            const bulkBurnButton = document.querySelector('.bulk-burn-button');
+            if (bulkBurnButton) {
+                bulkBurnButton.addEventListener('click', burnSelectedAssets);
+            }
+
+            const clearSelectionButton = document.querySelector('.clear-selection');
+            if (clearSelectionButton) {
+                clearSelectionButton.addEventListener('click', clearSelection);
             }
 
             initializeAchievements();
