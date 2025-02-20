@@ -12,6 +12,25 @@
   "dependencies": {
     "@metaplex-foundation/js": "^0.20.1",
     "@metaplex-foundation/mpl-bubblegum": "^4.3.1",
-    "@solana/web3.js": "^1.98.0"
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-react": "^0.15.35",
+    "@solana/wallet-adapter-react-ui": "^0.9.35",
+    "@solana/wallet-adapter-wallets": "^0.19.32",
+    "@solana/web3.js": "^1.98.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "browserify-zlib": "^0.2.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "https-browserify": "^1.0.0",
+    "process": "^0.11.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "stream-browserify": "^3.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.7.3",
+    "url": "^0.11.4",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1"
   }
 }

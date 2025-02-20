@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.udev
     pkgs.binaryen
     pkgs.rustup
     pkgs.wasm-pack
