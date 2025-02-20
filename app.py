@@ -155,6 +155,7 @@ async def is_nft(mint_address):
 async def get_cnft_metadata(address):
     """Fetch cNFT metadata from the chain"""
     try:
+        logger.info(f"Fetching cNFT metadata for address: {address}")
         # Get metadata PDA for the cNFT
         metadata_response = await make_rpc_call(
             "getProgramAccounts",
@@ -165,7 +166,7 @@ async def get_cnft_metadata(address):
                     "filters": [
                         {
                             "memcmp": {
-                                "offset": 0,
+                                "offset": 8,  # Skip discriminator
                                 "bytes": address
                             }
                         }
@@ -175,27 +176,43 @@ async def get_cnft_metadata(address):
         )
 
         if "result" in metadata_response and metadata_response["result"]:
+            logger.info(f"Found metadata for cNFT: {address}")
             data = base64.b64decode(metadata_response["result"][0]["account"]["data"][0])
 
             # Parse metadata
             try:
-                metadata_url = data[32:].decode('utf-8').strip('\x00')
+                # Extract URI from data, skipping version and other fields
+                metadata_uri = data[8:].decode('utf-8').strip('\x00')
+                logger.info(f"Metadata URI for cNFT {address}: {metadata_uri}")
+
+                # Handle IPFS URLs
+                if metadata_uri.startswith('ipfs://'):
+                    metadata_uri = f'https://ipfs.io/ipfs/{metadata_uri[7:]}'
+
                 async with httpx.AsyncClient() as client:
-                    metadata_resp = await client.get(metadata_url, timeout=10.0)
+                    metadata_resp = await client.get(metadata_uri, timeout=10.0)
                     if metadata_resp.status_code == 200:
                         metadata = metadata_resp.json()
+
+                        # Handle IPFS image URLs
+                        image_url = metadata.get('image', '')
+                        if image_url.startswith('ipfs://'):
+                            image_url = f'https://ipfs.io/ipfs/{image_url[7:]}'
+
                         return {
                             'name': metadata.get('name', f'cNFT {address[:4]}...{address[-4:]}'),
                             'description': metadata.get('description', 'A compressed NFT on Solana'),
-                            'image': metadata.get('image', '/static/default-nft-image.svg'),
+                            'image': image_url or '/static/default-nft-image.svg',
                             'collection': metadata.get('collection', {}).get('name', ''),
-                            'explorer_url': f"https://explorer.solana.com/address/{address}"
+                            'mint': address,
+                            'explorer_url': f"https://solscan.io/token/{address}"
                         }
             except Exception as e:
-                logger.error(f"Error parsing cNFT metadata: {str(e)}")
+                logger.error(f"Error parsing cNFT metadata for {address}: {str(e)}")
+                logger.exception("Full stack trace")
 
     except Exception as e:
-        logger.error(f"Error fetching cNFT metadata: {str(e)}")
+        logger.error(f"Error fetching cNFT metadata for {address}: {str(e)}")
         logger.exception("Full stack trace")
 
     # Return default metadata if all else fails
@@ -203,7 +220,8 @@ async def get_cnft_metadata(address):
         'name': f'cNFT {address[:4]}...{address[-4:]}',
         'description': 'A compressed NFT on Solana',
         'image': '/static/default-nft-image.svg',
-        'explorer_url': f"https://explorer.solana.com/address/{address}"
+        'mint': address,
+        'explorer_url': f"https://solscan.io/token/{address}"
     }
 
 
@@ -262,6 +280,7 @@ async def fetch_assets(wallet_address):
 
         # Try to get cNFTs
         try:
+            logger.info("Fetching cNFTs...")
             cnft_accounts_response = await make_rpc_call(
                 "getProgramAccounts",
                 [
@@ -271,7 +290,7 @@ async def fetch_assets(wallet_address):
                         "filters": [
                             {
                                 "memcmp": {
-                                    "offset": 32,  # Skip the first 32 bytes (version + padding)
+                                    "offset": 8,  # Skip discriminator
                                     "bytes": wallet_address
                                 }
                             }
@@ -285,6 +304,7 @@ async def fetch_assets(wallet_address):
                 for account in cnft_accounts_response["result"]:
                     try:
                         address = account["pubkey"]
+                        logger.info(f"Processing cNFT: {address}")
                         cnft_metadata = await get_cnft_metadata(address)
                         if cnft_metadata:
                             cnfts.append(cnft_metadata)
@@ -294,6 +314,7 @@ async def fetch_assets(wallet_address):
 
         except Exception as e:
             logger.error(f"Error fetching cNFTs: {str(e)}")
+            logger.exception("Full stack trace")
 
         logger.info(f"Found {len(tokens)} tokens, {len(nfts)} NFTs, and {len(cnfts)} cNFTs")
         return {
