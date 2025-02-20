@@ -719,6 +719,59 @@
                 updateBulkActionsBar();
             }
 
+            function setupAssetSelection(card, asset, displayName) {
+                const selector = card.querySelector('.asset-selector');
+                const burnInput = card.querySelector('.burn-amount');
+
+                if (!selector) return; // Skip if no selector found
+
+                selector.addEventListener('change', (e) => {
+                    const isSelected = e.target.checked;
+                    const card = e.target.closest('.asset-card');
+
+                    if (isSelected) {
+                        let amount = asset.amount;
+                        if (burnInput) {
+                            const inputAmount = parseFloat(burnInput.value);
+                            if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
+                                amount = inputAmount;
+                            }
+                        }
+
+                        selectedAssets.set(asset.mint, {
+                            type: asset.is_nft ? 'nft' : 'token',
+                            amount: amount,
+                            decimals: asset.decimals,
+                            displayName: displayName
+                        });
+                        card.classList.add('selected');
+                    } else {
+                        selectedAssets.delete(asset.mint);
+                        card.classList.remove('selected');
+                    }
+
+                    updateBulkActionsBar();
+                });
+
+                // Update amount when burn input changes for tokens
+                if (burnInput && !asset.is_nft) {
+                    burnInput.addEventListener('input', () => {
+                        if (selectedAssets.has(asset.mint)) {
+                            const inputAmount = parseFloat(burnInput.value);
+                            if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
+                                selectedAssets.set(asset.mint, {
+                                    ...selectedAssets.get(asset.mint),
+                                    amount: inputAmount
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Initialize the bulk actions bar
+            bulkActionsBar.style.display = 'none';
+
             async function burnSelectedAssets() {
                 if (selectedAssets.size === 0) {
                     showError('No assets selected for burning');
@@ -782,133 +835,13 @@
             }
 
             // Add event listeners for bulk action buttons
-            bulkBurnButton.addEventListener('click', burnSelectedAssets);
-            clearSelectionButton.addEventListener('click', clearSelection);
-
-
-            // Achievement definitions
-            const ACHIEVEMENTS = {
-                FIRST_CONNECTION: {
-                    id: 'first_connection',
-                    title: 'Connected Explorer',
-                    description: 'Connect your wallet for the first time',
-                    icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
-                    maxProgress: 1
-                },
-                ASSET_VIEWER: {
-                    id: 'asset_viewer',
-                    title: 'Asset Explorer',
-                    description: 'View your token collection',
-                    icon: 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-                    maxProgress: 1
-                },
-                BURN_TOKENS: {
-                    id: 'burn_tokens',
-                    title: 'Token Burn Master',
-                    description: 'Burn tokens 3 times',
-                    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
-                    maxProgress: 3
-                }
-            };
-
-            // Achievement tracking
-            let userAchievements = {};
-
-            function initializeAchievements() {
-                const storedAchievements = localStorage.getItem('userAchievements');
-                userAchievements = storedAchievements ? JSON.parse(storedAchievements) : {};
-
-                // Initialize achievements if not exists
-                Object.keys(ACHIEVEMENTS).forEach(key => {
-                    if (!userAchievements[key]) {
-                        userAchievements[key] = {
-                            progress: 0,
-                            completed: false
-                        };
-                    }
-                });
-
-                updateAchievementsDisplay();
-                saveAchievements();
+            if (bulkBurnButton) {
+                bulkBurnButton.addEventListener('click', burnSelectedAssets);
+            }
+            if (clearSelectionButton) {
+                clearSelectionButton.addEventListener('click', clearSelection);
             }
 
-            function updateAchievement(achievementId, progress = 1) {
-                if (!userAchievements[achievementId]) return;
-
-                const achievement = ACHIEVEMENTS[achievementId];
-                userAchievements[achievementId].progress = Math.min(
-                    userAchievements[achievementId].progress + progress,
-                    achievement.maxProgress
-                );
-
-                if (userAchievements[achievementId].progress >= achievement.maxProgress) {
-                    userAchievements[achievementId].completed = true;
-                    showAchievementNotification(achievement.title);
-                }
-
-                updateAchievementsDisplay();
-                saveAchievements();
-            }
-
-            function createAchievementCard(achievementId) {
-                const achievement = ACHIEVEMENTS[achievementId];
-                const userProgress = userAchievements[achievementId];
-                const template = document.querySelector('#achievement-card-template');
-                const card = template.content.cloneNode(true);
-
-                card.querySelector('.achievement-title').textContent = achievement.title;
-                card.querySelector('.achievement-description').textContent = achievement.description;
-                card.querySelector('.achievement-svg').innerHTML = `<path d="${achievement.icon}" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-
-                const progressPercent = (userProgress.progress /achievement.maxProgress) * 100;
-                card.querySelector('.progress-fill').style.width = `${progressPercent}%`;
-                card.querySelector('.progress-text').textContent =
-                    `${userProgress.progress}/${achievement.maxProgress}`;
-
-                const achievementCard = card.querySelector('.achievement-card');
-                if (userProgress.completed) {
-                    achievementCard.classList.add('completed');
-                }
-
-                return card;
-            }
-
-            function updateAchievementsDisplay() {
-                const container = document.querySelector('.achievements-grid');
-                if (!container) return;
-
-                container.innerHTML = '';
-                Object.keys(ACHIEVEMENTS).forEach(achievementId => {
-                    const card = createAchievementCard(achievementId);
-                    container.appendChild(card);
-                });
-
-                document.getElementById('achievementsContainer').style.display = 'block';
-            }
-
-            function showAchievementNotification(title) {
-                const notification = document.createElement('div');
-                notification.className = 'achievement-notification';
-                notification.innerHTML = `
-                    <div class="notification-content">
-                        <span class="notification-icon">🏆</span>
-                        <span>Achievement Unlocked: ${title}</span>
-                    </div>
-                `;
-
-                document.body.appendChild(notification);
-                setTimeout(() => {
-                    notification.classList.add('show');
-                    setTimeout(() => {
-                        notification.classList.remove('show');
-                        setTimeout(() => notification.remove(), 300);
-                    }, 3000);
-                }, 100);
-            }
-
-            function saveAchievements() {
-                localStorage.setItem('userAchievements', JSON.stringify(userAchievements));
-            }
 
             function setupBurnButton(burnButton, burnInput, token) {
                 burnButton.addEventListener('click', async () => {
@@ -945,106 +878,6 @@
                     }
                 });
             }
-
-            function setupAssetSelection(card, asset, displayName) {
-                const selector = card.querySelector('.asset-selector');
-                const burnInput = card.querySelector('.burn-amount');
-
-                selector.addEventListener('change', (e) => {
-                    const isSelected = e.target.checked;
-                    if (isSelected) {
-                        selectedAssets.set(asset.mint, {
-                            type: asset.is_nft ? 'nft' : 'token',
-                            amount: parseFloat(burnInput.value) || asset.amount,
-                            decimals: asset.decimals,
-                            displayName: displayName
-                        });
-                        card.classList.add('selected');
-                    } else {
-                        selectedAssets.delete(asset.mint);
-                        card.classList.remove('selected');
-                    }
-                    updateBulkActionsBar();
-                });
-
-                // Update amount when burn input changes
-                if (burnInput) {
-                    burnInput.addEventListener('change', () => {
-                        if (selectedAssets.has(asset.mint)) {
-                            selectedAssets.set(asset.mint, {
-                                ...selectedAssets.get(asset.mint),
-                                amount: parseFloat(burnInput.value) || asset.amount
-                            });
-                        }
-                    });
-                }
-            }
-
-            async function burnSelectedAssets() {
-                if (selectedAssets.size === 0) {
-                    showError('No assets selected for burning');
-                    return;
-                }
-
-                // Create a summary of selected assets
-                let summary = 'You are about to burn:\n';
-                for (const [mint, asset] of selectedAssets) {
-                    const amount = asset.type === 'nft' ? '1' : asset.amount;
-                    summary += `\n- ${asset.displayName}: ${amount}`;
-                }
-
-                if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
-                    return;
-                }
-
-                try {
-                    showLoading(true);
-                    const instructions = [];
-
-                    // Create burn instructions for each selected asset
-                    for (const [mint, asset] of selectedAssets) {
-                        const burnInstructions = await burnToken(mint, asset.amount, asset.decimals);
-                        instructions.push(...burnInstructions);
-                    }
-
-                    // Create and send transaction
-                    const latestBlockhash = await connection.getLatestBlockhash();
-                    const transaction = new solanaWeb3.Transaction({
-                        feePayer: currentWallet.publicKey,
-                        ...latestBlockhash,
-                    });
-
-                    transaction.add(...instructions);
-
-                    const signed = await currentWallet.signTransaction(transaction);
-                    const signature = await connection.sendRawTransaction(signed.serialize());
-                    await connection.confirmTransaction(signature);
-
-                    showStatus('Assets burned successfully');
-
-                    // Remove burned assets from display
-                    for (const [mint] of selectedAssets) {
-                        const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
-                        if (card) {
-                            card.classList.add('burned');
-                            setTimeout(() => {
-                                card.remove();
-                            }, 500);
-                        }
-                    }
-
-                    // Clear selection
-                    clearSelection();
-                } catch (error) {
-                    showError(`Failed to burn assets: ${error.message}`);
-                } finally {
-                    showLoading(false);
-                }
-            }
-
-            // Add event listeners for bulk action buttons
-            bulkBurnButton.addEventListener('click', burnSelectedAssets);
-            clearSelectionButton.addEventListener('click', clearSelection);
 
 
             // Check if wallet is already connected
