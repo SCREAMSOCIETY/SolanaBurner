@@ -416,24 +416,37 @@
 
             // Enhanced image loading with multiple fallbacks
             const iconElem = card.querySelector('.token-icon');
-            if (token.icon && token.icon.startsWith('http')) {
-                iconElem.src = token.icon;
-            } else {
-                iconElem.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
-            }
 
-            // Error handler that tries multiple fallback sources
-            iconElem.onerror = function() {
-                const mint = token.mint;
-                // Try Solana token list first
-                this.src = `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${mint}/logo.png`;
+            // Helper function to try loading from multiple sources
+            const tryLoadImage = (sources) => {
+                let currentIndex = 0;
 
-                // If that fails, use our default
-                this.onerror = function() {
-                    this.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
-                    this.onerror = null; // Prevent infinite loop
+                const tryNextSource = () => {
+                    if (currentIndex < sources.length) {
+                        iconElem.src = sources[currentIndex];
+                        currentIndex++;
+                    } else {
+                        // If all sources fail, use default
+                        iconElem.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
+                        iconElem.onerror = null; // Prevent infinite loop
+                    }
                 };
+
+                iconElem.onerror = tryNextSource;
+                tryNextSource();
             };
+
+            // Try multiple sources in order
+            const mint = token.mint;
+            const imageSources = [
+                token.icon,
+                `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${mint}/logo.png`,
+                `https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/assets/mainnet/${mint}/logo.png`,
+                `https://arweave.net/image/${mint}`,
+                "{{ url_for('static', filename='default-token-icon.svg') }}"
+            ].filter(src => src && typeof src === 'string'); // Filter out null/undefined sources
+
+            tryLoadImage(imageSources);
 
             // Rest of token card creation
             card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;

@@ -80,32 +80,49 @@ async def make_rpc_call(method, params):
             raise
 
 async def get_token_metadata(mint_address):
-    """Fetch token metadata from Solana Explorer API"""
+    """Fetch token metadata from multiple sources"""
     try:
+        # Try Solana token list first
+        token_list_url = f"https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/{mint_address}.json"
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{SOLANA_EXPLORER_API}/token-metadata/{mint_address}",
-                timeout=10.0
-            )
+            response = await client.get(token_list_url, timeout=10.0)
 
             if response.status_code == 200:
                 data = response.json()
-                # Ensure the icon URL is absolute and uses HTTPS
-                icon_url = data.get('icon', '')
-                if icon_url and not icon_url.startswith(('http://', 'https://')):
-                    icon_url = f"https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/{mint_address}/logo.png"
-
+                logger.info(f"Successfully fetched token metadata from token list for {mint_address}")
                 return {
                     'symbol': data.get('symbol', 'Unknown'),
                     'name': data.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
-                    'icon': icon_url,
+                    'icon': data.get('logoURI', ''),
                     'decimals': data.get('decimals', 9),
                     'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                 }
+
+        # Try Jupiter API as backup
+        jupiter_url = f"https://token.jup.ag/all"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(jupiter_url, timeout=10.0)
+
+            if response.status_code == 200:
+                tokens = response.json()
+                token_info = next((token for token in tokens if token.get('address') == mint_address), None)
+
+                if token_info:
+                    logger.info(f"Successfully fetched token metadata from Jupiter for {mint_address}")
+                    return {
+                        'symbol': token_info.get('symbol', 'Unknown'),
+                        'name': token_info.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
+                        'icon': token_info.get('logoURI', ''),
+                        'decimals': token_info.get('decimals', 9),
+                        'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                    }
+
     except Exception as e:
         logger.error(f"Error fetching token metadata: {str(e)}")
+        logger.exception("Full stack trace")
 
     # Fallback metadata with default icon
+    logger.info(f"Using fallback metadata for {mint_address}")
     return {
         'symbol': 'Unknown',
         'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
