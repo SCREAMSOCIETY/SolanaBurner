@@ -63,18 +63,6 @@
                         <span class="balance-label">Balance:</span>
                         <span class="balance-amount"></span>
                     </div>
-                    <div class="token-supply">
-                        <span class="supply-label">Supply:</span>
-                        <span class="supply-amount"></span>
-                    </div>
-                    <div class="token-price">
-                        <span class="price-label">Price USD:</span>
-                        <span class="price-amount"></span>
-                    </div>
-                    <div class="token-volume">
-                        <span class="volume-label">24h Volume:</span>
-                        <span class="volume-amount"></span>
-                    </div>
                 </div>
                 <div class="token-actions">
                     <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
@@ -406,9 +394,6 @@
                 card.querySelector('.token-name').textContent = displayName;
                 card.querySelector('.token-symbol').textContent = token.symbol || formatAddress(token.mint);
                 card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
-                card.querySelector('.supply-amount').textContent = formatNumber(token.supply);
-                card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
-                card.querySelector('.volume-amount').textContent = token.volume_24h !== 'Unknown' ? `$${formatNumber(token.volume_24h)}` : 'Unknown';
 
                 card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
 
@@ -421,36 +406,7 @@
                 burnButton.dataset.decimals = token.decimals;
 
                 setupBurnButton(burnButton, burnInput, token);
-
-                const selector = card.querySelector('.asset-selector');
-                selector.addEventListener('change', (e) => {
-                    const isSelected = e.target.checked;
-                    const card = e.target.closest('.asset-card');
-
-                    if (isSelected) {
-                        selectedAssets.set(token.mint, {
-                            type: 'token',
-                            amount: parseFloat(card.querySelector('.burn-amount').value) || token.amount,
-                            decimals: token.decimals,
-                            displayName: displayName
-                        });
-                        card.classList.add('selected');
-                    } else {
-                        selectedAssets.delete(token.mint);
-                        card.classList.remove('selected');
-                    }
-
-                    updateBulkActionsBar();
-                });
-
-                burnInput.addEventListener('change', () => {
-                    if (selectedAssets.has(token.mint)) {
-                        selectedAssets.set(token.mint, {
-                            ...selectedAssets.get(token.mint),
-                            amount: parseFloat(burnInput.value) || token.amount
-                        });
-                    }
-                });
+                setupAssetSelection(card, token, displayName);
 
                 return card;
             }
@@ -635,6 +591,7 @@
                     showError(`Failed to load assets: ${error.message}`);
                 }
             }
+
 
 
 
@@ -978,6 +935,26 @@
                     if (result) {
                         burnInput.value = '';
                     }
+                });
+            }
+
+            function setupAssetSelection(card, asset, displayName) {
+                const selector = card.querySelector('.asset-selector');
+                selector.addEventListener('change', (e) => {
+                    const isSelected = e.target.checked;
+                    if (isSelected) {
+                        selectedAssets.set(asset.mint, {
+                            type: 'token',
+                            amount: parseFloat(card.querySelector('.burn-amount').value) || asset.amount,
+                            decimals: asset.decimals,
+                            displayName: displayName
+                        });
+                        card.classList.add('selected');
+                    } else {
+                        selectedAssets.delete(asset.mint);
+                        card.classList.remove('selected');
+                    }
+                    updateBulkActionsBar();
                 });
             }
 
