@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Load Solana Web3 first -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <style>
         .collection-section {
@@ -209,783 +210,817 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function() {
+        // Global variables
+        let currentWallet = null;
+        let connection = null;
+        const TOKEN_PROGRAM_ID = null; // Will be initialized after Solana loads
+
+        // Wait for both DOM and Solana to be ready
+        function initializeWallet() {
             console.log("Initializing wallet handler...");
 
-            const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-
-            const connectButton = document.getElementById('connectButton');
-            const walletInfo = document.getElementById('walletInfo');
-            const walletAddress = document.getElementById('walletAddress');
-            const statusMessage = document.getElementById('statusMessage');
-            const assetsContainer = document.getElementById('assetsContainer');
-            const loadingMessage = document.getElementById('loadingMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            const bulkActionsBar = document.querySelector('.bulk-actions-bar');
-            const selectedCountDisplay = document.querySelector('.selected-count');
-            const bulkBurnButton = document.querySelector('.bulk-burn-button');
-            const clearSelectionButton = document.querySelector('.clear-selection');
-
-            let currentWallet = null;
-            let connection = null;
-            let selectedAssets = new Map();
-
-            function showStatus(message, isError = false) {
-                statusMessage.textContent = message;
-                statusMessage.style.display = 'block';
-                statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
-                console.log(`Status: ${message}`);
+            if (!window.solanaWeb3) {
+                console.error("Solana Web3 not loaded yet");
+                setTimeout(initializeWallet, 100);
+                return;
             }
 
-            function showLoading(show = true) {
-                loadingMessage.style.display = show ? 'block' : 'none';
-                if (show) {
-                    errorMessage.style.display = 'none';
-                }
-            }
+            try {
+                // Initialize Solana-specific constants
+                TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-                loadingMessage.style.display = 'none';
-                console.error('Error:', message);
-            }
+                const connectButton = document.getElementById('connectButton');
+                const walletInfo = document.getElementById('walletInfo');
+                const walletAddress = document.getElementById('walletAddress');
+                const statusMessage = document.getElementById('statusMessage');
+                const assetsContainer = document.getElementById('assetsContainer');
+                const loadingMessage = document.getElementById('loadingMessage');
+                const errorMessage = document.getElementById('errorMessage');
 
-            function getConnection() {
-                const endpoint = '{{ rpc_endpoint }}';
-                console.log('Using RPC endpoint:', endpoint);
-                return new solanaWeb3.Connection(endpoint);
-            }
+                console.log("DOM elements initialized");
 
-            async function connectWallet() {
-                try {
-                    console.log("Starting wallet connection process...");
-
-                    // Check if Phantom is installed
-                    if (!window.solana || !window.solana.isPhantom) {
-                        showStatus('Phantom wallet not found. Please install Phantom.', true);
-                        window.open('https://phantom.app/', '_blank');
-                        return;
-                    }
-
-                    showStatus('Connecting to Phantom...');
-
-                    // Request connection
-                    const resp = await window.solana.connect();
-                    console.log("Connection response received:", resp);
-
-                    if (resp.publicKey) {
-                        const address = resp.publicKey.toString();
-                        console.log('Connected to wallet:', address);
-
-                        currentWallet = window.solana;
-                        connection = getConnection();
-
-                        connectButton.style.display = 'none';
-                        walletInfo.style.display = 'block';
-                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
-                        assetsContainer.style.display = 'block';
-
-                        showStatus('Wallet connected successfully');
-                        await loadAssets(address);
-                    }
-                } catch (error) {
-                    console.error('Connection error:', error);
-                    showStatus(`Failed to connect: ${error.message}`, true);
-
-                    // Reset connection state
-                    currentWallet = null;
-                    connection = null;
-                    connectButton.style.display = 'block';
-                    walletInfo.style.display = 'none';
-                    assetsContainer.style.display = 'none';
-                }
-            }
-
-            // Initialize connect button event listener
-            if (connectButton) {
-                console.log("Setting up connect button listener");
-                connectButton.addEventListener('click', connectWallet);
-            }
-
-            // Initialize wallet event listeners
-            if (window.solana) {
-                console.log("Setting up Solana wallet listeners");
-
-                window.solana.on('connect', () => {
-                    console.log('Wallet connected event received');
-                    if (window.solana.publicKey) {
-                        const address = window.solana.publicKey.toString();
-                        currentWallet = window.solana;
-                        connection = getConnection();
-
-                        connectButton.style.display = 'none';
-                        walletInfo.style.display = 'block';
-                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
-                        assetsContainer.style.display = 'block';
-
-                        showStatus('Connected to Phantom wallet');
-                        loadAssets(address);
-                    }
-                });
-
-                window.solana.on('disconnect', () => {
-                    console.log('Wallet disconnected event received');
-                    currentWallet = null;
-                    connection = null;
-                    connectButton.style.display = 'block';
-                    walletInfo.style.display = 'none';
-                    assetsContainer.style.display = 'none';
-                    showStatus('Wallet disconnected');
-                });
-
-                // Check if wallet is already connected
-                if (window.solana.isPhantom && window.solana.isConnected) {
-                    console.log('Wallet is already connected, initializing...');
-                    connectWallet();
-                }
-            }
-
-            function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
-                imgElement.classList.add('loading');
-
-                const defaultImages = {
-                    'token': '{{ url_for('static', filename='default-token-icon.svg') }}',
-                    'nft': '{{ url_for('static', filename='default-nft-image.svg') }}',
-                    'cnft': '{{ url_for('static', filename='default-nft-image.svg') }}'
-                };
-
-                const ipfsGateways = [
-                    'https://ipfs.io/ipfs/',
-                    'https://gateway.pinata.cloud/ipfs/',
-                    'https://cloudflare-ipfs.com/ipfs/',
-                    'https://gateway.ipfs.io/ipfs/'
-                ];
-
-                async function tryLoadImage(url) {
-                    return new Promise((resolve, reject) => {
-                        const img = new Image();
-                        img.onload = () => resolve(url);
-                        img.onerror = () => reject();
-                        img.src = url;
-                    });
-                }
-
-                async function loadWithFallback() {
-                    if (!primaryUrl) {
-                        imgElement.src = defaultImages[type];
-                        imgElement.classList.remove('loading');
-                        return;
-                    }
-
+                async function connectWallet() {
                     try {
-                        await tryLoadImage(primaryUrl);
-                        imgElement.src = primaryUrl;
-                    } catch {
-                        if (primaryUrl.startsWith('ipfs://')) {
-                            const hash = primaryUrl.replace('ipfs://', '');
-                            let loaded = false;
+                        console.log("Starting wallet connection process...");
 
-                            for (const gateway of ipfsGateways) {
-                                try {
-                                    const url = gateway + hash;
-                                    await tryLoadImage(url);
-                                    imgElement.src = url;
-                                    loaded = true;
-                                    break;
-                                } catch {
-                                    continue;
-                                }
-                            }
-
-                            if (!loaded) {
-                                imgElement.src = defaultImages[type];
-                            }
-                        } else {
-                            imgElement.src = defaultImages[type];
+                        // Check if Phantom is installed
+                        if (!window.solana || !window.solana.isPhantom) {
+                            console.error("Phantom wallet not found");
+                            showStatus('Phantom wallet not found. Please install Phantom.', true);
+                            window.open('https://phantom.app/', '_blank');
+                            return;
                         }
-                    }
 
-                    imgElement.classList.remove('loading');
-                }
+                        showStatus('Connecting to Phantom...');
+                        console.log("Requesting wallet connection...");
 
-                loadWithFallback();
-            }
+                        // Request connection
+                        const resp = await window.solana.connect();
+                        console.log("Connection response received:", resp);
 
-            function formatAddress(address) {
-                return `${address.slice(0, 4)}...${address.slice(-4)}`;
-            }
+                        if (resp.publicKey) {
+                            const address = resp.publicKey.toString();
+                            console.log('Connected to wallet:', address);
 
-            function getDisplayName(asset, type = 'token') {
-                if (type === 'token') {
-                    // For tokens, try name + symbol if available
-                    if (asset.name && asset.symbol) {
-                        return `${asset.name} (${asset.symbol})`;
-                    } else if (asset.name) {
-                        return asset.name;
-                    } else if (asset.symbol) {
-                        return asset.symbol;
-                    }
-                } else if (type === 'nft') {
-                    // For NFTs, try name + collection
-                    if (asset.name && asset.collection) {
-                        return `${asset.name} - ${asset.collection}`;
-                    } else if (asset.name) {
-                        return asset.name;
-                    } else if (asset.collection) {
-                        return `NFT from ${asset.collection}`;
-                    }
-                }
-                // Fallback to formatted address
-                return `${type === 'token' ? 'Token' : 'NFT'} ${formatAddress(asset.mint)}`;
-            }
+                            currentWallet = window.solana;
+                            connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
 
-            function createTokenCard(token) {
-                const template = document.querySelector('#token-card-template');
-                const card = template.content.cloneNode(true);
-                const cardElement = card.querySelector('.asset-card');
-                cardElement.dataset.mint = token.mint;
+                            connectButton.style.display = 'none';
+                            walletInfo.style.display = 'block';
+                            walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                            assetsContainer.style.display = 'block';
 
-                const iconElem = card.querySelector('.token-icon');
-                setupIntelligentImageLoading(iconElem, token.icon, 'token');
-
-                const displayName = getDisplayName(token, 'token');
-                card.querySelector('.token-name').textContent = displayName;
-                card.querySelector('.token-symbol').textContent = token.symbol || formatAddress(token.mint);
-                card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
-
-                card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
-
-                const burnInput = card.querySelector('.burn-amount');
-                burnInput.max = token.amount;
-                burnInput.min = 0.000001;
-
-                const burnButton = card.querySelector('.burn-button');
-                burnButton.dataset.mint = token.mint;
-                burnButton.dataset.decimals = token.decimals;
-
-                setupBurnButton(burnButton, burnInput, token);
-                setupAssetSelection(card, token, displayName);
-
-                return card;
-            }
-
-            function createNFTCard(nft) {
-                const template = document.querySelector('#nft-card-template');
-                const card = template.content.cloneNode(true);
-                const cardElement = card.querySelector('.asset-card');
-                cardElement.dataset.mint = nft.mint;
-
-                const imageElem = card.querySelector('.nft-image');
-                setupIntelligentImageLoading(imageElem, nft.image, 'nft');
-
-                const displayName = getDisplayName(nft, 'nft');
-                card.querySelector('.nft-name').textContent = displayName;
-                card.querySelector('.nft-collection').textContent = nft.collection || '';
-                card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
-
-                const burnButton = card.querySelector('.burn-button');
-                burnButton.dataset.mint = nft.mint;
-
-                burnButton.addEventListener('click', async () => {
-                    if (!confirm(`Are you sure you want to burn this NFT (${displayName})? This action cannot be undone.`)) {
-                        return;
-                    }
-
-                    try {
-                        showLoading(true);
-                        const result = await burnToken(nft.mint, 1, 0);
-                        if (result) {
-                            showStatus('NFT burned successfully');
-                            card.classList.add('burned');
-                            setTimeout(() => {
-                                card.remove();
-                            }, 500);
+                            showStatus('Wallet connected successfully');
+                            await loadAssets(address);
                         }
                     } catch (error) {
-                        showError(`Failed to burn NFT: ${error.message}`);
-                    } finally {
-                        showLoading(false);
+                        console.error('Connection error:', error);
+                        showStatus(`Failed to connect: ${error.message}`, true);
+
+                        // Reset connection state
+                        currentWallet = null;
+                        connection = null;
+                        connectButton.style.display = 'block';
+                        walletInfo.style.display = 'none';
+                        assetsContainer.style.display = 'none';
                     }
-                });
-
-                const selector = card.querySelector('.asset-selector');
-                selector.addEventListener('change', (e) => {
-                    const isSelected = e.target.checked;
-                    const card = e.target.closest('.asset-card');
-
-                    if (isSelected) {
-                        selectedAssets.set(nft.mint, {
-                            type: 'nft',
-                            amount: 1,
-                            decimals: 0,
-                            displayName: displayName
-                        });
-                        card.classList.add('selected');
-                    } else {
-                        selectedAssets.delete(nft.mint);
-                        card.classList.remove('selected');
-                    }
-
-                    updateBulkActionsBar();
-                });
-
-                return card;
-            }
-
-            function createCNFTCard(cnft) {
-                const template = document.querySelector('#cnft-card-template');
-                const card = template.content.cloneNode(true);
-
-                const imageElem = card.querySelector('.cnft-image');
-                setupIntelligentImageLoading(imageElem, cnft.image, 'cnft');
-
-                card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
-                card.querySelector('.cnft-collection').textContent = cnft.collection || '';
-
-                return card;
-            }
-
-            function displayNFTs(nfts) {
-                const nftsContainer = document.querySelector('#nfts .collections-grid');
-                nftsContainer.innerHTML = '';
-
-                if (!nfts || nfts.length === 0) {
-                    nftsContainer.innerHTML = '<div class="no-assets">No NFTs found</div>';
-                    return;
                 }
 
-                // Group NFTs by collection
-                const nftsByCollection = nfts.reduce((acc, nft) => {
-                    const collection = nft.collection || 'Other';
-                    if (!acc[collection]) {
-                        acc[collection] = [];
-                    }
-                    acc[collection].push(nft);
-                    return acc;
-                }, {});
+                // Initialize connect button event listener
+                if (connectButton) {
+                    console.log("Setting up connect button listener");
+                    connectButton.addEventListener('click', connectWallet);
+                }
 
-                // Sort collections alphabetically
-                const sortedCollections = Object.keys(nftsByCollection).sort((a, b) => {
-                    if (a === 'Other') return 1;
-                    if (b === 'Other') return -1;
-                    return a.localeCompare(b);
-                });
+                // Initialize wallet event listeners
+                if (window.solana) {
+                    console.log("Setting up Solana wallet listeners");
 
-                // Create sections for each collection
-                sortedCollections.forEach(collection => {
-                    const collectionSection = document.createElement('div');
-                    collectionSection.className = 'collection-section';
+                    window.solana.on('connect', () => {
+                        console.log('Wallet connected event received');
+                        if (window.solana.publicKey) {
+                            const address = window.solana.publicKey.toString();
+                            currentWallet = window.solana;
+                            connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
 
-                    const header = document.createElement('div');
-                    header.className = 'collection-header';
-                    header.textContent = collection;
-                    collectionSection.appendChild(header);
+                            connectButton.style.display = 'none';
+                            walletInfo.style.display = 'block';
+                            walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                            assetsContainer.style.display = 'block';
 
-                    const grid = document.createElement('div');
-                    grid.className = 'collection-grid';
-
-                    // Sort NFTs within collection by name
-                    const sortedNFTs = nftsByCollection[collection].sort((a, b) => {
-                        return (a.name || '').localeCompare(b.name || '');
+                            showStatus('Connected to Phantom wallet');
+                            loadAssets(address);
+                        }
                     });
 
-                    sortedNFTs.forEach(nft => {
-                        const card = createNFTCard(nft);
-                        grid.appendChild(card);
+                    window.solana.on('disconnect', () => {
+                        console.log('Wallet disconnected event received');
+                        currentWallet = null;
+                        connection = null;
+                        connectButton.style.display = 'block';
+                        walletInfo.style.display = 'none';
+                        assetsContainer.style.display = 'none';
+                        showStatus('Wallet disconnected');
                     });
 
-                    collectionSection.appendChild(grid);
-                    nftsContainer.appendChild(collectionSection);
-                });
-            }
-
-            function createDomainCard(domain) {
-                const template = document.querySelector('#domain-card-template');
-                const card = template.content.cloneNode(true);
-                const cardElement = card.querySelector('.asset-card');
-                cardElement.dataset.mint = domain.mint;
-
-                const displayName = domain.name + '.sol';
-                card.querySelector('.domain-name').textContent = displayName;
-                if (domain.parent_name) {
-                    card.querySelector('.domain-parent').textContent = `Parent: ${domain.parent_name}`;
-                }
-
-                card.querySelector('.solscan-link').href = domain.explorer_url;
-
-                const burnButton = card.querySelector('.burn-button');
-                burnButton.dataset.mint = domain.mint;
-
-                setupAssetSelection(card, domain, displayName);
-
-                return card;
-            }
-
-            async function loadAssets(publicKey) {
-                showLoading(true);
-                document.querySelectorAll('.assets-grid, .collections-grid').forEach(grid => {
-                    grid.innerHTML = '';
-                    grid.style.display = 'none';
-                });
-
-                try {
-                    const response = await fetch(`/assets?wallet=${publicKey}`);
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.message || 'Failed to fetch assets');
+                    // Check if wallet is already connected
+                    if (window.solana.isPhantom && window.solana.isConnected) {
+                        console.log('Wallet is already connected, initializing...');
+                        connectWallet();
                     }
-
-                    const assets = data.assets;
-                    const tokensGrid = document.querySelector('#tokens .assets-grid');
-
-                    if (!assets.tokens || assets.tokens.length === 0) {
-                        tokensGrid.innerHTML = '<div class="no-assets">No tokens found</div>';
-                    } else {
-                        assets.tokens.forEach(token => {
-                            const card = createTokenCard(token);
-                            tokensGrid.appendChild(card);
-                        });
-                    }
-
-                    // Use the new displayNFTs function
-                    displayNFTs(assets.nfts);
-
-                    const cnftsGrid = document.querySelector('#cnfts .assets-grid');
-                    if (!assets.cnfts || assets.cnfts.length === 0) {
-                        cnftsGrid.innerHTML = '<div class="no-assets">No cNFTs found</div>';
-                    } else {
-                        assets.cnfts.forEach(cnft => {
-                            const card = createCNFTCard(cnft);
-                            cnftsGrid.appendChild(card);
-                        });
-                    }
-
-                    const domainsGrid = document.querySelector('#domains .assets-grid');
-                    if (!assets.domains || assets.domains.length === 0) {
-                        domainsGrid.innerHTML = '<div class="no-assets">No .sol domains found</div>';
-                    } else {
-                        assets.domains.forEach(domain => {
-                            const card = createDomainCard(domain);
-                            domainsGrid.appendChild(card);
-                        });
-                    }
-
-                    showLoading(false);
-                    document.querySelectorAll('.assets-grid, .collections-grid').forEach(grid => {
-                        grid.style.display = 'grid';
-                    });
-
-                } catch (error) {
-                    console.error('Error loading assets:', error);
-                    showError(`Failed to load assets: ${error.message}`);
-                }
-            }
-
-
-
-            function formatNumber(num) {
-                return new Intl.NumberFormat('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 6
-                }).format(num);
-            }
-
-            function validateBurnAmount(input, maxAmount) {
-                const amount = parseFloat(input.value);
-                console.log('Validating burn amount:', amount, 'max:', maxAmount);
-
-                if (isNaN(amount) || amount <= 0) {
-                    showError('Please enter a valid amount greater than 0');
-                    return false;
+                } else {
+                    console.error("Solana object not found in window");
                 }
 
-                if (amount - maxAmount > Number.EPSILON) {
-                    showError(`Amount cannot exceed ${maxAmount}`);
-                    return false;
-                }
-
-                return true;
+            } catch (error) {
+                console.error("Error during wallet initialization:", error);
             }
+        }
 
-            async function burnToken(mint, amount, decimals) {
-                const mintPubkey = new solanaWeb3.PublicKey(mint);
-                const walletPubkey = currentWallet.publicKey;
+        // Start initialization when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Content Loaded, starting wallet initialization");
+            initializeWallet();
+        });
 
-                console.log(`Creating burn instruction for ${mint}`);
-                console.log(`- Amount: ${amount}`);
-                console.log(`- Decimals: ${decimals}`);
 
-                const effectiveDecimals = decimals;
-                const multiplier = BigInt(10 ** effectiveDecimals);
-                const rawAmount = BigInt(Math.round(amount * Number(multiplier)));
+        function showStatus(message, isError = false) {
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+            statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
+            console.log(`Status: ${message}`);
+        }
 
-                if (rawAmount <= BigInt(0)) {
-                    throw new Error('Amount must be greater than 0');
-                }
-
-                const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
-                    [
-                        walletPubkey.toBuffer(),
-                        TOKEN_PROGRAM_ID.toBuffer(),
-                        mintPubkey.toBuffer(),
-                    ],
-                    new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
-                );
-
-                // Create burn instruction
-                const burnIx = createBurnInstruction(
-                    tokenAccountPubkey,
-                    mintPubkey,
-                    walletPubkey,
-                    rawAmount
-                );
-
-                // Check if we should close the account (for NFTs or when burning entire balance)
-                const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
-                const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
-                const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
-
-                if (shouldClose) {
-                    // Add close instruction to return rent
-                    const closeIx = new solanaWeb3.TransactionInstruction({
-                        keys: [
-                            { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
-                            { pubkey: walletPubkey, isSigner: false, isWritable: true },
-                            { pubkey: walletPubkey, isSigner: true, isWritable: false },
-                        ],
-                        programId: TOKEN_PROGRAM_ID,
-                        data: new Uint8Array([9]) // Close account instruction
-                    });
-                    return [burnIx, closeIx];
-                }
-
-                return [burnIx];
+        function showLoading(show = true) {
+            loadingMessage.style.display = show ? 'block' : 'none';
+            if (show) {
+                errorMessage.style.display = 'none';
             }
+        }
 
-            function createBurnInstruction(tokenAccount, mint, owner, amount) {
-                const dataLayout = new Uint8Array(9);
-                dataLayout[0] = 8; // Burn instruction
-                const amountBytes = new Uint8Array(8);
-                const view = new DataView(amountBytes.buffer);
-                view.setBigUint64(0, amount, true);
-                dataLayout.set(amountBytes, 1);
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            loadingMessage.style.display = 'none';
+            console.error('Error:', message);
+        }
 
-                return new solanaWeb3.TransactionInstruction({
-                    keys: [
-                        { pubkey: tokenAccount, isSigner: false, isWritable: true },
-                        { pubkey: mint, isSigner: false, isWritable: true },
-                        { pubkey: owner, isSigner: true, isWritable: false },
-                    ],
-                    programId: TOKEN_PROGRAM_ID,
-                    data: dataLayout
-                });
-            }
+        function getConnection() {
+            const endpoint = '{{ rpc_endpoint }}';
+            console.log('Using RPC endpoint:', endpoint);
+            return new solanaWeb3.Connection(endpoint);
+        }
 
-
-            // Initialize tab switching
-            const tabs = document.querySelectorAll('.tab-button');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    console.log('Tab clicked:', tab.dataset.tab);
-                    tabs.forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-
-                    tab.classList.add('active');
-                    document.getElementById(tab.dataset.tab).classList.add('active');
-                });
+        async function loadAssets(publicKey) {
+            showLoading(true);
+            document.querySelectorAll('.assets-grid, .collections-grid').forEach(grid => {
+                grid.innerHTML = '';
+                grid.style.display = 'none';
             });
 
-            // Add bulk selection state
-            function updateBulkActionsBar() {
-                const count = selectedAssets.size;
-                if (count > 0) {
-                    selectedCountDisplay.textContent = `${count} item${count === 1 ? '' : 's'} selected`;
-                    bulkActionsBar.style.display = 'flex';
-                } else {
-                    bulkActionsBar.style.display = 'none';
+            try {
+                const response = await fetch(`/assets?wallet=${publicKey}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to fetch assets');
                 }
-            }
 
-            function clearSelection() {
-                selectedAssets.clear();
-                document.querySelectorAll('.asset-selector').forEach(checkbox => {
-                    checkbox.checked = false;
-                    checkbox.closest('.asset-card').classList.remove('selected');
-                });
-                updateBulkActionsBar();
-            }
+                const assets = data.assets;
+                const tokensGrid = document.querySelector('#tokens .assets-grid');
 
-            function setupAssetSelection(card, asset, displayName) {
-                const selector = card.querySelector('.asset-selector');
-                const burnInput = card.querySelector('.burn-amount');
-
-                if (!selector) return; // Skip if no selector found
-
-                selector.addEventListener('change', (e) => {
-                    const isSelected = e.target.checked;
-                    const card = e.target.closest('.asset-card');
-
-                    if (isSelected) {
-                        let amount = asset.amount;
-                        if (burnInput) {
-                            const inputAmount = parseFloat(burnInput.value);
-                            if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
-                                amount = inputAmount;
-                            }
-                        }
-
-                        selectedAssets.set(asset.mint, {
-                            type: asset.is_nft ? 'nft' : 'token',
-                            amount: amount,
-                            decimals: asset.decimals,
-                            displayName: displayName
-                        });
-                        card.classList.add('selected');
-                    } else {
-                        selectedAssets.delete(asset.mint);
-                        card.classList.remove('selected');
-                    }
-
-                    updateBulkActionsBar();
-                });
-
-                // Update amount when burn input changes for tokens
-                if (burnInput && !asset.is_nft) {
-                    burnInput.addEventListener('input', () => {
-                        if (selectedAssets.has(asset.mint)) {
-                            const inputAmount = parseFloat(burnInput.value);
-                            if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
-                                selectedAssets.set(asset.mint, {
-                                    ...selectedAssets.get(asset.mint),
-                                    amount: inputAmount
-                                });
-                            }
-                        }
+                if (!assets.tokens || assets.tokens.length === 0) {
+                    tokensGrid.innerHTML = '<div class="no-assets">No tokens found</div>';
+                } else {
+                    assets.tokens.forEach(token => {
+                        const card = createTokenCard(token);
+                        tokensGrid.appendChild(card);
                     });
                 }
+
+                // Use the new displayNFTs function
+                displayNFTs(assets.nfts);
+
+                const cnftsGrid = document.querySelector('#cnfts .assets-grid');
+                if (!assets.cnfts || assets.cnfts.length === 0) {
+                    cnftsGrid.innerHTML = '<div class="no-assets">No cNFTs found</div>';
+                } else {
+                    assets.cnfts.forEach(cnft => {
+                        const card = createCNFTCard(cnft);
+                        cnftsGrid.appendChild(card);
+                    });
+                }
+
+                const domainsGrid = document.querySelector('#domains .assets-grid');
+                if (!assets.domains || assets.domains.length === 0) {
+                    domainsGrid.innerHTML = '<div class="no-assets">No .sol domains found</div>';
+                } else {
+                    assets.domains.forEach(domain => {
+                        const card = createDomainCard(domain);
+                        domainsGrid.appendChild(card);
+                    });
+                }
+
+                showLoading(false);
+                document.querySelectorAll('.assets-grid, .collections-grid').forEach(grid => {
+                    grid.style.display = 'grid';
+                });
+
+            } catch (error) {
+                console.error('Error loading assets:', error);
+                showError(`Failed to load assets: ${error.message}`);
+            }
+        }
+
+
+
+        function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
+            imgElement.classList.add('loading');
+
+            const defaultImages = {
+                'token': '{{ url_for('static', filename='default-token-icon.svg') }}',
+                'nft': '{{ url_for('static', filename='default-nft-image.svg') }}',
+                'cnft': '{{ url_for('static', filename='default-nft-image.svg') }}'
+            };
+
+            const ipfsGateways = [
+                'https://ipfs.io/ipfs/',
+                'https://gateway.pinata.cloud/ipfs/',
+                'https://cloudflare-ipfs.com/ipfs/',
+                'https://gateway.ipfs.io/ipfs/'
+            ];
+
+            async function tryLoadImage(url) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(url);
+                    img.onerror = () => reject();
+                    img.src = url;
+                });
             }
 
-            // Initialize the bulk actions bar
-            bulkActionsBar.style.display = 'none';
-
-            async function burnSelectedAssets() {
-                if (selectedAssets.size === 0) {
-                    showError('No assets selected for burning');
+            async function loadWithFallback() {
+                if (!primaryUrl) {
+                    imgElement.src = defaultImages[type];
+                    imgElement.classList.remove('loading');
                     return;
                 }
 
-                // Create a summary of selected assets
-                let summary = 'You are about to burn:\n';
-                for (const [mint, asset] of selectedAssets) {
-                    const amount = asset.type === 'nft' ? '1' : asset.amount;
-                    summary += `\n- ${asset.displayName}: ${amount}`;
+                try {
+                    await tryLoadImage(primaryUrl);
+                    imgElement.src = primaryUrl;
+                } catch {
+                    if (primaryUrl.startsWith('ipfs://')) {
+                        const hash = primaryUrl.replace('ipfs://', '');
+                        let loaded = false;
+
+                        for (const gateway of ipfsGateways) {
+                            try {
+                                const url = gateway + hash;
+                                await tryLoadImage(url);
+                                imgElement.src = url;
+                                loaded = true;
+                                break;
+                            } catch {
+                                continue;
+                            }
+                        }
+
+                        if (!loaded) {
+                            imgElement.src = defaultImages[type];
+                        }
+                    } else {
+                        imgElement.src = defaultImages[type];
+                    }
                 }
 
-                if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
+                imgElement.classList.remove('loading');
+            }
+
+            loadWithFallback();
+        }
+
+        function formatAddress(address) {
+            return `${address.slice(0, 4)}...${address.slice(-4)}`;
+        }
+
+        function getDisplayName(asset, type = 'token') {
+            if (type === 'token') {
+                // For tokens, try name + symbol if available
+                if (asset.name && asset.symbol) {
+                    return `${asset.name} (${asset.symbol})`;
+                } else if (asset.name) {
+                    return asset.name;
+                } else if (asset.symbol) {
+                    return asset.symbol;
+                }
+            } else if (type === 'nft') {
+                // For NFTs, try name + collection
+                if (asset.name && asset.collection) {
+                    return `${asset.name} - ${asset.collection}`;
+                } else if (asset.name) {
+                    return asset.name;
+                } else if (asset.collection) {
+                    return `NFT from ${asset.collection}`;
+                }
+            }
+            // Fallback to formatted address
+            return `${type === 'token' ? 'Token' : 'NFT'} ${formatAddress(asset.mint)}`;
+        }
+
+        function createTokenCard(token) {
+            const template = document.querySelector('#token-card-template');
+            const card = template.content.cloneNode(true);
+            const cardElement = card.querySelector('.asset-card');
+            cardElement.dataset.mint = token.mint;
+
+            const iconElem = card.querySelector('.token-icon');
+            setupIntelligentImageLoading(iconElem, token.icon, 'token');
+
+            const displayName = getDisplayName(token, 'token');
+            card.querySelector('.token-name').textContent = displayName;
+            card.querySelector('.token-symbol').textContent = token.symbol || formatAddress(token.mint);
+            card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
+
+            card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
+
+            const burnInput = card.querySelector('.burn-amount');
+            burnInput.max = token.amount;
+            burnInput.min = 0.000001;
+
+            const burnButton = card.querySelector('.burn-button');
+            burnButton.dataset.mint = token.mint;
+            burnButton.dataset.decimals = token.decimals;
+
+            setupBurnButton(burnButton, burnInput, token);
+            setupAssetSelection(card, token, displayName);
+
+            return card;
+        }
+
+        function createNFTCard(nft) {
+            const template = document.querySelector('#nft-card-template');
+            const card = template.content.cloneNode(true);
+            const cardElement = card.querySelector('.asset-card');
+            cardElement.dataset.mint = nft.mint;
+
+            const imageElem = card.querySelector('.nft-image');
+            setupIntelligentImageLoading(imageElem, nft.image, 'nft');
+
+            const displayName = getDisplayName(nft, 'nft');
+            card.querySelector('.nft-name').textContent = displayName;
+            card.querySelector('.nft-collection').textContent = nft.collection || '';
+            card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
+
+            const burnButton = card.querySelector('.burn-button');
+            burnButton.dataset.mint = nft.mint;
+
+            burnButton.addEventListener('click', async () => {
+                if (!confirm(`Are you sure you want to burn this NFT (${displayName})? This action cannot be undone.`)) {
                     return;
                 }
 
                 try {
                     showLoading(true);
-                    const instructions = [];
+                    const result = await burnToken(nft.mint, 1, 0);
+                    if (result) {
+                        showStatus('NFT burned successfully');
+                        card.classList.add('burned');
+                        setTimeout(() => {
+                            card.remove();
+                        }, 500);
+                    }
+                } catch (error) {
+                    showError(`Failed to burn NFT: ${error.message}`);
+                } finally {
+                    showLoading(false);
+                }
+            });
 
-                    // Create burn instructions for each selected asset
-                    for (const [mint, asset] of selectedAssets) {
-                        const burnInstructions = await burnToken(mint, asset.amount, asset.decimals);
-                        instructions.push(...burnInstructions);
+            const selector = card.querySelector('.asset-selector');
+            selector.addEventListener('change', (e) => {
+                const isSelected = e.target.checked;
+                const card = e.target.closest('.asset-card');
+
+                if (isSelected) {
+                    selectedAssets.set(nft.mint, {
+                        type: 'nft',
+                        amount: 1,
+                        decimals: 0,
+                        displayName: displayName
+                    });
+                    card.classList.add('selected');
+                } else {
+                    selectedAssets.delete(nft.mint);
+                    card.classList.remove('selected');
+                }
+
+                updateBulkActionsBar();
+            });
+
+            return card;
+        }
+
+        function createCNFTCard(cnft) {
+            const template = document.querySelector('#cnft-card-template');
+            const card = template.content.cloneNode(true);
+
+            const imageElem = card.querySelector('.cnft-image');
+            setupIntelligentImageLoading(imageElem, cnft.image, 'cnft');
+
+            card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
+            card.querySelector('.cnft-collection').textContent = cnft.collection || '';
+
+            return card;
+        }
+
+        function displayNFTs(nfts) {
+            const nftsContainer = document.querySelector('#nfts .collections-grid');
+            nftsContainer.innerHTML = '';
+
+            if (!nfts || nfts.length === 0) {
+                nftsContainer.innerHTML = '<div class="no-assets">No NFTs found</div>';
+                return;
+            }
+
+            // Group NFTs by collection
+            const nftsByCollection = nfts.reduce((acc, nft) => {
+                const collection = nft.collection || 'Other';
+                if (!acc[collection]) {
+                    acc[collection] = [];
+                }
+                acc[collection].push(nft);
+                return acc;
+            }, {});
+
+            // Sort collections alphabetically
+            const sortedCollections = Object.keys(nftsByCollection).sort((a, b) => {
+                if (a === 'Other') return 1;
+                if (b === 'Other') return -1;
+                return a.localeCompare(b);
+            });
+
+            // Create sections for each collection
+            sortedCollections.forEach(collection => {
+                const collectionSection = document.createElement('div');
+                collectionSection.className = 'collection-section';
+
+                const header = document.createElement('div');
+                header.className = 'collection-header';
+                header.textContent = collection;
+                collectionSection.appendChild(header);
+
+                const grid = document.createElement('div');
+                grid.className = 'collection-grid';
+
+                // Sort NFTs within collection by name
+                const sortedNFTs = nftsByCollection[collection].sort((a, b) => {
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+
+                sortedNFTs.forEach(nft => {
+                    const card = createNFTCard(nft);
+                    grid.appendChild(card);
+                });
+
+                collectionSection.appendChild(grid);
+                nftsContainer.appendChild(collectionSection);
+            });
+        }
+
+        function createDomainCard(domain) {
+            const template = document.querySelector('#domain-card-template');
+            const card = template.content.cloneNode(true);
+            const cardElement = card.querySelector('.asset-card');
+            cardElement.dataset.mint = domain.mint;
+
+            const displayName = domain.name + '.sol';
+            card.querySelector('.domain-name').textContent = displayName;
+            if (domain.parent_name) {
+                card.querySelector('.domain-parent').textContent = `Parent: ${domain.parent_name}`;
+            }
+
+            card.querySelector('.solscan-link').href = domain.explorer_url;
+
+            const burnButton = card.querySelector('.burn-button');
+            burnButton.dataset.mint = domain.mint;
+
+            setupAssetSelection(card, domain, displayName);
+
+            return card;
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
+            }).format(num);
+        }
+
+        function validateBurnAmount(input, maxAmount) {
+            const amount = parseFloat(input.value);
+            console.log('Validating burn amount:', amount, 'max:', maxAmount);
+
+            if (isNaN(amount) || amount <= 0) {
+                showError('Please enter a valid amount greater than 0');
+                return false;
+            }
+
+            if (amount - maxAmount > Number.EPSILON) {
+                showError(`Amount cannot exceed ${maxAmount}`);
+                return false;
+            }
+
+            return true;
+        }
+
+        async function burnToken(mint, amount, decimals) {
+            const mintPubkey = new solanaWeb3.PublicKey(mint);
+            const walletPubkey = currentWallet.publicKey;
+
+            console.log(`Creating burn instruction for ${mint}`);
+            console.log(`- Amount: ${amount}`);
+            console.log(`- Decimals: ${decimals}`);
+
+            const effectiveDecimals = decimals;
+            const multiplier = BigInt(10 ** effectiveDecimals);
+            const rawAmount = BigInt(Math.round(amount * Number(multiplier)));
+
+            if (rawAmount <= BigInt(0)) {
+                throw new Error('Amount must be greater than 0');
+            }
+
+            const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
+                [
+                    walletPubkey.toBuffer(),
+                    TOKEN_PROGRAM_ID.toBuffer(),
+                    mintPubkey.toBuffer(),
+                ],
+                new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+            );
+
+            // Create burn instruction
+            const burnIx = createBurnInstruction(
+                tokenAccountPubkey,
+                mintPubkey,
+                walletPubkey,
+                rawAmount
+            );
+
+            // Check if we should close the account (for NFTs or when burning entire balance)
+            const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+            const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
+            const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
+
+            if (shouldClose) {
+                // Add close instruction to return rent
+                const closeIx = new solanaWeb3.TransactionInstruction({
+                    keys: [
+                        { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
+                        { pubkey: walletPubkey, isSigner: false, isWritable: true },
+                        { pubkey: walletPubkey, isSigner: true, isWritable: false },
+                    ],
+                    programId: TOKEN_PROGRAM_ID,
+                    data: new Uint8Array([9]) // Close account instruction
+                });
+                return [burnIx, closeIx];
+            }
+
+            return [burnIx];
+        }
+
+        function createBurnInstruction(tokenAccount, mint, owner, amount) {
+            const dataLayout = new Uint8Array(9);
+            dataLayout[0] = 8; // Burn instruction
+            const amountBytes = new Uint8Array(8);
+            const view = new DataView(amountBytes.buffer);
+            view.setBigUint64(0, amount, true);
+            dataLayout.set(amountBytes, 1);
+
+            return new solanaWeb3.TransactionInstruction({
+                keys: [
+                    { pubkey: tokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: mint, isSigner: false, isWritable: true },
+                    { pubkey: owner, isSigner: true, isWritable: false },
+                ],
+                programId: TOKEN_PROGRAM_ID,
+                data: dataLayout
+            });
+        }
+
+
+        // Initialize tab switching
+        const tabs = document.querySelectorAll('.tab-button');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                console.log('Tab clicked:', tab.dataset.tab);
+                tabs.forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Add bulk selection state
+        let selectedAssets = new Map();
+        function updateBulkActionsBar() {
+            const count = selectedAssets.size;
+            if (count > 0) {
+                selectedCountDisplay.textContent = `${count} item${count === 1 ? '' : 's'} selected`;
+                bulkActionsBar.style.display = 'flex';
+            } else {
+                bulkActionsBar.style.display = 'none';
+            }
+        }
+
+        const bulkActionsBar = document.querySelector('.bulk-actions-bar');
+        const selectedCountDisplay = document.querySelector('.selected-count');
+        const bulkBurnButton = document.querySelector('.bulk-burn-button');
+        const clearSelectionButton = document.querySelector('.clear-selection');
+
+
+        function clearSelection() {
+            selectedAssets.clear();
+            document.querySelectorAll('.asset-selector').forEach(checkbox => {
+                checkbox.checked = false;
+                checkbox.closest('.asset-card').classList.remove('selected');
+            });
+            updateBulkActionsBar();
+        }
+
+        function setupAssetSelection(card, asset, displayName) {
+            const selector = card.querySelector('.asset-selector');
+            const burnInput = card.querySelector('.burn-amount');
+
+            if (!selector) return; // Skip if no selector found
+
+            selector.addEventListener('change', (e) => {
+                const isSelected = e.target.checked;
+                const card = e.target.closest('.asset-card');
+
+                if (isSelected) {
+                    let amount = asset.amount;
+                    if (burnInput) {
+                        const inputAmount = parseFloat(burnInput.value);
+                        if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
+                            amount = inputAmount;
+                        }
                     }
 
-                    // Create and send transaction
-                    const latestBlockhash = await connection.getLatestBlockhash();
-                    const transaction = new solanaWeb3.Transaction({
-                        feePayer: currentWallet.publicKey,
-                        ...latestBlockhash,
+                    selectedAssets.set(asset.mint, {
+                        type: asset.is_nft ? 'nft' : 'token',
+                        amount: amount,
+                        decimals: asset.decimals,
+                        displayName: displayName
                     });
+                    card.classList.add('selected');
+                } else {
+                    selectedAssets.delete(asset.mint);
+                    card.classList.remove('selected');
+                }
 
-                    transaction.add(...instructions);
+                updateBulkActionsBar();
+            });
 
-                    const signed= await currentWallet.signTransaction(transaction);
-                    const signature = await connection.sendRawTransaction(signed.serialize());
-                    await connection.confirmTransaction(signature);
+            // Update amount when burn input changes for tokens
+            if (burnInput && !asset.is_nft) {
+                burnInput.addEventListener('input', () => {
+                    if (selectedAssets.has(asset.mint)) {
+                        const inputAmount = parseFloat(burnInput.value);
+                        if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
+                            selectedAssets.set(asset.mint, {
+                                ...selectedAssets.get(asset.mint),
+                                amount: inputAmount
+                            });
+                        }
+                    }
+                });
+            }
+        }
 
-                    showStatus('Assets burned successfully');
+        // Initialize the bulk actions bar
+        bulkActionsBar.style.display = 'none';
 
-                    // Remove burned assets from display
-                    for (const [mint] of selectedAssets) {
-                        const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
-                        if (card) {
+        async function burnSelectedAssets() {
+            if (selectedAssets.size === 0) {
+                showError('No assets selected for burning');
+                return;
+            }
+
+            // Create a summary of selected assets
+            let summary = 'You are about to burn:\n';
+            for (const [mint, asset] of selectedAssets) {
+                const amount = asset.type === 'nft' ? '1' : asset.amount;
+                summary += `\n- ${asset.displayName}: ${amount}`;
+            }
+
+            if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const instructions = [];
+
+                // Create burn instructions for each selected asset
+                for (const [mint, asset] of selectedAssets) {
+                    const burnInstructions = await burnToken(mint, asset.amount, asset.decimals);
+                    instructions.push(...burnInstructions);
+                }
+
+                // Create and send transaction
+                const latestBlockhash = await connection.getLatestBlockhash();
+                const transaction = new solanaWeb3.Transaction({
+                    feePayer: currentWallet.publicKey,
+                    ...latestBlockhash,
+                });
+
+                transaction.add(...instructions);
+
+                const signed= await currentWallet.signTransaction(transaction);
+                const signature = await connection.sendRawTransaction(signed.serialize());
+                await connection.confirmTransaction(signature);
+
+                showStatus('Assets burned successfully');
+
+                // Remove burned assets from display
+                for (const [mint] of selectedAssets) {
+                    const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
+                    if (card) {
+                        card.classList.add('burned');
+                        setTimeout(() => {
+                            card.remove();
+                        }, 500);
+                    }                        }
+                }
+
+                // Clear selection
+                clearSelection();
+            } catch (error) {
+                showError(`Failed to burn assets: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Add event listeners for bulk action buttons
+        if (bulkBurnButton) {
+            bulkBurnButton.addEventListener('click', burnSelectedAssets);
+        }
+        if (clearSelectionButton) {
+            clearSelectionButton.addEventListener('click', clearSelection);
+        }
+
+
+        function setupBurnButton(burnButton, burnInput, token) {
+            burnButton.addEventListener('click', async () => {
+                if (!validateBurnAmount(burnInput, token.amount)){
+                    return;
+                }
+
+                const amount = parseFloat(burnInput.value);
+                if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    showLoading(true);
+                    const result = await burnToken(token.mint, amount, token.decimals);
+                    if (result) {
+                        showStatus('Token burned successfully');
+                        burnInput.value = '';
+                        // Update the display
+                        token.amount -= amount;
+                        const card = burnButton.closest('.asset-card');
+                        card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
+                        if (token.amount <= 0) {
                             card.classList.add('burned');
                             setTimeout(() => {
                                 card.remove();
                             }, 500);
-                        }                        }
+                        }
                     }
-
-                    // Clear selection
-                    clearSelection();
                 } catch (error) {
-                    showError(`Failed to burn assets: ${error.message}`);
+                    showError(`Failed to burn token: ${error.message}`);
                 } finally {
                     showLoading(false);
                 }
-            }
-
-            // Add event listeners for bulk action buttons
-            if (bulkBurnButton) {
-                bulkBurnButton.addEventListener('click', burnSelectedAssets);
-            }
-            if (clearSelectionButton) {
-                clearSelectionButton.addEventListener('click', clearSelection);
-            }
+            });
+        }
 
 
-            function setupBurnButton(burnButton, burnInput, token) {
-                burnButton.addEventListener('click', async () => {
-                    if (!validateBurnAmount(burnInput, token.amount)){
-                        return;
-                    }
+        // Check if wallet is already connected
+        if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
+            console.log('Wallet already connected, reconnecting...');
+            connectWallet();
+        }
 
-                    const amount = parseFloat(burnInput.value);
-                    if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
-                        return;
-                    }
+        function initializeAchievements() {
+            // Placeholder for achievements initialization.  Implementation would go here.
+        }
 
-                    try {
-                        showLoading(true);
-                        const result = await burnToken(token.mint, amount, token.decimals);
-                        if (result) {
-                            showStatus('Token burned successfully');
-                            burnInput.value = '';
-                            // Update the display
-                            token.amount -= amount;
-                            const card = burnButton.closest('.asset-card');
-                            card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
-                            if (token.amount <= 0) {
-                                card.classList.add('burned');
-                                setTimeout(() => {
-                                    card.remove();
-                                }, 500);
-                            }
-                        }
-                    } catch (error) {
-                        showError(`Failed to burn token: ${error.message}`);
-                    } finally {
-                        showLoading(false);
-                    }
-                });
-            }
-
-
-            // Check if wallet is already connected
-            if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
-                console.log('Wallet already connected, reconnecting...');
-                connectWallet();
-            }
-
-            initializeAchievements();
-        });
+        initializeAchievements();
     </script>
 </body>
 </html>
