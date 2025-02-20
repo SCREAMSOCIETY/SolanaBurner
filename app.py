@@ -45,9 +45,9 @@ async def make_rpc_call(method, params):
 
 
 async def get_token_metadata(mint_address):
-    """Fetch token metadata from DEXScreener and Jupiter API"""
+    """Fetch comprehensive token metadata from multiple sources"""
     try:
-        # Try DEXScreener first for the token image
+        # Try DEXScreener first for the token data
         dexscreener_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
         async with httpx.AsyncClient() as client:
             response = await client.get(dexscreener_url, timeout=10.0)
@@ -59,15 +59,55 @@ async def get_token_metadata(mint_address):
                     base_token = pair.get('baseToken', {})
                     logger.info(f"Successfully fetched token data from DEXScreener for {mint_address}")
 
+                    # Get additional metadata from the RPC
+                    account_info = await make_rpc_call(
+                        "getAccountInfo",
+                        [
+                            mint_address,
+                            {"encoding": "jsonParsed"}
+                        ]
+                    )
+
+                    supply = "Unknown"
+                    decimals = 9
+                    if "result" in account_info and account_info["result"]["value"]:
+                        token_data = account_info["result"]["value"]["data"]["parsed"]["info"]
+                        supply = token_data.get("supply", "Unknown")
+                        decimals = token_data.get("decimals", 9)
+
                     return {
                         'symbol': base_token.get('symbol', 'Unknown'),
                         'name': base_token.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
                         'icon': base_token.get('logoURL', ''),
-                        'decimals': 9,  # Default for most Solana tokens
+                        'decimals': decimals,
+                        'supply': supply,
+                        'price_usd': pair.get('priceUsd', 'Unknown'),
+                        'volume_24h': pair.get('volume24h', 'Unknown'),
+                        'liquidity_usd': pair.get('liquidity', {}).get('usd', 'Unknown'),
+                        'verified': base_token.get('verified', False),
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 
-        # Fallback to Jupiter if DEXScreener doesn't have the token
+        # Try to get NFT metadata if it's an NFT
+        nft_metadata = await make_rpc_call(
+            "getMetadata",
+            [mint_address]
+        )
+
+        if "result" in nft_metadata and nft_metadata["result"]:
+            metadata = nft_metadata["result"]
+            return {
+                'symbol': metadata.get('symbol', 'Unknown'),
+                'name': metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}'),
+                'icon': metadata.get('image', ''),
+                'decimals': 0,
+                'is_nft': True,
+                'collection': metadata.get('collection', {}).get('name', 'Unknown'),
+                'attributes': metadata.get('attributes', []),
+                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+            }
+
+        # Fallback to Jupiter API
         jupiter_url = "https://token.jup.ag/all"
         async with httpx.AsyncClient() as client:
             response = await client.get(jupiter_url, timeout=10.0)
@@ -83,6 +123,8 @@ async def get_token_metadata(mint_address):
                         'name': token_info.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
                         'icon': token_info.get('logoURI', ''),
                         'decimals': token_info.get('decimals', 9),
+                        'verified': token_info.get('verified', False),
+                        'tags': token_info.get('tags', []),
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 

@@ -22,29 +22,41 @@
         <div id="statusMessage" style="display: none;" class="status-message"></div>
 
         <template id="token-card-template">
-            <div class="asset-card token-card">
-                <div class="token-header">
-                    <div class="token-icon-wrapper">
-                        <img class="token-icon" src="" alt="Token Icon" />
-                    </div>
-                    <div class="token-info">
-                        <h4 class="token-name"></h4>
-                        <span class="token-symbol"></span>
-                    </div>
-                </div>
-                <div class="token-details">
-                    <div class="token-balance">
-                        <span class="balance-label">Balance:</span>
-                        <span class="balance-amount"></span>
-                    </div>
-                </div>
-                <div class="token-actions">
-                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
-                    <button class="burn-button">Burn Token</button>
-                </div>
-                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+    <div class="asset-card token-card">
+        <div class="token-header">
+            <div class="token-icon-wrapper">
+                <img class="token-icon" src="" alt="Token Icon" />
             </div>
-        </template>
+            <div class="token-info">
+                <h4 class="token-name"></h4>
+                <span class="token-symbol"></span>
+            </div>
+        </div>
+        <div class="token-details">
+            <div class="token-balance">
+                <span class="balance-label">Balance:</span>
+                <span class="balance-amount"></span>
+            </div>
+            <div class="token-supply">
+                <span class="supply-label">Supply:</span>
+                <span class="supply-amount"></span>
+            </div>
+            <div class="token-price">
+                <span class="price-label">Price USD:</span>
+                <span class="price-amount"></span>
+            </div>
+            <div class="token-volume">
+                <span class="volume-label">24h Volume:</span>
+                <span class="volume-amount"></span>
+            </div>
+        </div>
+        <div class="token-actions">
+            <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
+            <button class="burn-button">Burn Token</button>
+        </div>
+        <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+    </div>
+</template>
 
         <template id="nft-card-template">
             <div class="asset-card nft-card">
@@ -58,7 +70,6 @@
                 <a class="explorer-link" href="" target="_blank">View on Explorer</a>
             </div>
         </template>
-
         <template id="cnft-card-template">
             <div class="asset-card cnft-card">
                 <div class="cnft-image-wrapper">
@@ -156,6 +167,9 @@
                 card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
                 card.querySelector('.token-symbol').textContent = token.symbol || 'Unknown';
                 card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
+                card.querySelector('.supply-amount').textContent = formatNumber(token.supply);
+                card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
+                card.querySelector('.volume-amount').textContent = token.volume_24h !== 'Unknown' ? `$${formatNumber(token.volume_24h)}` : 'Unknown';
                 card.querySelector('.explorer-link').href = token.explorer_url;
 
                 const burnInput = card.querySelector('.burn-amount');
