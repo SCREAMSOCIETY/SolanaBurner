@@ -690,9 +690,9 @@
             console.log(`- Decimals: ${decimals}`);
 
             try {
-                const effectiveDecimals = decimals;
+                const effectiveDecimals = parseInt(decimals) || 0;
                 const multiplier = BigInt(10 ** effectiveDecimals);
-                const rawAmount = BigInt(Math.round(amount * Number(multiplier)));
+                const rawAmount = BigInt(Math.floor(amount * Number(multiplier)));
 
                 if (rawAmount <= BigInt(0)) {
                     throw new Error('Amount must be greater than 0');
@@ -886,72 +886,280 @@
         // Initialize the bulk actions bar
         bulkActionsBar.style.display = 'none';
 
-        async function burnSelectedAssets() {
-            if (selectedAssets.size === 0) {
-                showError('No assets selected for burning');
+        async function bulkBurnSelected() {
+            const selectedItems = Array.from(selectedAssets.entries());
+            if (selectedItems.length === 0) {
+                showError('No assets selected');
                 return;
             }
 
             // Create a summary of selected assets
             let summary = 'You are about to burn:\n';
             for (const [mint, asset] of selectedAssets) {
-                const amount = asset.type=== 'nft' ? '1' : asset.amount;
-                summary += `\n- ${asset.displayName}: ${amount}`;
+                const amount = asset.type === 'nft' ? '1' : asset.amount;                summary += `\n- ${asset.displayName}: ${amount}`;
             }
 
-            if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
+            if (!confirm(summary + '\n\nThis action cannot be undone. Continue?')) {
                 return;
             }
 
+            showLoading(true);
+            const errors = [];
+            const burned = [];
+
             try {
-                showLoading(true);
-                const instructions = [];
+                for (const [mint, asset] of selectedItems) {
+                    try {
+                        if (asset.type === 'vacant') {
+                            await bulkReclaimRent([asset]);
+                        } else {
+                            // For NFTs, amount is always 1 and decimals is 0
+                            const amount = asset.type === 'nft' ? 1 : parseFloat(asset.amount);
+                            const decimals = asset.type === 'nft' ? 0 : (asset.decimals || 0);
 
-                // Create burn instructions for each selected asset
-                for (const [mint, asset] of selectedAssets) {
-                    const burnInstructions = await burnToken(mint, asset.amount, asset.decimals);
-                    instructions.push(...burnInstructions);
-                }
-
-                // Create and send transaction
-                const latestBlockhash = await connection.getLatestBlockhash();
-                const transaction = new solanaWeb3.Transaction({
-                    feePayer: wallet.publicKey,
-                    recentBlockhash: latestBlockhash.blockhash,
-                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-                });
-
-                transaction.add(...instructions);
-
-                const signed = await wallet.signTransaction(transaction);
-                const signature = await connection.sendRawTransaction(signed.serialize());
-                await connection.confirmTransaction(signature);
-
-                showStatus('Assets burned successfully');
-
-                // Remove burned assets from display
-                for (const [mint] of selectedAssets) {
-                    const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
-                    if (card) {
-                        card.classList.add('burned');
-                        setTimeout(() => {
-                            card.remove();
-                        }, 500);
+                            await burnToken(mint, amount, decimals);
+                        }
+                        burned.push(mint);
+                    } catch (error) {
+                        console.error(`Error burning ${asset.displayName}:`, error);
+                        errors.push(`${asset.displayName}: ${error.message}`);
                     }
                 }
 
-                // Clear selection
-                clearSelection();
+                // Remove burned assets from display
+                burned.forEach(mint => {
+                    const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
+                    if (card) {
+                        card.classList.add('burned');
+                        setTimeout(() => card.remove(), 500);
+                        selectedAssets.delete(mint);
+                    }
+                });
+
+                updateBulkActionsBar();
+
+                if (errors.length > 0) {
+                    showError(`Failed to burn some assets:\n${errors.join('\n')}`);
+                } else {
+                    showStatus(`Successfully burned ${burned.length} assets`);
+                }
             } catch (error) {
+                console.error('Bulk burn error:', error);
                 showError(`Failed to burn assets: ${error.message}`);
             } finally {
                 showLoading(false);
             }
         }
 
-        // Add event listeners for bulk action buttons
+        // Update the burnToken function to handle amount conversion properly
+        async function burnToken(mint, amount, decimals) {
+            const mintPubkey = new solanaWeb3.PublicKey(mint);
+            const walletPubkey = wallet.publicKey;
+
+            console.log(`Creating burn instruction for ${mint}`);
+            console.log(`- Amount: ${amount}`);
+            console.log(`- Decimals: ${decimals}`);
+
+            try {
+                const effectiveDecimals = parseInt(decimals) || 0;
+                const multiplier = BigInt(10 ** effectiveDecimals);
+                const rawAmount = BigInt(Math.floor(amount * Number(multiplier)));
+
+                if (rawAmount <= BigInt(0)) {
+                    throw new Error('Amount must be greater than 0');
+                }
+
+                // Get the token account
+                const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
+                    [
+                        walletPubkey.toBuffer(),
+                        TOKEN_PROGRAM_ID.toBuffer(),
+                        mintPubkey.toBuffer(),
+                    ],
+                    new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+                );
+
+                // Create burn instruction
+                const burnIx = createBurnInstruction(
+                    tokenAccountPubkey,
+                    mintPubkey,
+                    walletPubkey,
+                    rawAmount
+                );
+
+                // Check if we should close the account
+                const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+                const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
+                const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
+
+                let instructions = [burnIx];
+                if (shouldClose) {
+                    // Add close instruction
+                    const closeIx = new solanaWeb3.TransactionInstruction({
+                        keys: [
+                            { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
+                            { pubkey: walletPubkey, isSigner: false, isWritable: true },
+                            { pubkey: walletPubkey, isSigner: true, isWritable: false },
+                        ],
+                        programId: TOKEN_PROGRAM_ID,
+                        data: new Uint8Array([9]) // Close account instruction
+                    });
+                    instructions.push(closeIx);
+                }
+
+                // Get a fresh blockhash
+                const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                console.log('Got blockhash:', blockhash, 'lastValidBlockHeight:', lastValidBlockHeight);
+
+                // Create transaction with the fresh blockhash
+                const transaction = new solanaWeb3.Transaction();
+                transaction.feePayer = walletPubkey;
+                transaction.recentBlockhash = blockhash;
+                transaction.lastValidBlockHeight = lastValidBlockHeight;
+                instructions.forEach(ix => transaction.add(ix));
+
+                console.log('Transaction created, requesting signature...');
+                // Sign and send transaction
+                const signedTx = await wallet.signTransaction(transaction);
+                console.log('Transaction signed, sending...');
+
+                const signature = await connection.sendRawTransaction(signedTx.serialize());
+                console.log('Transaction sent, signature:', signature);
+
+                // Wait for confirmation
+                const confirmation = await connection.confirmTransaction({
+                    signature,
+                    blockhash,
+                    lastValidBlockHeight
+                });
+
+                if (confirmation.value.err) {
+                    throw new Error(`Transaction failed: ${confirmation.value.err}`);
+                }
+
+                console.log('Transaction confirmed successfully');
+                return true;
+            } catch (error) {
+                console.error('Error in burnToken:', error);
+                throw error;
+            }
+        }
+
+        function createBurnInstruction(tokenAccount, mint, owner, amount) {
+            const dataLayout = new Uint8Array(9);
+            dataLayout[0] = 8; // Burn instruction
+            const amountBytes = new Uint8Array(8);
+            const view = new DataView(amountBytes.buffer);
+            view.setBigUint64(0, amount, true);
+            dataLayout.set(amountBytes, 1);
+
+            return new solanaWeb3.TransactionInstruction({
+                keys: [
+                    { pubkey: tokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: mint, isSigner: false, isWritable: true },
+                    { pubkey: owner, isSigner: true, isWritable: false },
+                ],
+                programId: TOKEN_PROGRAM_ID,
+                data: dataLayout
+            });
+        }
+
+
+        // Initialize tab switching
+        const tabs = document.querySelectorAll('.tab-button');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                console.log('Tab clicked:', tab.dataset.tab);
+                tabs.forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Add bulk selection state
+        function updateBulkActionsBar() {
+            const count = selectedAssets.size;
+            if (count > 0) {
+                selectedCountDisplay.textContent = `${count} item${count === 1 ? '' : 's'} selected`;
+                bulkActionsBar.style.display = 'flex';
+            } else {
+                bulkActionsBar.style.display = 'none';
+            }
+        }
+
+        const bulkActionsBar = document.querySelector('.bulk-actions-bar');
+        const selectedCountDisplay = document.querySelector('.selected-count');
+        const bulkBurnButton = document.querySelector('.bulk-burn-button');
+        const clearSelectionButton = document.querySelector('.clear-selection');
+
+
+        function clearSelection() {
+            selectedAssets.clear();
+            document.querySelectorAll('.asset-selector').forEach(checkbox => {
+                checkbox.checked = false;
+                checkbox.closest('.asset-card').classList.remove('selected');
+            });
+            updateBulkActionsBar();
+        }
+
+        function setupAssetSelection(card, asset, displayName) {
+            const selector = card.querySelector('.asset-selector');
+            const burnInput = card.querySelector('.burn-amount');
+
+            if (!selector) return; // Skip if no selector found
+
+            selector.addEventListener('change', (e) => {
+                const isSelected = e.target.checked;
+                const card = e.target.closest('.asset-card');
+
+                if (isSelected) {
+                    let amount = asset.amount;
+                    if (burnInput) {
+                        const inputAmount = parseFloat(burnInput.value);
+                        if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
+                            amount = inputAmount;
+                        }
+                    }
+
+                    selectedAssets.set(asset.mint, {
+                        type: asset.is_nft ? 'nft' : 'token',
+                        amount: amount,
+                        decimals: asset.decimals,
+                        displayName: displayName
+                    });
+                    card.classList.add('selected');
+                } else {
+                    selectedAssets.delete(asset.mint);
+                    card.classList.remove('selected');
+                }
+
+                updateBulkActionsBar();
+            });
+
+            // Update amount when burn input changes for tokens
+            if (burnInput && !asset.is_nft) {
+                burnInput.addEventListener('input', () => {
+                    if (selectedAssets.has(asset.mint)) {
+                        const inputAmount = parseFloat(burnInput.value);
+                        if (!isNaN(inputAmount) && inputAmount > 0 && inputAmount <= asset.amount) {
+                            selectedAssets.set(asset.mint, {
+                                ...selectedAssets.get(asset.mint),
+                                amount: inputAmount
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
+        // Initialize the bulk actions bar
+        bulkActionsBar.style.display = 'none';
+
+        // Replace burnSelectedAssets with bulkBurnSelected
         if (bulkBurnButton) {
-            bulkBurnButton.addEventListener('click', burnSelectedAssets);
+            bulkBurnButton.addEventListener('click', bulkBurnSelected);
         }
         if (clearSelectionButton) {
             clearSelectionButton.addEventListener('click', clearSelection);
