@@ -54,6 +54,9 @@
                     <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
                     <button class="burn-button">Burn Token</button>
                 </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
             </div>
         </template>
 
@@ -65,6 +68,9 @@
                 <div class="nft-info">
                     <h4 class="nft-name"></h4>
                     <p class="nft-collection"></p>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
                 </div>
             </div>
         </template>
@@ -169,6 +175,8 @@
                 card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
                 card.querySelector('.volume-amount').textContent = token.volume_24h !== 'Unknown' ? `$${formatNumber(token.volume_24h)}` : 'Unknown';
 
+                // Set Solscan link
+                card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
 
                 const burnInput = card.querySelector('.burn-amount');
                 burnInput.max = token.amount;
@@ -210,21 +218,8 @@
                 card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
 
-                return card;
-            }
-
-            function createCNFTCard(cnft) {
-                const template = document.querySelector('#cnft-card-template');
-                const card = template.content.cloneNode(true);
-
-                const imageElem = card.querySelector('.cnft-image');
-                imageElem.src = cnft.image || "{{ url_for('static', filename='default-nft-image.svg') }}";
-                imageElem.onerror = function() {
-                    this.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
-                };
-
-                card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
-                card.querySelector('.cnft-collection').textContent = cnft.collection || '';
+                // Set Solscan link
+                card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
 
                 return card;
             }
