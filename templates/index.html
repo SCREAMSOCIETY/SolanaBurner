@@ -660,7 +660,7 @@
                             { pubkey: walletPubkey, isSigner: true, isWritable: false },
                         ],
                         programId: TOKEN_PROGRAM_ID,
-                        data: Buffer.from([9]) // Close account instruction
+                        data: new Uint8Array([9]) // Close account instruction
                     });
                     return [burnIx, closeIx];
                 }
