@@ -68,8 +68,8 @@ h3 {
     align-items: center;
     gap: 0.5rem;
     position: relative;
-    overflow: hidden; /* Added for animation */
-    transition: all 0.3s ease; /* Added for animation */
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
 .connect-button::before {
@@ -627,6 +627,12 @@ h3 {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: opacity 0.3s ease-out, filter 0.3s ease-out;
+}
+
+.token-icon.loading {
+    opacity: 0.7;
+    filter: blur(3px);
 }
 
 .token-info {
@@ -703,6 +709,12 @@ h3 {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: opacity 0.3s ease-out, filter 0.3s ease-out;
+}
+
+.nft-image.loading, .cnft-image.loading {
+    opacity: 0.7;
+    filter: blur(3px);
 }
 
 .nft-info, .cnft-info {
@@ -998,4 +1010,62 @@ h3 {
 
 .notification-icon {
     font-size: 1.2rem;
+}
+
+/* Image Loading States */
+.token-icon, .nft-image, .cnft-image {
+    transition: opacity 0.3s ease-out, filter 0.3s ease-out;
+}
+
+.token-icon.loading, .nft-image.loading, .cnft-image.loading {
+    opacity: 0.7;
+    filter: blur(3px);
+}
+
+.token-icon-wrapper, .nft-image-wrapper, .cnft-image-wrapper {
+    position: relative;
+}
+
+.token-icon-wrapper::before, .nft-image-wrapper::before, .cnft-image-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid rgba(153, 69, 255, 0.2);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+}
+
+.loading + .token-icon-wrapper::before,
+.loading + .nft-image-wrapper::before,
+.loading + .cnft-image-wrapper::before {
+    opacity: 1;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Fallback image transitions */
+.token-icon[src*="default-token-icon.svg"],
+.nft-image[src*="default-nft-image.svg"],
+.cnft-image[src*="default-nft-image.svg"] {
+    opacity: 0.8;
+    filter: grayscale(100%);
+    transition: all 0.3s ease-out;
+}
+
+.token-icon[src*="default-token-icon.svg"]:hover,
+.nft-image[src*="default-nft-image.svg"]:hover,
+.cnft-image[src*="default-nft-image.svg"]:hover {
+    opacity: 1;
+    filter: grayscale(0%);
 }

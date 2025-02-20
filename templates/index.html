@@ -25,7 +25,7 @@
             <div class="asset-card token-card">
                 <div class="token-header">
                     <div class="token-icon-wrapper">
-                        <img class="token-icon" src="" alt="Token Icon" loading="lazy" onerror="this.src='{{ url_for('static', filename='default-token-icon.svg') }}'; this.onerror=null;" />
+                        <img class="token-icon" src="" alt="Token Icon" loading="lazy" />
                     </div>
                     <div class="token-info">
                         <h4 class="token-name"></h4>
@@ -63,7 +63,7 @@
         <template id="nft-card-template">
             <div class="asset-card nft-card">
                 <div class="nft-image-wrapper">
-                    <img class="nft-image" src="" alt="NFT" loading="lazy" onerror="this.src='{{ url_for('static', filename='default-nft-image.svg') }}'; this.onerror=null;" />
+                    <img class="nft-image" src="" alt="NFT" loading="lazy" />
                 </div>
                 <div class="nft-info">
                     <h4 class="nft-name"></h4>
@@ -78,7 +78,7 @@
         <template id="cnft-card-template">
             <div class="asset-card cnft-card">
                 <div class="cnft-image-wrapper">
-                    <img class="cnft-image" src="" alt="cNFT" loading="lazy" onerror="this.src='{{ url_for('static', filename='default-nft-image.svg') }}'; this.onerror=null;" />
+                    <img class="cnft-image" src="" alt="cNFT" loading="lazy" />
                 </div>
                 <div class="cnft-info">
                     <h4 class="cnft-name"></h4>
@@ -186,22 +186,78 @@
                 });
             }
 
+            function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
+                imgElement.classList.add('loading');
+
+                const defaultImages = {
+                    'token': '{{ url_for('static', filename='default-token-icon.svg') }}',
+                    'nft': '{{ url_for('static', filename='default-nft-image.svg') }}',
+                    'cnft': '{{ url_for('static', filename='default-nft-image.svg') }}'
+                };
+
+                const ipfsGateways = [
+                    'https://ipfs.io/ipfs/',
+                    'https://gateway.pinata.cloud/ipfs/',
+                    'https://cloudflare-ipfs.com/ipfs/',
+                    'https://gateway.ipfs.io/ipfs/'
+                ];
+
+                async function tryLoadImage(url) {
+                    return new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.onload = () => resolve(url);
+                        img.onerror = () => reject();
+                        img.src = url;
+                    });
+                }
+
+                async function loadWithFallback() {
+                    if (!primaryUrl) {
+                        imgElement.src = defaultImages[type];
+                        imgElement.classList.remove('loading');
+                        return;
+                    }
+
+                    try {
+                        await tryLoadImage(primaryUrl);
+                        imgElement.src = primaryUrl;
+                    } catch {
+                        if (primaryUrl.startsWith('ipfs://')) {
+                            const hash = primaryUrl.replace('ipfs://', '');
+                            let loaded = false;
+
+                            for (const gateway of ipfsGateways) {
+                                try {
+                                    const url = gateway + hash;
+                                    await tryLoadImage(url);
+                                    imgElement.src = url;
+                                    loaded = true;
+                                    break;
+                                } catch {
+                                    continue;
+                                }
+                            }
+
+                            if (!loaded) {
+                                imgElement.src = defaultImages[type];
+                            }
+                        } else {
+                            imgElement.src = defaultImages[type];
+                        }
+                    }
+
+                    imgElement.classList.remove('loading');
+                }
+
+                loadWithFallback();
+            }
+
             function createTokenCard(token) {
                 const template = document.querySelector('#token-card-template');
                 const card = template.content.cloneNode(true);
 
                 const iconElem = card.querySelector('.token-icon');
-                // Set default image first
-                iconElem.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
-
-                // Try to load the token's icon if available
-                if (token.icon) {
-                    const img = new Image();
-                    img.onload = function() {
-                        iconElem.src = token.icon;
-                    };
-                    img.src = token.icon;
-                }
+                setupIntelligentImageLoading(iconElem, token.icon, 'token');
 
                 card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
                 card.querySelector('.token-symbol').textContent = token.symbol || 'Unknown';
@@ -210,7 +266,6 @@
                 card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
                 card.querySelector('.volume-amount').textContent = token.volume_24h !== 'Unknown' ? `$${formatNumber(token.volume_24h)}` : 'Unknown';
 
-                // Set Solscan link
                 card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
 
                 const burnInput = card.querySelector('.burn-amount');
@@ -221,7 +276,6 @@
                 burnButton.dataset.mint = token.mint;
                 burnButton.dataset.decimals = token.decimals;
 
-                // Setup burn functionality
                 setupBurnButton(burnButton, burnInput, token);
 
                 return card;
@@ -232,22 +286,10 @@
                 const card = template.content.cloneNode(true);
 
                 const imageElem = card.querySelector('.nft-image');
-                // Set default image first
-                imageElem.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
-
-                // Try to load the NFT's image if available
-                if (nft.image) {
-                    const img = new Image();
-                    img.onload = function() {
-                        imageElem.src = nft.image;
-                    };
-                    img.src = nft.image;
-                }
+                setupIntelligentImageLoading(imageElem, nft.image, 'nft');
 
                 card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
-
-                // Set Solscan link
                 card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
 
                 return card;
@@ -258,17 +300,7 @@
                 const card = template.content.cloneNode(true);
 
                 const imageElem = card.querySelector('.cnft-image');
-                // Set default image first
-                imageElem.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
-
-                // Try to load the cNFT's image if available
-                if (cnft.image) {
-                    const img = new Image();
-                    img.onload = function() {
-                        imageElem.src = cnft.image;
-                    };
-                    img.src = cnft.image;
-                }
+                setupIntelligentImageLoading(imageElem, cnft.image, 'cnft');
 
                 card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
                 card.querySelector('.cnft-collection').textContent = cnft.collection || '';
@@ -523,7 +555,6 @@
                     showLoading(false);
                 }
             }
-
 
 
             // Achievement definitions
