@@ -55,6 +55,13 @@
                     <div class="assets-grid"></div>
                 </div>
                 <div id="vacant" class="tab-panel">
+                    <div class="bulk-actions-bar">
+                        <div class="selected-count">0 accounts selected</div>
+                        <div class="bulk-actions">
+                            <button class="bulk-reclaim-button">Reclaim Selected</button>
+                            <button class="clear-selection">Clear Selection</button>
+                        </div>
+                    </div>
                     <div class="assets-grid"></div>
                 </div>
             </div>
@@ -163,6 +170,9 @@
         </template>
         <template id="vacant-account-template">
             <div class="asset-card vacant-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select account for reclaiming">
+                </div>
                 <div class="vacant-info">
                     <h4 class="account-address"></h4>
                     <p class="rent-amount">Rent: 0.00 SOL</p>
@@ -1053,8 +1063,11 @@
                 vacantAccounts.forEach(account => {
                     const template = document.querySelector('#vacant-account-template');
                     const card = template.content.cloneNode(true);
+                    const cardElement = card.querySelector('.vacant-card');
 
                     const address = account.pubkey.toString();
+                    cardElement.dataset.address = address;
+
                     card.querySelector('.account-address').textContent = `Account: ${address.slice(0,4)}...${address.slice(-4)}`;
 
                     const rentBalance = account.account.lamports / solanaWeb3.LAMPORTS_PER_SOL;
@@ -1062,7 +1075,25 @@
 
                     card.querySelector('.solscan-link').href = `https://solscan.io/account/${address}`;
 
-                    // Setup reclaim button
+                    // Setup selection checkbox
+                    const selector = card.querySelector('.asset-selector');
+                    selector.addEventListener('change', (e) => {
+                        const isSelected = e.target.checked;
+                        if (isSelected) {
+                            selectedAssets.set(address, {
+                                type: 'vacant',
+                                address: address,
+                                rentBalance: rentBalance
+                            });
+                            cardElement.classList.add('selected');
+                        } else {
+                            selectedAssets.delete(address);
+                            cardElement.classList.remove('selected');
+                        }
+                        updateBulkActionsBar();
+                    });
+
+                    // Setup individual reclaim button
                     const reclaimButton = card.querySelector('.reclaim-button');
                     reclaimButton.addEventListener('click', async () => {
                         if (!confirm('Are you sure you want to reclaim rent from this account? This will close the account.')) {
@@ -1070,59 +1101,29 @@
                         }
 
                         try {
-                            showLoading(true);
-                            const accountPubkey = new solanaWeb3.PublicKey(address);
-
-                            // Create close instruction
-                            const closeIx = new solanaWeb3.TransactionInstruction({
-                                keys: [
-                                    { pubkey: accountPubkey, isSigner: false, isWritable: true },
-                                    { pubkey: wallet.publicKey, isSigner: false, isWritable: true },
-                                    { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
-                                ],
-                                programId: TOKEN_PROGRAM_ID,
-                                data: new Uint8Array([9]) // Close account instruction
-                            });
-
-                            // Get latest blockhash
-                            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-
-                            // Create and send transaction
-                            const transaction = new solanaWeb3.Transaction();
-                            transaction.feePayer = wallet.publicKey;
-                            transaction.recentBlockhash = blockhash;
-                            transaction.lastValidBlockHeight = lastValidBlockHeight;
-                            transaction.add(closeIx);
-
-                            const signedTx = await wallet.signTransaction(transaction);
-                            const signature = await connection.sendRawTransaction(signedTx.serialize());
-
-                            const confirmation = await connection.confirmTransaction({
-                                signature,
-                                blockhash,
-                                lastValidBlockHeight
-                            });
-
-                            if (confirmation.value.err) {
-                                throw new Error(`Transaction failed: ${confirmation.value.err}`);
-                            }
-
-                            showStatus(`Successfully reclaimed ${rentBalance.toFixed(6)} SOL`);
-
-                            // Remove card from display
-                            const cardElement = reclaimButton.closest('.vacant-card');
-                            cardElement.classList.add('burned');
-                            setTimeout(() => cardElement.remove(), 500);
-
+                            await bulkReclaimRent([{address, rentBalance}]);
                         } catch (error) {
                             console.error('Reclaim error:', error);
                             showError(`Failed to reclaim rent: ${error.message}`);
-                        } finally {
-                            showLoading(false);
                         }
                     });
 
                     vacantGrid.appendChild(card);
+                });
+
+                // Setup bulk reclaim button
+                const bulkReclaimButton = document.querySelector('#vacant .bulk-reclaim-button');
+                bulkReclaimButton.addEventListener('click', async () => {
+                    const selectedVacantAccounts = Array.from(selectedAssets.entries())
+                        .filter(([_, asset]) => asset.type === 'vacant')
+                        .map(([_, asset]) => asset);
+
+                    if (selectedVacantAccounts.length === 0) {
+                        showError('No accounts selected for reclaiming');
+                        return;
+                    }
+
+                    await bulkReclaimRent(selectedVacantAccounts);
                 });
 
             } catch (error) {
@@ -1137,6 +1138,77 @@
             await originalLoadAssets(publicKey);
             await loadVacantAccounts(publicKey);
         };
+
+        async function bulkReclaimRent(accounts) {
+            if (!confirm(`Are you sure you want to reclaim rent from ${accounts.length} accounts? This action cannot be undone.`)) {
+                return;
+            }
+
+            showLoading(true);
+            let successCount = 0;
+            let totalSOL = 0;
+
+            try {
+                // Get latest blockhash
+                const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+                // Create transaction
+                const transaction = new solanaWeb3.Transaction();
+                transaction.feePayer = wallet.publicKey;
+                transaction.recentBlockhash = blockhash;
+                transaction.lastValidBlockHeight = lastValidBlockHeight;
+
+                // Add close instructions for all selected accounts
+                accounts.forEach(account => {
+                    const closeIx = new solanaWeb3.TransactionInstruction({
+                        keys: [
+                            { pubkey: new solanaWeb3.PublicKey(account.address), isSigner: false, isWritable: true },
+                            { pubkey: wallet.publicKey, isSigner: false, isWritable: true },
+                            { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+                        ],
+                        programId: TOKEN_PROGRAM_ID,
+                        data: new Uint8Array([9]) // Close account instruction
+                    });
+                    transaction.add(closeIx);
+                    totalSOL += account.rentBalance;
+                });
+
+                // Sign and send transaction
+                const signedTx = await wallet.signTransaction(transaction);
+                const signature = await connection.sendRawTransaction(signedTx.serialize());
+
+                const confirmation = await connection.confirmTransaction({
+                    signature,
+                    blockhash,
+                    lastValidBlockHeight
+                });
+
+                if (confirmation.value.err) {
+                    throw new Error(`Transaction failed: ${confirmation.value.err}`);
+                }
+
+                showStatus(`Successfully reclaimed ${totalSOL.toFixed(6)} SOL from ${accounts.length} accounts`);
+
+                // Remove reclaimed accounts from display
+                accounts.forEach(account => {
+                    const card = document.querySelector(`.vacant-card[data-address="${account.address}"]`);
+                    if (card) {
+                        card.classList.add('burned');
+                        setTimeout(() => card.remove(), 500);
+                    }
+                });
+
+                // Clear selection
+                selectedAssets.clear();
+                updateBulkActionsBar();
+
+            } catch (error) {
+                console.error('Bulk reclaim error:', error);
+                showError(`Failed to reclaim rent: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
     </script>
 </body>
 </html>
