@@ -55,25 +55,17 @@ async def get_token_metadata(mint_address):
             if response.status_code == 200:
                 dex_data = response.json()
                 if dex_data.get('pairs') and len(dex_data['pairs']) > 0:
-                    token_data = dex_data['pairs'][0]
+                    pair = dex_data['pairs'][0]
+                    base_token = pair.get('baseToken', {})
                     logger.info(f"Successfully fetched token data from DEXScreener for {mint_address}")
 
-                    # Now get additional metadata from Jupiter
-                    jupiter_url = "https://token.jup.ag/all"
-                    response = await client.get(jupiter_url, timeout=10.0)
-
-                    if response.status_code == 200:
-                        tokens = response.json()
-                        token_info = next((token for token in tokens if token.get('address') == mint_address), None)
-
-                        if token_info:
-                            return {
-                                'symbol': token_info.get('symbol', token_data.get('baseToken', {}).get('symbol', 'Unknown')),
-                                'name': token_info.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
-                                'icon': token_data.get('baseToken', {}).get('logoURI', token_info.get('logoURI', '')),
-                                'decimals': token_info.get('decimals', 9),
-                                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-                            }
+                    return {
+                        'symbol': base_token.get('symbol', 'Unknown'),
+                        'name': base_token.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
+                        'icon': base_token.get('logoURL', ''),
+                        'decimals': 9,  # Default for most Solana tokens
+                        'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                    }
 
         # Fallback to Jupiter if DEXScreener doesn't have the token
         jupiter_url = "https://token.jup.ag/all"
@@ -108,6 +100,42 @@ async def get_token_metadata(mint_address):
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
+async def get_cnft_metadata(address):
+    """Fetch cNFT metadata from the chain"""
+    try:
+        # Get metadata PDA for the cNFT
+        metadata_response = await make_rpc_call(
+            "getAccountInfo",
+            [
+                address,
+                {"encoding": "base64"}
+            ]
+        )
+
+        if "result" in metadata_response and metadata_response["result"]["value"]:
+            data = base64.b64decode(metadata_response["result"]["value"]["data"][0])
+
+            # Parse metadata (simplified for now)
+            try:
+                return {
+                    'name': f'cNFT {address[:4]}...{address[-4:]}',
+                    'description': 'A compressed NFT on Solana',
+                    'image': '/static/default-nft-image.svg',  # Default image for now
+                    'explorer_url': f"https://explorer.solana.com/address/{address}"
+                }
+            except Exception as e:
+                logger.error(f"Error parsing cNFT metadata: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Error fetching cNFT metadata: {str(e)}")
+        logger.exception("Full stack trace")
+
+    return {
+        'name': f'cNFT {address[:4]}...{address[-4:]}',
+        'description': 'A compressed NFT on Solana',
+        'image': '/static/default-nft-image.svg',
+        'explorer_url': f"https://explorer.solana.com/address/{address}"
+    }
 
 async def fetch_assets(wallet_address):
     """Fetch assets using direct RPC calls"""
@@ -212,20 +240,24 @@ async def fetch_assets(wallet_address):
             )
 
             if "result" in cnft_accounts_response:
+                cnft_tasks = []
                 for account in cnft_accounts_response["result"]:
                     try:
-                        data = base64.b64decode(account["account"]["data"][0])
+                        address = account["pubkey"]
+                        cnft_tasks.append(get_cnft_metadata(address))
                         cnfts.append({
-                            'address': account["pubkey"],
-                            'type': 'cnft',
-                            'name': f'cNFT {account["pubkey"][:4]}...{account["pubkey"][-4:]}',
-                            'description': 'A compressed NFT on Solana',
-                            'image': '',  # Add placeholder for image
-                            'explorer_url': f"https://explorer.solana.com/address/{account['pubkey']}"
+                            'address': address,
+                            'type': 'cnft'
                         })
                     except Exception as e:
                         logger.error(f"Error processing cNFT account: {str(e)}")
                         continue
+
+                if cnft_tasks:
+                    cnft_results = await asyncio.gather(*cnft_tasks, return_exceptions=True)
+                    for i, result in enumerate(cnft_results):
+                        if not isinstance(result, Exception) and i < len(cnfts):
+                            cnfts[i].update(result)
 
         except Exception as e:
             logger.error(f"Error fetching cNFTs: {str(e)}")
@@ -268,6 +300,7 @@ def get_assets():
             'message': str(e)
         }), 500
 
+
 def get_port():
     """Get an available port for the Flask application"""
     try:
@@ -292,6 +325,7 @@ def get_port():
 
     logger.error("No available ports found")
     return None
+
 
 if __name__ == '__main__':
     port = get_port()
