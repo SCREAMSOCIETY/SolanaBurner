@@ -107,8 +107,29 @@ async def get_magiceden_metadata(mint_address):
         logger.error(f"Error fetching Magic Eden metadata: {str(e)}")
     return None
 
+async def get_solscan_metadata(mint_address):
+    """Fetch token metadata from Solscan API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://public-api.solscan.io/token/meta?tokenAddress={mint_address}",
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    return {
+                        'name': data.get('name', ''),
+                        'symbol': data.get('symbol', 'Unknown'),
+                        'icon': data.get('icon', ''),
+                        'decimals': data.get('decimals'),
+                    }
+    except Exception as e:
+        logger.error(f"Error fetching Solscan metadata: {str(e)}")
+    return None
+
 async def get_token_metadata(mint_address):
-    """Fetch token metadata focusing on name and image, prioritizing DexScreener"""
+    """Fetch token metadata focusing on name and image, prioritizing Solscan"""
     try:
         # First check if this is an NFT
         account_info = await make_rpc_call(
@@ -137,7 +158,22 @@ async def get_token_metadata(mint_address):
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 
-            # For regular tokens, try DexScreener first
+            # For regular tokens, try Solscan first
+            solscan_metadata = await get_solscan_metadata(mint_address)
+            if solscan_metadata:
+                logger.info(f"Found Solscan metadata for token: {mint_address}")
+                return {
+                    'name': solscan_metadata.get('name', ''),
+                    'symbol': solscan_metadata.get('symbol', 'Unknown'),
+                    'icon': solscan_metadata.get('icon'),
+                    'decimals': solscan_metadata.get('decimals', decimals),
+                    'amount': token_data.get('tokenAmount', {}).get('amount', '0'),
+                    'mint': mint_address,
+                    'is_token': True,
+                    'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                }
+
+            # Try DexScreener as fallback
             try:
                 async with httpx.AsyncClient() as client:
                     dex_response = await client.get(
@@ -163,20 +199,6 @@ async def get_token_metadata(mint_address):
                             }
             except Exception as e:
                 logger.error(f"Error fetching DEXScreener data: {str(e)}")
-
-            # Try Jupiter as fallback
-            jupiter_metadata = await get_jupiter_token_metadata(mint_address)
-            if jupiter_metadata:
-                return {
-                    'name': jupiter_metadata.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
-                    'symbol': jupiter_metadata.get('symbol', 'Unknown'),
-                    'icon': jupiter_metadata.get('icon'),
-                    'decimals': jupiter_metadata.get('decimals', decimals),
-                    'amount': token_data.get('tokenAmount', {}).get('amount', '0'),
-                    'mint': mint_address,
-                    'is_token': True,
-                    'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-                }
 
             # Check token list cache as last resort
             await fetch_token_list()
