@@ -688,8 +688,8 @@
                     rawAmount
                 );
 
-                // For NFTs or when burning entire balance, include close instruction
-                if (decimals === 0 || amount === token.amount) {
+                // Only include close instruction for NFTs (decimals === 0)
+                if (decimals === 0) {
                     const closeIx = new solanaWeb3.TransactionInstruction({
                         keys: [
                             { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
@@ -892,7 +892,7 @@
 
                 const progressPercent = (userProgress.progress /achievement.maxProgress) * 100;
                 card.querySelector('.progress-fill').style.width = `${progressPercent}%`;
-                card.querySelector('.progress-text').textContent =
+                card.querySelector('.progress-text`.textContent =
                     `${userProgress.progress}/${achievement.maxProgress}`;
 
                 const achievementCard = card.querySelector('.achievement-card');
