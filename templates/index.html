@@ -117,7 +117,8 @@
             <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
             <div id="errorMessage" class="error-message" style="display: none;"></div>
 
-            <div class="bulk-actions-bar" style="display: none;">
+            <!-- Moved bulk actions bar outside of tab panels -->
+            <div class="bulk-actions-bar">
                 <div class="selected-count">0 items selected</div>
                 <div class="bulk-actions">
                     <button class="bulk-burn-button">Burn Selected</button>
@@ -911,7 +912,7 @@
 
             function setupBurnButton(burnButton, burnInput, token) {
                 burnButton.addEventListener('click', async () => {
-                    if (!validateBurnAmount(burnInput, token.amount)) {
+                    if (!validateBurnAmount(burnInput, token.amount)){
                         return;
                     }
 
