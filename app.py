@@ -17,44 +17,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
-RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL', 'https://api.devnet.solana.com')
-SOLANA_EXPLORER_API = "https://api.explorer.solana.com/v1"
+RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL')
 
-def get_port():
-    """Get the port for the Flask application"""
-    # First check for Replit's PORT environment variable
-    replit_port = os.getenv("PORT")
-    if replit_port:
-        try:
-            port = int(replit_port)
-            logger.info(f"Using Replit PORT: {port}")
-            return port
-        except ValueError:
-            logger.warning(f"Invalid PORT environment variable: {replit_port}")
-
-    # Try to use port 8080
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('0.0.0.0', 8080))
-        sock.close()
-        logger.info("Using port 8080")
-        return 8080
-    except OSError:
-        logger.warning("Port 8080 is not available")
-
-    # Try alternative ports
-    for port in range(8081, 8090):
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.bind(('0.0.0.0', port))
-            sock.close()
-            logger.info(f"Using port {port}")
-            return port
-        except OSError:
-            continue
-
-    logger.error("No available ports found")
-    return None
 
 async def make_rpc_call(method, params):
     """Make a direct RPC call to Solana"""
@@ -79,27 +43,11 @@ async def make_rpc_call(method, params):
             logger.error(f"RPC call failed: {str(e)}")
             raise
 
+
 async def get_token_metadata(mint_address):
-    """Fetch token metadata from multiple sources"""
+    """Fetch token metadata from Jupiter API"""
     try:
-        # Try Solana token list first
-        token_list_url = f"https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/{mint_address}.json"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(token_list_url, timeout=10.0)
-
-            if response.status_code == 200:
-                data = response.json()
-                logger.info(f"Successfully fetched token metadata from token list for {mint_address}")
-                return {
-                    'symbol': data.get('symbol', 'Unknown'),
-                    'name': data.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
-                    'icon': data.get('logoURI', ''),
-                    'decimals': data.get('decimals', 9),
-                    'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-                }
-
-        # Try Jupiter API as backup
-        jupiter_url = f"https://token.jup.ag/all"
+        jupiter_url = "https://token.jup.ag/all"
         async with httpx.AsyncClient() as client:
             response = await client.get(jupiter_url, timeout=10.0)
 
@@ -130,6 +78,7 @@ async def get_token_metadata(mint_address):
         'decimals': 9,
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
+
 
 async def fetch_assets(wallet_address):
     """Fetch assets using direct RPC calls"""
@@ -264,9 +213,11 @@ async def fetch_assets(wallet_address):
         logger.exception("Full stack trace")
         raise
 
+
 @app.route('/')
 def index():
     return render_template('index.html', rpc_endpoint=RPC_ENDPOINT)
+
 
 @app.route('/assets', methods=['GET'])
 def get_assets():
@@ -276,7 +227,6 @@ def get_assets():
 
     try:
         assets = asyncio.run(fetch_assets(wallet_address))
-
         return jsonify({
             'success': True,
             'assets': assets
@@ -289,72 +239,30 @@ def get_assets():
             'message': str(e)
         }), 500
 
-@app.route('/burn', methods=['POST'])
-def burn_assets():
+def get_port():
+    """Get an available port for the Flask application"""
     try:
-        data = request.json
-        logger.info(f"Received burn request with data: {data}")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('0.0.0.0', 8080))
+        sock.close()
+        logger.info("Using port 8080")
+        return 8080
+    except OSError:
+        logger.warning("Port 8080 is not available")
 
-        asset_type = data.get('assetType')
-        asset_id = data.get('assetId')
-        amount = data.get('amount')
-        decimals = data.get('decimals', 9)
-
-        if not all([asset_type, asset_id]):
-            logger.error("Missing required fields in burn request")
-            return jsonify({
-                'success': False,
-                'message': 'Asset type and ID are required'
-            }), 400
-
+    # Try alternative ports
+    for port in range(8081, 8090):
         try:
-            if asset_type == 'token':
-                if not amount or float(amount) <= 0:
-                    logger.error(f"Invalid amount in burn request: {amount}")
-                    return jsonify({
-                        'success': False,
-                        'message': 'Amount must be greater than 0'
-                    }), 400
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(('0.0.0.0', port))
+            sock.close()
+            logger.info(f"Using port {port}")
+            return port
+        except OSError:
+            continue
 
-                # Log the burn request
-                logger.info(f"Processing burn request for token {asset_id}")
-                logger.info(f"Amount: {amount}, Decimals: {decimals}")
-
-                # Here we would typically interact with Solana to burn the tokens
-                # For now, we're just simulating success
-                response_data = {
-                    'success': True,
-                    'message': f'Successfully initiated burn of {amount} tokens',
-                    'details': {
-                        'mint': asset_id,
-                        'amount': amount,
-                        'decimals': decimals
-                    }
-                }
-                logger.info(f"Burn request successful: {response_data}")
-                return jsonify(response_data)
-
-            else:
-                logger.error(f"Invalid asset type in burn request: {asset_type}")
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid asset type'
-                }), 400
-
-        except ValueError as e:
-            logger.error(f"Invalid amount format: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Invalid amount format'
-            }), 400
-
-    except Exception as e:
-        logger.error(f"Error in burn_assets: {str(e)}")
-        logger.exception("Full stack trace")
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+    logger.error("No available ports found")
+    return None
 
 if __name__ == '__main__':
     port = get_port()
