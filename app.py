@@ -135,7 +135,6 @@ async def get_token_metadata(mint_address):
         logger.exception("Full stack trace")
         return None
 
-
 async def fetch_assets(wallet_address):
     """Fetch assets using direct RPC calls"""
     logger.info(f"Fetching assets for wallet: {wallet_address}")
@@ -166,11 +165,12 @@ async def fetch_assets(wallet_address):
                     mint = parsed_data["mint"]
                     amount = int(parsed_data["tokenAmount"]["amount"])
                     decimals = parsed_data["tokenAmount"]["decimals"]
+                    frozen = parsed_data.get("state", "") == "frozen"
 
                     # Only process accounts with non-zero balance
                     if amount > 0:
-                        # Check if it's likely an NFT (decimals = 0 and amount = 1)
-                        metadata_tasks.append((mint, amount, decimals, get_token_metadata(mint)))
+                        # Check if it's likely an NFT (decimals = 0, amount = 1, and optionally frozen)
+                        metadata_tasks.append((mint, amount, decimals, frozen, get_token_metadata(mint)))
 
                 except Exception as e:
                     logger.error(f"Error processing token account: {str(e)}")
@@ -179,7 +179,7 @@ async def fetch_assets(wallet_address):
         # Process metadata for tokens and NFTs
         if metadata_tasks:
             logger.info(f"Fetching metadata for {len(metadata_tasks)} assets")
-            metadata_results = await asyncio.gather(*(task[3] for task in metadata_tasks), return_exceptions=True)
+            metadata_results = await asyncio.gather(*(task[4] for task in metadata_tasks), return_exceptions=True)
 
             for i, result in enumerate(metadata_results):
                 if isinstance(result, Exception):
@@ -190,19 +190,25 @@ async def fetch_assets(wallet_address):
                     continue
 
                 try:
-                    mint, amount, decimals = metadata_tasks[i][:3]
+                    mint, amount, decimals, frozen = metadata_tasks[i][:4]
 
                     # Double check for NFT classification
-                    if result.get('is_nft') and decimals == 0 and amount == 1:
+                    # An NFT should have:
+                    # 1. decimals = 0
+                    # 2. amount = 1
+                    # 3. Either frozen=true OR is_nft flag from metadata
+                    if (decimals == 0 and amount == 1 and (frozen or result.get('is_nft'))):
                         nfts.append(result)
+                        logger.info(f"Classified {mint} as NFT")
                     elif result.get('is_token'):
                         result['amount'] = float(amount) / (10 ** decimals)
                         tokens.append(result)
+                        logger.info(f"Classified {mint} as token")
                 except Exception as e:
                     logger.error(f"Error processing metadata result: {str(e)}")
                     continue
 
-        # Fetch cNFTs
+        # Try to get cNFTs
         try:
             cnft_accounts_response = await make_rpc_call(
                 "getProgramAccounts",
@@ -223,26 +229,15 @@ async def fetch_assets(wallet_address):
             )
 
             if "result" in cnft_accounts_response:
-                cnft_tasks = []
                 for account in cnft_accounts_response["result"]:
                     try:
                         address = account["pubkey"]
-                        logger.info(f"Found cNFT: {address}")
-                        cnft_tasks.append(get_cnft_metadata(address))
-                        cnfts.append({
-                            'address': address,
-                            'type': 'cnft'
-                        })
+                        cnft_metadata = await get_cnft_metadata(address)
+                        if cnft_metadata:
+                            cnfts.append(cnft_metadata)
                     except Exception as e:
                         logger.error(f"Error processing cNFT account: {str(e)}")
                         continue
-
-                if cnft_tasks:
-                    logger.info(f"Fetching metadata for {len(cnft_tasks)} cNFTs")
-                    cnft_results = await asyncio.gather(*cnft_tasks, return_exceptions=True)
-                    for i, result in enumerate(cnft_results):
-                        if not isinstance(result, Exception) and i < len(cnfts):
-                            cnfts[i].update(result)
 
         except Exception as e:
             logger.error(f"Error fetching cNFTs: {str(e)}")
@@ -258,7 +253,6 @@ async def fetch_assets(wallet_address):
         logger.error(f"Error in fetch_assets: {str(e)}")
         logger.exception("Full stack trace")
         raise
-
 
 async def get_cnft_metadata(address):
     """Fetch cNFT metadata from the chain"""
