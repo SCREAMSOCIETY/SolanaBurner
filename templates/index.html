@@ -398,7 +398,6 @@
         }
 
 
-
         function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
             imgElement.classList.add('loading');
 
@@ -1152,7 +1151,8 @@
             // Create a summary of selected assets
             let summary = 'You are about to burn:\n';
             for (const [mint, asset] of selectedAssets) {
-                const amount = asset.type === 'nft' ? '1' : asset.amount;                summary += `\n- ${asset.displayName}: ${amount}`;
+                const amount = asset.type === 'nft' ? '1' : asset.amount;
+                summary += `\n- ${asset.displayName}: ${amount}`;
             }
 
             if (!confirm(summary + '\n\nThis action cannot be undone. Continue?')) {
@@ -1162,42 +1162,127 @@
             showLoading(true);
             const errors = [];
             const burned = [];
+            const instructions = [];
 
             try {
+                // First, collect all instructions
                 for (const [mint, asset] of selectedItems) {
                     try {
                         if (asset.type === 'vacant') {
-                            await bulkReclaimRent([asset]);
+                            // For vacant accounts, create close instruction
+                            const accountPubkey = new solanaWeb3.PublicKey(asset.address);
+                            const closeIx = new solanaWeb3.TransactionInstruction({
+                                keys: [
+                                    { pubkey: accountPubkey, isSigner: false, isWritable: true },
+                                    { pubkey: wallet.publicKey, isSigner: false, isWritable: true },
+                                    { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+                                ],
+                                programId: TOKEN_PROGRAM_ID,
+                                data: new Uint8Array([9]) // Close account instruction
+                            });
+                            instructions.push(closeIx);
                         } else {
-                            // For NFTs, amount is always 1 and decimals is 0
+                            // For tokens and NFTs
+                            const mintPubkey = new solanaWeb3.PublicKey(mint);
                             const amount = asset.type === 'nft' ? 1 : parseFloat(asset.amount);
                             const decimals = asset.type === 'nft' ? 0 : (asset.decimals || 0);
 
-                            await burnToken(mint, amount, decimals);
+                            // Calculate burn amount
+                            const effectiveDecimals = parseInt(decimals) || 0;
+                            const multiplier = BigInt(10 ** effectiveDecimals);
+                            const rawAmount = BigInt(Math.floor(amount * Number(multiplier)));
+
+                            if (rawAmount <= BigInt(0)) {
+                                throw new Error('Amount must be greater than 0');
+                            }
+
+                            // Get associated token account
+                            const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
+                                [
+                                    wallet.publicKey.toBuffer(),
+                                    TOKEN_PROGRAM_ID.toBuffer(),
+                                    mintPubkey.toBuffer(),
+                                ],
+                                new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+                            );
+
+                            // Create burn instruction
+                            const burnIx = createBurnInstruction(
+                                tokenAccountPubkey,
+                                mintPubkey,
+                                wallet.publicKey,
+                                rawAmount
+                            );
+                            instructions.push(burnIx);
+
+                            // Check if we should close the account
+                            const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+                            const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
+                            const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
+
+                            if (shouldClose) {
+                                const closeIx = new solanaWeb3.TransactionInstruction({
+                                    keys: [
+                                        { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
+                                        { pubkey: wallet.publicKey, isSigner: false, isWritable: true },
+                                        { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+                                    ],
+                                    programId: TOKEN_PROGRAM_ID,
+                                    data: new Uint8Array([9]) // Close account instruction
+                                });
+                                instructions.push(closeIx);
+                            }
                         }
                         burned.push(mint);
                     } catch (error) {
-                        console.error(`Error burning ${asset.displayName}:`, error);
+                        console.error(`Error preparing burn instruction for ${asset.displayName}:`, error);
                         errors.push(`${asset.displayName}: ${error.message}`);
                     }
                 }
 
-                // Remove burned assets from display
-                burned.forEach(mint => {
-                    const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
-                    if (card) {
-                        card.classList.add('burned');
-                        setTimeout(() => card.remove(), 500);
-                        selectedAssets.delete(mint);
+                if (instructions.length > 0) {
+                    // Get latest blockhash
+                    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+                    // Create single transaction with all instructions
+                    const transaction = new solanaWeb3.Transaction();
+                    transaction.feePayer = wallet.publicKey;
+                    transaction.recentBlockhash = blockhash;
+                    transaction.lastValidBlockHeight = lastValidBlockHeight;
+                    instructions.forEach(ix => transaction.add(ix));
+
+                    // Sign and send transaction
+                    const signedTx = await wallet.signTransaction(transaction);
+                    const signature = await connection.sendRawTransaction(signedTx.serialize());
+
+                    // Wait for confirmation
+                    const confirmation = await connection.confirmTransaction({
+                        signature,
+                        blockhash,
+                        lastValidBlockHeight
+                    });
+
+                    if (confirmation.value.err) {
+                        throw new Error(`Transaction failed: ${confirmation.value.err}`);
                     }
-                });
 
-                updateBulkActionsBar();
+                    // Remove burned assets from display
+                    burned.forEach(mint => {
+                        const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
+                        if (card) {
+                            card.classList.add('burned');
+                            setTimeout(() => card.remove(), 500);
+                            selectedAssets.delete(mint);
+                        }
+                    });
 
-                if (errors.length > 0) {
-                    showError(`Failed to burn some assets:\n${errors.join('\n')}`);
-                } else {
-                    showStatus(`Successfully burned ${burned.length} assets`);
+                    updateBulkActionsBar();
+
+                    if (errors.length > 0) {
+                        showError(`Failed to burn some assets:\n${errors.join('\n')}`);
+                    } else {
+                        showStatus(`Successfully burned ${burned.length} assets`);
+                    }
                 }
             } catch (error) {
                 console.error('Bulk burn error:', error);
