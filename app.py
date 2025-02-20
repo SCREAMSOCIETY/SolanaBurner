@@ -23,6 +23,29 @@ RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL')
 # Cache for token list data
 token_list_cache = {}
 
+async def make_rpc_call(method, params):
+    """Make a direct RPC call to Solana"""
+    logger.info(f"Making RPC call to endpoint: {RPC_ENDPOINT}")
+    logger.info(f"Method: {method}")
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                RPC_ENDPOINT,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": method,
+                    "params": params
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"RPC call failed: {str(e)}")
+            raise
+
 async def fetch_token_list():
     """Fetch and cache the official Solana token list"""
     if not token_list_cache.get('tokens'):
