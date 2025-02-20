@@ -360,6 +360,7 @@
 
 
 
+
         function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
             imgElement.classList.add('loading');
 
@@ -652,7 +653,7 @@
                 return false;
             }
 
-            if (amount - maxAmount > Number.EPSILON) {
+            if (amount > maxAmount) {
                 showError(`Amount cannot exceed ${maxAmount}`);
                 return false;
             }
@@ -668,51 +669,76 @@
             console.log(`- Amount: ${amount}`);
             console.log(`- Decimals: ${decimals}`);
 
-            const effectiveDecimals = decimals;
-            const multiplier = BigInt(10 ** effectiveDecimals);
-            const rawAmount = BigInt(Math.round(amount * Number(multiplier)));
+            try {
+                const effectiveDecimals = decimals;
+                const multiplier = BigInt(10 ** effectiveDecimals);
+                const rawAmount = BigInt(Math.round(amount * Number(multiplier)));
 
-            if (rawAmount <= BigInt(0)) {
-                throw new Error('Amount must be greater than 0');
-            }
+                if (rawAmount <= BigInt(0)) {
+                    throw new Error('Amount must be greater than 0');
+                }
 
-            const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
-                [
-                    walletPubkey.toBuffer(),
-                    TOKEN_PROGRAM_ID.toBuffer(),
-                    mintPubkey.toBuffer(),
-                ],
-                new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
-            );
-
-            // Create burn instruction
-            const burnIx = createBurnInstruction(
-                tokenAccountPubkey,
-                mintPubkey,
-                walletPubkey,
-                rawAmount
-            );
-
-            // Check if we should close the account (for NFTs or when burning entire balance)
-            const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
-            const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
-            const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
-
-            if (shouldClose) {
-                // Add close instruction to return rent
-                const closeIx = new solanaWeb3.TransactionInstruction({
-                    keys: [
-                        { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
-                        { pubkey: walletPubkey, isSigner: false, isWritable: true },
-                        { pubkey: walletPubkey, isSigner: true, isWritable: false },
+                const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
+                    [
+                        walletPubkey.toBuffer(),
+                        TOKEN_PROGRAM_ID.toBuffer(),
+                        mintPubkey.toBuffer(),
                     ],
-                    programId: TOKEN_PROGRAM_ID,
-                    data: new Uint8Array([9]) // Close account instruction
-                });
-                return [burnIx, closeIx];
-            }
+                    new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+                );
 
-            return [burnIx];
+                // Create burn instruction
+                const burnIx = createBurnInstruction(
+                    tokenAccountPubkey,
+                    mintPubkey,
+                    walletPubkey,
+                    rawAmount
+                );
+
+                // Check if we should close the account
+                const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+                const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
+                const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
+
+                let instructions = [burnIx];
+                if (shouldClose) {
+                    // Add close instruction
+                    const closeIx = new solanaWeb3.TransactionInstruction({
+                        keys: [
+                            { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
+                            { pubkey: walletPubkey, isSigner: false, isWritable: true },
+                            { pubkey: walletPubkey, isSigner: true, isWritable: false },
+                        ],
+                        programId: TOKEN_PROGRAM_ID,
+                        data: new Uint8Array([9]) // Close account instruction
+                    });
+                    instructions.push(closeIx);
+                }
+
+                // Create and send transaction
+                const latestBlockhash = await connection.getLatestBlockhash();
+                const transaction = new solanaWeb3.Transaction({
+                    feePayer: walletPubkey,
+                    recentBlockhash: latestBlockhash.blockhash,
+                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+                });
+
+                transaction.add(...instructions);
+
+                // Sign and send transaction
+                const signedTx = await wallet.signTransaction(transaction);
+                const signature = await connection.sendRawTransaction(signedTx.serialize());
+                await connection.confirmTransaction({
+                    signature,
+                    blockhash: latestBlockhash.blockhash,
+                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+                });
+
+                return true;
+            } catch (error) {
+                console.error('Error in burnToken:', error);
+                throw error;
+            }
         }
 
         function createBurnInstruction(tokenAccount, mint, owner, amount) {
@@ -901,35 +927,56 @@
 
         function setupBurnButton(burnButton, burnInput, token) {
             burnButton.addEventListener('click', async () => {
-                if (!validateBurnAmount(burnInput, token.amount)){
+                const amount = parseFloat(burnInput.value);
+
+                // Validate input
+                if (isNaN(amount) || amount <= 0) {
+                    showError('Please enter a valid amount greater than 0');
                     return;
                 }
 
-                const amount = parseFloat(burnInput.value);
+                if (amount > token.amount) {
+                    showError(`Amount cannot exceed ${token.amount}`);
+                    return;
+                }
+
                 if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
-                    return;                }
+                    return;
+                }
 
                 try {
                     showLoading(true);
-                    const result = await burnToken(token.mint, amount, token.decimals);
-                    if (result) {
-                        showStatus('Token burned successfully');
-                        burnInput.value = '';
-                        // Update the display
+                    await burnToken(token.mint, amount, token.decimals);
+                    showStatus(`Successfully burned ${amount} ${token.symbol || 'tokens'}`);
+
+                    // Remove card if all tokens are burned
+                    const card = burnButton.closest('.asset-card');
+                    if (amount >= token.amount) {
+                        card.classList.add('burned');
+                        setTimeout(() => card.remove(), 500);
+                    } else {
+                        // Update displayed amount
+                        const balanceAmount = card.querySelector('.balance-amount');
+                        balanceAmount.textContent = formatNumber(token.amount - amount);
                         token.amount -= amount;
-                        const card = burnButton.closest('.asset-card');
-                        card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
-                        if (token.amount <= 0) {
-                            card.classList.add('burned');
-                            setTimeout(() => {
-                                card.remove();
-                            }, 500);
-                        }
                     }
                 } catch (error) {
-                    showError(`Failed to burn token: ${error.message}`);
+                    console.error('Burn error:', error);
+                    showError(`Failed to burn tokens: ${error.message}`);
                 } finally {
                     showLoading(false);
+                }
+            });
+
+            // Add input validation
+            burnInput.addEventListener('input', () => {
+                const amount = parseFloat(burnInput.value);
+                if (isNaN(amount) || amount <= 0) {
+                    burnButton.disabled = true;
+                } else if (amount > token.amount) {
+                    burnButton.disabled = true;
+                } else {
+                    burnButton.disabled = false;
                 }
             });
         }
