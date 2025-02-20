@@ -9,10 +9,8 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'static/dist'),
     filename: '[name].js',
-    library: {
-      name: '[name]',
-      type: 'window'
-    }
+    library: '[name]',
+    libraryTarget: 'window'
   },
   module: {
     rules: [
@@ -53,14 +51,15 @@ module.exports = {
       Buffer: ['buffer', 'Buffer']
     }),
     new webpack.DefinePlugin({
-      'process.env.NODE_ENV': JSON.stringify('development'),
-      'process.env.QUICKNODE_RPC_URL': JSON.stringify(process.env.QUICKNODE_RPC_URL)
+      'process.env': {
+        'NODE_ENV': JSON.stringify('development'),
+        'QUICKNODE_RPC_URL': JSON.stringify(process.env.QUICKNODE_RPC_URL || '')
+      }
     })
   ],
   externals: {
     'react': 'React',
-    'react-dom': 'ReactDOM',
-    'react-dom/client': 'ReactDOM'
+    'react-dom': 'ReactDOM'
   },
   mode: 'development',
   devtool: 'source-map'

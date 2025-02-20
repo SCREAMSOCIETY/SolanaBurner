@@ -5,8 +5,13 @@
     <title>Solana Asset Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <!-- Development React -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Solana Web3 -->
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <!-- Wallet Adapter -->
+    <script src="https://unpkg.com/@solana/wallet-adapter-base@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/wallet-adapter-wallets@latest/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div id="root">
@@ -18,14 +23,26 @@
     <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}"></script>
 
     <script>
-        window.addEventListener('load', function() {
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded, initializing wallet provider...');
+            // Check if all required dependencies are loaded
+            if (!window.React) {
+                console.error('React is not loaded');
+                return;
+            }
+            if (!window.ReactDOM) {
+                console.error('ReactDOM is not loaded');
+                return;
+            }
+            if (!window.solanaWeb3) {
+                console.error('Solana Web3 is not loaded');
+                return;
+            }
+
             try {
                 console.log('Initializing wallet provider...');
                 if (!window.WalletProvider) {
                     throw new Error('WalletProvider not loaded');
-                }
-                if (typeof window.WalletProvider.render !== 'function') {
-                    throw new Error('WalletProvider.render is not a function');
                 }
                 window.WalletProvider.render();
             } catch (error) {
