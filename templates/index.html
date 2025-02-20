@@ -637,6 +637,7 @@
             }
 
 
+
             function formatNumber(num) {
                 return new Intl.NumberFormat('en-US', {
                     minimumFractionDigits: 2,
@@ -730,6 +731,22 @@
                 });
             }
 
+
+            // Add tab switching functionality back
+            const tabs = document.querySelectorAll('.tab-button');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    console.log('Tab clicked:', tab.dataset.tab);
+                    tabs.forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+                    tab.classList.add('active');
+                    const panel = document.getElementById(tab.dataset.tab);
+                    if (panel) {
+                        panel.classList.add('active');
+                    }
+                });
+            });
 
             // Add bulk selection state
             let selectedAssets = new Map(); // Map of selected assets: mint -> {type, amount}
