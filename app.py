@@ -90,20 +90,26 @@ async def get_token_metadata(mint_address):
 
             if response.status_code == 200:
                 data = response.json()
+                # Ensure the icon URL is absolute and uses HTTPS
+                icon_url = data.get('icon', '')
+                if icon_url and not icon_url.startswith(('http://', 'https://')):
+                    icon_url = f"https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/{mint_address}/logo.png"
+
                 return {
                     'symbol': data.get('symbol', 'Unknown'),
                     'name': data.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
-                    'icon': data.get('icon', ''),
+                    'icon': icon_url,
                     'decimals': data.get('decimals', 9),
                     'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                 }
     except Exception as e:
         logger.error(f"Error fetching token metadata: {str(e)}")
 
+    # Fallback metadata with default icon
     return {
         'symbol': 'Unknown',
         'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
-        'icon': '',
+        'icon': '/static/default-token-icon.svg',
         'decimals': 9,
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
