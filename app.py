@@ -100,6 +100,7 @@ async def get_token_metadata(mint_address):
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
+
 async def get_cnft_metadata(address):
     """Fetch cNFT metadata from the chain"""
     try:
@@ -137,6 +138,7 @@ async def get_cnft_metadata(address):
         'explorer_url': f"https://explorer.solana.com/address/{address}"
     }
 
+
 async def fetch_assets(wallet_address):
     """Fetch assets using direct RPC calls"""
     logger.info(f"Fetching assets for wallet: {wallet_address}")
@@ -169,15 +171,18 @@ async def fetch_assets(wallet_address):
                     decimals = parsed_data["tokenAmount"]["decimals"]
 
                     if amount > 0:
-                        # If decimals is 0 and amount is 1, it's likely an NFT
+                        # If decimals is 0 and amount is 1, it's definitely an NFT
                         if decimals == 0 and amount == 1:
+                            logger.info(f"Found NFT: {mint}")
                             metadata_tasks.append(get_token_metadata(mint))
                             nfts.append({
                                 'mint': mint,
                                 'type': 'nft',
                                 'explorer_url': f"https://explorer.solana.com/address/{mint}"
                             })
+                        # Otherwise it's a fungible token
                         else:
+                            logger.info(f"Found token: {mint} with amount {amount} and decimals {decimals}")
                             metadata_tasks.append(get_token_metadata(mint))
                             tokens.append({
                                 'mint': mint,
@@ -208,7 +213,6 @@ async def fetch_assets(wallet_address):
                         token = tokens[token_index]
                         raw_amount = token.pop('raw_amount', 0)
                         decimals = token.pop('decimals', 9)
-
                         token.update(result)
                         token['amount'] = float(raw_amount) / (10 ** decimals)
                         token_index += 1
@@ -244,6 +248,7 @@ async def fetch_assets(wallet_address):
                 for account in cnft_accounts_response["result"]:
                     try:
                         address = account["pubkey"]
+                        logger.info(f"Found cNFT: {address}")
                         cnft_tasks.append(get_cnft_metadata(address))
                         cnfts.append({
                             'address': address,
@@ -254,6 +259,7 @@ async def fetch_assets(wallet_address):
                         continue
 
                 if cnft_tasks:
+                    logger.info(f"Fetching metadata for {len(cnft_tasks)} cNFTs")
                     cnft_results = await asyncio.gather(*cnft_tasks, return_exceptions=True)
                     for i, result in enumerate(cnft_results):
                         if not isinstance(result, Exception) and i < len(cnfts):
