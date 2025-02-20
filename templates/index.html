@@ -678,6 +678,7 @@
                     throw new Error('Amount must be greater than 0');
                 }
 
+                // Get the token account
                 const [tokenAccountPubkey] = await solanaWeb3.PublicKey.findProgramAddress(
                     [
                         walletPubkey.toBuffer(),
@@ -715,25 +716,37 @@
                     instructions.push(closeIx);
                 }
 
-                // Create and send transaction
-                const latestBlockhash = await connection.getLatestBlockhash();
-                const transaction = new solanaWeb3.Transaction({
-                    feePayer: walletPubkey,
-                    recentBlockhash: latestBlockhash.blockhash,
-                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-                });
+                // Get a fresh blockhash
+                const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                console.log('Got blockhash:', blockhash, 'lastValidBlockHeight:', lastValidBlockHeight);
 
-                transaction.add(...instructions);
+                // Create transaction with the fresh blockhash
+                const transaction = new solanaWeb3.Transaction();
+                transaction.feePayer = walletPubkey;
+                transaction.recentBlockhash = blockhash;
+                transaction.lastValidBlockHeight = lastValidBlockHeight;
+                instructions.forEach(ix => transaction.add(ix));
 
+                console.log('Transaction created, requesting signature...');
                 // Sign and send transaction
                 const signedTx = await wallet.signTransaction(transaction);
+                console.log('Transaction signed, sending...');
+
                 const signature = await connection.sendRawTransaction(signedTx.serialize());
-                await connection.confirmTransaction({
+                console.log('Transaction sent, signature:', signature);
+
+                // Wait for confirmation
+                const confirmation = await connection.confirmTransaction({
                     signature,
-                    blockhash: latestBlockhash.blockhash,
-                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+                    blockhash,
+                    lastValidBlockHeight
                 });
 
+                if (confirmation.value.err) {
+                    throw new Error(`Transaction failed: ${confirmation.value.err}`);
+                }
+
+                console.log('Transaction confirmed successfully');
                 return true;
             } catch (error) {
                 console.error('Error in burnToken:', error);
