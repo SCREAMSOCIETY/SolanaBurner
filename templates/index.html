@@ -177,7 +177,7 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             console.log("Initializing wallet handler...");
 
             const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
@@ -221,6 +221,82 @@
                     commitment: 'confirmed',
                     wsEndpoint: false
                 });
+            }
+
+            async function connectWallet() {
+                try {
+                    // Check if Phantom is installed
+                    if (!window.solana || !window.solana.isPhantom) {
+                        showStatus('Phantom wallet not found. Please install Phantom.', true);
+                        window.open('https://phantom.app/', '_blank');
+                        return;
+                    }
+
+                    // First disconnect if already connected
+                    if (currentWallet && currentWallet.isConnected) {
+                        await currentWallet.disconnect();
+                    }
+
+                    showStatus('Connecting to Phantom...');
+
+                    // Request connection
+                    const resp = await window.solana.connect();
+
+                    if (resp.publicKey) {
+                        const address = resp.publicKey.toString();
+                        console.log('Connected to wallet:', address);
+
+                        currentWallet = window.solana;
+                        connection = getConnection();
+
+                        connectButton.style.display = 'none';
+                        walletInfo.style.display = 'block';
+                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                        assetsContainer.style.display = 'block';
+
+                        showStatus('Wallet connected successfully');
+                        await loadAssets(address);
+
+                        // Trigger achievements
+                        updateAchievement('FIRST_CONNECTION');
+                        updateAchievement('ASSET_VIEWER');
+                    }
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    showStatus(`Failed to connect: ${error.message}`, true);
+
+                    // Reset connection state
+                    currentWallet = null;
+                    connection = null;
+                    connectButton.style.display = 'block';
+                    walletInfo.style.display = 'none';
+                    assetsContainer.style.display = 'none';
+                }
+            }
+
+            // Add event listeners for wallet status changes
+            if (window.solana) {
+                window.solana.on('connect', () => {
+                    console.log('Wallet connected event received');
+                });
+
+                window.solana.on('disconnect', () => {
+                    console.log('Wallet disconnected event received');
+                    currentWallet = null;
+                    connection = null;
+                    connectButton.style.display = 'block';
+                    walletInfo.style.display = 'none';
+                    assetsContainer.style.display = 'none';
+                    showStatus('Wallet disconnected');
+                });
+            }
+
+            connectButton.addEventListener('click', connectWallet);
+
+            // Check if wallet is already connected
+            if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
+                console.log('Wallet already connected, reconnecting...');
+                connectWallet();
             }
 
             function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
@@ -560,76 +636,6 @@
                 }
             }
 
-            async function connectWallet() {
-                try {
-                    if (!window.solana) {
-                        showStatus('Phantom wallet not found. Please install Phantom.', true);
-                        window.open('https://phantom.app/', '_blank');
-                        return;
-                    }
-
-                    if (!window.solana.isPhantom) {
-                        showStatus('Please install Phantom wallet', true);
-                        return;
-                    }
-
-                    showStatus('Connecting to Phantom...');
-                    const resp = await window.solana.connect();
-
-                    if (resp.publicKey) {
-                        const address = resp.publicKey.toString();
-                        console.log('Connected to wallet:', address);
-                        currentWallet = window.solana;
-                        connection = getConnection();
-
-                        connectButton.style.display = 'none';
-                        walletInfo.style.display = 'block';
-                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
-                        assetsContainer.style.display = 'block';
-
-                        showStatus('Wallet connected successfully');
-                        await loadAssets(address);
-
-                        // Trigger first connection achievement
-                        updateAchievement('FIRST_CONNECTION');
-
-                        // Trigger asset viewer achievement when assets are loaded
-                        updateAchievement('ASSET_VIEWER');
-                    }
-                } catch (error) {
-                    console.error('Connection error:', error);
-                    showStatus(`Failed to connect: ${error.message}`, true);
-                }
-            }
-
-            connectButton.addEventListener('click', connectWallet);
-
-            // Check if wallet is already connected
-            if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
-                const publicKey = window.solana.publicKey.toString();
-                currentWallet = window.solana;
-                connection = getConnection();
-
-                connectButton.style.display = 'none';
-                walletInfo.style.display = 'block';
-                walletAddress.textContent = `Address: ${publicKey.slice(0,6)}...${publicKey.slice(-6)}`;
-                assetsContainer.style.display = 'block';
-
-                showStatus('Wallet already connected');
-                loadAssets(publicKey);
-            }
-
-            // Tab switching functionality
-            const tabs = document.querySelectorAll('.tab-button');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-
-                    tab.classList.add('active');
-                    document.getElementById(tab.dataset.tab).classList.add('active');
-                });
-            });
 
             function formatNumber(num) {
                 return new Intl.NumberFormat('en-US', {
@@ -892,7 +898,7 @@
 
                 const progressPercent = (userProgress.progress /achievement.maxProgress) * 100;
                 card.querySelector('.progress-fill').style.width = `${progressPercent}%`;
-                card.querySelector('.progress-text`.textContent =
+                card.querySelector('.progress-text').textContent =
                     `${userProgress.progress}/${achievement.maxProgress}`;
 
                 const achievementCard = card.querySelector('.achievement-card');
