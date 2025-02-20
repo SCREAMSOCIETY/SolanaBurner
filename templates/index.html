@@ -27,6 +27,65 @@
         </div>
         <div id="statusMessage" style="display: none;" class="status-message"></div>
 
+        <!-- Templates moved outside -->
+        <template id="token-card-template">
+            <div class="asset-card token-card">
+                <div class="token-header">
+                    <div class="token-icon-wrapper">
+                        <img class="token-icon" src="" alt="Token Icon" />
+                    </div>
+                    <div class="token-info">
+                        <h4 class="token-name"></h4>
+                        <span class="token-symbol"></span>
+                    </div>
+                </div>
+                <div class="token-details">
+                    <div class="token-balance">
+                        <span class="balance-label">Balance:</span>
+                        <span class="balance-amount"></span>
+                    </div>
+                    <div class="token-value">
+                        <span class="value-label">USD Value:</span>
+                        <span class="value-amount"></span>
+                    </div>
+                </div>
+                <div class="token-actions">
+                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
+                    <button class="burn-button">Burn Token</button>
+                </div>
+                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+            </div>
+        </template>
+
+        <template id="nft-card-template">
+            <div class="asset-card nft-card">
+                <div class="nft-image-wrapper">
+                    <img class="nft-image" src="" alt="NFT" />
+                </div>
+                <div class="nft-info">
+                    <h4 class="nft-name"></h4>
+                    <p class="nft-collection"></p>
+                    <div class="nft-attributes">
+                        <!-- Attributes will be added dynamically -->
+                    </div>
+                </div>
+                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+            </div>
+        </template>
+
+        <template id="cnft-card-template">
+            <div class="asset-card cnft-card">
+                <div class="cnft-image-wrapper">
+                    <img class="cnft-image" src="" alt="cNFT" />
+                </div>
+                <div class="cnft-info">
+                    <h4 class="cnft-name"></h4>
+                    <p class="cnft-collection"></p>
+                </div>
+                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+            </div>
+        </template>
+
         <div id="assetsContainer" class="assets-container" style="display: none;">
             <h2>Your Assets</h2>
             <div class="tabs">
@@ -39,71 +98,13 @@
 
             <div class="tab-content">
                 <div id="tokens" class="tab-panel active">
-                    <div class="assets-grid">
-                        <template id="token-card-template">
-                            <div class="asset-card token-card">
-                                <div class="token-header">
-                                    <div class="token-icon-wrapper">
-                                        <img class="token-icon" src="" alt="Token Icon" />
-                                    </div>
-                                    <div class="token-info">
-                                        <h4 class="token-name"></h4>
-                                        <span class="token-symbol"></span>
-                                    </div>
-                                </div>
-                                <div class="token-details">
-                                    <div class="token-balance">
-                                        <span class="balance-label">Balance:</span>
-                                        <span class="balance-amount"></span>
-                                    </div>
-                                    <div class="token-value">
-                                        <span class="value-label">USD Value:</span>
-                                        <span class="value-amount"></span>
-                                    </div>
-                                </div>
-                                <div class="token-actions">
-                                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
-                                    <button class="burn-button">Burn Token</button>
-                                </div>
-                                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
-                            </div>
-                        </template>
-                    </div>
+                    <div class="assets-grid"></div>
                 </div>
                 <div id="nfts" class="tab-panel">
-                    <div class="assets-grid">
-                        <template id="nft-card-template">
-                            <div class="asset-card nft-card">
-                                <div class="nft-image-wrapper">
-                                    <img class="nft-image" src="" alt="NFT" />
-                                </div>
-                                <div class="nft-info">
-                                    <h4 class="nft-name"></h4>
-                                    <p class="nft-collection"></p>
-                                    <div class="nft-attributes">
-                                        <!-- Attributes will be added dynamically -->
-                                    </div>
-                                </div>
-                                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
-                            </div>
-                        </template>
-                    </div>
+                    <div class="assets-grid"></div>
                 </div>
                 <div id="cnfts" class="tab-panel">
-                    <div class="assets-grid">
-                        <template id="cnft-card-template">
-                            <div class="asset-card cnft-card">
-                                <div class="cnft-image-wrapper">
-                                    <img class="cnft-image" src="" alt="cNFT" />
-                                </div>
-                                <div class="cnft-info">
-                                    <h4 class="cnft-name"></h4>
-                                    <p class="cnft-collection"></p>
-                                </div>
-                                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
-                            </div>
-                        </template>
-                    </div>
+                    <div class="assets-grid"></div>
                 </div>
             </div>
         </div>
