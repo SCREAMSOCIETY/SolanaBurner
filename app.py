@@ -47,7 +47,27 @@ async def make_rpc_call(method, params):
 async def get_token_metadata(mint_address):
     """Fetch comprehensive token metadata from multiple sources"""
     try:
-        # Try DEXScreener first for the token data
+        # Try to get NFT metadata first if it's an NFT
+        nft_metadata = await make_rpc_call(
+            "getMetadata",
+            [mint_address]
+        )
+
+        if "result" in nft_metadata and nft_metadata["result"]:
+            metadata = nft_metadata["result"]
+            return {
+                'symbol': metadata.get('symbol', 'Unknown'),
+                'name': metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}'),
+                'icon': metadata.get('image', ''),
+                'decimals': 0,
+                'is_nft': True,
+                'mint': mint_address,
+                'collection': metadata.get('collection', {}).get('name', 'Unknown'),
+                'attributes': metadata.get('attributes', []),
+                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+            }
+
+        # If not an NFT, try DEXScreener for token data
         dexscreener_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
         async with httpx.AsyncClient() as client:
             response = await client.get(dexscreener_url, timeout=10.0)
@@ -85,27 +105,10 @@ async def get_token_metadata(mint_address):
                         'volume_24h': pair.get('volume24h', 'Unknown'),
                         'liquidity_usd': pair.get('liquidity', {}).get('usd', 'Unknown'),
                         'verified': base_token.get('verified', False),
+                        'mint': mint_address,
+                        'is_token': True,
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
-
-        # Try to get NFT metadata if it's an NFT
-        nft_metadata = await make_rpc_call(
-            "getMetadata",
-            [mint_address]
-        )
-
-        if "result" in nft_metadata and nft_metadata["result"]:
-            metadata = nft_metadata["result"]
-            return {
-                'symbol': metadata.get('symbol', 'Unknown'),
-                'name': metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}'),
-                'icon': metadata.get('image', ''),
-                'decimals': 0,
-                'is_nft': True,
-                'collection': metadata.get('collection', {}).get('name', 'Unknown'),
-                'attributes': metadata.get('attributes', []),
-                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-            }
 
         # Fallback to Jupiter API
         jupiter_url = "https://token.jup.ag/all"
@@ -125,6 +128,8 @@ async def get_token_metadata(mint_address):
                         'decimals': token_info.get('decimals', 9),
                         'verified': token_info.get('verified', False),
                         'tags': token_info.get('tags', []),
+                        'mint': mint_address,
+                        'is_token': True,
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 
@@ -139,6 +144,8 @@ async def get_token_metadata(mint_address):
         'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
         'icon': '/static/default-token-icon.svg',
         'decimals': 9,
+        'mint': mint_address,
+        'is_token': True,
         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
     }
 
@@ -210,29 +217,11 @@ async def fetch_assets(wallet_address):
                     parsed_data = account["account"]["data"]["parsed"]["info"]
                     mint = parsed_data["mint"]
                     amount = int(parsed_data["tokenAmount"]["amount"])
-                    decimals = parsed_data["tokenAmount"]["decimals"]
 
                     if amount > 0:
-                        if decimals == 0 and amount == 1:
-                            # This is a proper NFT with metadata
-                            logger.info(f"Found NFT: {mint}")
-                            metadata_tasks.append(get_token_metadata(mint))
-                            nfts.append({
-                                'mint': mint,
-                                'type': 'nft',
-                                'explorer_url': f"https://explorer.solana.com/address/{mint}"
-                            })
-                        else:
-                            # This is a fungible token
-                            logger.info(f"Found token: {mint} with amount {amount} and decimals {decimals}")
-                            metadata_tasks.append(get_token_metadata(mint))
-                            tokens.append({
-                                'mint': mint,
-                                'raw_amount': amount,
-                                'decimals': decimals,
-                                'type': 'token',
-                                'explorer_url': f"https://explorer.solana.com/address/{mint}"
-                            })
+                        # Get metadata for all assets
+                        metadata_tasks.append(get_token_metadata(mint))
+
                 except Exception as e:
                     logger.error(f"Error processing token account: {str(e)}")
                     continue
@@ -242,27 +231,18 @@ async def fetch_assets(wallet_address):
             logger.info(f"Fetching metadata for {len(metadata_tasks)} assets")
             metadata_results = await asyncio.gather(*metadata_tasks, return_exceptions=True)
 
-            token_index = 0
-            nft_index = 0
-
             for result in metadata_results:
                 if isinstance(result, Exception):
                     logger.error(f"Error fetching metadata: {str(result)}")
                     continue
 
                 try:
-                    if token_index < len(tokens):
-                        # Process token metadata
-                        token = tokens[token_index]
-                        raw_amount = token.pop('raw_amount', 0)
-                        decimals = token.pop('decimals', 9)
-                        token.update(result)
-                        token['amount'] = float(raw_amount) / (10 ** decimals)
-                        token_index += 1
-                    elif nft_index < len(nfts):
-                        # Process NFT metadata
-                        nfts[nft_index].update(result)
-                        nft_index += 1
+                    if result.get('is_nft'):
+                        # This is an NFT
+                        nfts.append(result)
+                    elif result.get('is_token'):
+                        # This is a token
+                        tokens.append(result)
                 except Exception as e:
                     logger.error(f"Error processing metadata result: {str(e)}")
                     continue

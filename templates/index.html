@@ -22,44 +22,40 @@
         <div id="statusMessage" style="display: none;" class="status-message"></div>
 
         <template id="token-card-template">
-    <div class="asset-card token-card">
-        <div class="token-header">
-            <div class="token-icon-wrapper">
-                <img class="token-icon" src="" alt="Token Icon" />
+            <div class="asset-card token-card">
+                <div class="token-header">
+                    <div class="token-icon-wrapper">
+                        <img class="token-icon" src="" alt="Token Icon" />
+                    </div>
+                    <div class="token-info">
+                        <h4 class="token-name"></h4>
+                        <span class="token-symbol"></span>
+                    </div>
+                </div>
+                <div class="token-details">
+                    <div class="token-balance">
+                        <span class="balance-label">Balance:</span>
+                        <span class="balance-amount"></span>
+                    </div>
+                    <div class="token-supply">
+                        <span class="supply-label">Supply:</span>
+                        <span class="supply-amount"></span>
+                    </div>
+                    <div class="token-price">
+                        <span class="price-label">Price USD:</span>
+                        <span class="price-amount"></span>
+                    </div>
+                    <div class="token-volume">
+                        <span class="volume-label">24h Volume:</span>
+                        <span class="volume-amount"></span>
+                    </div>
+                </div>
+                <div class="token-actions">
+                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
+                    <button class="burn-button">Burn Token</button>
+                </div>
             </div>
-            <div class="token-info">
-                <h4 class="token-name"></h4>
-                <span class="token-symbol"></span>
-            </div>
-        </div>
-        <div class="token-details">
-            <div class="token-balance">
-                <span class="balance-label">Balance:</span>
-                <span class="balance-amount"></span>
-            </div>
-            <div class="token-supply">
-                <span class="supply-label">Supply:</span>
-                <span class="supply-amount"></span>
-            </div>
-            <div class="token-price">
-                <span class="price-label">Price USD:</span>
-                <span class="price-amount"></span>
-            </div>
-            <div class="token-volume">
-                <span class="volume-label">24h Volume:</span>
-                <span class="volume-amount"></span>
-            </div>
-        </div>
-        <div class="token-actions">
-            <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
-            <button class="burn-button">Burn Token</button>
-        </div>
-        <div class="links-container">
-            <a class="explorer-link" href="" target="_blank">View on Explorer</a>
-            <a class="solscan-link" href="" target="_blank">View on Solscan</a>
-        </div>
-    </div>
-</template>
+        </template>
 
         <template id="nft-card-template">
             <div class="asset-card nft-card">
@@ -70,12 +66,9 @@
                     <h4 class="nft-name"></h4>
                     <p class="nft-collection"></p>
                 </div>
-                <div class="links-container">
-                    <a class="explorer-link" href="" target="_blank">View on Explorer</a>
-                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
-                </div>
             </div>
         </template>
+
         <template id="cnft-card-template">
             <div class="asset-card cnft-card">
                 <div class="cnft-image-wrapper">
@@ -84,10 +77,6 @@
                 <div class="cnft-info">
                     <h4 class="cnft-name"></h4>
                     <p class="cnft-collection"></p>
-                </div>
-                <div class="links-container">
-                    <a class="explorer-link" href="" target="_blank">View on Explorer</a>
-                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
                 </div>
             </div>
         </template>
@@ -180,9 +169,6 @@
                 card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
                 card.querySelector('.volume-amount').textContent = token.volume_24h !== 'Unknown' ? `$${formatNumber(token.volume_24h)}` : 'Unknown';
 
-                // Set Explorer and Solscan links
-                card.querySelector('.explorer-link').href = token.explorer_url;
-                card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
 
                 const burnInput = card.querySelector('.burn-amount');
                 burnInput.max = token.amount;
@@ -224,10 +210,6 @@
                 card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
 
-                // Set Explorer and Solscan links
-                card.querySelector('.explorer-link').href = nft.explorer_url;
-                card.querySelector('.solscan-link').href = `https://solscan.io/nft/${nft.mint}`;
-
                 return card;
             }
 
@@ -243,10 +225,6 @@
 
                 card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
                 card.querySelector('.cnft-collection').textContent = cnft.collection || '';
-
-                // Set Explorer and Solscan links
-                card.querySelector('.explorer-link').href = cnft.explorer_url;
-                card.querySelector('.solscan-link').href = `https://solscan.io/address/${cnft.address}`;
 
                 return card;
             }
