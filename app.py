@@ -56,9 +56,10 @@ async def get_token_metadata(mint_address):
         if "result" in account_info and account_info["result"]["value"]:
             token_data = account_info["result"]["value"]["data"]["parsed"]["info"]
             decimals = token_data.get("decimals", 9)
+            supply = token_data.get("supply", "Unknown")
 
-            # If decimals is 0, this might be an NFT, try to get NFT metadata
-            if decimals == 0:
+            # If supply is 1 and decimals is 0, it's likely an NFT
+            if decimals == 0 and supply == "1":
                 nft_metadata = await make_rpc_call(
                     "getMetadata",
                     [mint_address]
@@ -77,7 +78,7 @@ async def get_token_metadata(mint_address):
                         return {
                             'symbol': metadata.get('symbol', 'Unknown'),
                             'name': name,
-                            'image': image_url,
+                            'image': image_url or '/static/default-nft-image.svg',
                             'decimals': 0,
                             'is_nft': True,
                             'mint': mint_address,
@@ -101,22 +102,6 @@ async def get_token_metadata(mint_address):
                     base_token = pair.get('baseToken', {})
                     logger.info(f"Successfully fetched token data from DEXScreener for {mint_address}")
 
-                    # Get additional metadata from the RPC
-                    account_info = await make_rpc_call(
-                        "getAccountInfo",
-                        [
-                            mint_address,
-                            {"encoding": "jsonParsed"}
-                        ]
-                    )
-
-                    supply = "Unknown"
-                    decimals = 9
-                    if "result" in account_info and account_info["result"]["value"]:
-                        token_data = account_info["result"]["value"]["data"]["parsed"]["info"]
-                        supply = token_data.get("supply", "Unknown")
-                        decimals = token_data.get("decimals", 9)
-
                     return {
                         'symbol': base_token.get('symbol', 'Unknown'),
                         'name': base_token.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
@@ -138,7 +123,8 @@ async def get_token_metadata(mint_address):
             'symbol': 'Unknown',
             'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
             'icon': '/static/default-token-icon.svg',
-            'decimals': 9,
+            'decimals': decimals,
+            'supply': supply,
             'mint': mint_address,
             'is_token': True,
             'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
@@ -206,8 +192,8 @@ async def fetch_assets(wallet_address):
                 try:
                     mint, amount, decimals = metadata_tasks[i][:3]
 
-                    # Ensure NFT classification is correct (decimals = 0 and amount = 1)
-                    if decimals == 0 and amount == 1 and result.get('is_nft'):
+                    # Double check for NFT classification
+                    if result.get('is_nft') and decimals == 0 and amount == 1:
                         nfts.append(result)
                     elif result.get('is_token'):
                         result['amount'] = float(amount) / (10 ** decimals)
