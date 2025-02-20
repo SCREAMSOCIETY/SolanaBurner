@@ -261,7 +261,7 @@ async def get_cnft_metadata(address):
                     "filters": [
                         {
                             "memcmp": {
-                                "offset": 8,  # Skip discriminator
+                                "offset": 1,  # Adjust offset to match data layout
                                 "bytes": address
                             }
                         }
@@ -276,8 +276,9 @@ async def get_cnft_metadata(address):
 
             # Parse metadata
             try:
-                # Extract URI from data, skipping version and other fields
-                metadata_uri = data[8:].decode('utf-8').strip('\x00')
+                # Skip discriminator
+                metadata_length = int.from_bytes(data[9:13], byteorder='little')
+                metadata_uri = data[13:13+metadata_length].decode('utf-8').strip('\x00')
                 logger.info(f"Metadata URI for cNFT {address}: {metadata_uri}")
 
                 # Handle IPFS URLs
@@ -288,6 +289,7 @@ async def get_cnft_metadata(address):
                     metadata_resp = await client.get(metadata_uri, timeout=10.0)
                     if metadata_resp.status_code == 200:
                         metadata = metadata_resp.json()
+                        logger.info(f"Successfully fetched metadata for cNFT {address}: {metadata}")
 
                         # Handle IPFS image URLs
                         image_url = metadata.get('image', '')
@@ -300,7 +302,8 @@ async def get_cnft_metadata(address):
                             'image': image_url or '/static/default-nft-image.svg',
                             'collection': metadata.get('collection', {}).get('name', ''),
                             'mint': address,
-                            'explorer_url': f"https://solscan.io/token/{address}"
+                            'explorer_url': f"https://solscan.io/token/{address}",
+                            'attributes': metadata.get('attributes', [])
                         }
             except Exception as e:
                 logger.error(f"Error parsing cNFT metadata for {address}: {str(e)}")
@@ -318,7 +321,6 @@ async def get_cnft_metadata(address):
         'mint': address,
         'explorer_url': f"https://solscan.io/token/{address}"
     }
-
 
 async def get_sol_domains(wallet_address):
     """Fetch .sol domains owned by the wallet"""
@@ -427,7 +429,7 @@ async def fetch_assets(wallet_address):
                         "filters": [
                             {
                                 "memcmp": {
-                                    "offset": 8,  # Skip discriminator
+                                    "offset": 1,  # Updated offset
                                     "bytes": wallet_address
                                 }
                             }
