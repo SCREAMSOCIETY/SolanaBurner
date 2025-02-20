@@ -135,6 +135,7 @@ async def get_token_metadata(mint_address):
         logger.exception("Full stack trace")
         return None
 
+
 async def is_nft(mint_address):
     """Check if a token is an NFT by looking for Metaplex metadata"""
     try:
@@ -149,6 +150,62 @@ async def is_nft(mint_address):
     except Exception as e:
         logger.error(f"Error checking NFT status: {str(e)}")
         return False
+
+
+async def get_cnft_metadata(address):
+    """Fetch cNFT metadata from the chain"""
+    try:
+        # Get metadata PDA for the cNFT
+        metadata_response = await make_rpc_call(
+            "getProgramAccounts",
+            [
+                "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY",  # Bubblegum program
+                {
+                    "encoding": "base64",
+                    "filters": [
+                        {
+                            "memcmp": {
+                                "offset": 0,
+                                "bytes": address
+                            }
+                        }
+                    ]
+                }
+            ]
+        )
+
+        if "result" in metadata_response and metadata_response["result"]:
+            data = base64.b64decode(metadata_response["result"][0]["account"]["data"][0])
+
+            # Parse metadata
+            try:
+                metadata_url = data[32:].decode('utf-8').strip('\x00')
+                async with httpx.AsyncClient() as client:
+                    metadata_resp = await client.get(metadata_url, timeout=10.0)
+                    if metadata_resp.status_code == 200:
+                        metadata = metadata_resp.json()
+                        return {
+                            'name': metadata.get('name', f'cNFT {address[:4]}...{address[-4:]}'),
+                            'description': metadata.get('description', 'A compressed NFT on Solana'),
+                            'image': metadata.get('image', '/static/default-nft-image.svg'),
+                            'collection': metadata.get('collection', {}).get('name', ''),
+                            'explorer_url': f"https://explorer.solana.com/address/{address}"
+                        }
+            except Exception as e:
+                logger.error(f"Error parsing cNFT metadata: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Error fetching cNFT metadata: {str(e)}")
+        logger.exception("Full stack trace")
+
+    # Return default metadata if all else fails
+    return {
+        'name': f'cNFT {address[:4]}...{address[-4:]}',
+        'description': 'A compressed NFT on Solana',
+        'image': '/static/default-nft-image.svg',
+        'explorer_url': f"https://explorer.solana.com/address/{address}"
+    }
+
 
 async def fetch_assets(wallet_address):
     """Fetch assets using direct RPC calls"""
@@ -168,7 +225,6 @@ async def fetch_assets(wallet_address):
         tokens = []
         nfts = []
         cnfts = []
-        metadata_tasks = []
 
         if "result" in token_accounts_response:
             accounts = token_accounts_response["result"]["value"]
@@ -215,7 +271,7 @@ async def fetch_assets(wallet_address):
                         "filters": [
                             {
                                 "memcmp": {
-                                    "offset": 32,
+                                    "offset": 32,  # Skip the first 32 bytes (version + padding)
                                     "bytes": wallet_address
                                 }
                             }
@@ -224,7 +280,8 @@ async def fetch_assets(wallet_address):
                 ]
             )
 
-            if "result" in cnft_accounts_response:
+            if "result" in cnft_accounts_response and cnft_accounts_response["result"]:
+                logger.info(f"Found {len(cnft_accounts_response['result'])} cNFTs")
                 for account in cnft_accounts_response["result"]:
                     try:
                         address = account["pubkey"]
@@ -249,44 +306,6 @@ async def fetch_assets(wallet_address):
         logger.error(f"Error in fetch_assets: {str(e)}")
         logger.exception("Full stack trace")
         raise
-
-async def get_cnft_metadata(address):
-    """Fetch cNFT metadata from the chain"""
-    try:
-        # Get metadata PDA for the cNFT
-        metadata_response = await make_rpc_call(
-            "getAccountInfo",
-            [
-                address,
-                {"encoding": "base64"}
-            ]
-        )
-
-        if "result" in metadata_response and metadata_response["result"]["value"]:
-            data = base64.b64decode(metadata_response["result"]["value"]["data"][0])
-
-            # Parse metadata (simplified for now)
-            try:
-                return {
-                    'name': f'cNFT {address[:4]}...{address[-4:]}',
-                    'description': 'A compressed NFT on Solana',
-                    'image': '/static/default-nft-image.svg',  # Default image for now
-                    'explorer_url': f"https://explorer.solana.com/address/{address}"
-                }
-            except Exception as e:
-                logger.error(f"Error parsing cNFT metadata: {str(e)}")
-
-    except Exception as e:
-        logger.error(f"Error fetching cNFT metadata: {str(e)}")
-        logger.exception("Full stack trace")
-
-    return {
-        'name': f'cNFT {address[:4]}...{address[-4:]}',
-        'description': 'A compressed NFT on Solana',
-        'image': '/static/default-nft-image.svg',
-        'explorer_url': f"https://explorer.solana.com/address/{address}"
-    }
-
 
 
 @app.route('/')
