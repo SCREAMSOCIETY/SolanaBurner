@@ -67,7 +67,27 @@ h3 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    position: relative;
+    overflow: hidden; /* Added for animation */
+    transition: all 0.3s ease; /* Added for animation */
 }
+
+.connect-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+}
+
+.connect-button:hover::before {
+    transform: translateX(100%);
+}
+
 
 .wallet-icon {
     width: 24px;
@@ -99,7 +119,23 @@ h3 {
     color: var(--text-color);
     font-size: 1.1rem;
     margin: 2rem 0;
+    position: relative;
+    padding-right: 24px;
 }
+
+.loading-message::after {
+    content: '...';
+    position: absolute;
+    right: 0;
+    animation: loadingDots 1.5s infinite;
+}
+
+@keyframes loadingDots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
 
 .error-message {
     color: var(--error-color);
@@ -108,6 +144,13 @@ h3 {
     padding: 1rem;
     background-color: rgba(255, 70, 70, 0.1);
     border-radius: 8px;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
 }
 
 .assets-grid {
@@ -131,14 +174,31 @@ h3 {
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1rem;
-    transition: transform 0.2s, background-color 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.asset-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
 }
 
 .asset-card:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.asset-card:hover::before {
+    transform: translateX(100%);
 }
 
 .asset-card h4 {
@@ -161,6 +221,38 @@ h3 {
     cursor: pointer;
     transition: opacity 0.2s;
     margin-top: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.burn-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 70, 70, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+}
+
+.burn-button:active::after {
+    animation: burnEffect 0.5s ease-out;
+}
+
+@keyframes burnEffect {
+    0% {
+        width: 5px;
+        height: 5px;
+        opacity: 0.8;
+    }
+    100% {
+        width: 200px;
+        height: 200px;
+        opacity: 0;
+    }
 }
 
 .burn-button:hover {
@@ -280,6 +372,38 @@ h3 {
     font-size: 1rem;
     transition: all 0.2s;
     white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.burn-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 70, 70, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+}
+
+.burn-button:active::after {
+    animation: burnEffect 0.5s ease-out;
+}
+
+@keyframes burnEffect {
+    0% {
+        width: 5px;
+        height: 5px;
+        opacity: 0.8;
+    }
+    100% {
+        width: 200px;
+        height: 200px;
+        opacity: 0;
+    }
 }
 
 .burn-button:hover:not(:disabled) {
@@ -296,7 +420,18 @@ h3 {
     margin-top: 1rem;
     padding: 1rem;
     border-radius: 6px;
-    animation: fadeIn 0.3s ease-in-out;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes fadeIn {
@@ -438,11 +573,15 @@ h3 {
 
 .tab-panel {
     display: none;
-    animation: fadeIn 0.3s ease-in-out;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out;
 }
 
 .tab-panel.active {
     display: block;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 /* Token Card Specific Styles */
@@ -464,6 +603,24 @@ h3 {
     border-radius: 50%;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.token-icon-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(153, 69, 255, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+}
+
+.token-icon-wrapper:hover::after {
+    transform: translateX(100%);
 }
 
 .token-icon {
@@ -522,6 +679,24 @@ h3 {
     border-radius: 8px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.nft-image-wrapper::after, .cnft-image-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(153, 69, 255, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+}
+
+.nft-image-wrapper:hover::after, .cnft-image-wrapper:hover::after {
+    transform: translateX(100%);
 }
 
 .nft-image, .cnft-image {
@@ -599,6 +774,38 @@ h3 {
     padding: 0.5rem 1rem;
     cursor: pointer;
     transition: opacity 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.burn-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 70, 70, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+}
+
+.burn-button:active::after {
+    animation: burnEffect 0.5s ease-out;
+}
+
+@keyframes burnEffect {
+    0% {
+        width: 5px;
+        height: 5px;
+        opacity: 0.8;
+    }
+    100% {
+        width: 200px;
+        height: 200px;
+        opacity: 0;
+    }
 }
 
 .burn-button:hover:not(:disabled) {
@@ -662,6 +869,18 @@ h3 {
     gap: 1rem;
     transition: transform 0.2s, box-shadow 0.2s;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .achievement-card:hover {
@@ -675,6 +894,19 @@ h3 {
         rgba(20, 241, 149, 0.1),
         rgba(20, 241, 149, 0.05)
     );
+    animation: achievementComplete 0.6s ease-out;
+}
+
+@keyframes achievementComplete {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 .achievement-icon {
@@ -719,7 +951,7 @@ h3 {
     height: 100%;
     background: var(--primary-color);
     width: 0;
-    transition: width 0.3s ease;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .progress-text {
@@ -742,6 +974,16 @@ h3 {
     transform: translateX(120%);
     transition: transform 0.3s ease;
     z-index: 1000;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(120%);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 .achievement-notification.show {
