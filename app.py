@@ -55,17 +55,27 @@ async def get_token_metadata(mint_address):
 
         if "result" in nft_metadata and nft_metadata["result"]:
             metadata = nft_metadata["result"]
-            return {
-                'symbol': metadata.get('symbol', 'Unknown'),
-                'name': metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}'),
-                'icon': metadata.get('image', ''),
-                'decimals': 0,
-                'is_nft': True,
-                'mint': mint_address,
-                'collection': metadata.get('collection', {}).get('name', 'Unknown'),
-                'attributes': metadata.get('attributes', []),
-                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-            }
+            try:
+                name = metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}')
+                image_url = metadata.get('image', '')
+                # If the image URL is an IPFS URL, convert it to HTTP
+                if image_url.startswith('ipfs://'):
+                    image_url = f'https://ipfs.io/ipfs/{image_url[7:]}'
+
+                return {
+                    'symbol': metadata.get('symbol', 'Unknown'),
+                    'name': name,
+                    'image': image_url,
+                    'decimals': 0,
+                    'is_nft': True,
+                    'mint': mint_address,
+                    'collection': metadata.get('collection', {}).get('name', 'Unknown'),
+                    'attributes': metadata.get('attributes', []),
+                    'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                }
+            except Exception as e:
+                logger.error(f"Error processing NFT metadata: {str(e)}")
+                return None
 
         # If not an NFT, try DEXScreener for token data
         dexscreener_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
@@ -110,44 +120,22 @@ async def get_token_metadata(mint_address):
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 
-        # Fallback to Jupiter API
-        jupiter_url = "https://token.jup.ag/all"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(jupiter_url, timeout=10.0)
-
-            if response.status_code == 200:
-                tokens = response.json()
-                token_info = next((token for token in tokens if token.get('address') == mint_address), None)
-
-                if token_info:
-                    logger.info(f"Successfully fetched token metadata from Jupiter for {mint_address}")
-                    return {
-                        'symbol': token_info.get('symbol', 'Unknown'),
-                        'name': token_info.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
-                        'icon': token_info.get('logoURI', ''),
-                        'decimals': token_info.get('decimals', 9),
-                        'verified': token_info.get('verified', False),
-                        'tags': token_info.get('tags', []),
-                        'mint': mint_address,
-                        'is_token': True,
-                        'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-                    }
+        # Fallback metadata with default icon
+        logger.info(f"Using fallback metadata for {mint_address}")
+        return {
+            'symbol': 'Unknown',
+            'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
+            'icon': '/static/default-token-icon.svg',
+            'decimals': 9,
+            'mint': mint_address,
+            'is_token': True,
+            'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+        }
 
     except Exception as e:
         logger.error(f"Error fetching token metadata: {str(e)}")
         logger.exception("Full stack trace")
-
-    # Fallback metadata with default icon
-    logger.info(f"Using fallback metadata for {mint_address}")
-    return {
-        'symbol': 'Unknown',
-        'name': f'Token {mint_address[:4]}...{mint_address[-4:]}',
-        'icon': '/static/default-token-icon.svg',
-        'decimals': 9,
-        'mint': mint_address,
-        'is_token': True,
-        'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-    }
+        return None
 
 
 async def get_cnft_metadata(address):
@@ -217,9 +205,10 @@ async def fetch_assets(wallet_address):
                     parsed_data = account["account"]["data"]["parsed"]["info"]
                     mint = parsed_data["mint"]
                     amount = int(parsed_data["tokenAmount"]["amount"])
+                    decimals = parsed_data["tokenAmount"]["decimals"]
 
                     if amount > 0:
-                        # Get metadata for all assets
+                        # Only process if there's a non-zero balance
                         metadata_tasks.append(get_token_metadata(mint))
 
                 except Exception as e:
@@ -234,6 +223,9 @@ async def fetch_assets(wallet_address):
             for result in metadata_results:
                 if isinstance(result, Exception):
                     logger.error(f"Error fetching metadata: {str(result)}")
+                    continue
+
+                if result is None:
                     continue
 
                 try:
