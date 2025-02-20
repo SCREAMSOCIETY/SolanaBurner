@@ -108,9 +108,9 @@ async def get_magiceden_metadata(mint_address):
     return None
 
 async def get_token_metadata(mint_address):
-    """Fetch token metadata focusing on name and image"""
+    """Fetch token metadata focusing on name and image, prioritizing DexScreener"""
     try:
-        # Get basic token info
+        # First check if this is an NFT
         account_info = await make_rpc_call(
             "getAccountInfo",
             [mint_address, {"encoding": "jsonParsed"}]
@@ -137,49 +137,34 @@ async def get_token_metadata(mint_address):
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 
-                # Fallback to metaplex metadata
-                metadata_response = await make_rpc_call(
-                    "getProgramAccounts",
-                    [
-                        "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
-                        {
-                            "encoding": "base64",
-                            "filters": [
-                                {
-                                    "memcmp": {
-                                        "offset": 33,
-                                        "bytes": mint_address
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                )
+            # For regular tokens, try DexScreener first
+            try:
+                async with httpx.AsyncClient() as client:
+                    dex_response = await client.get(
+                        f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}",
+                        timeout=10.0
+                    )
+                    if dex_response.status_code == 200:
+                        dex_data = dex_response.json()
+                        if dex_data.get('pairs') and len(dex_data['pairs']) > 0:
+                            pair = dex_data['pairs'][0]
+                            base_token = pair.get('baseToken', {})
+                            logger.info(f"Successfully fetched token data from DEXScreener for {mint_address}")
 
-                if "result" in metadata_response and metadata_response["result"]:
-                    metadata = metadata_response["result"][0]
-                    try:
-                        metadata_decoded = base64.b64decode(metadata["account"]["data"][0])
-                        metadata_json = json.loads(metadata_decoded)
+                            return {
+                                'name': base_token.get('name', ''),
+                                'symbol': base_token.get('symbol', 'Unknown'),
+                                'icon': base_token.get('logoURI', ''),
+                                'decimals': decimals,
+                                'amount': token_data.get('tokenAmount', {}).get('amount', '0'),
+                                'mint': mint_address,
+                                'is_token': True,
+                                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                            }
+            except Exception as e:
+                logger.error(f"Error fetching DEXScreener data: {str(e)}")
 
-                        image_url = metadata_json.get('uri', '')
-                        if image_url.startswith('ipfs://'):
-                            image_url = f'https://ipfs.io/ipfs/{image_url[7:]}'
-
-                        return {
-                            'name': metadata_json.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}'),
-                            'image': image_url,
-                            'collection': metadata_json.get('collection', {}).get('name', 'Unknown'),
-                            'decimals': 0,
-                            'is_nft': True,
-                            'mint': mint_address,
-                            'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
-                        }
-                    except Exception as e:
-                        logger.error(f"Error processing NFT metadata: {str(e)}")
-
-            # For regular tokens
-            # Try Jupiter first for reliable token info
+            # Try Jupiter as fallback
             jupiter_metadata = await get_jupiter_token_metadata(mint_address)
             if jupiter_metadata:
                 return {
@@ -187,13 +172,13 @@ async def get_token_metadata(mint_address):
                     'symbol': jupiter_metadata.get('symbol', 'Unknown'),
                     'icon': jupiter_metadata.get('icon'),
                     'decimals': jupiter_metadata.get('decimals', decimals),
-                    'supply': supply,
+                    'amount': token_data.get('tokenAmount', {}).get('amount', '0'),
                     'mint': mint_address,
                     'is_token': True,
                     'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                 }
 
-            # Check token list cache
+            # Check token list cache as last resort
             await fetch_token_list()
             if mint_address in token_list_cache['tokens']:
                 token_info = token_list_cache['tokens'][mint_address]
@@ -202,7 +187,7 @@ async def get_token_metadata(mint_address):
                     'symbol': token_info.get('symbol', 'Unknown'),
                     'icon': token_info.get('logoURI'),
                     'decimals': token_info.get('decimals', decimals),
-                    'supply': supply,
+                    'amount': token_data.get('tokenAmount', {}).get('amount', '0'),
                     'mint': mint_address,
                     'is_token': True,
                     'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
@@ -214,7 +199,7 @@ async def get_token_metadata(mint_address):
                 'symbol': 'Unknown',
                 'icon': '/static/default-token-icon.svg',
                 'decimals': decimals,
-                'supply': supply,
+                'amount': token_data.get('tokenAmount', {}).get('amount', '0'),
                 'mint': mint_address,
                 'is_token': True,
                 'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
