@@ -254,14 +254,13 @@
             function getConnection() {
                 const endpoint = '{{ rpc_endpoint }}';
                 console.log('Using RPC endpoint:', endpoint);
-                return new solanaWeb3.Connection(endpoint, {
-                    commitment: 'confirmed',
-                    wsEndpoint: false
-                });
+                return new solanaWeb3.Connection(endpoint);
             }
 
             async function connectWallet() {
                 try {
+                    console.log("Starting wallet connection process...");
+
                     // Check if Phantom is installed
                     if (!window.solana || !window.solana.isPhantom) {
                         showStatus('Phantom wallet not found. Please install Phantom.', true);
@@ -269,15 +268,11 @@
                         return;
                     }
 
-                    // First disconnect if already connected
-                    if (currentWallet && currentWallet.isConnected) {
-                        await currentWallet.disconnect();
-                    }
-
                     showStatus('Connecting to Phantom...');
 
                     // Request connection
                     const resp = await window.solana.connect();
+                    console.log("Connection response received:", resp);
 
                     if (resp.publicKey) {
                         const address = resp.publicKey.toString();
@@ -307,17 +302,29 @@
                 }
             }
 
-            // Add event listeners for wallet status changes
+            // Initialize connect button event listener
+            if (connectButton) {
+                console.log("Setting up connect button listener");
+                connectButton.addEventListener('click', connectWallet);
+            }
+
+            // Initialize wallet event listeners
             if (window.solana) {
+                console.log("Setting up Solana wallet listeners");
+
                 window.solana.on('connect', () => {
                     console.log('Wallet connected event received');
-                    showStatus('Connected to Phantom wallet');
-                    if (currentWallet && currentWallet.publicKey) {
-                        const address = currentWallet.publicKey.toString();
-                        walletInfo.style.display = 'block';
+                    if (window.solana.publicKey) {
+                        const address = window.solana.publicKey.toString();
+                        currentWallet = window.solana;
+                        connection = getConnection();
+
                         connectButton.style.display = 'none';
+                        walletInfo.style.display = 'block';
                         walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
                         assetsContainer.style.display = 'block';
+
+                        showStatus('Connected to Phantom wallet');
                         loadAssets(address);
                     }
                 });
@@ -334,13 +341,11 @@
 
                 // Check if wallet is already connected
                 if (window.solana.isPhantom && window.solana.isConnected) {
-                    console.log('Wallet is already connected');
+                    console.log('Wallet is already connected, initializing...');
                     connectWallet();
                 }
             }
 
-            // Initialize connect button event listener
-            connectButton.addEventListener('click', connectWallet);
             function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
                 imgElement.classList.add('loading');
 
@@ -901,7 +906,7 @@
 
                     transaction.add(...instructions);
 
-                    const signed = await currentWallet.signTransaction(transaction);
+                    const signed= await currentWallet.signTransaction(transaction);
                     const signature = await connection.sendRawTransaction(signed.serialize());
                     await connection.confirmTransaction(signature);
 
