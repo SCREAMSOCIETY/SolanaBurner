@@ -135,6 +135,21 @@ async def get_token_metadata(mint_address):
         logger.exception("Full stack trace")
         return None
 
+async def is_nft(mint_address):
+    """Check if a token is an NFT by looking for Metaplex metadata"""
+    try:
+        metadata_response = await make_rpc_call(
+            "getAccountInfo",
+            [
+                f"metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",  # Metaplex metadata program
+                {"encoding": "base64"}
+            ]
+        )
+        return "result" in metadata_response and metadata_response["result"] is not None
+    except Exception as e:
+        logger.error(f"Error checking NFT status: {str(e)}")
+        return False
+
 async def fetch_assets(wallet_address):
     """Fetch assets using direct RPC calls"""
     logger.info(f"Fetching assets for wallet: {wallet_address}")
@@ -165,47 +180,28 @@ async def fetch_assets(wallet_address):
                     mint = parsed_data["mint"]
                     amount = int(parsed_data["tokenAmount"]["amount"])
                     decimals = parsed_data["tokenAmount"]["decimals"]
-                    frozen = parsed_data.get("state", "") == "frozen"
 
                     # Only process accounts with non-zero balance
                     if amount > 0:
-                        # Check if it's likely an NFT (decimals = 0, amount = 1, and optionally frozen)
-                        metadata_tasks.append((mint, amount, decimals, frozen, get_token_metadata(mint)))
+                        # First check if this is an NFT by looking for Metaplex metadata
+                        is_nft_token = await is_nft(mint)
+
+                        # If it has Metaplex metadata and meets NFT criteria (decimals=0, amount=1)
+                        if is_nft_token and decimals == 0 and amount == 1:
+                            logger.info(f"Found NFT: {mint}")
+                            nft_metadata = await get_token_metadata(mint)
+                            if nft_metadata:
+                                nfts.append(nft_metadata)
+                        else:
+                            # This is a regular token
+                            logger.info(f"Found token: {mint}")
+                            token_metadata = await get_token_metadata(mint)
+                            if token_metadata:
+                                token_metadata['amount'] = float(amount) / (10 ** decimals)
+                                tokens.append(token_metadata)
 
                 except Exception as e:
                     logger.error(f"Error processing token account: {str(e)}")
-                    continue
-
-        # Process metadata for tokens and NFTs
-        if metadata_tasks:
-            logger.info(f"Fetching metadata for {len(metadata_tasks)} assets")
-            metadata_results = await asyncio.gather(*(task[4] for task in metadata_tasks), return_exceptions=True)
-
-            for i, result in enumerate(metadata_results):
-                if isinstance(result, Exception):
-                    logger.error(f"Error fetching metadata: {str(result)}")
-                    continue
-
-                if result is None:
-                    continue
-
-                try:
-                    mint, amount, decimals, frozen = metadata_tasks[i][:4]
-
-                    # Double check for NFT classification
-                    # An NFT should have:
-                    # 1. decimals = 0
-                    # 2. amount = 1
-                    # 3. Either frozen=true OR is_nft flag from metadata
-                    if (decimals == 0 and amount == 1 and (frozen or result.get('is_nft'))):
-                        nfts.append(result)
-                        logger.info(f"Classified {mint} as NFT")
-                    elif result.get('is_token'):
-                        result['amount'] = float(amount) / (10 ** decimals)
-                        tokens.append(result)
-                        logger.info(f"Classified {mint} as token")
-                except Exception as e:
-                    logger.error(f"Error processing metadata result: {str(e)}")
                     continue
 
         # Try to get cNFTs
@@ -290,6 +286,7 @@ async def get_cnft_metadata(address):
         'image': '/static/default-nft-image.svg',
         'explorer_url': f"https://explorer.solana.com/address/{address}"
     }
+
 
 
 @app.route('/')
