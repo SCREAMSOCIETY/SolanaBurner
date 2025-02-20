@@ -59,7 +59,7 @@ async def get_token_metadata(mint_address):
             supply = token_data.get("supply", "Unknown")
 
             # If supply is 1 and decimals is 0, it's likely an NFT
-            if decimals == 0 and supply == "1":
+            if decimals == 0 and str(supply) == "1":
                 nft_metadata = await make_rpc_call(
                     "getMetadata",
                     [mint_address]
