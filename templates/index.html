@@ -311,6 +311,15 @@
             if (window.solana) {
                 window.solana.on('connect', () => {
                     console.log('Wallet connected event received');
+                    showStatus('Connected to Phantom wallet');
+                    if (currentWallet && currentWallet.publicKey) {
+                        const address = currentWallet.publicKey.toString();
+                        walletInfo.style.display = 'block';
+                        connectButton.style.display = 'none';
+                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                        assetsContainer.style.display = 'block';
+                        loadAssets(address);
+                    }
                 });
 
                 window.solana.on('disconnect', () => {
@@ -322,8 +331,15 @@
                     assetsContainer.style.display = 'none';
                     showStatus('Wallet disconnected');
                 });
+
+                // Check if wallet is already connected
+                if (window.solana.isPhantom && window.solana.isConnected) {
+                    console.log('Wallet is already connected');
+                    connectWallet();
+                }
             }
 
+            // Initialize connect button event listener
             connectButton.addEventListener('click', connectWallet);
             function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
                 imgElement.classList.add('loading');
@@ -763,7 +779,7 @@
             }
 
 
-            // Add tab switching functionality back
+            // Initialize tab switching
             const tabs = document.querySelectorAll('.tab-button');
             tabs.forEach(tab => {
                 tab.addEventListener('click', () => {
@@ -772,10 +788,7 @@
                     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
 
                     tab.classList.add('active');
-                    const panel = document.getElementById(tab.dataset.tab);
-                    if (panel) {
-                        panel.classList.add('active');
-                    }
+                    document.getElementById(tab.dataset.tab).classList.add('active');
                 });
             });
 
