@@ -40,17 +40,69 @@
             <div class="tab-content">
                 <div id="tokens" class="tab-panel active">
                     <div class="assets-grid">
-                        <!-- Token cards will be dynamically inserted here -->
+                        <template id="token-card-template">
+                            <div class="asset-card token-card">
+                                <div class="token-header">
+                                    <div class="token-icon-wrapper">
+                                        <img class="token-icon" src="" alt="Token Icon" />
+                                    </div>
+                                    <div class="token-info">
+                                        <h4 class="token-name"></h4>
+                                        <span class="token-symbol"></span>
+                                    </div>
+                                </div>
+                                <div class="token-details">
+                                    <div class="token-balance">
+                                        <span class="balance-label">Balance:</span>
+                                        <span class="balance-amount"></span>
+                                    </div>
+                                    <div class="token-value">
+                                        <span class="value-label">USD Value:</span>
+                                        <span class="value-amount"></span>
+                                    </div>
+                                </div>
+                                <div class="token-actions">
+                                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
+                                    <button class="burn-button">Burn Token</button>
+                                </div>
+                                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                            </div>
+                        </template>
                     </div>
                 </div>
                 <div id="nfts" class="tab-panel">
                     <div class="assets-grid">
-                        <!-- NFT cards will be dynamically inserted here -->
+                        <template id="nft-card-template">
+                            <div class="asset-card nft-card">
+                                <div class="nft-image-wrapper">
+                                    <img class="nft-image" src="" alt="NFT" />
+                                </div>
+                                <div class="nft-info">
+                                    <h4 class="nft-name"></h4>
+                                    <p class="nft-collection"></p>
+                                    <div class="nft-attributes">
+                                        <!-- Attributes will be added dynamically -->
+                                    </div>
+                                </div>
+                                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                            </div>
+                        </template>
                     </div>
                 </div>
                 <div id="cnfts" class="tab-panel">
                     <div class="assets-grid">
-                        <!-- cNFT cards will be dynamically inserted here -->
+                        <template id="cnft-card-template">
+                            <div class="asset-card cnft-card">
+                                <div class="cnft-image-wrapper">
+                                    <img class="cnft-image" src="" alt="cNFT" />
+                                </div>
+                                <div class="cnft-info">
+                                    <h4 class="cnft-name"></h4>
+                                    <p class="cnft-collection"></p>
+                                </div>
+                                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -204,7 +256,7 @@
             async function loadAssets(publicKey) {
                 showLoading(true);
                 document.querySelectorAll('.assets-grid').forEach(grid => {
-                    grid.innerHTML = ''; // Clear existing content
+                    grid.innerHTML = ''; 
                     grid.style.display = 'none';
                 });
 
@@ -225,104 +277,31 @@
 
                     // Handle tokens
                     if (!assets.tokens || assets.tokens.length === 0) {
-                        assetTypes.tokens.innerHTML = '<div class="no-assets"><p>No tokens found in your wallet</p></div>';
+                        assetTypes.tokens.innerHTML = '<div class="no-assets">No tokens found</div>';
                     } else {
                         assets.tokens.forEach(token => {
-                            const tokenCard = document.createElement('div');
-                            tokenCard.className = 'asset-card';
-
-                            const displayName = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
-
-                            tokenCard.innerHTML = `
-                                <h4>${displayName}</h4>
-                                <p>Symbol: ${token.symbol || 'Unknown'}</p>
-                                <p>Amount: ${token.amount}</p>
-                                <a href="${token.explorer_url}" target="_blank" class="explorer-link">
-                                    View on Explorer
-                                </a>
-                                <div class="burn-controls">
-                                    <input type="number" 
-                                           class="burn-amount" 
-                                           placeholder="Amount to burn" 
-                                           min="0.000001" 
-                                           max="${token.amount}"
-                                           step="0.000001"
-                                           value=""
-                                           style="width: 200px;"/>
-                                    <button class="burn-button" 
-                                            data-mint="${token.mint}"
-                                            data-decimals="${token.decimals || 9}"
-                                            data-max="${token.amount}">
-                                        Burn Token
-                                    </button>
-                                </div>
-                            `;
-
-                            const burnButton = tokenCard.querySelector('.burn-button');
-                            const burnInput = tokenCard.querySelector('.burn-amount');
-
-                            burnButton.addEventListener('click', async () => {
-                                const amount = parseFloat(burnInput.value);
-                                const maxAmount = parseFloat(burnButton.dataset.max);
-
-                                if (!validateBurnAmount(burnInput, maxAmount)) {
-                                    return;
-                                }
-
-                                if (!confirm(`Are you sure you want to burn ${amount} tokens? This action cannot be undone.`)) {
-                                    return;
-                                }
-
-                                const result = await burnToken(
-                                    burnButton.dataset.mint,
-                                    amount,
-                                    parseInt(burnButton.dataset.decimals)
-                                );
-
-                                if (result) {
-                                    burnInput.value = ''; // Clear input after successful burn
-                                }
-                            });
-
-                            assetTypes.tokens.appendChild(tokenCard);
+                            const card = createTokenCard(token);
+                            assetTypes.tokens.appendChild(card);
                         });
                     }
 
                     // Handle NFTs
                     if (!assets.nfts || assets.nfts.length === 0) {
-                        assetTypes.nfts.innerHTML = '<div class="no-assets"><p>No NFTs found in your wallet</p></div>';
+                        assetTypes.nfts.innerHTML = '<div class="no-assets">No NFTs found</div>';
                     } else {
                         assets.nfts.forEach(nft => {
-                            const nftCard = document.createElement('div');
-                            nftCard.className = 'asset-card nft-card';
-                            nftCard.innerHTML = `
-                                <h4>${nft.name || 'Unnamed NFT'}</h4>
-                                <img src="${nft.image || ''}" alt="${nft.name}" class="nft-image"/>
-                                <p>${nft.description || ''}</p>
-                                <a href="${nft.explorer_url}" target="_blank" class="explorer-link">
-                                    View on Explorer
-                                </a>
-                            `;
-                            assetTypes.nfts.appendChild(nftCard);
+                            const card = createNFTCard(nft);
+                            assetTypes.nfts.appendChild(card);
                         });
                     }
 
                     // Handle cNFTs
                     if (!assets.cnfts || assets.cnfts.length === 0) {
-                        assetTypes.cnfts.innerHTML = '<div class="no-assets"><p>No cNFTs found in your wallet</p></div>';
+                        assetTypes.cnfts.innerHTML = '<div class="no-assets">No cNFTs found</div>';
                     } else {
                         assets.cnfts.forEach(cnft => {
-                            const cnftCard = document.createElement('div');
-                            cnftCard.className = 'asset-card cnft-card';
-                            cnftCard.innerHTML = `
-                                <h4>${cnft.name || 'Unnamed cNFT'}</h4>
-                                <img src="${cnft.image || ''}" alt="${cnft.name}" class="nft-image"/>
-                                <p>${cnft.description || ''}</p>
-                                <a href="${cnft.explorer_url}" target="_blank" class="explorer-link">
-                                    View on Explorer
-                                </a>
-                            `;
-                            assetTypes.cnfts.appendChild(cnftCard);
+                            const card = createCNFTCard(cnft);
+                            assetTypes.cnfts.appendChild(card);
                         });
                     }
 
@@ -428,6 +407,142 @@
             }
 
             return true;
+        }
+
+        function createTokenCard(token) {
+            const template = document.querySelector('#token-card-template');
+            const card = template.content.cloneNode(true);
+
+            // Set token icon
+            const iconElem = card.querySelector('.token-icon');
+            iconElem.src = token.icon || 'default-token-icon.png';
+
+            // Set token info
+            card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
+            card.querySelector('.token-symbol').textContent = token.symbol || 'Unknown';
+
+            // Set balance
+            card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
+
+            // Set burn controls
+            const burnInput = card.querySelector('.burn-amount');
+            burnInput.max = token.amount;
+            burnInput.min = 0.000001;
+
+            const burnButton = card.querySelector('.burn-button');
+            burnButton.dataset.mint = token.mint;
+            burnButton.dataset.decimals = token.decimals;
+
+            // Set explorer link
+            card.querySelector('.explorer-link').href = token.explorer_url;
+
+            return card;
+        }
+
+        function createNFTCard(nft) {
+            const template = document.querySelector('#nft-card-template');
+            const card = template.content.cloneNode(true);
+
+            // Set NFT image
+            const imageElem = card.querySelector('.nft-image');
+            imageElem.src = nft.image || 'default-nft-image.png';
+
+            // Set NFT info
+            card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
+            card.querySelector('.nft-collection').textContent = nft.collection || '';
+
+            // Set explorer link
+            card.querySelector('.explorer-link').href = nft.explorer_url;
+
+            return card;
+        }
+
+        function createCNFTCard(cnft) {
+            const template = document.querySelector('#cnft-card-template');
+            const card = template.content.cloneNode(true);
+
+            // Set cNFT image
+            const imageElem = card.querySelector('.cnft-image');
+            imageElem.src = cnft.image || 'default-cnft-image.png';
+
+            // Set cNFT info
+            card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
+            card.querySelector('.cnft-collection').textContent = cnft.collection || '';
+
+            // Set explorer link
+            card.querySelector('.explorer-link').href = cnft.explorer_url;
+
+            return card;
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
+            }).format(num);
+        }
+
+        async function loadAssets(publicKey) {
+            showLoading(true);
+            document.querySelectorAll('.assets-grid').forEach(grid => {
+                grid.innerHTML = '';
+                grid.style.display = 'none';
+            });
+
+            try {
+                const response = await fetch(`/assets?wallet=${publicKey}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to fetch assets');
+                }
+
+                const assets = data.assets;
+                const assetTypes = {
+                    tokens: document.querySelector('#tokens .assets-grid'),
+                    nfts: document.querySelector('#nfts .assets-grid'),
+                    cnfts: document.querySelector('#cnfts .assets-grid')
+                };
+
+                // Handle tokens
+                if (!assets.tokens || assets.tokens.length === 0) {
+                    assetTypes.tokens.innerHTML = '<div class="no-assets">No tokens found</div>';
+                } else {
+                    assets.tokens.forEach(token => {
+                        const card = createTokenCard(token);
+                        assetTypes.tokens.appendChild(card);
+                    });
+                }
+
+                // Handle NFTs
+                if (!assets.nfts || assets.nfts.length === 0) {
+                    assetTypes.nfts.innerHTML = '<div class="no-assets">No NFTs found</div>';
+                } else {
+                    assets.nfts.forEach(nft => {
+                        const card = createNFTCard(nft);
+                        assetTypes.nfts.appendChild(card);
+                    });
+                }
+
+                // Handle cNFTs
+                if (!assets.cnfts || assets.cnfts.length === 0) {
+                    assetTypes.cnfts.innerHTML = '<div class="no-assets">No cNFTs found</div>';
+                } else {
+                    assets.cnfts.forEach(cnft => {
+                        const card = createCNFTCard(cnft);
+                        assetTypes.cnfts.appendChild(card);
+                    });
+                }
+
+                showLoading(false);
+                document.querySelectorAll('.assets-grid').forEach(grid => {
+                    grid.style.display = 'grid';
+                });
+
+            } catch (error) {
+                console.error('Error loading assets:', error);
+                showError(`Failed to load assets: ${error.message}`);
+            }
         }
     </script>
 </body>
