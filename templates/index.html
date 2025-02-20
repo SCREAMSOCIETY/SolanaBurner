@@ -109,6 +109,34 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Add achievements panel after the assets container -->
+        <div id="achievementsContainer" class="achievements-container" style="display: none;">
+            <h2>Achievements</h2>
+            <div class="achievements-grid">
+                <!-- Achievement cards will be dynamically added here -->
+            </div>
+        </div>
+
+        <template id="achievement-card-template">
+            <div class="achievement-card">
+                <div class="achievement-icon">
+                    <svg class="achievement-svg" viewBox="0 0 24 24" width="48" height="48">
+                        <!-- Icon will be set dynamically -->
+                    </svg>
+                </div>
+                <div class="achievement-info">
+                    <h3 class="achievement-title"></h3>
+                    <p class="achievement-description"></p>
+                </div>
+                <div class="achievement-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="progress-text"></span>
+                </div>
+            </div>
+        </template>
     </div>
 
     <script>
@@ -313,6 +341,12 @@
 
                         showStatus('Wallet connected successfully');
                         await loadAssets(address);
+
+                        // Trigger first connection achievement
+                        updateAchievement('FIRST_CONNECTION');
+
+                        // Trigger asset viewer achievement when assets are loaded
+                        updateAchievement('ASSET_VIEWER');
                     }
                 } catch (error) {
                     console.error('Connection error:', error);
@@ -450,6 +484,9 @@
                         throw new Error('Transaction failed to confirm');
                     }
 
+                    // Trigger burn achievement
+                    updateAchievement('TOKEN_BURN_MASTER');
+
                     showStatus(`Successfully burned ${amount} tokens`);
                     await loadAssets(currentWallet.publicKey.toString());
 
@@ -462,6 +499,133 @@
                     showLoading(false);
                 }
             }
+
+
+            // Achievement definitions
+            const ACHIEVEMENTS = {
+                FIRST_CONNECTION: {
+                    id: 'first_connection',
+                    title: 'Connected Explorer',
+                    description: 'Connect your wallet for the first time',
+                    icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+                    maxProgress: 1
+                },
+                ASSET_VIEWER: {
+                    id: 'asset_viewer',
+                    title: 'Asset Explorer',
+                    description: 'View your token collection',
+                    icon: 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+                    maxProgress: 1
+                },
+                TOKEN_BURN_MASTER: {
+                    id: 'token_burn_master',
+                    title: 'Token Burn Master',
+                    description: 'Burn tokens 3 times',
+                    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+                    maxProgress: 3
+                }
+            };
+
+            // Achievement tracking
+            let userAchievements = {};
+
+            function initializeAchievements() {
+                const storedAchievements = localStorage.getItem('userAchievements');
+                userAchievements = storedAchievements ? JSON.parse(storedAchievements) : {};
+
+                // Initialize achievements if not exists
+                Object.keys(ACHIEVEMENTS).forEach(key => {
+                    if (!userAchievements[key]) {
+                        userAchievements[key] = {
+                            progress: 0,
+                            completed: false
+                        };
+                    }
+                });
+
+                updateAchievementsDisplay();
+                saveAchievements();
+            }
+
+            function updateAchievement(achievementId, progress = 1) {
+                if (!userAchievements[achievementId]) return;
+
+                const achievement = ACHIEVEMENTS[achievementId];
+                userAchievements[achievementId].progress = Math.min(
+                    userAchievements[achievementId].progress + progress,
+                    achievement.maxProgress
+                );
+
+                if (userAchievements[achievementId].progress >= achievement.maxProgress) {
+                    userAchievements[achievementId].completed = true;
+                    showAchievementNotification(achievement.title);
+                }
+
+                updateAchievementsDisplay();
+                saveAchievements();
+            }
+
+            function createAchievementCard(achievementId) {
+                const achievement = ACHIEVEMENTS[achievementId];
+                const userProgress = userAchievements[achievementId];
+                const template = document.querySelector('#achievement-card-template');
+                const card = template.content.cloneNode(true);
+
+                card.querySelector('.achievement-title').textContent = achievement.title;
+                card.querySelector('.achievement-description').textContent = achievement.description;
+                card.querySelector('.achievement-svg').innerHTML = `<path d="${achievement.icon}" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+                const progressPercent = (userProgress.progress / achievement.maxProgress) * 100;
+                card.querySelector('.progress-fill').style.width = `${progressPercent}%`;
+                card.querySelector('.progress-text').textContent = 
+                    `${userProgress.progress}/${achievement.maxProgress}`;
+
+                const achievementCard = card.querySelector('.achievement-card');
+                if (userProgress.completed) {
+                    achievementCard.classList.add('completed');
+                }
+
+                return card;
+            }
+
+            function updateAchievementsDisplay() {
+                const container = document.querySelector('.achievements-grid');
+                if (!container) return;
+
+                container.innerHTML = '';
+                Object.keys(ACHIEVEMENTS).forEach(achievementId => {
+                    const card = createAchievementCard(achievementId);
+                    container.appendChild(card);
+                });
+
+                document.getElementById('achievementsContainer').style.display = 'block';
+            }
+
+            function showAchievementNotification(title) {
+                const notification = document.createElement('div');
+                notification.className = 'achievement-notification';
+                notification.innerHTML = `
+                    <div class="notification-content">
+                        <span class="notification-icon">🏆</span>
+                        <span>Achievement Unlocked: ${title}</span>
+                    </div>
+                `;
+
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.classList.add('show');
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => notification.remove(), 300);
+                    }, 3000);
+                }, 100);
+            }
+
+            function saveAchievements() {
+                localStorage.setItem('userAchievements', JSON.stringify(userAchievements));
+            }
+
+            initializeAchievements();
         });
     </script>
 </body>
