@@ -6,6 +6,7 @@ import base64
 from dotenv import load_dotenv
 import socket
 import os
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -19,30 +20,63 @@ load_dotenv()
 app = Flask(__name__)
 RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_URL')
 
+# Cache for token list data
+token_list_cache = {}
 
-async def make_rpc_call(method, params):
-    """Make a direct RPC call to Solana"""
-    logger.info(f"Making RPC call to endpoint: {RPC_ENDPOINT}")
-    logger.info(f"Method: {method}")
-
-    async with httpx.AsyncClient() as client:
+async def fetch_token_list():
+    """Fetch and cache the official Solana token list"""
+    if not token_list_cache.get('tokens'):
         try:
-            response = await client.post(
-                RPC_ENDPOINT,
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": method,
-                    "params": params
-                },
-                timeout=30.0
-            )
-            response.raise_for_status()
-            return response.json()
+            async with httpx.AsyncClient() as client:
+                response = await client.get('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json')
+                if response.status_code == 200:
+                    data = response.json()
+                    # Index tokens by mint address for faster lookup
+                    token_list_cache['tokens'] = {
+                        token['address']: token for token in data['tokens']
+                    }
+                    logger.info(f"Cached {len(token_list_cache['tokens'])} tokens from token list")
         except Exception as e:
-            logger.error(f"RPC call failed: {str(e)}")
-            raise
+            logger.error(f"Error fetching token list: {str(e)}")
+            token_list_cache['tokens'] = {}
 
+async def get_jupiter_token_metadata(mint_address):
+    """Fetch token metadata from Jupiter API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f'https://token.jup.ag/all')
+            if response.status_code == 200:
+                tokens = response.json()
+                for token in tokens:
+                    if token.get('address') == mint_address:
+                        return {
+                            'symbol': token.get('symbol'),
+                            'name': token.get('name'),
+                            'icon': token.get('logoURI'),
+                            'decimals': token.get('decimals'),
+                            'verified': True
+                        }
+    except Exception as e:
+        logger.error(f"Error fetching Jupiter metadata: {str(e)}")
+    return None
+
+async def get_magiceden_metadata(mint_address):
+    """Fetch NFT metadata from Magic Eden API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f'https://api-mainnet.magiceden.dev/v2/tokens/{mint_address}')
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'name': data.get('name'),
+                    'image': data.get('image'),
+                    'collection': data.get('collection'),
+                    'attributes': data.get('attributes', []),
+                    'verified': True
+                }
+    except Exception as e:
+        logger.error(f"Error fetching Magic Eden metadata: {str(e)}")
+    return None
 
 async def get_token_metadata(mint_address):
     """Fetch comprehensive token metadata from multiple sources"""
@@ -60,6 +94,24 @@ async def get_token_metadata(mint_address):
 
             # If supply is 1 and decimals is 0, it's likely an NFT
             if decimals == 0 and str(supply) == "1":
+                # Try Magic Eden first for NFT metadata
+                me_metadata = await get_magiceden_metadata(mint_address)
+                if me_metadata:
+                    logger.info(f"Found Magic Eden metadata for NFT: {mint_address}")
+                    return {
+                        'symbol': me_metadata.get('collection', 'Unknown'),
+                        'name': me_metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}'),
+                        'image': me_metadata.get('image'),
+                        'decimals': 0,
+                        'is_nft': True,
+                        'mint': mint_address,
+                        'collection': me_metadata.get('collection'),
+                        'attributes': me_metadata.get('attributes', []),
+                        'verified': me_metadata.get('verified', False),
+                        'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                    }
+
+                # Fallback to Metaplex metadata
                 nft_metadata = await make_rpc_call(
                     "getMetadata",
                     [mint_address]
@@ -71,7 +123,6 @@ async def get_token_metadata(mint_address):
                         name = metadata.get('name', f'NFT {mint_address[:4]}...{mint_address[-4:]}')
                         image_url = metadata.get('image', '')
 
-                        # If the image URL is an IPFS URL, convert it to HTTP
                         if image_url.startswith('ipfs://'):
                             image_url = f'https://ipfs.io/ipfs/{image_url[7:]}'
 
@@ -90,7 +141,36 @@ async def get_token_metadata(mint_address):
                         logger.error(f"Error processing NFT metadata: {str(e)}")
                         return None
 
-        # If not an NFT or NFT metadata fetch failed, try DEXScreener for token data
+        # Check token list cache first
+        await fetch_token_list()
+        if mint_address in token_list_cache['tokens']:
+            token_info = token_list_cache['tokens'][mint_address]
+            logger.info(f"Found token in token list: {mint_address}")
+            return {
+                'symbol': token_info.get('symbol', 'Unknown'),
+                'name': token_info.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
+                'icon': token_info.get('logoURI'),
+                'decimals': token_info.get('decimals', decimals),
+                'supply': supply,
+                'verified': True,
+                'mint': mint_address,
+                'is_token': True,
+                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+            }
+
+        # Try Jupiter API
+        jupiter_metadata = await get_jupiter_token_metadata(mint_address)
+        if jupiter_metadata:
+            logger.info(f"Found Jupiter metadata for token: {mint_address}")
+            return {
+                **jupiter_metadata,
+                'supply': supply,
+                'mint': mint_address,
+                'is_token': True,
+                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+            }
+
+        # Try DEXScreener as fallback
         dexscreener_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
         async with httpx.AsyncClient() as client:
             response = await client.get(dexscreener_url, timeout=10.0)
@@ -117,7 +197,7 @@ async def get_token_metadata(mint_address):
                         'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
                     }
 
-        # Fallback metadata with default icon
+        # Ultimate fallback with default icon
         logger.info(f"Using fallback metadata for {mint_address}")
         return {
             'symbol': 'Unknown',
@@ -134,7 +214,6 @@ async def get_token_metadata(mint_address):
         logger.error(f"Error fetching token metadata: {str(e)}")
         logger.exception("Full stack trace")
         return None
-
 
 async def is_nft(mint_address):
     """Check if a token is an NFT by looking for Metaplex metadata"""
