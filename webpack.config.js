@@ -38,16 +38,12 @@ module.exports = {
       "url": require.resolve("url/"),
       "zlib": require.resolve("browserify-zlib"),
       "buffer": require.resolve("buffer/"),
-      "process": require.resolve("process/browser"),
-      "vm": false,
-      "assert": false,
-      "path": false,
-      "fs": false
+      "process": require.resolve("process/browser")
     }
   },
   plugins: [
     new webpack.ProvidePlugin({
-      process: 'process/browser',
+      process: require.resolve("process/browser"),
       Buffer: ['buffer', 'Buffer']
     }),
     new webpack.DefinePlugin({

@@ -500,17 +500,15 @@ def get_assets():
 
 def get_port():
     """Get an available port for the Flask application"""
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('0.0.0.0', 8080))
-        sock.close()
-        logger.info("Using port 8080")
-        return 8080
-    except OSError:
-        logger.error("Port 8080 is not available, using port 3000")
-        return 3000
+    logger.info("Using port 3000 for Flask application")
+    return 3000
 
 if __name__ == '__main__':
-    port = get_port()
-    logger.info(f"Starting server on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    try:
+        port = get_port()
+        logger.info(f"Starting server on port {port}")
+        app.run(host='0.0.0.0', port=port, debug=True)
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}")
+        logger.exception("Full stack trace")
+        raise

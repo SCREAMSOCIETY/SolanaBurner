@@ -5,8 +5,8 @@
     <title>Solana Asset Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <!-- Development React -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
     <!-- Solana Web3 -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <!-- Wallet Adapter -->
@@ -19,38 +19,56 @@
     </div>
 
     <!-- Load our React component -->
-    <script src="{{ url_for('static', filename='dist/WalletProvider.js') }}"></script>
-    <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}"></script>
-
     <script>
-        window.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM fully loaded, initializing wallet provider...');
-            // Check if all required dependencies are loaded
-            if (!window.React) {
-                console.error('React is not loaded');
-                return;
+        // Verify React is loaded before proceeding
+        function checkDependencies() {
+            console.log('Checking dependencies...');
+            if (typeof React === 'undefined') {
+                console.error('React not loaded');
+                return false;
             }
-            if (!window.ReactDOM) {
-                console.error('ReactDOM is not loaded');
-                return;
+            if (typeof ReactDOM === 'undefined') {
+                console.error('ReactDOM not loaded');
+                return false;
             }
-            if (!window.solanaWeb3) {
-                console.error('Solana Web3 is not loaded');
+            if (typeof solanaWeb3 === 'undefined') {
+                console.error('Solana Web3 not loaded');
+                return false;
+            }
+            return true;
+        }
+
+        function initializeApp() {
+            if (!checkDependencies()) {
+                console.error('Dependencies not loaded, retrying in 1 second...');
+                setTimeout(initializeApp, 1000);
                 return;
             }
 
-            try {
-                console.log('Initializing wallet provider...');
-                if (!window.WalletProvider) {
-                    throw new Error('WalletProvider not loaded');
+            // Load and initialize WalletProvider
+            const script = document.createElement('script');
+            script.src = "{{ url_for('static', filename='dist/WalletProvider.js') }}";
+            script.onload = function() {
+                console.log('WalletProvider script loaded');
+                if (window.WalletProvider) {
+                    window.WalletProvider.render();
+                } else {
+                    console.error('WalletProvider not found on window object');
                 }
-                window.WalletProvider.render();
-            } catch (error) {
-                console.error('Error initializing wallet:', error);
-                document.getElementById('root').innerHTML = 
-                    '<div style="color: red; padding: 20px;">Error loading wallet provider. Please check console for details.</div>';
-            }
-        });
+            };
+            script.onerror = function() {
+                console.error('Failed to load WalletProvider script');
+            };
+            document.body.appendChild(script);
+        }
+
+        // Start initialization when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
     </script>
+    <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}"></script>
 </body>
 </html>
