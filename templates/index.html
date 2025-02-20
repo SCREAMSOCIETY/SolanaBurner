@@ -135,12 +135,21 @@
         </template>
         <template id="cnft-card-template">
             <div class="asset-card cnft-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select cNFT for burning">
+                </div>
                 <div class="cnft-image-wrapper">
                     <img class="cnft-image" src="" alt="cNFT" loading="lazy" />
                 </div>
                 <div class="cnft-info">
                     <h4 class="cnft-name"></h4>
                     <p class="cnft-collection"></p>
+                </div>
+                <div class="token-actions">
+                    <button class="burn-button">Burn cNFT</button>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
                 </div>
             </div>
         </template>
@@ -398,6 +407,7 @@
         }
 
 
+
         function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
             imgElement.classList.add('loading');
 
@@ -588,12 +598,53 @@
         function createCNFTCard(cnft) {
             const template = document.querySelector('#cnft-card-template');
             const card = template.content.cloneNode(true);
+            const cardElement = card.querySelector('.cnft-card');
+            cardElement.dataset.mint = cnft.mint;
 
             const imageElem = card.querySelector('.cnft-image');
             setupIntelligentImageLoading(imageElem, cnft.image, 'cnft');
 
-            card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
+            const displayName = cnft.name || `cNFT ${cnft.mint.slice(0,4)}...${cnft.mint.slice(-4)}`;
+            card.querySelector('.cnft-name').textContent = displayName;
             card.querySelector('.cnft-collection').textContent = cnft.collection || '';
+
+            // Add Solscan link
+            card.querySelector('.solscan-link').href = cnft.explorer_url || `https://solscan.io/token/${cnft.mint}`;
+
+            // Setup burn button handlers
+            const burnButton = card.querySelector('.burn-button');
+            burnButton.dataset.mint = cnft.mint;
+
+            burnButton.addEventListener('click', async () => {
+                if (!confirm(`Are you sure you want to burn this cNFT (${displayName})? This action cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    showLoading(true);
+                    const result = await burnToken(cnft.mint, 1, 0);
+                    if (result) {
+                        showStatus('cNFT burned successfully');
+                        cardElement.classList.add('burned');
+                        setTimeout(() => {
+                            cardElement.remove();
+                        }, 500);
+                    }
+                } catch (error) {
+                    showError(`Failed to burn cNFT: ${error.message}`);
+                } finally {
+                    showLoading(false);
+                }
+            });
+
+            // Setup selection functionality
+            setupAssetSelection(card, {
+                ...cnft,
+                is_nft: true,
+                mint: cnft.mint,
+                decimals: 0,
+                amount: 1
+            }, displayName);
 
             return card;
         }
