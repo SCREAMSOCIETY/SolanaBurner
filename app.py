@@ -45,8 +45,37 @@ async def make_rpc_call(method, params):
 
 
 async def get_token_metadata(mint_address):
-    """Fetch token metadata from Jupiter API"""
+    """Fetch token metadata from DEXScreener and Jupiter API"""
     try:
+        # Try DEXScreener first for the token image
+        dexscreener_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(dexscreener_url, timeout=10.0)
+
+            if response.status_code == 200:
+                dex_data = response.json()
+                if dex_data.get('pairs') and len(dex_data['pairs']) > 0:
+                    token_data = dex_data['pairs'][0]
+                    logger.info(f"Successfully fetched token data from DEXScreener for {mint_address}")
+
+                    # Now get additional metadata from Jupiter
+                    jupiter_url = "https://token.jup.ag/all"
+                    response = await client.get(jupiter_url, timeout=10.0)
+
+                    if response.status_code == 200:
+                        tokens = response.json()
+                        token_info = next((token for token in tokens if token.get('address') == mint_address), None)
+
+                        if token_info:
+                            return {
+                                'symbol': token_info.get('symbol', token_data.get('baseToken', {}).get('symbol', 'Unknown')),
+                                'name': token_info.get('name', f'Token {mint_address[:4]}...{mint_address[-4:]}'),
+                                'icon': token_data.get('baseToken', {}).get('logoURI', token_info.get('logoURI', '')),
+                                'decimals': token_info.get('decimals', 9),
+                                'explorer_url': f"https://explorer.solana.com/address/{mint_address}"
+                            }
+
+        # Fallback to Jupiter if DEXScreener doesn't have the token
         jupiter_url = "https://token.jup.ag/all"
         async with httpx.AsyncClient() as client:
             response = await client.get(jupiter_url, timeout=10.0)
