@@ -269,17 +269,46 @@
                 loadWithFallback();
             }
 
+            function formatAddress(address) {
+                return `${address.slice(0, 4)}...${address.slice(-4)}`;
+            }
+
+            function getDisplayName(asset, type = 'token') {
+                if (type === 'token') {
+                    // For tokens, try name + symbol if available
+                    if (asset.name && asset.symbol) {
+                        return `${asset.name} (${asset.symbol})`;
+                    } else if (asset.name) {
+                        return asset.name;
+                    } else if (asset.symbol) {
+                        return asset.symbol;
+                    }
+                } else if (type === 'nft') {
+                    // For NFTs, try name + collection
+                    if (asset.name && asset.collection) {
+                        return `${asset.name} - ${asset.collection}`;
+                    } else if (asset.name) {
+                        return asset.name;
+                    } else if (asset.collection) {
+                        return `NFT from ${asset.collection}`;
+                    }
+                }
+                // Fallback to formatted address
+                return `${type === 'token' ? 'Token' : 'NFT'} ${formatAddress(asset.mint)}`;
+            }
+
             function createTokenCard(token) {
                 const template = document.querySelector('#token-card-template');
                 const card = template.content.cloneNode(true);
                 const cardElement = card.querySelector('.asset-card');
-                cardElement.dataset.mint = token.mint;  // Add data-mint attribute
+                cardElement.dataset.mint = token.mint;
 
                 const iconElem = card.querySelector('.token-icon');
                 setupIntelligentImageLoading(iconElem, token.icon, 'token');
 
-                card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
-                card.querySelector('.token-symbol').textContent = token.symbol || 'Unknown';
+                const displayName = getDisplayName(token, 'token');
+                card.querySelector('.token-name').textContent = displayName;
+                card.querySelector('.token-symbol').textContent = token.symbol || formatAddress(token.mint);
                 card.querySelector('.balance-amount').textContent = formatNumber(token.amount);
                 card.querySelector('.supply-amount').textContent = formatNumber(token.supply);
                 card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
@@ -306,7 +335,8 @@
                         selectedAssets.set(token.mint, {
                             type: 'token',
                             amount: parseFloat(card.querySelector('.burn-amount').value) || token.amount,
-                            decimals: token.decimals
+                            decimals: token.decimals,
+                            displayName: displayName
                         });
                         card.classList.add('selected');
                     } else {
@@ -317,7 +347,6 @@
                     updateBulkActionsBar();
                 });
 
-                // Update burn amount when changed
                 burnInput.addEventListener('change', () => {
                     if (selectedAssets.has(token.mint)) {
                         selectedAssets.set(token.mint, {
@@ -334,12 +363,13 @@
                 const template = document.querySelector('#nft-card-template');
                 const card = template.content.cloneNode(true);
                 const cardElement = card.querySelector('.asset-card');
-                cardElement.dataset.mint = nft.mint;  // Add data-mint attribute
+                cardElement.dataset.mint = nft.mint;
 
                 const imageElem = card.querySelector('.nft-image');
                 setupIntelligentImageLoading(imageElem, nft.image, 'nft');
 
-                card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
+                const displayName = getDisplayName(nft, 'nft');
+                card.querySelector('.nft-name').textContent = displayName;
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
                 card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
 
@@ -347,13 +377,13 @@
                 burnButton.dataset.mint = nft.mint;
 
                 burnButton.addEventListener('click', async () => {
-                    if (!confirm(`Are you sure you want to burn this NFT? This action cannot be undone.`)) {
+                    if (!confirm(`Are you sure you want to burn this NFT (${displayName})? This action cannot be undone.`)) {
                         return;
                     }
 
                     try {
                         showLoading(true);
-                        const result = await burnToken(nft.mint, 1, 0); // NFTs always have amount 1 and decimals 0
+                        const result = await burnToken(nft.mint, 1, 0);
                         if (result) {
                             showStatus('NFT burned successfully');
                             card.classList.add('burned');
@@ -377,7 +407,8 @@
                         selectedAssets.set(nft.mint, {
                             type: 'nft',
                             amount: 1,
-                            decimals: 0
+                            decimals: 0,
+                            displayName: displayName
                         });
                         card.classList.add('selected');
                     } else {
@@ -656,10 +687,8 @@
                 // Create a summary of selected assets
                 let summary = 'You are about to burn:\n';
                 for (const [mint, asset] of selectedAssets) {
-                    const card = document.querySelector(`[data-mint="${mint}"]`).closest('.asset-card');
-                    const name = card.querySelector('.token-name, .nft-name').textContent;
                     const amount = asset.type === 'nft' ? '1' : asset.amount;
-                    summary += `\n- ${name}: ${amount}`;
+                    summary += `\n- ${asset.displayName}: ${amount}`;
                 }
 
                 if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
