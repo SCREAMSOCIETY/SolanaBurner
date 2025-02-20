@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -20,88 +19,6 @@
             </div>
         </div>
         <div id="statusMessage" style="display: none;" class="status-message"></div>
-
-        <template id="token-card-template">
-            <div class="asset-card token-card">
-                <div class="selection-overlay">
-                    <input type="checkbox" class="asset-selector" aria-label="Select asset for burning">
-                </div>
-                <div class="token-header">
-                    <div class="token-icon-wrapper">
-                        <img class="token-icon" src="" alt="Token Icon" loading="lazy" />
-                    </div>
-                    <div class="token-info">
-                        <h4 class="token-name"></h4>
-                        <span class="token-symbol"></span>
-                    </div>
-                </div>
-                <div class="token-details">
-                    <div class="token-balance">
-                        <span class="balance-label">Balance:</span>
-                        <span class="balance-amount"></span>
-                    </div>
-                </div>
-                <div class="token-actions">
-                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
-                    <button class="burn-button">Burn Token</button>
-                </div>
-                <div class="links-container">
-                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
-                </div>
-            </div>
-        </template>
-
-        <template id="nft-card-template">
-            <div class="asset-card nft-card">
-                <div class="selection-overlay">
-                    <input type="checkbox" class="asset-selector" aria-label="Select NFT for burning">
-                </div>
-                <div class="nft-image-wrapper">
-                    <img class="nft-image" src="" alt="NFT" loading="lazy" />
-                </div>
-                <div class="nft-info">
-                    <h4 class="nft-name"></h4>
-                    <p class="nft-collection"></p>
-                </div>
-                <div class="token-actions">
-                    <button class="burn-button">Burn NFT</button>
-                </div>
-                <div class="links-container">
-                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
-                </div>
-            </div>
-        </template>
-
-        <template id="cnft-card-template">
-            <div class="asset-card cnft-card">
-                <div class="cnft-image-wrapper">
-                    <img class="cnft-image" src="" alt="cNFT" loading="lazy" />
-                </div>
-                <div class="cnft-info">
-                    <h4 class="cnft-name"></h4>
-                    <p class="cnft-collection"></p>
-                </div>
-            </div>
-        </template>
-
-        <template id="domain-card-template">
-            <div class="asset-card domain-card">
-                <div class="selection-overlay">
-                    <input type="checkbox" class="asset-selector" aria-label="Select domain for burning">
-                </div>
-                <div class="domain-info">
-                    <h4 class="domain-name"></h4>
-                    <p class="domain-parent"></p>
-                </div>
-                <div class="token-actions">
-                    <button class="burn-button">Burn Domain</button>
-                </div>
-                <div class="links-container">
-                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
-                </div>
-            </div>
-        </template>
-
         <div id="assetsContainer" class="assets-container" style="display: none;">
             <h2>Your Assets</h2>
             <div class="tabs">
@@ -161,144 +78,188 @@
                 </div>
             </div>
         </template>
+        <template id="token-card-template">
+            <div class="asset-card token-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select asset for burning">
+                </div>
+                <div class="token-header">
+                    <div class="token-icon-wrapper">
+                        <img class="token-icon" src="" alt="Token Icon" loading="lazy" />
+                    </div>
+                    <div class="token-info">
+                        <h4 class="token-name"></h4>
+                        <span class="token-symbol"></span>
+                    </div>
+                </div>
+                <div class="token-details">
+                    <div class="token-balance">
+                        <span class="balance-label">Balance:</span>
+                        <span class="balance-amount"></span>
+                    </div>
+                </div>
+                <div class="token-actions">
+                    <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
+                    <button class="burn-button">Burn Token</button>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
+            </div>
+        </template>
+        <template id="nft-card-template">
+            <div class="asset-card nft-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select NFT for burning">
+                </div>
+                <div class="nft-image-wrapper">
+                    <img class="nft-image" src="" alt="NFT" loading="lazy" />
+                </div>
+                <div class="nft-info">
+                    <h4 class="nft-name"></h4>
+                    <p class="nft-collection"></p>
+                </div>
+                <div class="token-actions">
+                    <button class="burn-button">Burn NFT</button>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
+            </div>
+        </template>
+        <template id="cnft-card-template">
+            <div class="asset-card cnft-card">
+                <div class="cnft-image-wrapper">
+                    <img class="cnft-image" src="" alt="cNFT" loading="lazy" />
+                </div>
+                <div class="cnft-info">
+                    <h4 class="cnft-name"></h4>
+                    <p class="cnft-collection"></p>
+                </div>
+            </div>
+        </template>
+        <template id="domain-card-template">
+            <div class="asset-card domain-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select domain for burning">
+                </div>
+                <div class="domain-info">
+                    <h4 class="domain-name"></h4>
+                    <p class="domain-parent"></p>
+                </div>
+                <div class="token-actions">
+                    <button class="burn-button">Burn Domain</button>
+                </div>
+                <div class="links-container">
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
+            </div>
+        </template>
     </div>
 
-    <script>
-        // Global variables with proper scoping
-        let currentWallet = null;
-        let connection = null;
-        let TOKEN_PROGRAM_ID = null;
-        let selectedAssets = new Map();
+    <!-- Load Solana first -->
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 
-        // Initialize UI elements
+    <script>
+        // Debug logging
+        const debug = (msg) => {
+            console.log(`[Debug] ${msg}`);
+        };
+
+        // Global state
+        let wallet = null;
+        let connection = null;
+
+        // UI elements
         const connectButton = document.getElementById('connectButton');
         const walletInfo = document.getElementById('walletInfo');
         const walletAddress = document.getElementById('walletAddress');
         const statusMessage = document.getElementById('statusMessage');
         const assetsContainer = document.getElementById('assetsContainer');
-        const loadingMessage = document.getElementById('loadingMessage');
-        const errorMessage = document.getElementById('errorMessage');
 
+        // Show status message
         function showStatus(message, isError = false) {
-            console.log(`Status: ${message}${isError ? ' (ERROR)' : ''}`);
+            debug(`Status: ${message} (${isError ? 'error' : 'info'})`);
             statusMessage.textContent = message;
             statusMessage.style.display = 'block';
             statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
         }
 
-        // Wait for Solana Web3 to be ready
-        function waitForSolana(callback) {
-            if (window.solanaWeb3) {
-                console.log("Solana Web3 loaded, initializing...");
-                callback();
-            } else {
-                console.log("Waiting for Solana Web3 to load...");
-                setTimeout(() => waitForSolana(callback), 100);
-            }
-        }
-
-        // Initialize wallet connection
-        async function initializeWallet() {
-            try {
-                // Initialize Solana constants
-                TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-
-                // Add click handler for connect button
-                connectButton.addEventListener('click', connectWallet);
-
-                // Setup wallet event listeners if Phantom is available
-                if (window.solana) {
-                    console.log("Setting up Phantom wallet listeners");
-
-                    window.solana.on('connect', async () => {
-                        console.log("Wallet connected event fired");
-                        if (window.solana.publicKey) {
-                            const address = window.solana.publicKey.toString();
-                            console.log(`Connected to wallet: ${address}`);
-
-                            currentWallet = window.solana;
-                            connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
-
-                            connectButton.style.display = 'none';
-                            walletInfo.style.display = 'block';
-                            walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
-                            assetsContainer.style.display = 'block';
-
-                            showStatus('Connected to Phantom wallet');
-                            await loadAssets(address);
-                        }
-                    });
-
-                    window.solana.on('disconnect', () => {
-                        console.log("Wallet disconnected event fired");
-                        currentWallet = null;
-                        connection = null;
-                        connectButton.style.display = 'block';
-                        walletInfo.style.display = 'none';
-                        assetsContainer.style.display = 'none';
-                        showStatus('Wallet disconnected');
-                    });
-
-                    // Check if already connected
-                    if (window.solana.isPhantom && window.solana.isConnected) {
-                        console.log("Wallet already connected, initializing...");
-                        connectWallet();
-                    }
-                } else {
-                    console.log("Phantom wallet not found");
-                    showStatus('Please install Phantom wallet', true);
-                }
-            } catch (error) {
-                console.error("Wallet initialization error:", error);
-                showStatus(`Wallet initialization failed: ${error.message}`, true);
-            }
-        }
-
+        // Simple wallet connection
         async function connectWallet() {
             try {
-                console.log("Starting wallet connection...");
+                debug('Starting wallet connection...');
 
+                // Check if Phantom is installed
                 if (!window.solana || !window.solana.isPhantom) {
-                    console.error("Phantom wallet not found");
-                    showStatus('Please install Phantom wallet', true);
+                    debug('Phantom wallet not found');
+                    showStatus('Please install Phantom wallet first', true);
                     window.open('https://phantom.app/', '_blank');
                     return;
                 }
 
+                debug('Phantom detected, requesting connection...');
                 showStatus('Connecting to Phantom...');
+
+                // Request connection
                 const resp = await window.solana.connect();
-                console.log("Connection response:", resp);
+                debug('Connection response received');
 
                 if (resp.publicKey) {
                     const address = resp.publicKey.toString();
-                    currentWallet = window.solana;
-                    connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
+                    debug(`Connected to address: ${address}`);
 
+                    // Update UI
                     connectButton.style.display = 'none';
                     walletInfo.style.display = 'block';
-                    walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-6)}`;
+                    walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-4)}`;
                     assetsContainer.style.display = 'block';
 
+                    // Initialize connection
+                    wallet = window.solana;
+                    connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
+
                     showStatus('Successfully connected to wallet');
+
+                    // Load assets
                     await loadAssets(address);
                 }
             } catch (error) {
-                console.error("Connection error:", error);
-                showStatus(`Connection failed: ${error.message}`, true);
-
-                currentWallet = null;
-                connection = null;
-                connectButton.style.display = 'block';
-                walletInfo.style.display = 'none';
-                assetsContainer.style.display = 'none';
+                debug(`Connection error: ${error.message}`);
+                showStatus(`Failed to connect: ${error.message}`, true);
             }
         }
 
-        // Start initialization when both DOM and Solana are ready
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM loaded, waiting for Solana Web3...");
-            waitForSolana(initializeWallet);
+        // Setup event listeners
+        connectButton.addEventListener('click', () => {
+            debug('Connect button clicked');
+            connectWallet();
         });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            debug('Page loaded, checking wallet status');
+
+            if (window.solana && window.solana.isPhantom) {
+                debug('Phantom detected on load');
+                if (window.solana.isConnected) {
+                    debug('Wallet is already connected');
+                    connectWallet();
+                }
+            } else {
+                debug('Phantom not detected on load');
+                showStatus('Please install Phantom wallet', true);
+            }
+        });
+
+
+        let currentWallet = null;
+        let connection = null;
+        let TOKEN_PROGRAM_ID = null;
+        let selectedAssets = new Map();
+
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorMessage = document.getElementById('errorMessage');
 
         function showLoading(show = true) {
             loadingMessage.style.display = show ? 'block' : 'none';
@@ -380,6 +341,7 @@
                 showError(`Failed to load assets: ${error.message}`);
             }
         }
+
 
 
         function setupIntelligentImageLoading(imgElement, primaryUrl, type = 'token') {
@@ -894,12 +856,12 @@
                 // Remove burned assets from display
                 for (const [mint] of selectedAssets) {
                     const card = document.querySelector(`.asset-card[data-mint="${mint}"]`);
-                    if (                    if (card) {
+                    if (card) {
                         card.classList.add('burned');
                         setTimeout(() => {
                             card.remove();
                         }, 500);
-                    }                        }
+                    }
                 }
 
                 // Clear selection
@@ -956,9 +918,8 @@
             });
         }
 
-
         // Check if wallet is already connected
-        if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
+        if (window.solana&& window.solana.isPhantom && window.solana.isConnected) {
             console.log('Wallet already connected, reconnecting...');
             connectWallet();
         }
