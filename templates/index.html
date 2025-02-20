@@ -69,6 +69,9 @@
                     <h4 class="nft-name"></h4>
                     <p class="nft-collection"></p>
                 </div>
+                <div class="token-actions">
+                    <button class="burn-button">Burn NFT</button>
+                </div>
                 <div class="links-container">
                     <a class="solscan-link" href="" target="_blank">View on Solscan</a>
                 </div>
@@ -291,6 +294,31 @@
                 card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
                 card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
+
+                const burnButton = card.querySelector('.burn-button');
+                burnButton.dataset.mint = nft.mint;
+
+                burnButton.addEventListener('click', async () => {
+                    if (!confirm(`Are you sure you want to burn this NFT? This action cannot be undone.`)) {
+                        return;
+                    }
+
+                    try {
+                        showLoading(true);
+                        const result = await burnToken(nft.mint, 1, 0); // NFTs always have amount 1 and decimals 0
+                        if (result) {
+                            showStatus('NFT burned successfully');
+                            card.classList.add('burned');
+                            setTimeout(() => {
+                                card.remove();
+                            }, 500);
+                        }
+                    } catch (error) {
+                        showError(`Failed to burn NFT: ${error.message}`);
+                    } finally {
+                        showLoading(false);
+                    }
+                });
 
                 return card;
             }
