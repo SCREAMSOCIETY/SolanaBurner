@@ -55,13 +55,6 @@
                     <div class="assets-grid"></div>
                 </div>
                 <div id="vacant" class="tab-panel">
-                    <div class="bulk-actions-bar">
-                        <div class="selected-count">0 accounts selected</div>
-                        <div class="bulk-actions">
-                            <button class="bulk-reclaim-button">Reclaim Selected</button>
-                            <button class="clear-selection">Clear Selection</button>
-                        </div>
-                    </div>
                     <div class="assets-grid"></div>
                 </div>
             </div>
@@ -902,7 +895,7 @@
             // Create a summary of selected assets
             let summary = 'You are about to burn:\n';
             for (const [mint, asset] of selectedAssets) {
-                const amount = asset.type === 'nft' ? '1' : asset.amount;
+                const amount = asset.type=== 'nft' ? '1' : asset.amount;
                 summary += `\n- ${asset.displayName}: ${amount}`;
             }
 
@@ -1111,21 +1104,6 @@
                     vacantGrid.appendChild(card);
                 });
 
-                // Setup bulk reclaim button
-                const bulkReclaimButton = document.querySelector('#vacant .bulk-reclaim-button');
-                bulkReclaimButton.addEventListener('click', async () => {
-                    const selectedVacantAccounts = Array.from(selectedAssets.entries())
-                        .filter(([_, asset]) => asset.type === 'vacant')
-                        .map(([_, asset]) => asset);
-
-                    if (selectedVacantAccounts.length === 0) {
-                        showError('No accounts selected for reclaiming');
-                        return;
-                    }
-
-                    await bulkReclaimRent(selectedVacantAccounts);
-                });
-
             } catch (error) {
                 console.error('Error loading vacant accounts:', error);
                 vacantGrid.innerHTML = `<div class="error">Error loading vacant accounts: ${error.message}</div>`;
@@ -1145,7 +1123,6 @@
             }
 
             showLoading(true);
-            let successCount = 0;
             let totalSOL = 0;
 
             try {
@@ -1209,6 +1186,7 @@
                 showLoading(false);
             }
         }
+
     </script>
 </body>
 </html>
