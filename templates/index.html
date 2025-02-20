@@ -3,6 +3,8 @@
 <head>
     <meta charset="utf-8" />
     <title>Solana Token Burner</title>
+    <!-- Load Solana Web3 first -->
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
@@ -157,18 +159,11 @@
         </template>
     </div>
 
-    <!-- Load Solana first -->
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-
     <script>
-        // Debug logging
-        const debug = (msg) => {
-            console.log(`[Debug] ${msg}`);
-        };
-
-        // Global state
+        // Single source of truth for wallet state
         let wallet = null;
         let connection = null;
+        let TOKEN_PROGRAM_ID = null;
 
         // UI elements
         const connectButton = document.getElementById('connectButton');
@@ -177,37 +172,40 @@
         const statusMessage = document.getElementById('statusMessage');
         const assetsContainer = document.getElementById('assetsContainer');
 
-        // Show status message
         function showStatus(message, isError = false) {
-            debug(`Status: ${message} (${isError ? 'error' : 'info'})`);
+            console.log(`Status: ${message} (${isError ? 'error' : 'info'})`);
             statusMessage.textContent = message;
             statusMessage.style.display = 'block';
             statusMessage.className = `status-message ${isError ? 'error' : 'success'}`;
         }
 
-        // Simple wallet connection
         async function connectWallet() {
-            try {
-                debug('Starting wallet connection...');
+            console.log('Connect wallet clicked');
 
+            try {
                 // Check if Phantom is installed
                 if (!window.solana || !window.solana.isPhantom) {
-                    debug('Phantom wallet not found');
+                    console.log('Phantom not found');
                     showStatus('Please install Phantom wallet first', true);
                     window.open('https://phantom.app/', '_blank');
                     return;
                 }
 
-                debug('Phantom detected, requesting connection...');
+                console.log('Requesting connection...');
                 showStatus('Connecting to Phantom...');
 
                 // Request connection
                 const resp = await window.solana.connect();
-                debug('Connection response received');
+                console.log('Connection response:', resp);
 
                 if (resp.publicKey) {
                     const address = resp.publicKey.toString();
-                    debug(`Connected to address: ${address}`);
+                    console.log('Connected to address:', address);
+
+                    // Update global state
+                    wallet = window.solana;
+                    connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
+                    TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
                     // Update UI
                     connectButton.style.display = 'none';
@@ -215,47 +213,65 @@
                     walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-4)}`;
                     assetsContainer.style.display = 'block';
 
-                    // Initialize connection
-                    wallet = window.solana;
-                    connection = new solanaWeb3.Connection('{{ rpc_endpoint }}');
-
                     showStatus('Successfully connected to wallet');
-
-                    // Load assets
                     await loadAssets(address);
                 }
             } catch (error) {
-                debug(`Connection error: ${error.message}`);
+                console.error('Connection error:', error);
                 showStatus(`Failed to connect: ${error.message}`, true);
+
+                // Reset state
+                wallet = null;
+                connection = null;
+                TOKEN_PROGRAM_ID = null;
+
+                // Reset UI
+                connectButton.style.display = 'block';
+                walletInfo.style.display = 'none';
+                assetsContainer.style.display = 'none';
             }
         }
 
-        // Setup event listeners
-        connectButton.addEventListener('click', () => {
-            debug('Connect button clicked');
-            connectWallet();
-        });
-
-        // Initialize
+        // Initialize when page loads
         document.addEventListener('DOMContentLoaded', () => {
-            debug('Page loaded, checking wallet status');
+            console.log('Page loaded, initializing...');
 
-            if (window.solana && window.solana.isPhantom) {
-                debug('Phantom detected on load');
+            // Setup connect button handler
+            connectButton.addEventListener('click', connectWallet);
+            console.log('Connect button handler attached');
+
+            // Setup Phantom event listeners
+            if (window.solana) {
+                window.solana.on('connect', () => {
+                    console.log('Wallet connected event received');
+                    if (window.solana.publicKey) {
+                        const address = window.solana.publicKey.toString();
+                        walletAddress.textContent = `Address: ${address.slice(0,6)}...${address.slice(-4)}`;
+                    }
+                });
+
+                window.solana.on('disconnect', () => {
+                    console.log('Wallet disconnected');
+                    wallet = null;
+                    connection = null;
+                    TOKEN_PROGRAM_ID = null;
+                    connectButton.style.display = 'block';
+                    walletInfo.style.display = 'none';
+                    assetsContainer.style.display = 'none';
+                    showStatus('Wallet disconnected');
+                });
+
+                // Check if already connected
                 if (window.solana.isConnected) {
-                    debug('Wallet is already connected');
+                    console.log('Wallet already connected, connecting...');
                     connectWallet();
                 }
             } else {
-                debug('Phantom not detected on load');
+                console.log('Phantom not detected');
                 showStatus('Please install Phantom wallet', true);
             }
         });
 
-
-        let currentWallet = null;
-        let connection = null;
-        let TOKEN_PROGRAM_ID = null;
         let selectedAssets = new Map();
 
         const loadingMessage = document.getElementById('loadingMessage');
@@ -646,7 +662,7 @@
 
         async function burnToken(mint, amount, decimals) {
             const mintPubkey = new solanaWeb3.PublicKey(mint);
-            const walletPubkey = currentWallet.publicKey;
+            const walletPubkey = wallet.publicKey;
 
             console.log(`Creating burn instruction for ${mint}`);
             console.log(`- Amount: ${amount}`);
@@ -841,13 +857,14 @@
                 // Create and send transaction
                 const latestBlockhash = await connection.getLatestBlockhash();
                 const transaction = new solanaWeb3.Transaction({
-                    feePayer: currentWallet.publicKey,
-                    ...latestBlockhash,
+                    feePayer: wallet.publicKey,
+                    recentBlockhash: latestBlockhash.blockhash,
+                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
                 });
 
                 transaction.add(...instructions);
 
-                const signed= await currentWallet.signTransaction(transaction);
+                const signed = await wallet.signTransaction(transaction);
                 const signature = await connection.sendRawTransaction(signed.serialize());
                 await connection.confirmTransaction(signature);
 
@@ -890,8 +907,7 @@
 
                 const amount = parseFloat(burnInput.value);
                 if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
-                    return;
-                }
+                    return;                }
 
                 try {
                     showLoading(true);
