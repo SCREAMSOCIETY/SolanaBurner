@@ -54,7 +54,10 @@
             <input type="number" class="burn-amount" placeholder="Amount to burn" step="0.000001" />
             <button class="burn-button">Burn Token</button>
         </div>
-        <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+        <div class="links-container">
+            <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+            <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+        </div>
     </div>
 </template>
 
@@ -67,7 +70,10 @@
                     <h4 class="nft-name"></h4>
                     <p class="nft-collection"></p>
                 </div>
-                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                <div class="links-container">
+                    <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
             </div>
         </template>
         <template id="cnft-card-template">
@@ -79,7 +85,10 @@
                     <h4 class="cnft-name"></h4>
                     <p class="cnft-collection"></p>
                 </div>
-                <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                <div class="links-container">
+                    <a class="explorer-link" href="" target="_blank">View on Explorer</a>
+                    <a class="solscan-link" href="" target="_blank">View on Solscan</a>
+                </div>
             </div>
         </template>
 
@@ -170,7 +179,10 @@
                 card.querySelector('.supply-amount').textContent = formatNumber(token.supply);
                 card.querySelector('.price-amount').textContent = token.price_usd !== 'Unknown' ? `$${Number(token.price_usd).toFixed(6)}` : 'Unknown';
                 card.querySelector('.volume-amount').textContent = token.volume_24h !== 'Unknown' ? `$${formatNumber(token.volume_24h)}` : 'Unknown';
+
+                // Set Explorer and Solscan links
                 card.querySelector('.explorer-link').href = token.explorer_url;
+                card.querySelector('.solscan-link').href = `https://solscan.io/token/${token.mint}`;
 
                 const burnInput = card.querySelector('.burn-amount');
                 burnInput.max = token.amount;
@@ -211,7 +223,10 @@
 
                 card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
+
+                // Set Explorer and Solscan links
                 card.querySelector('.explorer-link').href = nft.explorer_url;
+                card.querySelector('.solscan-link').href = `https://solscan.io/nft/${nft.mint}`;
 
                 return card;
             }
@@ -228,7 +243,10 @@
 
                 card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
                 card.querySelector('.cnft-collection').textContent = cnft.collection || '';
+
+                // Set Explorer and Solscan links
                 card.querySelector('.explorer-link').href = cnft.explorer_url;
+                card.querySelector('.solscan-link').href = `https://solscan.io/address/${cnft.address}`;
 
                 return card;
             }

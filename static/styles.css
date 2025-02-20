@@ -305,6 +305,8 @@ h3 {
 }
 
 .explorer-link {
+    display: inline-block;
+    margin-top: 1rem;
     color: var(--primary-color);
     text-decoration: none;
     font-size: 0.9rem;
@@ -315,6 +317,7 @@ h3 {
 .explorer-link:hover {
     opacity: 1;
 }
+
 
 .burn-amount::-webkit-inner-spin-button,
 .burn-amount::-webkit-outer-spin-button {
@@ -558,7 +561,6 @@ h3 {
     font-size: 0.8rem;
 }
 
-
 .explorer-link {
     display: inline-block;
     margin-top: 1rem;
@@ -608,4 +610,32 @@ h3 {
 .burn-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Links Container Styles */
+.links-container {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.explorer-link,
+.solscan-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    background: rgba(153, 69, 255, 0.1);
+}
+
+.explorer-link:hover,
+.solscan-link:hover {
+    opacity: 1;
+    background: rgba(153, 69, 255, 0.2);
 }
