@@ -272,6 +272,8 @@
             function createTokenCard(token) {
                 const template = document.querySelector('#token-card-template');
                 const card = template.content.cloneNode(true);
+                const cardElement = card.querySelector('.asset-card');
+                cardElement.dataset.mint = token.mint;  // Add data-mint attribute
 
                 const iconElem = card.querySelector('.token-icon');
                 setupIntelligentImageLoading(iconElem, token.icon, 'token');
@@ -331,6 +333,8 @@
             function createNFTCard(nft) {
                 const template = document.querySelector('#nft-card-template');
                 const card = template.content.cloneNode(true);
+                const cardElement = card.querySelector('.asset-card');
+                cardElement.dataset.mint = nft.mint;  // Add data-mint attribute
 
                 const imageElem = card.querySelector('.nft-image');
                 setupIntelligentImageLoading(imageElem, nft.image, 'nft');
@@ -649,7 +653,16 @@
             }
 
             async function burnSelectedAssets() {
-                if (!confirm(`Are you sure you want to burn ${selectedAssets.size} selected asset(s)? This action cannot be undone.`)) {
+                // Create a summary of selected assets
+                let summary = 'You are about to burn:\n';
+                for (const [mint, asset] of selectedAssets) {
+                    const card = document.querySelector(`[data-mint="${mint}"]`).closest('.asset-card');
+                    const name = card.querySelector('.token-name, .nft-name').textContent;
+                    const amount = asset.type === 'nft' ? '1' : asset.amount;
+                    summary += `\n- ${name}: ${amount}`;
+                }
+
+                if (!confirm(`${summary}\n\nThis action cannot be undone. Do you want to continue?`)) {
                     return;
                 }
 
