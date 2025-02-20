@@ -23,6 +23,9 @@
 
         <template id="token-card-template">
             <div class="asset-card token-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select asset for burning">
+                </div>
                 <div class="token-header">
                     <div class="token-icon-wrapper">
                         <img class="token-icon" src="" alt="Token Icon" loading="lazy" />
@@ -62,6 +65,9 @@
 
         <template id="nft-card-template">
             <div class="asset-card nft-card">
+                <div class="selection-overlay">
+                    <input type="checkbox" class="asset-selector" aria-label="Select NFT for burning">
+                </div>
                 <div class="nft-image-wrapper">
                     <img class="nft-image" src="" alt="NFT" loading="lazy" />
                 </div>
@@ -99,6 +105,14 @@
             </div>
             <div id="loadingMessage" class="loading-message" style="display: none;">Loading assets...</div>
             <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+            <div class="bulk-actions-bar" style="display: none;">
+                <div class="selected-count">0 items selected</div>
+                <div class="bulk-actions">
+                    <button class="bulk-burn-button">Burn Selected</button>
+                    <button class="clear-selection">Clear Selection</button>
+                </div>
+            </div>
 
             <div class="tab-content">
                 <div id="tokens" class="tab-panel active">
@@ -281,6 +295,36 @@
 
                 setupBurnButton(burnButton, burnInput, token);
 
+                const selector = card.querySelector('.asset-selector');
+                selector.addEventListener('change', (e) => {
+                    const isSelected = e.target.checked;
+                    const card = e.target.closest('.asset-card');
+
+                    if (isSelected) {
+                        selectedAssets.set(token.mint, {
+                            type: 'token',
+                            amount: parseFloat(card.querySelector('.burn-amount').value) || token.amount,
+                            decimals: token.decimals
+                        });
+                        card.classList.add('selected');
+                    } else {
+                        selectedAssets.delete(token.mint);
+                        card.classList.remove('selected');
+                    }
+
+                    updateBulkActionsBar();
+                });
+
+                // Update burn amount when changed
+                burnInput.addEventListener('change', () => {
+                    if (selectedAssets.has(token.mint)) {
+                        selectedAssets.set(token.mint, {
+                            ...selectedAssets.get(token.mint),
+                            amount: parseFloat(burnInput.value) || token.amount
+                        });
+                    }
+                });
+
                 return card;
             }
 
@@ -318,6 +362,26 @@
                     } finally {
                         showLoading(false);
                     }
+                });
+
+                const selector = card.querySelector('.asset-selector');
+                selector.addEventListener('change', (e) => {
+                    const isSelected = e.target.checked;
+                    const card = e.target.closest('.asset-card');
+
+                    if (isSelected) {
+                        selectedAssets.set(nft.mint, {
+                            type: 'nft',
+                            amount: 1,
+                            decimals: 0
+                        });
+                        card.classList.add('selected');
+                    } else {
+                        selectedAssets.delete(nft.mint);
+                        card.classList.remove('selected');
+                    }
+
+                    updateBulkActionsBar();
                 });
 
                 return card;
@@ -726,6 +790,75 @@
                     }
                 });
             }
+
+            // Add bulk selection state
+            let selectedAssets = new Map(); // Map of selected assets: mint -> {type, amount}
+            const bulkActionsBar = document.querySelector('.bulk-actions-bar');
+            const selectedCountDisplay = document.querySelector('.selected-count');
+            const bulkBurnButton = document.querySelector('.bulk-burn-button');
+            const clearSelectionButton = document.querySelector('.clear-selection');
+
+            function updateBulkActionsBar() {
+                const count = selectedAssets.size;
+                if (count > 0) {
+                    selectedCountDisplay.textContent = `${count} item${count === 1 ? '' : 's'} selected`;
+                    bulkActionsBar.style.display = 'flex';
+                } else {
+                    bulkActionsBar.style.display = 'none';
+                }
+            }
+
+            function clearSelection() {
+                selectedAssets.clear();
+                document.querySelectorAll('.asset-selector').forEach(checkbox => {
+                    checkbox.checked = false;
+                    checkbox.closest('.asset-card').classList.remove('selected');
+                });
+                updateBulkActionsBar();
+            }
+
+            async function burnSelectedAssets() {
+                if (!confirm(`Are you sure you want to burn ${selectedAssets.size} selected asset(s)? This action cannot be undone.`)) {
+                    return;
+                }
+
+                showLoading(true);
+                const burnResults = [];
+
+                try {
+                    for (const [mint, asset] of selectedAssets) {
+                        try {
+                            const result = await burnToken(mint, asset.amount, asset.decimals);
+                            burnResults.push({ mint, success: result });
+                        } catch (error) {
+                            console.error(`Failed to burn asset ${mint}:`, error);
+                            burnResults.push({ mint, success: false, error: error.message });
+                        }
+                    }
+
+                    // Process results
+                    const successful = burnResults.filter(r => r.success).length;
+                    const failed = burnResults.filter(r => !r.success).length;
+
+                    if (successful > 0) {
+                        showStatus(`Successfully burned ${successful} asset${successful === 1 ? '' : 's'}${failed > 0 ? `, ${failed} failed` : ''}`);
+                        // Trigger burn achievement
+                        updateAchievement('TOKEN_BURN_MASTER');
+                        // Reload assets
+                        await loadAssets(currentWallet.publicKey.toString());
+                    } else {
+                        showError('Failed to burn selected assets');
+                    }
+
+                    clearSelection();
+                } catch (error) {
+                    console.error('Bulk burn error:', error);
+                    showError(`Failed to process bulk burn: ${error.message}`);
+                } finally {
+                    showLoading(false);
+                }
+            }
+
 
             initializeAchievements();
         });
