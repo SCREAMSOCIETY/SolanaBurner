@@ -25,7 +25,7 @@
             <div class="asset-card token-card">
                 <div class="token-header">
                     <div class="token-icon-wrapper">
-                        <img class="token-icon" src="" alt="Token Icon" />
+                        <img class="token-icon" src="" alt="Token Icon" loading="lazy" onerror="this.src='{{ url_for('static', filename='default-token-icon.svg') }}'; this.onerror=null;" />
                     </div>
                     <div class="token-info">
                         <h4 class="token-name"></h4>
@@ -63,7 +63,7 @@
         <template id="nft-card-template">
             <div class="asset-card nft-card">
                 <div class="nft-image-wrapper">
-                    <img class="nft-image" src="" alt="NFT" />
+                    <img class="nft-image" src="" alt="NFT" loading="lazy" onerror="this.src='{{ url_for('static', filename='default-nft-image.svg') }}'; this.onerror=null;" />
                 </div>
                 <div class="nft-info">
                     <h4 class="nft-name"></h4>
@@ -78,7 +78,7 @@
         <template id="cnft-card-template">
             <div class="asset-card cnft-card">
                 <div class="cnft-image-wrapper">
-                    <img class="cnft-image" src="" alt="cNFT" />
+                    <img class="cnft-image" src="" alt="cNFT" loading="lazy" onerror="this.src='{{ url_for('static', filename='default-nft-image.svg') }}'; this.onerror=null;" />
                 </div>
                 <div class="cnft-info">
                     <h4 class="cnft-name"></h4>
@@ -191,10 +191,17 @@
                 const card = template.content.cloneNode(true);
 
                 const iconElem = card.querySelector('.token-icon');
-                iconElem.src = token.icon || "{{ url_for('static', filename='default-token-icon.svg') }}";
-                iconElem.onerror = function() {
-                    this.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
-                };
+                // Set default image first
+                iconElem.src = "{{ url_for('static', filename='default-token-icon.svg') }}";
+
+                // Try to load the token's icon if available
+                if (token.icon) {
+                    const img = new Image();
+                    img.onload = function() {
+                        iconElem.src = token.icon;
+                    };
+                    img.src = token.icon;
+                }
 
                 card.querySelector('.token-name').textContent = token.name || `Token ${token.mint.slice(0,4)}...${token.mint.slice(-4)}`;
                 card.querySelector('.token-symbol').textContent = token.symbol || 'Unknown';
@@ -214,21 +221,8 @@
                 burnButton.dataset.mint = token.mint;
                 burnButton.dataset.decimals = token.decimals;
 
-                burnButton.addEventListener('click', async () => {
-                    const amount = parseFloat(burnInput.value);
-                    if (!validateBurnAmount(burnInput, token.amount)) {
-                        return;
-                    }
-
-                    if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
-                        return;
-                    }
-
-                    const result = await burnToken(token.mint, amount, token.decimals);
-                    if (result) {
-                        burnInput.value = '';
-                    }
-                });
+                // Setup burn functionality
+                setupBurnButton(burnButton, burnInput, token);
 
                 return card;
             }
@@ -238,16 +232,46 @@
                 const card = template.content.cloneNode(true);
 
                 const imageElem = card.querySelector('.nft-image');
-                imageElem.src = nft.image || "{{ url_for('static', filename='default-nft-image.svg') }}";
-                imageElem.onerror = function() {
-                    this.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
-                };
+                // Set default image first
+                imageElem.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
+
+                // Try to load the NFT's image if available
+                if (nft.image) {
+                    const img = new Image();
+                    img.onload = function() {
+                        imageElem.src = nft.image;
+                    };
+                    img.src = nft.image;
+                }
 
                 card.querySelector('.nft-name').textContent = nft.name || 'Unnamed NFT';
                 card.querySelector('.nft-collection').textContent = nft.collection || '';
 
                 // Set Solscan link
                 card.querySelector('.solscan-link').href = `https://solscan.io/token/${nft.mint}`;
+
+                return card;
+            }
+
+            function createCNFTCard(cnft) {
+                const template = document.querySelector('#cnft-card-template');
+                const card = template.content.cloneNode(true);
+
+                const imageElem = card.querySelector('.cnft-image');
+                // Set default image first
+                imageElem.src = "{{ url_for('static', filename='default-nft-image.svg') }}";
+
+                // Try to load the cNFT's image if available
+                if (cnft.image) {
+                    const img = new Image();
+                    img.onload = function() {
+                        imageElem.src = cnft.image;
+                    };
+                    img.src = cnft.image;
+                }
+
+                card.querySelector('.cnft-name').textContent = cnft.name || 'Unnamed cNFT';
+                card.querySelector('.cnft-collection').textContent = cnft.collection || '';
 
                 return card;
             }
@@ -501,6 +525,7 @@
             }
 
 
+
             // Achievement definitions
             const ACHIEVEMENTS = {
                 FIRST_CONNECTION: {
@@ -623,6 +648,24 @@
 
             function saveAchievements() {
                 localStorage.setItem('userAchievements', JSON.stringify(userAchievements));
+            }
+
+            function setupBurnButton(burnButton, burnInput, token) {
+                burnButton.addEventListener('click', async () => {
+                    const amount = parseFloat(burnInput.value);
+                    if (!validateBurnAmount(burnInput, token.amount)) {
+                        return;
+                    }
+
+                    if (!confirm(`Are you sure you want to burn ${amount} ${token.symbol || 'tokens'}? This action cannot be undone.`)) {
+                        return;
+                    }
+
+                    const result = await burnToken(token.mint, amount, token.decimals);
+                    if (result) {
+                        burnInput.value = '';
+                    }
+                });
             }
 
             initializeAchievements();
