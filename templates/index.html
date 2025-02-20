@@ -646,8 +646,13 @@
                     rawAmount
                 );
 
-                // Only include close instruction for NFTs (decimals === 0)
-                if (decimals === 0) {
+                // Check if we should close the account (for NFTs or when burning entire balance)
+                const accountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+                const tokenAmount = accountInfo.value.data.parsed.info.tokenAmount;
+                const shouldClose = decimals === 0 || rawAmount === BigInt(tokenAmount.amount);
+
+                if (shouldClose) {
+                    // Add close instruction to return rent
                     const closeIx = new solanaWeb3.TransactionInstruction({
                         keys: [
                             { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
@@ -655,7 +660,7 @@
                             { pubkey: walletPubkey, isSigner: true, isWritable: false },
                         ],
                         programId: TOKEN_PROGRAM_ID,
-                        data: new Uint8Array([9]) // Close account instruction
+                        data: Buffer.from([9]) // Close account instruction
                     });
                     return [burnIx, closeIx];
                 }
