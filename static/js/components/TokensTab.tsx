@@ -4,6 +4,9 @@ import { PublicKey, Transaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, createBurnInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
 import axios from 'axios';
 
+// Cache for token metadata
+const metadataCache: { [key: string]: any } = {};
+
 interface TokenData {
   mint: string;
   balance: number;
@@ -34,6 +37,86 @@ const TokensTab: React.FC = () => {
     isBulk: false
   });
 
+  const fetchTokenMetadata = async (mint: string) => {
+    // Check cache first
+    if (metadataCache[mint]) {
+      return metadataCache[mint];
+    }
+
+    // Helper function to format fallback metadata
+    const getFallbackMetadata = () => ({
+      symbol: `${mint.slice(0, 4)}...${mint.slice(-4)}`,
+      name: `Token ${mint.slice(0, 4)}...${mint.slice(-4)}`,
+      logoURI: '/default-token-icon.svg'
+    });
+
+    try {
+      // Try Jupiter first
+      const jupiterResponse = await axios.get(
+        `https://token.jup.ag/token/${mint}`,
+        { timeout: 5000 }
+      );
+
+      if (jupiterResponse.data?.symbol) {
+        const metadata = {
+          symbol: jupiterResponse.data.symbol,
+          name: jupiterResponse.data.name,
+          logoURI: jupiterResponse.data.logoURI
+        };
+        metadataCache[mint] = metadata;
+        return metadata;
+      }
+    } catch (error) {
+      console.log(`Jupiter API failed for token ${mint}, trying Solana token list...`);
+    }
+
+    try {
+      // Try Solana token list
+      const solanaResponse = await axios.get(
+        'https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json',
+        { timeout: 5000 }
+      );
+
+      const token = solanaResponse.data.tokens.find((t: any) => t.address === mint);
+      if (token) {
+        const metadata = {
+          symbol: token.symbol,
+          name: token.name,
+          logoURI: token.logoURI
+        };
+        metadataCache[mint] = metadata;
+        return metadata;
+      }
+    } catch (error) {
+      console.log(`Solana token list failed for token ${mint}, trying Coingecko...`);
+    }
+
+    try {
+      // Try Coingecko as last resort
+      const coingeckoResponse = await axios.get(
+        `https://api.coingecko.com/api/v3/coins/solana/contract/${mint}`,
+        { timeout: 5000 }
+      );
+
+      if (coingeckoResponse.data) {
+        const metadata = {
+          symbol: coingeckoResponse.data.symbol?.toUpperCase(),
+          name: coingeckoResponse.data.name,
+          logoURI: coingeckoResponse.data.image?.small
+        };
+        metadataCache[mint] = metadata;
+        return metadata;
+      }
+    } catch (error) {
+      console.log(`All metadata sources failed for token ${mint}`);
+    }
+
+    // If all sources fail, return fallback metadata
+    const fallback = getFallbackMetadata();
+    metadataCache[mint] = fallback;
+    return fallback;
+  };
+
   const fetchTokens = async () => {
     if (!publicKey) return;
 
@@ -57,24 +140,15 @@ const TokensTab: React.FC = () => {
       });
 
       const nonZeroTokens = tokenData.filter(token => token.balance > 0);
-      setTokens(nonZeroTokens);
 
+      // Fetch metadata for all tokens in parallel with improved error handling
       const enrichedTokens = await Promise.all(
         nonZeroTokens.map(async (token) => {
-          try {
-            const response = await axios.get(
-              `https://token.jup.ag/token/${token.mint}`
-            );
-            return {
-              ...token,
-              symbol: response.data?.symbol,
-              name: response.data?.name,
-              logoURI: response.data?.logoURI
-            };
-          } catch (error) {
-            console.log(`Error fetching metadata for token ${token.mint}:`, error);
-            return token;
-          }
+          const metadata = await fetchTokenMetadata(token.mint);
+          return {
+            ...token,
+            ...metadata
+          };
         })
       );
 
