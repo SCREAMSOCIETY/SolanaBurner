@@ -3,21 +3,27 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-// Use port 3000 as specified in the port mapping
 const port = process.env.PORT || 3000;
 
-// Enable CORS and static file serving
-app.use(cors());
+// Enable CORS with specific options
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+
+// Serve static files from the static directory
 app.use(express.static(path.join(__dirname, 'static')));
+
+// Serve webpack bundle from dist directory
 app.use('/dist', express.static(path.join(__dirname, 'static', 'dist')));
 
-// Health check endpoint
+// Health check endpoint for monitoring
 app.get('/ping', (req, res) => {
   console.log('Health check endpoint called');
   res.json({ status: 'ok' });
 });
 
-// Serve the main HTML file for all routes to support client-side routing
+// Serve index.html for all routes to support client-side routing
 app.get('*', (req, res) => {
   console.log(`Serving index.html for path: ${req.path}`);
   res.sendFile(path.join(__dirname, 'templates', 'index.html'));
@@ -25,8 +31,11 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('Server error:', err.stack);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 // Start the server
@@ -36,19 +45,21 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
 });
 
-// Handle server errors
+// Handle server startup errors
 server.on('error', (error) => {
   if (error.syscall !== 'listen') {
     throw error;
   }
 
+  const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
+
   switch (error.code) {
     case 'EACCES':
-      console.error(`Port ${port} requires elevated privileges`);
+      console.error(`${bind} requires elevated privileges`);
       process.exit(1);
       break;
     case 'EADDRINUSE':
-      console.error(`Port ${port} is already in use`);
+      console.error(`${bind} is already in use`);
       process.exit(1);
       break;
     default:

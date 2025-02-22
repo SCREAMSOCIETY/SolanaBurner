@@ -11,16 +11,26 @@ name = "Project"
 mode = "parallel"
 author = "agent"
 
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
 [[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Build TypeScript"
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install && npx webpack --config webpack.config.js && node server.js"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Express Server"
+args = "Build"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Server"
 
 [[workflows.workflow]]
-name = "Build TypeScript"
+name = "Project"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -31,10 +41,25 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx webpack --mode development --watch"
+args = "npm run build && node server.js"
+waitForPort = 3000
 
 [[workflows.workflow]]
-name = "Express Server"
+name = "Build"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx webpack --config webpack.config.js"
+
+[[workflows.workflow]]
+name = "Server"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -49,7 +74,7 @@ args = "node server.js"
 waitForPort = 3000
 
 [deployment]
-run = ["sh", "-c", "python app.py"]
+run = ["sh", "-c", "npm run build && node server.js"]
 
 [[ports]]
 localPort = 3000

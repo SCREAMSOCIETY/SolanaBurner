@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import WalletProvider from './WalletProvider';
+import TabsContainer from './components/TabsContainer';
 
 const App: React.FC = () => {
   return (
@@ -8,7 +9,7 @@ const App: React.FC = () => {
       <WalletProvider>
         <div className="content">
           <h1>Solana Asset Manager</h1>
-          {/* Additional components will go here */}
+          <TabsContainer />
         </div>
       </WalletProvider>
     </div>
@@ -30,7 +31,6 @@ function initApp() {
   );
 }
 
-// Export for window access
 declare global {
   interface Window {
     App: {
