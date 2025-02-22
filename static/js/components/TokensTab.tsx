@@ -247,8 +247,9 @@ const TokensTab: React.FC = () => {
     setBulkBurnSelected(new Set());
   };
 
-  const calculateRentReturn = (tokens: TokenData[]): string => {
-    const totalLamports = tokens.reduce((acc, token) => {
+  // Enhanced rent return calculation with detailed breakdown
+  const calculateRentReturn = (selectedTokens: TokenData[]): string => {
+    const totalLamports = selectedTokens.reduce((acc, token) => {
       let rentAmount = TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS; // Base token account rent
 
       if (token.hasMetadata) {
@@ -259,6 +260,48 @@ const TokensTab: React.FC = () => {
     }, 0);
 
     return (totalLamports / LAMPORTS_PER_SOL).toFixed(8);
+  };
+
+  // Update the renderRentReturnInfo function to be more prominent and detailed
+  const renderRentReturnInfo = () => {
+    if (bulkBurnSelected.size === 0) return null;
+
+    const selectedTokens = tokens.filter(token => bulkBurnSelected.has(token.mint));
+    const rentReturn = calculateRentReturn(selectedTokens);
+
+    // Calculate breakdown
+    const tokensWithMetadata = selectedTokens.filter(t => t.hasMetadata).length;
+    const tokensWithoutMetadata = selectedTokens.length - tokensWithMetadata;
+
+    const baseRentTotal = (TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS * selectedTokens.length / LAMPORTS_PER_SOL).toFixed(8);
+    const metadataRentTotal = (METADATA_RENT_EXEMPT_LAMPORTS * tokensWithMetadata / LAMPORTS_PER_SOL).toFixed(8);
+
+    return (
+      <div className="rent-return-display">
+        <h3>Estimated Rent Return</h3>
+        <div className="rent-amount">{rentReturn} SOL</div>
+        <div className="rent-breakdown">
+          <h4>Breakdown:</h4>
+          <ul>
+            <li>
+              Base Rent ({tokensWithoutMetadata + tokensWithMetadata} tokens):
+              <span className="amount">{baseRentTotal} SOL</span>
+              <small>({(TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS / LAMPORTS_PER_SOL).toFixed(8)} SOL per token)</small>
+            </li>
+            {tokensWithMetadata > 0 && (
+              <li>
+                Metadata Rent ({tokensWithMetadata} tokens):
+                <span className="amount">{metadataRentTotal} SOL</span>
+                <small>({(METADATA_RENT_EXEMPT_LAMPORTS / LAMPORTS_PER_SOL).toFixed(8)} SOL per token with metadata)</small>
+              </li>
+            )}
+          </ul>
+        </div>
+        <p className="rent-explanation">
+          * Rent return varies based on token type. Tokens with metadata return more SOL when burned.
+        </p>
+      </div>
+    );
   };
 
   if (!publicKey) {
@@ -275,6 +318,9 @@ const TokensTab: React.FC = () => {
       <h2>Tokens</h2>
       {bulkBurnSelected.size > 0 && (
         <div className="bulk-burn-controls">
+          <div className="rent-counter-container">
+            {renderRentReturnInfo()}
+          </div>
           <button 
             className="burn-button"
             onClick={handleBulkBurnClick}

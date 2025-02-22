@@ -79849,8 +79849,10 @@ var TokensTab = function TokensTab() {
       return _ref5.apply(this, arguments);
     };
   }();
-  var calculateRentReturn = function calculateRentReturn(tokens) {
-    var totalLamports = tokens.reduce(function (acc, token) {
+
+  // Enhanced rent return calculation with detailed breakdown
+  var calculateRentReturn = function calculateRentReturn(selectedTokens) {
+    var totalLamports = selectedTokens.reduce(function (acc, token) {
       var rentAmount = TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS; // Base token account rent
 
       if (token.hasMetadata) {
@@ -79859,6 +79861,36 @@ var TokensTab = function TokensTab() {
       return acc + rentAmount;
     }, 0);
     return (totalLamports / _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.LAMPORTS_PER_SOL).toFixed(8);
+  };
+
+  // Update the renderRentReturnInfo function to be more prominent and detailed
+  var renderRentReturnInfo = function renderRentReturnInfo() {
+    if (bulkBurnSelected.size === 0) return null;
+    var selectedTokens = tokens.filter(function (token) {
+      return bulkBurnSelected.has(token.mint);
+    });
+    var rentReturn = calculateRentReturn(selectedTokens);
+
+    // Calculate breakdown
+    var tokensWithMetadata = selectedTokens.filter(function (t) {
+      return t.hasMetadata;
+    }).length;
+    var tokensWithoutMetadata = selectedTokens.length - tokensWithMetadata;
+    var baseRentTotal = (TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS * selectedTokens.length / _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.LAMPORTS_PER_SOL).toFixed(8);
+    var metadataRentTotal = (METADATA_RENT_EXEMPT_LAMPORTS * tokensWithMetadata / _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.LAMPORTS_PER_SOL).toFixed(8);
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "rent-return-display"
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h3", null, "Estimated Rent Return"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "rent-amount"
+    }, rentReturn, " SOL"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "rent-breakdown"
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h4", null, "Breakdown:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("ul", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Base Rent (", tokensWithoutMetadata + tokensWithMetadata, " tokens):", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+      className: "amount"
+    }, baseRentTotal, " SOL"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("small", null, "(", (TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS / _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.LAMPORTS_PER_SOL).toFixed(8), " SOL per token)")), tokensWithMetadata > 0 && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Metadata Rent (", tokensWithMetadata, " tokens):", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+      className: "amount"
+    }, metadataRentTotal, " SOL"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("small", null, "(", (METADATA_RENT_EXEMPT_LAMPORTS / _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.LAMPORTS_PER_SOL).toFixed(8), " SOL per token with metadata)")))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+      className: "rent-explanation"
+    }, "* Rent return varies based on token type. Tokens with metadata return more SOL when burned."));
   };
   if (!publicKey) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
@@ -79871,7 +79903,9 @@ var TokensTab = function TokensTab() {
     className: "container"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", null, "Tokens"), bulkBurnSelected.size > 0 && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "bulk-burn-controls"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "rent-counter-container"
+  }, renderRentReturnInfo()), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", {
     className: "burn-button",
     onClick: handleBulkBurnClick
   }, "Burn ", bulkBurnSelected.size, " Selected Tokens"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", {

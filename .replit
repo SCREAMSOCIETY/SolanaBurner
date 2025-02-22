@@ -29,6 +29,10 @@ args = "Build"
 task = "workflow.run"
 args = "Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Asset Management Server"
+
 [[workflows.workflow]]
 name = "Project"
 author = "agent"
@@ -73,6 +77,21 @@ task = "shell.exec"
 args = "NODE_ENV=development node server.js"
 waitForPort = 3000
 
+[[workflows.workflow]]
+name = "Asset Management Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "NODE_ENV=development node server.js"
+waitForPort = 3000
+
 [deployment]
 run = ["sh", "-c", "npm run build && node server.js"]
 
@@ -83,6 +102,10 @@ externalPort = 4200
 [[ports]]
 localPort = 3001
 externalPort = 5000
+
+[[ports]]
+localPort = 3002
+externalPort = 5173
 
 [[ports]]
 localPort = 8080

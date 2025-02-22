@@ -1109,7 +1109,7 @@ h3 {
     to {
         transform: translateX(0);
     }
-}
+}}
 
 .achievement-notification.show {
     transform: translateX(0);
@@ -1694,4 +1694,98 @@ p {
   margin-top: 0.5rem !important;
   font-style: italic;
   opacity: 0.6 !important;
+}
+
+.rent-return-display {
+    background: rgba(153, 69, 255, 0.1);
+    border: 1px solid var(--primary-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.rent-return-display h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+.rent-return-display .rent-amount {
+    font-size: 2rem;
+    color: var(--success-color);
+    margin: 1rem 0;
+    font-weight: bold;
+}
+
+.rent-return-display .rent-breakdown {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.rent-return-display .rent-breakdown h4 {
+    color: var(--text-color);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.rent-return-display .rent-breakdown ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.rent-return-display .rent-breakdown li {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rent-return-display .rent-breakdown li:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.rent-return-display .rent-breakdown .amount {
+    color: var(--success-color);
+    font-size: 1.2rem;
+    margin: 0.5rem 0;
+}
+
+.rent-return-display .rent-breakdown small {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+}
+
+.rent-return-display .rent-explanation {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    font-style: italic;
+}
+
+.rent-counter-container {
+    flex: 1;
+    max-width: 500px;
+}
+
+.bulk-burn-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(255, 70, 70, 0.1);
+    border-radius: 8px;
+    align-items: stretch;
+}
+
+.bulk-burn-controls .button-group {
+    display: flex;
+    gap: 1rem;
 }

@@ -4,7 +4,7 @@ const cors = require('cors');
 
 const app = express();
 const DEFAULT_PORT = 3000;
-const port = process.env.PORT || DEFAULT_PORT;
+const MAX_PORT_ATTEMPTS = 10;
 
 // Enable CORS for all routes
 app.use(cors());
@@ -41,29 +41,49 @@ app.get('*', (req, res) => {
   });
 });
 
-// Try to start server
-const startServer = () => {
+// Try to start server with improved port handling and logging
+const startServer = async (port = DEFAULT_PORT, attempt = 1) => {
+  if (attempt > MAX_PORT_ATTEMPTS) {
+    console.error(`Failed to find an available port after ${MAX_PORT_ATTEMPTS} attempts`);
+    process.exit(1);
+  }
+
+  console.log(`[Server] Attempting to start server on port ${port} (attempt ${attempt}/${MAX_PORT_ATTEMPTS})`);
+
   try {
-    const server = app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running at http://0.0.0.0:${port}`);
-      console.log('Static files served from:', path.join(__dirname, 'static'));
-      console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
-    }).on('error', (error) => {
+    const server = app.listen(port, '0.0.0.0');
+
+    server.on('error', (error) => {
+      console.log(`[Server] Error on port ${port}:`, error.code);
       if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Trying port ${port + 1}`);
-        setTimeout(() => {
-          server.close();
-          startServer(port + 1);
-        }, 1000);
+        console.log(`[Server] Port ${port} is in use, trying port ${port + 1}`);
+        server.close();
+        startServer(port + 1, attempt + 1);
       } else {
-        console.error('Failed to start server:', error);
+        console.error('[Server] Fatal error:', error);
         process.exit(1);
       }
     });
+
+    server.on('listening', () => {
+      const addr = server.address();
+      console.log(`[Server] Successfully started on port ${addr.port}`);
+      console.log('[Server] Access URLs:');
+      console.log(`[Server] Local: http://localhost:${addr.port}`);
+      console.log(`[Server] Network: http://0.0.0.0:${addr.port}`);
+      console.log('[Server] Static files path:', path.join(__dirname, 'static'));
+      console.log('[Server] Dist files path:', path.join(__dirname, 'static', 'dist'));
+    });
+
   } catch (err) {
-    console.error('Error starting server:', err);
+    console.error('[Server] Unexpected error during startup:', err);
     process.exit(1);
   }
 };
 
-startServer();
+// Start the server
+console.log('[Server] Starting application server...');
+startServer().catch(err => {
+  console.error('[Server] Fatal error during server startup:', err);
+  process.exit(1);
+});
