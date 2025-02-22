@@ -79459,7 +79459,14 @@ function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 
 // Cache for token metadata
 var metadataCache = {};
+
+// Update the rent exempt constants 
+var SPL_TOKEN_MINT_RENT_EXEMPT_LAMPORTS = 1461600; // ~0.00146 SOL
+var TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS = 2039280; // ~0.00204 SOL
+var METADATA_RENT_EXEMPT_LAMPORTS = 5616000; // ~0.00562 SOL
+
 var TokensTab = function TokensTab() {
+  var _burnModal$tokens$, _burnModal$tokens$2, _burnModal$tokens$3, _burnModal$tokens$4, _burnModal$tokens$5;
   var _useConnection = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_2__.useConnection)(),
     connection = _useConnection.connection;
   var _useWallet = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_3__.useWallet)(),
@@ -79510,7 +79517,8 @@ var TokensTab = function TokensTab() {
               return {
                 symbol: "".concat(mint.slice(0, 4), "...").concat(mint.slice(-4)),
                 name: "Token ".concat(mint.slice(0, 4), "...").concat(mint.slice(-4)),
-                logoURI: '/default-token-icon.svg'
+                logoURI: '/default-token-icon.svg',
+                hasMetadata: false
               };
             };
             _context.prev = 3;
@@ -79527,7 +79535,8 @@ var TokensTab = function TokensTab() {
             metadata = {
               symbol: jupiterResponse.data.symbol,
               name: jupiterResponse.data.name,
-              logoURI: jupiterResponse.data.logoURI
+              logoURI: jupiterResponse.data.logoURI,
+              hasMetadata: true // Token has metadata if we found it
             };
             metadataCache[mint] = metadata;
             return _context.abrupt("return", metadata);
@@ -79556,7 +79565,8 @@ var TokensTab = function TokensTab() {
             _metadata = {
               symbol: token.symbol,
               name: token.name,
-              logoURI: token.logoURI
+              logoURI: token.logoURI,
+              hasMetadata: true
             };
             metadataCache[mint] = _metadata;
             return _context.abrupt("return", _metadata);
@@ -79582,7 +79592,8 @@ var TokensTab = function TokensTab() {
             _metadata2 = {
               symbol: (_coingeckoResponse$da = coingeckoResponse.data.symbol) === null || _coingeckoResponse$da === void 0 ? void 0 : _coingeckoResponse$da.toUpperCase(),
               name: coingeckoResponse.data.name,
-              logoURI: (_coingeckoResponse$da2 = coingeckoResponse.data.image) === null || _coingeckoResponse$da2 === void 0 ? void 0 : _coingeckoResponse$da2.small
+              logoURI: (_coingeckoResponse$da2 = coingeckoResponse.data.image) === null || _coingeckoResponse$da2 === void 0 ? void 0 : _coingeckoResponse$da2.small,
+              hasMetadata: true
             };
             metadataCache[mint] = _metadata2;
             return _context.abrupt("return", _metadata2);
@@ -79838,6 +79849,17 @@ var TokensTab = function TokensTab() {
       return _ref5.apply(this, arguments);
     };
   }();
+  var calculateRentReturn = function calculateRentReturn(tokens) {
+    var totalLamports = tokens.reduce(function (acc, token) {
+      var rentAmount = TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS; // Base token account rent
+
+      if (token.hasMetadata) {
+        rentAmount += METADATA_RENT_EXEMPT_LAMPORTS; // Add metadata rent if present
+      }
+      return acc + rentAmount;
+    }, 0);
+    return (totalLamports / _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.LAMPORTS_PER_SOL).toFixed(8);
+  };
   if (!publicKey) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
       className: "container"
@@ -79931,20 +79953,68 @@ var TokensTab = function TokensTab() {
       className: "solscan-link"
     }, "View on Solscan")));
   })), burnModal.isOpen && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "modal-overlay"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "confirmation-dialog"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h3", null, "Confirm Burn"), burnModal.isBulk ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, "You are about to burn ", burnModal.tokens.length, " tokens:"), burnModal.tokens.map(function (token) {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "modal-header"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h3", null, burnModal.isBulk ? 'Confirm Bulk Burn' : 'Confirm Burn'), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", {
+    className: "close-button",
+    onClick: function onClick() {
+      return setBurnModal({
+        isOpen: false,
+        tokens: [],
+        isBulk: false
+      });
+    },
+    disabled: !!burningToken
+  }, "\xD7")), burnModal.isBulk ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+    className: "burn-warning"
+  }, "You are about to burn ", burnModal.tokens.length, " tokens:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "tokens-list"
+  }, burnModal.tokens.map(function (token) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
       key: token.mint,
       className: "confirmation-token"
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", null, token.name || 'Unknown Token'), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "token-info"
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+      className: "token-name"
+    }, token.name || 'Unknown Token'), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+      className: "token-symbol"
+    }, "(", token.symbol, ")")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
       className: "amount"
     }, (token.balance / Math.pow(10, token.decimals)).toLocaleString(), " ", token.symbol));
-  })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, "You are about to burn:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+  })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "rent-return-info"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, "Estimated rent return:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+    className: "rent-amount"
+  }, calculateRentReturn(burnModal.tokens), " SOL"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+    className: "rent-detail"
+  }, "Varies based on token type and metadata"))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+    className: "burn-warning"
+  }, "You are about to burn:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "burn-details"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "token-info"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+    className: "token-name"
+  }, ((_burnModal$tokens$ = burnModal.tokens[0]) === null || _burnModal$tokens$ === void 0 ? void 0 : _burnModal$tokens$.name) || 'Unknown Token'), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+    className: "token-symbol"
+  }, "(", (_burnModal$tokens$2 = burnModal.tokens[0]) === null || _burnModal$tokens$2 === void 0 ? void 0 : _burnModal$tokens$2.symbol, ")")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "amount"
-  }, (burnModal.tokens[0].balance / Math.pow(10, burnModal.tokens[0].decimals)).toLocaleString(), " ", burnModal.tokens[0].symbol), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, "This action cannot be undone.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+  }, (((_burnModal$tokens$3 = burnModal.tokens[0]) === null || _burnModal$tokens$3 === void 0 ? void 0 : _burnModal$tokens$3.balance) / Math.pow(10, (_burnModal$tokens$4 = burnModal.tokens[0]) === null || _burnModal$tokens$4 === void 0 ? void 0 : _burnModal$tokens$4.decimals)).toLocaleString(), " ", (_burnModal$tokens$5 = burnModal.tokens[0]) === null || _burnModal$tokens$5 === void 0 ? void 0 : _burnModal$tokens$5.symbol)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "rent-return-info"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, "Estimated rent return:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+    className: "rent-amount"
+  }, calculateRentReturn([burnModal.tokens[0]]), " SOL"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+    className: "rent-detail"
+  }, "Varies based on token type and metadata")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+    className: "burn-notice"
+  }, "This action cannot be undone.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "confirmation-buttons"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", {
-    className: "confirm-burn",
+    className: "confirm-burn ".concat(burningToken ? 'processing' : ''),
     onClick: function onClick() {
       return burnModal.isBulk ? burnSelectedTokens() : burnToken(burnModal.tokens[0].mint, burnModal.tokens[0].balance);
     },
@@ -79959,7 +80029,7 @@ var TokensTab = function TokensTab() {
       });
     },
     disabled: !!burningToken
-  }, "Cancel"))));
+  }, "Cancel")))));
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (TokensTab);
 

@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction } from '@solana/web3.js';
+import { PublicKey, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, createBurnInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
 import axios from 'axios';
 
 // Cache for token metadata
 const metadataCache: { [key: string]: any } = {};
+
+// Update the rent exempt constants 
+const SPL_TOKEN_MINT_RENT_EXEMPT_LAMPORTS = 1461600; // ~0.00146 SOL
+const TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS = 2039280;  // ~0.00204 SOL
+const METADATA_RENT_EXEMPT_LAMPORTS = 5616000;       // ~0.00562 SOL
 
 interface TokenData {
   mint: string;
@@ -15,6 +20,7 @@ interface TokenData {
   name?: string;
   logoURI?: string;
   tokenAccount: string;
+  hasMetadata?: boolean;  // Add this field to track if token has metadata
 }
 
 interface BurnModalData {
@@ -47,7 +53,8 @@ const TokensTab: React.FC = () => {
     const getFallbackMetadata = () => ({
       symbol: `${mint.slice(0, 4)}...${mint.slice(-4)}`,
       name: `Token ${mint.slice(0, 4)}...${mint.slice(-4)}`,
-      logoURI: '/default-token-icon.svg'
+      logoURI: '/default-token-icon.svg',
+      hasMetadata: false
     });
 
     try {
@@ -61,7 +68,8 @@ const TokensTab: React.FC = () => {
         const metadata = {
           symbol: jupiterResponse.data.symbol,
           name: jupiterResponse.data.name,
-          logoURI: jupiterResponse.data.logoURI
+          logoURI: jupiterResponse.data.logoURI,
+          hasMetadata: true // Token has metadata if we found it
         };
         metadataCache[mint] = metadata;
         return metadata;
@@ -82,7 +90,8 @@ const TokensTab: React.FC = () => {
         const metadata = {
           symbol: token.symbol,
           name: token.name,
-          logoURI: token.logoURI
+          logoURI: token.logoURI,
+          hasMetadata: true
         };
         metadataCache[mint] = metadata;
         return metadata;
@@ -102,7 +111,8 @@ const TokensTab: React.FC = () => {
         const metadata = {
           symbol: coingeckoResponse.data.symbol?.toUpperCase(),
           name: coingeckoResponse.data.name,
-          logoURI: coingeckoResponse.data.image?.small
+          logoURI: coingeckoResponse.data.image?.small,
+          hasMetadata: true
         };
         metadataCache[mint] = metadata;
         return metadata;
@@ -237,6 +247,20 @@ const TokensTab: React.FC = () => {
     setBulkBurnSelected(new Set());
   };
 
+  const calculateRentReturn = (tokens: TokenData[]): string => {
+    const totalLamports = tokens.reduce((acc, token) => {
+      let rentAmount = TOKEN_ACCOUNT_RENT_EXEMPT_LAMPORTS; // Base token account rent
+
+      if (token.hasMetadata) {
+        rentAmount += METADATA_RENT_EXEMPT_LAMPORTS; // Add metadata rent if present
+      }
+
+      return acc + rentAmount;
+    }, 0);
+
+    return (totalLamports / LAMPORTS_PER_SOL).toFixed(8);
+  };
+
   if (!publicKey) {
     return (
       <div className="container">
@@ -350,44 +374,81 @@ const TokensTab: React.FC = () => {
       )}
 
       {burnModal.isOpen && (
-        <div className="confirmation-dialog">
-          <h3>Confirm Burn</h3>
-          {burnModal.isBulk ? (
-            <>
-              <p>You are about to burn {burnModal.tokens.length} tokens:</p>
-              {burnModal.tokens.map(token => (
-                <div key={token.mint} className="confirmation-token">
-                  <span>{token.name || 'Unknown Token'}</span>
-                  <span className="amount">
-                    {(token.balance / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
-                  </span>
+        <div className="modal-overlay">
+          <div className="confirmation-dialog">
+            <div className="modal-header">
+              <h3>{burnModal.isBulk ? 'Confirm Bulk Burn' : 'Confirm Burn'}</h3>
+              <button 
+                className="close-button"
+                onClick={() => setBurnModal({ isOpen: false, tokens: [], isBulk: false })}
+                disabled={!!burningToken}
+              >
+                ×
+              </button>
+            </div>
+
+            {burnModal.isBulk ? (
+              <>
+                <p className="burn-warning">You are about to burn {burnModal.tokens.length} tokens:</p>
+                <div className="tokens-list">
+                  {burnModal.tokens.map(token => (
+                    <div key={token.mint} className="confirmation-token">
+                      <div className="token-info">
+                        <span className="token-name">{token.name || 'Unknown Token'}</span>
+                        <span className="token-symbol">({token.symbol})</span>
+                      </div>
+                      <span className="amount">
+                        {(token.balance / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </>
-          ) : (
-            <>
-              <p>You are about to burn:</p>
-              <div className="amount">
-                {(burnModal.tokens[0].balance / Math.pow(10, burnModal.tokens[0].decimals)).toLocaleString()} {burnModal.tokens[0].symbol}
-              </div>
-              <p>This action cannot be undone.</p>
-            </>
-          )}
-          <div className="confirmation-buttons">
-            <button 
-              className="confirm-burn"
-              onClick={() => burnModal.isBulk ? burnSelectedTokens() : burnToken(burnModal.tokens[0].mint, burnModal.tokens[0].balance)}
-              disabled={!!burningToken}
-            >
-              {burningToken ? 'Processing...' : 'Confirm Burn'}
-            </button>
-            <button 
-              className="cancel-burn"
-              onClick={() => setBurnModal({ isOpen: false, tokens: [], isBulk: false })}
-              disabled={!!burningToken}
-            >
-              Cancel
-            </button>
+                <div className="rent-return-info">
+                  <p>Estimated rent return:</p>
+                  <span className="rent-amount">{calculateRentReturn(burnModal.tokens)} SOL</span>
+                  <p className="rent-detail">Varies based on token type and metadata</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="burn-warning">You are about to burn:</p>
+                <div className="burn-details">
+                  <div className="token-info">
+                    <span className="token-name">{burnModal.tokens[0]?.name || 'Unknown Token'}</span>
+                    <span className="token-symbol">({burnModal.tokens[0]?.symbol})</span>
+                  </div>
+                  <div className="amount">
+                    {(burnModal.tokens[0]?.balance / Math.pow(10, burnModal.tokens[0]?.decimals)).toLocaleString()} {burnModal.tokens[0]?.symbol}
+                  </div>
+                </div>
+                <div className="rent-return-info">
+                  <p>Estimated rent return:</p>
+                  <span className="rent-amount">{calculateRentReturn([burnModal.tokens[0]])} SOL</span>
+                  <p className="rent-detail">Varies based on token type and metadata</p>
+                </div>
+                <p className="burn-notice">This action cannot be undone.</p>
+              </>
+            )}
+
+            <div className="confirmation-buttons">
+              <button 
+                className={`confirm-burn ${burningToken ? 'processing' : ''}`}
+                onClick={() => burnModal.isBulk 
+                  ? burnSelectedTokens() 
+                  : burnToken(burnModal.tokens[0].mint, burnModal.tokens[0].balance)
+                }
+                disabled={!!burningToken}
+              >
+                {burningToken ? 'Processing...' : 'Confirm Burn'}
+              </button>
+              <button 
+                className="cancel-burn"
+                onClick={() => setBurnModal({ isOpen: false, tokens: [], isBulk: false })}
+                disabled={!!burningToken}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

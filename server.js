@@ -3,7 +3,8 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const DEFAULT_PORT = 3000;
+const port = process.env.PORT || DEFAULT_PORT;
 
 // Enable CORS for all routes
 app.use(cors());
@@ -32,34 +33,37 @@ app.get('/ping', (req, res) => {
 // Serve index.html for all routes to support client-side routing
 app.get('*', (req, res) => {
   console.log(`Serving index.html for path: ${req.path}`);
-  res.sendFile(path.join(__dirname, 'templates', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'), err => {
+    if (err) {
+      console.error('Error sending index.html:', err);
+      res.status(500).send('Error loading application');
+    }
+  });
 });
 
-// Start the server with proper error handling
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running at http://0.0.0.0:${port}`);
-  console.log('Static files served from:', path.join(__dirname, 'static'));
-  console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
-});
-
-// Handle server startup errors
-server.on('error', (error) => {
-  if (error.syscall !== 'listen') {
-    throw error;
+// Try to start server
+const startServer = () => {
+  try {
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`Server running at http://0.0.0.0:${port}`);
+      console.log('Static files served from:', path.join(__dirname, 'static'));
+      console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
+    }).on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Trying port ${port + 1}`);
+        setTimeout(() => {
+          server.close();
+          startServer(port + 1);
+        }, 1000);
+      } else {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+      }
+    });
+  } catch (err) {
+    console.error('Error starting server:', err);
+    process.exit(1);
   }
+};
 
-  const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
-
-  switch (error.code) {
-    case 'EACCES':
-      console.error(`${bind} requires elevated privileges`);
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      console.error(`${bind} is already in use`);
-      process.exit(1);
-      break;
-    default:
-      throw error;
-  }
-});
+startServer();
