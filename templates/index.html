@@ -4,14 +4,9 @@
     <meta charset="utf-8" />
     <title>Solana Asset Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <!-- Development React -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
-    <!-- Solana Web3 -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <!-- Wallet Adapter -->
-    <script src="https://unpkg.com/@solana/wallet-adapter-base@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/wallet-adapter-wallets@latest/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div id="root">
@@ -19,55 +14,13 @@
     </div>
 
     <!-- Load our React component -->
+    <script src="{{ url_for('static', filename='dist/WalletProvider.js') }}"></script>
     <script>
-        // Verify React is loaded before proceeding
-        function checkDependencies() {
-            console.log('Checking dependencies...');
-            if (typeof React === 'undefined') {
-                console.error('React not loaded');
-                return false;
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.WalletProvider) {
+                window.WalletProvider.render();
             }
-            if (typeof ReactDOM === 'undefined') {
-                console.error('ReactDOM not loaded');
-                return false;
-            }
-            if (typeof solanaWeb3 === 'undefined') {
-                console.error('Solana Web3 not loaded');
-                return false;
-            }
-            return true;
-        }
-
-        function initializeApp() {
-            if (!checkDependencies()) {
-                console.error('Dependencies not loaded, retrying in 1 second...');
-                setTimeout(initializeApp, 1000);
-                return;
-            }
-
-            // Load and initialize WalletProvider
-            const script = document.createElement('script');
-            script.src = "{{ url_for('static', filename='dist/WalletProvider.js') }}";
-            script.onload = function() {
-                console.log('WalletProvider script loaded');
-                if (window.WalletProvider) {
-                    window.WalletProvider.render();
-                } else {
-                    console.error('WalletProvider not found on window object');
-                }
-            };
-            script.onerror = function() {
-                console.error('Failed to load WalletProvider script');
-            };
-            document.body.appendChild(script);
-        }
-
-        // Start initialization when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeApp);
-        } else {
-            initializeApp();
-        }
+        });
     </script>
     <script src="{{ url_for('static', filename='dist/cnft-handler.js') }}"></script>
 </body>
