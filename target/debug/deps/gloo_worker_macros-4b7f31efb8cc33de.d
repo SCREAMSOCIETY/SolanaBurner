@@ -1,8 +1,0 @@
-/home/runner/workspace/target/debug/deps/libgloo_worker_macros-4b7f31efb8cc33de.so: /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/lib.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/oneshot.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/reactor.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/worker_fn.rs
-
-/home/runner/workspace/target/debug/deps/gloo_worker_macros-4b7f31efb8cc33de.d: /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/lib.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/oneshot.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/reactor.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/worker_fn.rs
-
-/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/lib.rs:
-/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/oneshot.rs:
-/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/reactor.rs:
-/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gloo-worker-macros-0.1.0/src/worker_fn.rs:

@@ -1,5 +1,5 @@
 import logging
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 from flask_cors import CORS
 import os
 
@@ -10,8 +10,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+app = Flask(__name__, static_folder='static', template_folder='.')
 CORS(app)  # Enable CORS for all routes
+
+@app.route('/static/dist/<path:filename>')
+def serve_static_dist(filename):
+    logger.info(f"Serving dist file: {filename}")
+    try:
+        return send_from_directory('static/dist', filename)
+    except Exception as e:
+        logger.error(f"Error serving {filename}: {str(e)}")
+        return str(e), 404
 
 @app.route('/ping')
 def ping():
@@ -20,7 +29,7 @@ def ping():
 
 @app.route('/')
 def index():
-    logger.info("Root endpoint called - serving index.html template")
+    logger.info("Root endpoint called - serving index.html")
     try:
         return render_template('index.html')
     except Exception as e:
@@ -30,7 +39,7 @@ def index():
 
 if __name__ == '__main__':
     try:
-        port = int(os.environ.get('PORT', 8082))
+        port = int(os.environ.get('PORT', 5000))
         logger.info(f"Starting Flask server on port {port}")
         logger.debug("Current environment:")
         logger.debug(f"REPLIT_DEV_DOMAIN: {os.environ.get('REPLIT_DEV_DOMAIN', 'not set')}")
