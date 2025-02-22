@@ -1,5 +1,4 @@
 import React, { FC, useMemo } from 'react';
-import { createRoot } from 'react-dom/client';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import {
     ConnectionProvider,
@@ -20,16 +19,12 @@ import { clusterApiUrl, Connection } from '@solana/web3.js';
 // Default styles that can be overridden by your app
 require('@solana/wallet-adapter-react-ui/styles.css');
 
-declare global {
-    interface Window {
-        WalletProvider: {
-            render: () => void;
-        };
-    }
+interface Props {
+  children?: React.ReactNode;
 }
 
-const App: FC = () => {
-    console.log('App component initializing');
+export const WalletProvider: FC<Props> = ({ children }) => {
+    console.log('WalletProvider component initializing');
 
     // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
     const network = WalletAdapterNetwork.Mainnet;
@@ -65,17 +60,17 @@ const App: FC = () => {
         []
     );
 
-    console.log('Rendering App component structure');
+    console.log('Rendering WalletProvider component structure');
     return (
         <ConnectionProvider endpoint={endpoint}>
             <SolanaWalletProvider wallets={wallets} autoConnect>
                 <WalletModalProvider>
                     <div className="wallet-container">
-                        <h1>Solana Asset Manager</h1>
                         <div className="wallet-buttons">
                             <WalletMultiButton />
                             <WalletDisconnectButton />
                         </div>
+                        {children}
                     </div>
                 </WalletModalProvider>
             </SolanaWalletProvider>
@@ -83,35 +78,4 @@ const App: FC = () => {
     );
 };
 
-function initWalletProvider() {
-    try {
-        console.log('Starting WalletProvider initialization');
-        const container = document.getElementById('root');
-        if (!container) {
-            throw new Error('Root element not found');
-        }
-
-        console.log('Creating React root');
-        const root = createRoot(container);
-
-        console.log('Rendering App component');
-        root.render(
-            <React.StrictMode>
-                <App />
-            </React.StrictMode>
-        );
-        console.log('WalletProvider initialized successfully');
-    } catch (error) {
-        console.error('Error initializing WalletProvider:', error);
-        if (error instanceof Error) {
-            console.error('Error details:', error.message);
-            console.error('Stack trace:', error.stack);
-        }
-    }
-}
-
-window.WalletProvider = {
-    render: initWalletProvider
-};
-
-console.log('WalletProvider module loaded successfully');
+export default WalletProvider;

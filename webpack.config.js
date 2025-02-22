@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 
 module.exports = {
   entry: {
+    'app': './static/js/App.tsx',
     'WalletProvider': './static/js/WalletProvider.tsx',
     'cnft-handler': './static/js/cnft-handler.js'
   },
@@ -17,7 +18,18 @@ module.exports = {
     rules: [
       {
         test: /\.(ts|tsx)$/,
-        use: 'ts-loader',
+        use: [
+          {
+            loader: 'babel-loader',
+            options: {
+              presets: [
+                '@babel/preset-env',
+                '@babel/preset-react',
+                '@babel/preset-typescript'
+              ]
+            }
+          }
+        ],
         exclude: /node_modules/
       },
       {
@@ -45,7 +57,8 @@ module.exports = {
   plugins: [
     new webpack.ProvidePlugin({
       process: require.resolve("process/browser"),
-      Buffer: ['buffer', 'Buffer']
+      Buffer: ['buffer', 'Buffer'],
+      React: 'react'
     }),
     new webpack.DefinePlugin({
       'process.env': {
@@ -54,10 +67,6 @@ module.exports = {
       }
     })
   ],
-  externals: {
-    'react': 'React',
-    'react-dom': 'ReactDOM'
-  },
   mode: 'development',
   devtool: 'source-map'
 };
