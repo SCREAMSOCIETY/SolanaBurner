@@ -29,6 +29,10 @@ args = "Build"
 task = "workflow.run"
 args = "Asset Management Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Flask Server"
+
 [[workflows.workflow]]
 name = "Project"
 author = "agent"
@@ -71,6 +75,21 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "RUST_LOG=debug cargo run"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Flask Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python app.py"
 waitForPort = 5000
 
 [deployment]

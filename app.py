@@ -10,7 +10,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static', template_folder='.')
+app = Flask(__name__, 
+           static_folder='static',
+           template_folder='templates')  # Explicitly set template folder
 CORS(app)  # Enable CORS for all routes
 
 @app.route('/static/dist/<path:filename>')
@@ -18,6 +20,15 @@ def serve_static_dist(filename):
     logger.info(f"Serving dist file: {filename}")
     try:
         return send_from_directory('static/dist', filename)
+    except Exception as e:
+        logger.error(f"Error serving {filename}: {str(e)}")
+        return str(e), 404
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    logger.info(f"Serving static file: {filename}")
+    try:
+        return send_from_directory('static', filename)
     except Exception as e:
         logger.error(f"Error serving {filename}: {str(e)}")
         return str(e), 404

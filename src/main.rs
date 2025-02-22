@@ -1,45 +1,36 @@
-use actix_files as fs;
-use actix_web::{
-    middleware::Logger,
-    web, App, HttpServer,
-    Result,
-};
-use std::path::PathBuf;
-
-async fn index() -> Result<fs::NamedFile> {
-    println!("Serving index.html");
-    Ok(fs::NamedFile::open("./templates/index.html")?)
-}
-
-async fn serve_static_files(path: web::Path<String>) -> Result<fs::NamedFile> {
-    let mut file_path: PathBuf = PathBuf::from("static");
-    file_path.push(path.into_inner());
-    println!("Serving static file: {:?}", file_path);
-    Ok(fs::NamedFile::open(file_path)?)
-}
+use actix_web::{middleware, web, App, HttpServer, HttpResponse};
+use std::io;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    // Initialize logger with debug level
+async fn main() -> io::Result<()> {
     std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
-    println!("Starting server at http://0.0.0.0:5000");
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(5000);
 
-    HttpServer::new(|| {
-        println!("Creating new server instance");
+    println!("Starting minimal server at http://0.0.0.0:{}", port);
+
+    match HttpServer::new(move || {
+        println!("Creating new app instance");
         App::new()
-            .wrap(Logger::default())
-            .service(
-                web::resource("/")
-                    .route(web::get().to(index))
-            )
-            .service(
-                web::scope("/static")
-                    .route("/{filename:.*}", web::get().to(serve_static_files))
-            )
+            .wrap(middleware::Logger::default())
+            .route("/", web::get().to(|| async { 
+                HttpResponse::Ok().body("Server is running!")
+            }))
     })
-    .bind(("0.0.0.0", 5000))?
-    .run()
-    .await
+    .bind(("0.0.0.0", port)) {
+        Ok(server) => {
+            println!("Successfully bound to port {}", port);
+            server.workers(1)
+                .run()
+                .await
+        },
+        Err(e) => {
+            eprintln!("Failed to bind to port {}: {}", port, e);
+            Err(e)
+        }
+    }
 }
