@@ -1,5 +1,3 @@
-console.log('WalletProvider module loading...');
-
 import React, { FC, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
@@ -40,12 +38,21 @@ const App: FC = () => {
 
     // You can also provide a custom RPC endpoint.
     const endpoint = process.env.QUICKNODE_RPC_URL || clusterApiUrl(network);
-    console.log('Using endpoint:', endpoint);
+    console.log('Using endpoint:', endpoint.split('?')[0]); // Log endpoint without query params for security
 
     // Initialize Solana connection
     const connection = useMemo(() => {
-        console.log('Creating Solana connection');
-        return new Connection(endpoint);
+        console.log('Creating Solana connection to:', network);
+        try {
+            const conn = new Connection(endpoint, 'confirmed');
+            console.log('Solana connection created successfully');
+            return conn;
+        } catch (error) {
+            console.error('Error creating Solana connection:', error);
+            // Fallback to public RPC
+            console.log('Falling back to public RPC endpoint');
+            return new Connection(clusterApiUrl(network), 'confirmed');
+        }
     }, [endpoint]);
 
     const wallets = useMemo(
@@ -78,7 +85,6 @@ const App: FC = () => {
     );
 };
 
-console.log('Defining initWalletProvider');
 const initWalletProvider = () => {
     try {
         console.log('Starting WalletProvider initialization');

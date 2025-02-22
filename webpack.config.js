@@ -1,5 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
+const dotenv = require('dotenv');
 
 module.exports = {
   entry: {
@@ -49,7 +50,7 @@ module.exports = {
     new webpack.DefinePlugin({
       'process.env': {
         'NODE_ENV': JSON.stringify('development'),
-        'QUICKNODE_RPC_URL': JSON.stringify(process.env.QUICKNODE_RPC_URL || '')
+        'QUICKNODE_RPC_URL': JSON.stringify(process.env.QUICKNODE_RPC_URL)
       }
     })
   ],
