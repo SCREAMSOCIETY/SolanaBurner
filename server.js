@@ -5,21 +5,17 @@ const cors = require('cors');
 const app = express();
 const DEFAULT_PORT = 3002;
 
-// Enable CORS with specific configuration
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Enable CORS
+app.use(cors());
 
-// Request logging middleware with more detailed logging
+// Request logging
 app.use((req, res, next) => {
-  console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
-// Serve static files from dist directory first (since it's the compiled version)
-app.use('/static/dist', express.static(path.join(__dirname, 'static', 'dist'), {
+// Serve webpack bundled files
+app.use('/static/dist', express.static(path.join(__dirname, 'static/dist'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
@@ -27,7 +23,7 @@ app.use('/static/dist', express.static(path.join(__dirname, 'static', 'dist'), {
   }
 }));
 
-// Then serve other static files
+// Serve other static files
 app.use('/static', express.static(path.join(__dirname, 'static'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
@@ -37,36 +33,35 @@ app.use('/static', express.static(path.join(__dirname, 'static'), {
 }));
 
 // Health check endpoint
-app.get('/ping', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve index.html for all other routes
+// Catch-all route for SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
-  console.error('[Server Error]', err);
+  console.error('[Error]', err);
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // Start server
-const startServer = () => {
+function startServer() {
   const server = app.listen(DEFAULT_PORT, '0.0.0.0', () => {
     const addr = server.address();
-    console.log(`[Server] ${new Date().toISOString()} - Server started on port ${addr.port}`);
-    console.log(`[Server] Local: http://localhost:${addr.port}`);
-    console.log(`[Server] Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+    console.log(`[${new Date().toISOString()}] Server started`);
+    console.log(`Local: http://localhost:${addr.port}`);
+    console.log(`Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
   });
 
   server.on('error', (error) => {
-    console.error('[Server] Server error:', error);
+    console.error('Server error:', error);
     process.exit(1);
   });
-};
+}
 
-// Start the application
-console.log('[Server] Starting server...');
+console.log('Starting server...');
 startServer();

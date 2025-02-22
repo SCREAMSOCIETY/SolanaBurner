@@ -1,10 +1,5 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Metaplex } from '@metaplex-foundation/js';
-import { 
-    ConcurrentMerkleTree,
-    SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-    SPL_NOOP_PROGRAM_ID,
-} from '@metaplex-foundation/mpl-bubblegum';
 
 export interface CNFTMetadata {
     mint: string;
@@ -15,7 +10,6 @@ export interface CNFTMetadata {
     collection?: string;
     attributes: Array<{trait_type: string, value: string}>;
     explorer_url: string;
-    proof?: any;
 }
 
 export class CNFTHandler {
@@ -34,29 +28,34 @@ export class CNFTHandler {
             console.log('Fetching cNFTs for wallet:', walletAddress);
             const owner = new PublicKey(walletAddress);
 
-            // Use Metaplex's findAllByOwner with compressed flag
-            console.log('Querying Metaplex for compressed NFTs...');
+            // Use findAllByOwner without type specification
             const nfts = await this.metaplex.nfts().findAllByOwner({
-                owner: owner,
-                commitment: 'confirmed',
-                type: 'compressedNft'
+                owner,
             });
 
-            console.log(`Found ${nfts.length} compressed NFTs`);
+            console.log(`Found ${nfts.length} NFTs, filtering for compressed ones`);
+
+            // Filter for compressed NFTs
+            const compressedNfts = nfts.filter(nft => {
+                return nft.compression && nft.compression.compressed === true;
+            });
+
+            console.log(`Found ${compressedNfts.length} compressed NFTs`);
 
             // Map the NFTs to our metadata format
-            const cnfts = nfts.map(nft => {
+            const cnfts = compressedNfts.map(nft => {
                 try {
-                    return {
+                    const metadata = {
                         mint: nft.address.toString(),
-                        name: nft.name || 'Unnamed',
-                        symbol: nft.symbol || '',
-                        description: nft.description || '',
-                        image: nft.uri || '/default-nft-image.svg',
+                        name: nft.json?.name || 'Unnamed',
+                        symbol: nft.json?.symbol || '',
+                        description: nft.json?.description || '',
+                        image: nft.json?.image || '/default-nft-image.svg',
                         collection: nft.collection?.address.toString(),
-                        attributes: nft.attributes || [],
+                        attributes: nft.json?.attributes || [],
                         explorer_url: `https://solscan.io/token/${nft.address.toString()}`
                     };
+                    return metadata;
                 } catch (error) {
                     console.error('Error processing NFT metadata:', error);
                     return null;
@@ -75,9 +74,8 @@ export class CNFTHandler {
     async burnCNFT(assetId: string) {
         try {
             const mintPubkey = new PublicKey(assetId);
-            const burnIx = await this.metaplex.nfts().builders().delete({
+            const burnIx = await this.metaplex.nfts().delete({
                 mintAddress: mintPubkey,
-                compressed: true
             });
 
             return burnIx;
