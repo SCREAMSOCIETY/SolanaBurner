@@ -493,6 +493,7 @@ h3 {
     z-index: 1000;
     max-width: 400px;
     width: 90%;
+    animation: fadeIn 0.3s ease-out;
 }
 
 .confirmation-dialog h3 {
@@ -533,6 +534,39 @@ h3 {
     border: 1px solid var(--text-color) !important;
 }
 
+.confirmation-buttons button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.confirmation-token {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.confirmation-token:last-child {
+    border-bottom: none;
+}
+
+.confirmation-token .amount {
+    margin: 0;
+    font-size: 1rem;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
 .processing {
     opacity: 0.7;
     pointer-events: none;
@@ -555,7 +589,6 @@ h3 {
     }
 }
 
-/* Tab Styles */
 .tabs {
     display: flex;
     justify-content: center;
@@ -801,11 +834,97 @@ h3 {
     opacity: 1;
 }
 
+
 /* Burn Controls */
 .token-actions {
     display: flex;
     gap: 0.5rem;
     margin-top: 1rem;
+}
+
+.token-checkbox {
+  margin-right: 1rem;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.bulk-burn-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(255, 70, 70, 0.1);
+  border-radius: 8px;
+  align-items: center;
+}
+
+.cancel-button {
+  background: var(--card-background);
+  color: var(--text-color);
+  border: 1px solid var(--text-color);
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.burn-button {
+  background: var(--error-color);
+  color: var(--text-color);
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.burn-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.burn-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+/* Burn animation effect */
+.burn-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 70, 70, 0.8);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.burn-button:active::after {
+  animation: burnEffect 0.5s ease-out;
+}
+
+@keyframes burnEffect {
+  0% {
+    width: 5px;
+    height: 5px;
+    opacity: 0.8;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
 }
 
 .burn-amount {
@@ -818,58 +937,15 @@ h3 {
     font-size: 0.9rem;
 }
 
-.burn-button {
-    background: var(--error-color);
-    color: var(--text-color);
-    border: none;
-    border-radius: 6px;
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    transition: opacity 0.2s;
-    position: relative;
-    overflow: hidden;
+.burn-amount:focus {
+    outline: none;
+    border-color: var(--success-color);
 }
 
-.burn-button::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 5px;
-    height: 5px;
-    background: rgba(255, 70, 70, 0.8);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    opacity: 0;
+.burn-amount:invalid {
+    border-color: var(--error-color);
 }
 
-.burn-button:active::after {
-    animation: burnEffect 0.5s ease-out;
-}
-
-@keyframes burnEffect {
-    0% {
-        width: 5px;
-        height: 5px;
-        opacity: 0.8;
-    }
-    100% {
-        width: 200px;
-        height: 200px;
-        opacity: 0;
-    }
-}
-
-.burn-button:hover:not(:disabled) {
-    opacity: 0.9;
-}
-
-.burn-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Links Container Styles */
 .links-container {
     display: flex;
     gap: 1rem;
@@ -1212,6 +1288,7 @@ h3 {
     transform: translateY(-2px);
     opacity: 0.9;
 }
+
 /* Tab Styles */
 .tabs-container {
     max-width: 1200px;
@@ -1286,4 +1363,95 @@ h2 {
 p {
     color: var(--text-color);
     opacity: 0.8;
+}
+
+.token-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.token-checkbox {
+  margin-right: 1rem;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.bulk-burn-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(255, 70, 70, 0.1);
+  border-radius: 8px;
+  align-items: center;
+}
+
+.cancel-button {
+  background: var(--card-background);
+  color: var(--text-color);
+  border: 1px solid var(--text-color);
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.burn-button {
+  background: var(--error-color);
+  color: var(--text-color);
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.burn-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.burn-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+/* Burn animation effect */
+.burn-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 70, 70, 0.8);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.burn-button:active::after {
+  animation: burnEffect 0.5s ease-out;
+}
+
+@keyframes burnEffect {
+  0% {
+    width: 5px;
+    height: 5px;
+    opacity: 0.8;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
 }
