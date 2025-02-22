@@ -68524,17 +68524,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "react");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony import */ var react_dom_client__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react-dom/client */ "./node_modules/react-dom/client.js");
-/* harmony import */ var _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @solana/wallet-adapter-base */ "./node_modules/@solana/wallet-adapter-base/lib/esm/types.js");
-/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/ConnectionProvider.js");
-/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/WalletProvider.js");
-/* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-phantom/lib/esm/adapter.js");
-/* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-solflare/lib/esm/adapter.js");
-/* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-ledger/lib/esm/adapter.js");
-/* harmony import */ var _solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui */ "./node_modules/@solana/wallet-adapter-react-ui/lib/esm/WalletModalProvider.js");
-/* harmony import */ var _solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui */ "./node_modules/@solana/wallet-adapter-react-ui/lib/esm/WalletMultiButton.js");
-/* harmony import */ var _solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui */ "./node_modules/@solana/wallet-adapter-react-ui/lib/esm/WalletDisconnectButton.js");
+/* harmony import */ var _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @solana/wallet-adapter-base */ "./node_modules/@solana/wallet-adapter-base/lib/esm/types.js");
+/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/ConnectionProvider.js");
+/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/WalletProvider.js");
+/* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-phantom/lib/esm/adapter.js");
+/* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-solflare/lib/esm/adapter.js");
+/* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-ledger/lib/esm/adapter.js");
+/* harmony import */ var _solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui */ "./node_modules/@solana/wallet-adapter-react-ui/lib/esm/WalletModalProvider.js");
+/* harmony import */ var _solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui */ "./node_modules/@solana/wallet-adapter-react-ui/lib/esm/WalletMultiButton.js");
+/* harmony import */ var _solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui */ "./node_modules/@solana/wallet-adapter-react-ui/lib/esm/WalletDisconnectButton.js");
 /* harmony import */ var _solana_web3_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @solana/web3.js */ "./node_modules/@solana/web3.js/lib/index.browser.esm.js");
-/* harmony import */ var _solana_wallet_adapter_react_ui_styles_css__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @solana/wallet-adapter-react-ui/styles.css */ "./node_modules/@solana/wallet-adapter-react-ui/styles.css");
 
 
 
@@ -68543,13 +68542,12 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-console.log('Dependencies imported successfully');
 // Default styles that can be overridden by your app
-
+__webpack_require__(/*! @solana/wallet-adapter-react-ui/styles.css */ "./node_modules/@solana/wallet-adapter-react-ui/styles.css");
 var App = function () {
     console.log('App component initializing');
     // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
-    var network = _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_5__.WalletAdapterNetwork.Mainnet;
+    var network = _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_4__.WalletAdapterNetwork.Mainnet;
     // You can also provide a custom RPC endpoint.
     var endpoint = "https://broken-prettiest-needle.solana-mainnet.quiknode.pro/84bb745fca3e8888fc4ac36c2f76d61892c7dda1" || 0;
     console.log('Using endpoint:', endpoint.split('?')[0]); // Log endpoint without query params for security
@@ -68571,15 +68569,15 @@ var App = function () {
     var wallets = (0,react__WEBPACK_IMPORTED_MODULE_1__.useMemo)(function () {
         console.log('Initializing wallet adapters');
         return [
-            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_6__.PhantomWalletAdapter(),
-            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_7__.SolflareWalletAdapter(),
-            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_8__.LedgerWalletAdapter(),
+            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_5__.PhantomWalletAdapter(),
+            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_6__.SolflareWalletAdapter(),
+            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_7__.LedgerWalletAdapter(),
         ];
     }, []);
     console.log('Rendering App component structure');
-    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_9__.ConnectionProvider, { endpoint: endpoint, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_10__.WalletProvider, { wallets: wallets, autoConnect: true, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_11__.WalletModalProvider, { children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "wallet-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { children: "Solana Asset Manager" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "wallet-buttons", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_12__.WalletMultiButton, {}), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_13__.WalletDisconnectButton, {})] })] }) }) }) }));
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_8__.ConnectionProvider, { endpoint: endpoint, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_9__.WalletProvider, { wallets: wallets, autoConnect: true, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__.WalletModalProvider, { children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "wallet-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { children: "Solana Asset Manager" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "wallet-buttons", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_11__.WalletMultiButton, {}), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_12__.WalletDisconnectButton, {})] })] }) }) }) }));
 };
-var initWalletProvider = function () {
+function initWalletProvider() {
     try {
         console.log('Starting WalletProvider initialization');
         var container = document.getElementById('root');
@@ -68599,9 +68597,7 @@ var initWalletProvider = function () {
             console.error('Stack trace:', error.stack);
         }
     }
-};
-console.log('Setting up window.WalletProvider');
-// Export to window object for script tag access
+}
 window.WalletProvider = {
     render: initWalletProvider
 };

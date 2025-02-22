@@ -17,10 +17,8 @@ import {
 } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl, Connection } from '@solana/web3.js';
 
-console.log('Dependencies imported successfully');
-
 // Default styles that can be overridden by your app
-import '@solana/wallet-adapter-react-ui/styles.css';
+require('@solana/wallet-adapter-react-ui/styles.css');
 
 declare global {
     interface Window {
@@ -85,7 +83,7 @@ const App: FC = () => {
     );
 };
 
-const initWalletProvider = () => {
+function initWalletProvider() {
     try {
         console.log('Starting WalletProvider initialization');
         const container = document.getElementById('root');
@@ -110,11 +108,10 @@ const initWalletProvider = () => {
             console.error('Stack trace:', error.stack);
         }
     }
-};
+}
 
-console.log('Setting up window.WalletProvider');
-// Export to window object for script tag access
 window.WalletProvider = {
     render: initWalletProvider
 };
+
 console.log('WalletProvider module loaded successfully');

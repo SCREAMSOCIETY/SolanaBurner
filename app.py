@@ -1,5 +1,6 @@
 import logging
-from flask import Flask, jsonify
+from flask import Flask, render_template
+from flask_cors import CORS
 import os
 
 # Configure basic logging with more detail
@@ -9,29 +10,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', template_folder='templates')
+CORS(app)  # Enable CORS for all routes
 
 @app.route('/ping')
 def ping():
     logger.info("Ping endpoint called")
-    return jsonify({"status": "ok"})
+    return {"status": "ok"}
 
 @app.route('/')
 def index():
-    logger.info("Root endpoint called")
-    # Temporarily return JSON instead of template to test server accessibility
-    return jsonify({"message": "Server is running", "status": "ok"})
+    logger.info("Root endpoint called - serving index.html template")
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"Error rendering template: {str(e)}")
+        logger.exception("Detailed error trace:")
+        return {"error": str(e)}, 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8082))  # Changed default port to 8082
-    logger.info(f"Starting Flask server on port {port}")
     try:
-        logger.debug(f"Attempting to bind to host: 0.0.0.0, port: {port}")
+        port = int(os.environ.get('PORT', 8082))
+        logger.info(f"Starting Flask server on port {port}")
+        logger.debug("Current environment:")
+        logger.debug(f"REPLIT_DEV_DOMAIN: {os.environ.get('REPLIT_DEV_DOMAIN', 'not set')}")
+        logger.debug(f"PORT: {os.environ.get('PORT', 'not set')}")
+
         app.run(
             host='0.0.0.0',
             port=port,
             debug=True,
-            use_reloader=False
+            use_reloader=False,
+            threaded=True
         )
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}")
