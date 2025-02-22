@@ -10,6 +10,7 @@ export interface CNFTMetadata {
     collection?: string;
     attributes: Array<{trait_type: string, value: string}>;
     explorer_url: string;
+    proof?: any;
 }
 
 export class CNFTHandler {
@@ -28,34 +29,29 @@ export class CNFTHandler {
             console.log('Fetching cNFTs for wallet:', walletAddress);
             const owner = new PublicKey(walletAddress);
 
-            // Use findAllByOwner without type specification
-            const nfts = await this.metaplex.nfts().findAllByOwner({
-                owner,
-            });
+            // Get all NFTs for the wallet
+            console.log('Fetching all NFTs...');
+            const nfts = await this.metaplex.nfts().findAllByOwner({ owner });
 
-            console.log(`Found ${nfts.length} NFTs, filtering for compressed ones`);
+            console.log(`Found ${nfts.length} total NFTs, filtering for compressed ones`);
 
-            // Filter for compressed NFTs
-            const compressedNfts = nfts.filter(nft => {
-                return nft.compression && nft.compression.compressed === true;
-            });
-
+            // Filter for compressed NFTs only
+            const compressedNfts = nfts.filter(nft => nft.compression.compressed);
             console.log(`Found ${compressedNfts.length} compressed NFTs`);
 
             // Map the NFTs to our metadata format
             const cnfts = compressedNfts.map(nft => {
                 try {
-                    const metadata = {
+                    return {
                         mint: nft.address.toString(),
-                        name: nft.json?.name || 'Unnamed',
+                        name: nft.json?.name || 'Unnamed cNFT',
                         symbol: nft.json?.symbol || '',
                         description: nft.json?.description || '',
-                        image: nft.json?.image || '/default-nft-image.svg',
+                        image: nft.json?.image || '/static/default-nft-image.svg',
                         collection: nft.collection?.address.toString(),
                         attributes: nft.json?.attributes || [],
                         explorer_url: `https://solscan.io/token/${nft.address.toString()}`
                     };
-                    return metadata;
                 } catch (error) {
                     console.error('Error processing NFT metadata:', error);
                     return null;
@@ -63,7 +59,7 @@ export class CNFTHandler {
             });
 
             // Filter out any null entries from failed processing
-            return cnfts.filter(cnft => cnft !== null) as CNFTMetadata[];
+            return cnfts.filter((cnft): cnft is CNFTMetadata => cnft !== null);
 
         } catch (error) {
             console.error('Error in fetchCNFTs:', error);
@@ -71,14 +67,15 @@ export class CNFTHandler {
         }
     }
 
-    async burnCNFT(assetId: string) {
+    async burnCNFT(assetId: string): Promise<any> {
         try {
             const mintPubkey = new PublicKey(assetId);
-            const burnIx = await this.metaplex.nfts().delete({
+            const burnTx = await this.metaplex.nfts().delete({
                 mintAddress: mintPubkey,
+                collection: undefined // Will be determined from the NFT metadata
             });
 
-            return burnIx;
+            return burnTx;
         } catch (error) {
             console.error('Error creating burn instruction for cNFT:', error);
             throw error;

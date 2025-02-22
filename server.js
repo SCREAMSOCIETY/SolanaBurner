@@ -3,7 +3,7 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const DEFAULT_PORT = 3002;
+const DEFAULT_PORT = 5000;
 
 // Enable CORS
 app.use(cors());
@@ -14,16 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve webpack bundled files
-app.use('/static/dist', express.static(path.join(__dirname, 'static/dist'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-  }
-}));
-
-// Serve other static files
+// Serve static files
 app.use('/static', express.static(path.join(__dirname, 'static'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
@@ -39,6 +30,7 @@ app.get('/health', (req, res) => {
 
 // Catch-all route for SPA
 app.get('*', (req, res) => {
+  console.log('Serving index.html for path:', req.path);
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -50,17 +42,22 @@ app.use((err, req, res, next) => {
 
 // Start server
 function startServer() {
-  const server = app.listen(DEFAULT_PORT, '0.0.0.0', () => {
-    const addr = server.address();
-    console.log(`[${new Date().toISOString()}] Server started`);
-    console.log(`Local: http://localhost:${addr.port}`);
-    console.log(`Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
-  });
+  try {
+    const server = app.listen(DEFAULT_PORT, '0.0.0.0', () => {
+      const addr = server.address();
+      console.log(`[${new Date().toISOString()}] Server started`);
+      console.log(`Local: http://localhost:${addr.port}`);
+      console.log(`Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+    });
 
-  server.on('error', (error) => {
-    console.error('Server error:', error);
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      process.exit(1);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
     process.exit(1);
-  });
+  }
 }
 
 console.log('Starting server...');

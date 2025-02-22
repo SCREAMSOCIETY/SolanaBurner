@@ -11,7 +11,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'static/dist'),
     filename: '[name].bundle.js',
-    clean: true, // Clean the output directory before emit
+    clean: true,
     publicPath: '/static/dist/'
   },
   module: {
