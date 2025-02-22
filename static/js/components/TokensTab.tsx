@@ -49,6 +49,9 @@ const TokensTab: React.FC = () => {
         // Filter out tokens with 0 balance
         const nonZeroTokens = tokenData.filter(token => token.balance > 0);
 
+        // Set tokens immediately to show "no tokens" state faster
+        setTokens(nonZeroTokens);
+
         // Fetch token metadata from Jupiter API
         const enrichedTokens = await Promise.all(
           nonZeroTokens.map(async (token) => {
@@ -89,7 +92,7 @@ const TokensTab: React.FC = () => {
 
   if (!publicKey) {
     return (
-      <div className="tokens-container">
+      <div className="container">
         <h2>Tokens</h2>
         <p className="connect-message">Connect your wallet to view tokens</p>
       </div>
@@ -97,9 +100,9 @@ const TokensTab: React.FC = () => {
   }
 
   return (
-    <div className="tokens-container">
+    <div className="container">
       <h2>Tokens</h2>
-      {loading ? (
+      {loading && tokens.length === 0 ? (
         <div className="loading-message">Loading tokens...</div>
       ) : error ? (
         <div className="error-message">{error}</div>

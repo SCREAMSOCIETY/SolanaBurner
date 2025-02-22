@@ -282,6 +282,13 @@ h3 {
     margin: 2rem 0;
 }
 
+.no-assets-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.5;
+    margin-top: 0.5rem;
+}
+
 .network-selector {
     margin-bottom: 2rem;
 }

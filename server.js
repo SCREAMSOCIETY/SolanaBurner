@@ -5,11 +5,17 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enable CORS with specific options
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+// Enable CORS for all routes
+app.use(cors());
+
+// Better error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err.stack);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
 
 // Serve static files from the static directory
 app.use(express.static(path.join(__dirname, 'static')));
@@ -29,16 +35,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'templates', 'index.html'));
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
-// Start the server
+// Start the server with proper error handling
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://0.0.0.0:${port}`);
   console.log('Static files served from:', path.join(__dirname, 'static'));

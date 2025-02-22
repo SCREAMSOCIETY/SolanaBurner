@@ -74592,8 +74592,11 @@ var TokensTab = function TokensTab() {
               }); // Filter out tokens with 0 balance
               nonZeroTokens = tokenData.filter(function (token) {
                 return token.balance > 0;
-              }); // Fetch token metadata from Jupiter API
-              _context2.next = 12;
+              }); // Set tokens immediately to show "no tokens" state faster
+              setTokens(nonZeroTokens);
+
+              // Fetch token metadata from Jupiter API
+              _context2.next = 13;
               return Promise.all(nonZeroTokens.map(/*#__PURE__*/function () {
                 var _ref2 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee(token) {
                   var _response$data, _response$data2, _response$data3, response;
@@ -74625,25 +74628,25 @@ var TokensTab = function TokensTab() {
                   return _ref2.apply(this, arguments);
                 };
               }()));
-            case 12:
+            case 13:
               enrichedTokens = _context2.sent;
               setTokens(enrichedTokens);
-              _context2.next = 20;
+              _context2.next = 21;
               break;
-            case 16:
-              _context2.prev = 16;
+            case 17:
+              _context2.prev = 17;
               _context2.t0 = _context2["catch"](2);
               console.error('Error fetching tokens:', _context2.t0);
               setError('Failed to fetch tokens. Please try again.');
-            case 20:
-              _context2.prev = 20;
+            case 21:
+              _context2.prev = 21;
               setLoading(false);
-              return _context2.finish(20);
-            case 23:
+              return _context2.finish(21);
+            case 24:
             case "end":
               return _context2.stop();
           }
-        }, _callee2, null, [[2, 16, 20, 23]]);
+        }, _callee2, null, [[2, 17, 21, 24]]);
       }));
       return function fetchTokens() {
         return _ref.apply(this, arguments);
@@ -74659,14 +74662,14 @@ var TokensTab = function TokensTab() {
   }, [publicKey, connection]);
   if (!publicKey) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-      className: "tokens-container"
+      className: "container"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", null, "Tokens"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
       className: "connect-message"
     }, "Connect your wallet to view tokens"));
   }
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-    className: "tokens-container"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", null, "Tokens"), loading ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "container"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", null, "Tokens"), loading && tokens.length === 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "loading-message"
   }, "Loading tokens...") : error ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "error-message"
