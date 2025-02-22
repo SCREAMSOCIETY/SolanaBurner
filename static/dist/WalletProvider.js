@@ -1,4 +1,14 @@
-/******/ (() => { // webpackBootstrap
+(function webpackUniversalModuleDefinition(root, factory) {
+	if(typeof exports === 'object' && typeof module === 'object')
+		module.exports = factory();
+	else if(typeof define === 'function' && define.amd)
+		define([], factory);
+	else if(typeof exports === 'object')
+		exports["WalletProvider"] = factory();
+	else
+		root["WalletProvider"] = factory();
+})(this, () => {
+return /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
 /***/ "./node_modules/@ledgerhq/errors/lib-es/helpers.js":
@@ -44662,7 +44672,7 @@ function version(uuid) {
 /******/ 		
 /******/ 		}
 /******/ 		
-/******/ 		var chunkLoadingGlobal = self["webpackChunkworkspace"] = self["webpackChunkworkspace"] || [];
+/******/ 		var chunkLoadingGlobal = this["webpackChunkworkspace"] = this["webpackChunkworkspace"] || [];
 /******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
 /******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
 /******/ 	})();
@@ -44703,54 +44713,54 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-
 // Default styles that can be overridden by your app
 __webpack_require__(/*! @solana/wallet-adapter-react-ui/styles.css */ "./node_modules/@solana/wallet-adapter-react-ui/styles.css");
-var WalletProvider = function WalletProvider(_ref) {
-  var children = _ref.children;
-  console.log('WalletProvider component initializing');
-
-  // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
-  var network = _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_2__.WalletAdapterNetwork.Mainnet;
-
-  // You can also provide a custom RPC endpoint.
-  var endpoint = "https://broken-prettiest-needle.solana-mainnet.quiknode.pro/84bb745fca3e8888fc4ac36c2f76d61892c7dda1" || 0;
-  console.log('Using endpoint:', endpoint.split('?')[0]); // Log endpoint without query params for security
-
-  // Initialize Solana connection
-  var connection = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(function () {
-    console.log('Creating Solana connection to:', network);
-    try {
-      var conn = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Connection(endpoint, 'confirmed');
-      console.log('Solana connection created successfully');
-      return conn;
-    } catch (error) {
-      console.error('Error creating Solana connection:', error);
-      // Fallback to public RPC
-      console.log('Falling back to public RPC endpoint');
-      return new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Connection((0,_solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.clusterApiUrl)(network), 'confirmed');
-    }
-  }, [endpoint]);
-  var wallets = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(function () {
-    console.log('Initializing wallet adapters');
-    return [new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_3__.PhantomWalletAdapter(), new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_4__.SolflareWalletAdapter(), new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_5__.LedgerWalletAdapter()];
-  }, []);
-  console.log('Rendering WalletProvider component structure');
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_6__.ConnectionProvider, {
-    endpoint: endpoint
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_7__.WalletProvider, {
-    wallets: wallets,
-    autoConnect: true
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_8__.WalletModalProvider, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-    className: "wallet-container"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-    className: "wallet-buttons"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_9__.WalletMultiButton, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__.WalletDisconnectButton, null)), children))));
+const WalletProvider = ({ children }) => {
+    console.log('WalletProvider component initializing');
+    // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
+    const network = _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_2__.WalletAdapterNetwork.Mainnet;
+    // You can also provide a custom RPC endpoint.
+    const endpoint = "https://broken-prettiest-needle.solana-mainnet.quiknode.pro/84bb745fca3e8888fc4ac36c2f76d61892c7dda1" || 0;
+    console.log('Using endpoint:', endpoint.split('?')[0]); // Log endpoint without query params for security
+    // Initialize Solana connection
+    const connection = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+        console.log('Creating Solana connection to:', network);
+        try {
+            const conn = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Connection(endpoint, 'confirmed');
+            console.log('Solana connection created successfully');
+            return conn;
+        }
+        catch (error) {
+            console.error('Error creating Solana connection:', error);
+            // Fallback to public RPC
+            console.log('Falling back to public RPC endpoint');
+            return new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Connection((0,_solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.clusterApiUrl)(network), 'confirmed');
+        }
+    }, [endpoint]);
+    const wallets = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+        console.log('Initializing wallet adapters');
+        return [
+            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_3__.PhantomWalletAdapter(),
+            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_4__.SolflareWalletAdapter(),
+            new _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_5__.LedgerWalletAdapter(),
+        ];
+    }, []);
+    console.log('Rendering WalletProvider component structure');
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_6__.ConnectionProvider, { endpoint: endpoint },
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_7__.WalletProvider, { wallets: wallets, autoConnect: true },
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_8__.WalletModalProvider, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { className: "wallet-container" },
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { className: "wallet-buttons" },
+                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_9__.WalletMultiButton, null),
+                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__.WalletDisconnectButton, null)),
+                    children)))));
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (WalletProvider);
+
 })();
 
-window.WalletProvider = __webpack_exports__;
+/******/ 	return __webpack_exports__;
 /******/ })()
 ;
+});
 //# sourceMappingURL=WalletProvider.js.map

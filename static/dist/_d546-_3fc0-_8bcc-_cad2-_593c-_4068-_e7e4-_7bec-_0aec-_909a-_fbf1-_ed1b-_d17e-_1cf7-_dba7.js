@@ -1,4 +1,4 @@
-(self["webpackChunkworkspace"] = self["webpackChunkworkspace"] || []).push([["_d546-_3fc0-_8bcc-_cad2-_593c-_4068-_e7e4-_7bec-_0aec-_909a-_fbf1-_ed1b-_d17e-_1cf7-_dba7"],{
+(this["webpackChunkworkspace"] = this["webpackChunkworkspace"] || []).push([["_d546-_3fc0-_8bcc-_cad2-_593c-_4068-_e7e4-_7bec-_0aec-_909a-_fbf1-_ed1b-_d17e-_1cf7-_dba7"],{
 
 /***/ "?0aec":
 /*!************************!*\

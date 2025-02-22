@@ -1,42 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { CNFTHandler } from '../cnft-handler';
-import { PublicKey } from '@solana/web3.js';
-
-interface CNFT {
-  mint: string;
-  name: string;
-  symbol: string;
-  description: string;
-  image: string;
-  collection?: string;
-  attributes: Array<{trait_type: string, value: string}>;
-  explorer_url: string;
-  proof: any;
-}
+import { CNFTHandler, CNFTMetadata } from '../cnft-handler';
 
 const CNFTsTab: React.FC = () => {
   const { connection } = useConnection();
   const { publicKey, wallet } = useWallet();
-  const [cnfts, setCNFTs] = useState<CNFT[]>([]);
+  const [cnfts, setCNFTs] = useState<CNFTMetadata[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCNFTs = async () => {
-      if (!publicKey || !connection) return;
+      if (!publicKey || !connection || !wallet) {
+        console.log('Prerequisites not met:', { 
+          hasPublicKey: !!publicKey, 
+          hasConnection: !!connection,
+          hasWallet: !!wallet 
+        });
+        return;
+      }
 
       setLoading(true);
       setError(null);
 
       try {
+        console.log('Creating CNFTHandler instance...');
         const handler = new CNFTHandler(connection, wallet);
-        const fetchedCNFTs = await handler.fetchCNFTs(publicKey);
-        console.log('Fetched cNFTs:', fetchedCNFTs);
+
+        console.log('Fetching CNFTs for wallet:', publicKey.toString());
+        const fetchedCNFTs = await handler.fetchCNFTs(publicKey.toString());
+
+        console.log('Successfully fetched CNFTs:', fetchedCNFTs);
         setCNFTs(fetchedCNFTs);
       } catch (err) {
-        console.error('Error fetching cNFTs:', err);
-        setError('Failed to fetch compressed NFTs');
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+        console.error('Error in fetchCNFTs:', errorMessage);
+        setError(`Failed to fetch compressed NFTs: ${errorMessage}`);
       } finally {
         setLoading(false);
       }
@@ -45,48 +44,73 @@ const CNFTsTab: React.FC = () => {
     fetchCNFTs();
   }, [publicKey, connection, wallet]);
 
+  if (!publicKey) {
+    return (
+      <div className="cnfts-container p-4">
+        <h2 className="text-2xl font-bold mb-4">Compressed NFTs</h2>
+        <div className="text-center py-8">
+          <p className="text-gray-600">Connect your wallet to view compressed NFTs</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="cnfts-container">
-      <h2>Compressed NFTs</h2>
-      {publicKey ? (
-        <>
-          {loading && <p>Loading compressed NFTs...</p>}
-          {error && <p className="error">{error}</p>}
-          {!loading && !error && (
-            <div className="cnfts-grid">
-              {cnfts.length === 0 ? (
-                <p>No compressed NFTs found in this wallet</p>
-              ) : (
-                cnfts.map((cnft) => (
-                  <div key={cnft.mint} className="cnft-card">
-                    <img 
-                      src={cnft.image || '/default-nft-image.svg'} 
-                      alt={cnft.name}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/default-nft-image.svg';
-                      }}
-                    />
-                    <div className="cnft-info">
-                      <h3>{cnft.name}</h3>
-                      {cnft.collection && <p>Collection: {cnft.collection}</p>}
-                      <a 
-                        href={cnft.explorer_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="view-on-explorer"
-                      >
-                        View on Explorer
-                      </a>
-                    </div>
-                  </div>
-                ))
-              )}
+    <div className="cnfts-container p-4">
+      <h2 className="text-2xl font-bold mb-4">Compressed NFTs</h2>
+
+      {loading && (
+        <div className="text-center py-8">
+          <p className="text-gray-600">Loading compressed NFTs...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cnfts.length === 0 ? (
+            <div className="col-span-full text-center py-8">
+              <p className="text-gray-600">No compressed NFTs found in this wallet</p>
             </div>
+          ) : (
+            cnfts.map((cnft) => (
+              <div key={cnft.mint} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="aspect-square relative">
+                  <img 
+                    src={cnft.image || '/default-nft-image.svg'} 
+                    alt={cnft.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/default-nft-image.svg';
+                    }}
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg mb-2">{cnft.name}</h3>
+                  {cnft.collection && (
+                    <p className="text-sm text-gray-600 mb-2">
+                      Collection: {cnft.collection}
+                    </p>
+                  )}
+                  <a 
+                    href={cnft.explorer_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 text-sm inline-block"
+                  >
+                    View on Explorer
+                  </a>
+                </div>
+              </div>
+            ))
           )}
-        </>
-      ) : (
-        <p>Connect your wallet to view compressed NFTs</p>
+        </div>
       )}
     </div>
   );

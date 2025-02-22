@@ -7,19 +7,19 @@ const DEFAULT_PORT = 3002;
 
 // Enable CORS with specific configuration
 app.use(cors({
-  origin: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Request logging middleware
+// Request logging middleware with more detailed logging
 app.use((req, res, next) => {
-  console.log(`[Server] ${req.method} ${req.url}`);
+  console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
-// Serve webpack bundle from dist directory first (since it's the compiled version)
-app.use('/dist', express.static(path.join(__dirname, 'static', 'dist'), {
+// Serve static files from dist directory first (since it's the compiled version)
+app.use('/static/dist', express.static(path.join(__dirname, 'static', 'dist'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
@@ -27,7 +27,7 @@ app.use('/dist', express.static(path.join(__dirname, 'static', 'dist'), {
   }
 }));
 
-// Then serve static files
+// Then serve other static files
 app.use('/static', express.static(path.join(__dirname, 'static'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
@@ -38,7 +38,7 @@ app.use('/static', express.static(path.join(__dirname, 'static'), {
 
 // Health check endpoint
 app.get('/ping', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Serve index.html for all other routes
@@ -46,13 +46,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('[Server Error]', err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
 // Start server
 const startServer = () => {
   const server = app.listen(DEFAULT_PORT, '0.0.0.0', () => {
     const addr = server.address();
-    console.log(`[Server] Server started on port ${addr.port}`);
+    console.log(`[Server] ${new Date().toISOString()} - Server started on port ${addr.port}`);
     console.log(`[Server] Local: http://localhost:${addr.port}`);
-    console.log(`[Server] Network: http://0.0.0.0:${addr.port}`);
+    console.log(`[Server] Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
   });
 
   server.on('error', (error) => {
