@@ -27,10 +27,6 @@ args = "Build"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Asset Management Server"
 
 [[workflows.workflow]]
@@ -63,21 +59,6 @@ task = "shell.exec"
 args = "npx webpack --config webpack.config.js"
 
 [[workflows.workflow]]
-name = "Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "NODE_ENV=development node server.js"
-waitForPort = 3000
-
-[[workflows.workflow]]
 name = "Asset Management Server"
 author = "agent"
 
@@ -90,7 +71,7 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "NODE_ENV=development node server.js"
-waitForPort = 3000
+waitForPort = 3002
 
 [deployment]
 run = ["sh", "-c", "npm run build && node server.js"]
