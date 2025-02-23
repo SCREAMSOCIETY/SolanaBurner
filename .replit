@@ -23,11 +23,11 @@ args = "npm install && npx webpack --config webpack.config.js && node server.js"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Server"
+args = "Build"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Build"
+args = "Server"
 
 [[workflows.workflow]]
 name = "Project"
@@ -45,21 +45,6 @@ args = "npm run build && node server.js"
 waitForPort = 3000
 
 [[workflows.workflow]]
-name = "Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=8080 NODE_ENV=development node server.js"
-waitForPort = 8080
-
-[[workflows.workflow]]
 name = "Build"
 author = "agent"
 
@@ -72,6 +57,21 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm install && npx webpack --config webpack.config.js"
+
+[[workflows.workflow]]
+name = "Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server.js"
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "npm run build && node server.js"]
