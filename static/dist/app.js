@@ -78130,7 +78130,7 @@ var TokensTab = function TokensTab() {
             case 3:
               response = _context.sent;
               setSolscanApiKey(response.data.solscanApiKey);
-              console.log('Successfully fetched API key configuration');
+              console.log('Successfully fetched API key:', response.data.solscanApiKey ? 'Present' : 'Missing');
               _context.next = 12;
               break;
             case 8:
@@ -78206,7 +78206,7 @@ var TokensTab = function TokensTab() {
               // Set tokens immediately to show basic data
               setTokens(tokenData);
 
-              // Fetch detailed token info from Solscan API with improved error handling
+              // Fetch detailed token info from Solscan API v2 with improved error handling
               _context3.next = 17;
               return Promise.all(tokenData.map(/*#__PURE__*/function () {
                 var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(token, index) {
@@ -78220,7 +78220,8 @@ var TokensTab = function TokensTab() {
                           return setTimeout(resolve, index * 500);
                         });
                       case 3:
-                        _context2.next = 5;
+                        console.log("Fetching metadata for token ".concat(token.mint));
+                        _context2.next = 6;
                         return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/v2/token/meta?token=".concat(token.mint), {
                           headers: {
                             'Accept': 'application/json',
@@ -78228,14 +78229,14 @@ var TokensTab = function TokensTab() {
                           },
                           timeout: 10000
                         });
-                      case 5:
+                      case 6:
                         response = _context2.sent;
-                        console.log("Solscan response for ".concat(token.mint, ":"), {
+                        console.log("Solscan v2 response for ".concat(token.mint, ":"), {
                           status: response.status,
                           hasData: !!response.data
                         });
                         if (!(response.data && response.data.success)) {
-                          _context2.next = 10;
+                          _context2.next = 11;
                           break;
                         }
                         data = response.data.data;
@@ -78244,39 +78245,39 @@ var TokensTab = function TokensTab() {
                           name: data.name || 'Unknown Token',
                           logoURI: data.icon || '/default-token-icon.svg'
                         }));
-                      case 10:
+                      case 11:
                         console.warn("No valid data returned for token ".concat(token.mint));
                         return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: 'Unknown',
                           name: 'Unknown Token',
                           logoURI: '/default-token-icon.svg'
                         }));
-                      case 14:
-                        _context2.prev = 14;
+                      case 15:
+                        _context2.prev = 15;
                         _context2.t0 = _context2["catch"](0);
                         console.error("Error fetching metadata for token ".concat(token.mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
 
                         // Check for specific error types
                         if (!(((_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.status) === 429)) {
-                          _context2.next = 21;
+                          _context2.next = 22;
                           break;
                         }
                         console.warn('Rate limit hit, will retry after delay');
-                        _context2.next = 21;
+                        _context2.next = 22;
                         return new Promise(function (resolve) {
                           return setTimeout(resolve, 2000);
                         });
-                      case 21:
+                      case 22:
                         return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: 'Unknown',
                           name: 'Unknown Token',
                           logoURI: '/default-token-icon.svg'
                         }));
-                      case 22:
+                      case 23:
                       case "end":
                         return _context2.stop();
                     }
-                  }, _callee2, null, [[0, 14]]);
+                  }, _callee2, null, [[0, 15]]);
                 }));
                 return function (_x, _x2) {
                   return _ref3.apply(this, arguments);

@@ -3,17 +3,8 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
+// Use Replit's provided port or fallback to 5000
 const port = process.env.PORT || 5000;
-
-// Enable CORS for all routes
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Parse JSON bodies
-app.use(express.json());
 
 // Enhanced request logging middleware
 app.use((req, res, next) => {
@@ -46,19 +37,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files from the static directory with logging
-app.use(express.static(path.join(__dirname, 'static'), {
-  setHeaders: (res, filePath) => {
-    console.log(`[${new Date().toISOString()}] Serving static file: ${filePath}`);
-  }
+// Enable CORS for all routes
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Serve webpack bundle from dist directory with logging
-app.use('/dist', express.static(path.join(__dirname, 'static', 'dist'), {
-  setHeaders: (res, filePath) => {
-    console.log(`[${new Date().toISOString()}] Serving dist file: ${filePath}`);
-  }
-}));
+// Parse JSON bodies
+app.use(express.json());
+
+// Serve static files from the static directory
+app.use(express.static(path.join(__dirname, 'static')));
+
+// Serve webpack bundle from dist directory
+app.use('/dist', express.static(path.join(__dirname, 'static', 'dist')));
 
 // API endpoint to get environment variables safely
 app.get('/api/config', (req, res) => {
@@ -78,12 +71,12 @@ app.get('/ping', (req, res) => {
 
 // Serve index.html for all routes to support client-side routing
 app.get('*', (req, res) => {
-  const indexPath = path.join(__dirname, 'templates', 'index.html');
   console.log(`[${new Date().toISOString()}] Serving index.html for path: ${req.path}`);
-  console.log('Index file path:', indexPath);
+  const indexPath = path.join(__dirname, 'templates', 'index.html');
 
   // Check if index.html exists
-  if (!require('fs').existsSync(indexPath)) {
+  const fs = require('fs');
+  if (!fs.existsSync(indexPath)) {
     console.error('ERROR: index.html not found at path:', indexPath);
     return res.status(404).send('Index file not found');
   }
@@ -109,7 +102,13 @@ app.use((err, req, res, next) => {
 
 // Start the server with proper error handling
 try {
-  const server = app.listen(port, '0.0.0.0', () => {
+  console.log('Starting server with configuration:');
+  console.log('- Port:', port);
+  console.log('- Environment:', process.env.NODE_ENV);
+  console.log('- Static directory:', path.join(__dirname, 'static'));
+  console.log('- Templates directory:', path.join(__dirname, 'templates'));
+
+  const server = app.listen(port, () => {
     console.log('=================================');
     console.log(`Server running at http://0.0.0.0:${port}`);
     console.log('Static files served from:', path.join(__dirname, 'static'));
@@ -117,25 +116,6 @@ try {
     console.log('Templates directory:', path.join(__dirname, 'templates'));
     console.log('Environment:', process.env.NODE_ENV);
     console.log('=================================');
-  }).on('error', (error) => {
-    if (error.syscall !== 'listen') {
-      throw error;
-    }
-
-    const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
-
-    switch (error.code) {
-      case 'EACCES':
-        console.error(`${bind} requires elevated privileges`);
-        process.exit(1);
-        break;
-      case 'EADDRINUSE':
-        console.error(`${bind} is already in use`);
-        process.exit(1);
-        break;
-      default:
-        throw error;
-    }
   });
 
   // Handle process termination gracefully

@@ -81,43 +81,73 @@ const TokensTab: React.FC = () => {
         // Set tokens immediately to show basic data
         setTokens(tokenData);
 
-        // Fetch detailed token info from Solscan API
+        // Fetch detailed token info from Solscan API v2 with improved error handling
         const enrichedTokens = await Promise.all(
-          tokenData.map(async (token) => {
+          tokenData.map(async (token, index) => {
             try {
-              console.log(`Fetching metadata for token ${token.mint}`);
+              // Add delay to prevent rate limiting
+              await new Promise(resolve => setTimeout(resolve, index * 500));
 
+              console.log(`Fetching metadata for token ${token.mint}`);
               const response = await axios.get(
-                `https://public-api.solscan.io/token/meta?tokenAddress=${token.mint}`,
+                `https://api.solscan.io/v2/token/meta?token=${token.mint}`,
                 {
                   headers: {
-                    'token': solscanApiKey
-                  }
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${solscanApiKey}`
+                  },
+                  timeout: 10000
                 }
               );
 
-              console.log(`Solscan response for ${token.mint}:`, response.data);
+              console.log(`Solscan v2 response for ${token.mint}:`, {
+                status: response.status,
+                hasData: !!response.data
+              });
 
-              if (response.data) {
+              if (response.data && response.data.success) {
+                const data = response.data.data;
                 return {
                   ...token,
-                  symbol: response.data.symbol || 'Unknown',
-                  name: response.data.name || 'Unknown Token',
-                  logoURI: response.data.icon || '/default-token-icon.svg'
+                  symbol: data.symbol || 'Unknown',
+                  name: data.name || 'Unknown Token',
+                  logoURI: data.icon || '/default-token-icon.svg'
                 };
               }
 
-              return token;
-            } catch (error) {
-              console.error(`Error fetching metadata for token ${token.mint}:`, error);
-              return token;
+              console.warn(`No valid data returned for token ${token.mint}`);
+              return {
+                ...token,
+                symbol: 'Unknown',
+                name: 'Unknown Token',
+                logoURI: '/default-token-icon.svg'
+              };
+            } catch (error: any) {
+              console.error(
+                `Error fetching metadata for token ${token.mint}:`,
+                error.response?.data || error.message
+              );
+
+              // Check for specific error types
+              if (error.response?.status === 429) {
+                console.warn('Rate limit hit, will retry after delay');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Could implement retry logic here
+              }
+
+              return {
+                ...token,
+                symbol: 'Unknown',
+                name: 'Unknown Token',
+                logoURI: '/default-token-icon.svg'
+              };
             }
           })
         );
 
-        console.log('Enriched tokens:', enrichedTokens);
+        console.log('Enriched tokens:', enrichedTokens.length);
         setTokens(enrichedTokens);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching tokens:', err);
         setError('Failed to fetch tokens. Please try again.');
       } finally {
