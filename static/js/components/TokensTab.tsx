@@ -66,13 +66,16 @@ const TokensTab: React.FC = () => {
           }
         }
 
-        // Set tokens immediately to show "no tokens" state faster
+        // Set tokens immediately to show basic data
         setTokens(tokenData);
 
-        // Fetch detailed token info from Solscan API for each token
+        // Fetch detailed token info from Solscan API with improved error handling and rate limiting
         const enrichedTokens = await Promise.all(
-          tokenData.map(async (token) => {
+          tokenData.map(async (token, index) => {
             try {
+              // Add delay to prevent rate limiting issues
+              await new Promise(resolve => setTimeout(resolve, index * 200));
+
               const response = await axios.get(
                 `https://api.solscan.io/token/meta?token=${token.mint}`,
                 {
@@ -80,20 +83,32 @@ const TokensTab: React.FC = () => {
                     'Accept': 'application/json',
                     'User-Agent': 'Solana Asset Manager',
                     'Token': solscanApiKey
-                  }
+                  },
+                  timeout: 5000 // 5 second timeout
                 }
               );
 
-              const data = response.data?.data;
+              if (response.status === 200 && response.data?.data) {
+                const data = response.data.data;
+                return {
+                  ...token,
+                  symbol: data.symbol || 'Unknown',
+                  name: data.name || 'Unknown Token',
+                  logoURI: data.icon || '/default-token-icon.svg'
+                };
+              }
+
+              console.log(`No data returned for token ${token.mint}`);
+              return token;
+            } catch (error) {
+              console.error(`Error fetching metadata for token ${token.mint}:`, error);
+              // Return token with default values on error
               return {
                 ...token,
-                symbol: data?.symbol || 'Unknown',
-                name: data?.name || 'Unknown Token',
-                logoURI: data?.icon || '/default-token-icon.svg'
+                symbol: 'Unknown',
+                name: 'Unknown Token',
+                logoURI: '/default-token-icon.svg'
               };
-            } catch (error) {
-              console.log(`Error fetching metadata for token ${token.mint}:`, error);
-              return token;
             }
           })
         );
