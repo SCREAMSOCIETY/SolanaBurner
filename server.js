@@ -3,7 +3,7 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 5000; // ALWAYS use port 5000 for Replit
 
 // Enable CORS for all routes
 app.use(cors());

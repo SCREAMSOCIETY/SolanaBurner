@@ -71,7 +71,7 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "NODE_ENV=development node server.js"
-waitForPort = 3000
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "npm run build && node server.js"]
@@ -79,6 +79,10 @@ run = ["sh", "-c", "npm run build && node server.js"]
 [[ports]]
 localPort = 3000
 externalPort = 4200
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
 
 [[ports]]
 localPort = 8080
