@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <title>Solana Asset Manager</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
@@ -13,9 +13,14 @@
         <!-- React will render here -->
     </div>
 
-    <!-- Load our bundled React application -->
-    <script src="/static/dist/app.bundle.js"></script>
-    <script src="/static/dist/WalletProvider.bundle.js"></script>
-    <script src="/static/dist/cnft-handler.bundle.js"></script>
+    <!-- Load our React application -->
+    <script src="/dist/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.App) {
+                window.App.render();
+            }
+        });
+    </script>
 </body>
 </html>

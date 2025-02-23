@@ -10,9 +10,10 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, 'static/dist'),
-    filename: '[name].bundle.js',
-    clean: true,
-    publicPath: '/static/dist/'
+    filename: '[name].js',
+    library: '[name]',
+    libraryTarget: 'umd',
+    globalObject: 'this'
   },
   module: {
     rules: [

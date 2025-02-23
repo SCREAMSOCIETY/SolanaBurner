@@ -3,94 +3,70 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const DEFAULT_PORT = 3002;
 
-// Enable CORS
-app.use(cors());
+// Enable CORS with specific configuration
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Request logging with more details
+// Request logging middleware with more detailed logging
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  console.log('Request headers:', req.headers);
+  console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
-// Serve static files with detailed logging
-app.use('/static', express.static(path.join(__dirname, 'static'), {
+// Serve static files from dist directory first (since it's the compiled version)
+app.use('/static/dist', express.static(path.join(__dirname, 'static', 'dist'), {
   setHeaders: (res, filePath) => {
-    console.log('Serving static file:', filePath);
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
     }
   }
 }));
 
-// Add security headers
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  next();
-});
+// Then serve other static files
+app.use('/static', express.static(path.join(__dirname, 'static'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/ping', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Catch-all route for SPA
+// Serve index.html for all other routes
 app.get('*', (req, res) => {
-  console.log('Serving index.html for path:', req.path);
-  res.sendFile(path.join(__dirname, 'index.html'), err => {
-    if (err) {
-      console.error('Error sending index.html:', err);
-      res.status(500).send('Error loading application');
-    }
-  });
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('[Error]', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: err.message
-  });
+  console.error('[Server Error]', err);
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Start server with better error handling
-function startServer() {
-  try {
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      const addr = server.address();
-      console.log('='.repeat(50));
-      console.log(`[${new Date().toISOString()}] Server started successfully`);
-      console.log(`Local: http://localhost:${addr.port}`);
-      console.log(`Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
-      console.log('Static files directory:', path.join(__dirname, 'static'));
-      console.log('='.repeat(50));
-    });
+// Start server
+const startServer = () => {
+  const server = app.listen(DEFAULT_PORT, '0.0.0.0', () => {
+    const addr = server.address();
+    console.log(`[Server] ${new Date().toISOString()} - Server started on port ${addr.port}`);
+    console.log(`[Server] Local: http://localhost:${addr.port}`);
+    console.log(`[Server] Network: http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+  });
 
-    server.on('error', (error) => {
-      console.error('Server error:', error);
-      if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${PORT} is already in use`);
-      }
-      process.exit(1);
-    });
-
-    // Handle process termination
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM received. Shutting down gracefully...');
-      server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-      });
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
+  server.on('error', (error) => {
+    console.error('[Server] Server error:', error);
     process.exit(1);
-  }
-}
+  });
+};
 
-console.log('Starting server...');
+// Start the application
+console.log('[Server] Starting server...');
 startServer();

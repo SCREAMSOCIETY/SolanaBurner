@@ -29,10 +29,6 @@ args = "Build"
 task = "workflow.run"
 args = "Asset Management Server"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Flask Server"
-
 [[workflows.workflow]]
 name = "Project"
 author = "agent"
@@ -74,23 +70,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "RUST_LOG=debug cargo run"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Flask Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python app.py"
-waitForPort = 5000
+args = "NODE_ENV=development node server.js"
+waitForPort = 3002
 
 [deployment]
 run = ["sh", "-c", "npm run build && node server.js"]
@@ -106,10 +87,6 @@ externalPort = 5000
 [[ports]]
 localPort = 3002
 externalPort = 5173
-
-[[ports]]
-localPort = 5000
-externalPort = 6000
 
 [[ports]]
 localPort = 8080

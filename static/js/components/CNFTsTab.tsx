@@ -11,10 +11,11 @@ const CNFTsTab: React.FC = () => {
 
   useEffect(() => {
     const fetchCNFTs = async () => {
-      if (!publicKey || !connection) {
+      if (!publicKey || !connection || !wallet) {
         console.log('Prerequisites not met:', { 
           hasPublicKey: !!publicKey, 
-          hasConnection: !!connection
+          hasConnection: !!connection,
+          hasWallet: !!wallet 
         });
         return;
       }
@@ -70,45 +71,45 @@ const CNFTsTab: React.FC = () => {
         </div>
       )}
 
-      {!loading && !error && cnfts.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-gray-600">No compressed NFTs found in this wallet</p>
-        </div>
-      )}
-
-      {!loading && !error && cnfts.length > 0 && (
+      {!loading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cnfts.map((cnft) => (
-            <div key={cnft.mint} className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="aspect-square relative">
-                <img 
-                  src={cnft.image || '/static/default-nft-image.svg'} 
-                  alt={cnft.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/static/default-nft-image.svg';
-                  }}
-                />
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-lg mb-2">{cnft.name}</h3>
-                {cnft.collection && (
-                  <p className="text-sm text-gray-600 mb-2">
-                    Collection: {cnft.collection}
-                  </p>
-                )}
-                <a 
-                  href={cnft.explorer_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-700 text-sm inline-block"
-                >
-                  View on Explorer
-                </a>
-              </div>
+          {cnfts.length === 0 ? (
+            <div className="col-span-full text-center py-8">
+              <p className="text-gray-600">No compressed NFTs found in this wallet</p>
             </div>
-          ))}
+          ) : (
+            cnfts.map((cnft) => (
+              <div key={cnft.mint} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="aspect-square relative">
+                  <img 
+                    src={cnft.image || '/default-nft-image.svg'} 
+                    alt={cnft.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/default-nft-image.svg';
+                    }}
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg mb-2">{cnft.name}</h3>
+                  {cnft.collection && (
+                    <p className="text-sm text-gray-600 mb-2">
+                      Collection: {cnft.collection}
+                    </p>
+                  )}
+                  <a 
+                    href={cnft.explorer_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 text-sm inline-block"
+                  >
+                    View on Explorer
+                  </a>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>
