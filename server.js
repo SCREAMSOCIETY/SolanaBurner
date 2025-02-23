@@ -8,15 +8,6 @@ const port = 5000; // ALWAYS use port 5000 for Replit
 // Enable CORS for all routes
 app.use(cors());
 
-// Better error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
 // Parse JSON bodies
 app.use(express.json());
 
@@ -25,6 +16,13 @@ app.use(express.static(path.join(__dirname, 'static')));
 
 // Serve webpack bundle from dist directory
 app.use('/dist', express.static(path.join(__dirname, 'static', 'dist')));
+
+// API endpoint to get environment variables safely
+app.get('/api/config', (req, res) => {
+  res.json({
+    solscanApiKey: process.env.SOLSCAN_API_KEY || ''
+  });
+});
 
 // Health check endpoint for monitoring
 app.get('/ping', (req, res) => {
@@ -36,6 +34,15 @@ app.get('/ping', (req, res) => {
 app.get('*', (req, res) => {
   console.log(`Serving index.html for path: ${req.path}`);
   res.sendFile(path.join(__dirname, 'templates', 'index.html'));
+});
+
+// Better error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err.stack);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 // Start the server with proper error handling

@@ -23,10 +23,24 @@ const TokensTab: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [burning, setBurning] = useState(false);
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
+  const [solscanApiKey, setSolscanApiKey] = useState<string>('');
+
+  useEffect(() => {
+    // Fetch the Solscan API key from our backend
+    const fetchApiKey = async () => {
+      try {
+        const response = await axios.get('/api/config');
+        setSolscanApiKey(response.data.solscanApiKey);
+      } catch (err) {
+        console.error('Error fetching API key:', err);
+      }
+    };
+    fetchApiKey();
+  }, []);
 
   useEffect(() => {
     const fetchTokens = async () => {
-      if (!publicKey) return;
+      if (!publicKey || !solscanApiKey) return;
 
       try {
         setLoading(true);
@@ -64,7 +78,8 @@ const TokensTab: React.FC = () => {
                 {
                   headers: {
                     'Accept': 'application/json',
-                    'User-Agent': 'Solana Asset Manager'
+                    'User-Agent': 'Solana Asset Manager',
+                    'Token': solscanApiKey
                   }
                 }
               );
@@ -99,7 +114,7 @@ const TokensTab: React.FC = () => {
       setLoading(false);
       setError(null);
     }
-  }, [publicKey, connection]);
+  }, [publicKey, connection, solscanApiKey]);
 
   const handleBurnToken = async (token: TokenData) => {
     if (!publicKey || !token.account) return;

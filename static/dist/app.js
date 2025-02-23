@@ -78174,7 +78174,8 @@ var TokensTab = function TokensTab() {
                         return axios__WEBPACK_IMPORTED_MODULE_5__["default"].get("https://api.solscan.io/token/meta?token=".concat(token.mint), {
                           headers: {
                             'Accept': 'application/json',
-                            'User-Agent': 'Solana Asset Manager'
+                            'User-Agent': 'Solana Asset Manager',
+                            'Token': ({"NODE_ENV":"development","QUICKNODE_RPC_URL":"https://broken-prettiest-needle.solana-mainnet.quiknode.pro/84bb745fca3e8888fc4ac36c2f76d61892c7dda1"}).SOLSCAN_API_KEY
                           }
                         });
                       case 3:
