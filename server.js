@@ -9,13 +9,15 @@ console.log('[SERVER INIT] Script starting, environment:', {
 try {
   console.log('[SERVER INIT] Loading express module...');
   const express = require('express');
+  const cors = require('cors');
   console.log('[SERVER INIT] Express module loaded successfully');
 
   console.log('[SERVER INIT] Creating express app instance...');
   const app = express();
   console.log('[SERVER INIT] Express app instance created');
 
-  const port = 5000;
+  // Enable CORS
+  app.use(cors());
 
   // Simple test endpoint
   app.get('/ping', (req, res) => {
@@ -27,11 +29,13 @@ try {
   console.log('[SERVER INIT] Setting up static file serving...');
   app.use('/static', express.static('static'));
 
-  // Serve index.html
-  app.get('/', (req, res) => {
-    console.log('[SERVER] Serving index.html');
+  // Serve index.html for all routes to support SPA
+  app.get('*', (req, res) => {
+    console.log('[SERVER] Serving index.html for path:', req.path);
     res.sendFile('templates/index.html', { root: __dirname });
   });
+
+  const port = 5000;
 
   // Start server with explicit host binding and detailed error logging
   app.listen(port, '0.0.0.0', () => {

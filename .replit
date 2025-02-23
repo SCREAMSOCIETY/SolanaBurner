@@ -70,7 +70,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx serve templates --listen 0.0.0.0:5000 --single --cors --debug"
+args = "node simpleServer.js"
 waitForPort = 5000
 
 [deployment]
