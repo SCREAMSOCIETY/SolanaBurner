@@ -3,21 +3,30 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-// Use Replit's provided port or fallback to 5000
 const port = process.env.PORT || 5000;
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Enable CORS for all routes
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Enhanced request logging middleware
 app.use((req, res, next) => {
   const startTime = Date.now();
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
 
-  // Log request body if present
-  if (Object.keys(req.body).length > 0) {
+  // Log request body if present and not empty
+  if (req.body && Object.keys(req.body).length > 0) {
     console.log('Request body:', JSON.stringify(req.body));
   }
 
   // Log query parameters if present
-  if (Object.keys(req.query).length > 0) {
+  if (req.query && Object.keys(req.query).length > 0) {
     console.log('Query params:', req.query);
   }
 
@@ -36,16 +45,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
-// Enable CORS for all routes
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Parse JSON bodies
-app.use(express.json());
 
 // Serve static files from the static directory
 app.use(express.static(path.join(__dirname, 'static')));
