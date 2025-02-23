@@ -12,7 +12,8 @@ module.exports = {
     path: path.resolve(__dirname, 'static/dist'),
     filename: '[name].js',
     library: '[name]',
-    libraryTarget: 'window'
+    libraryTarget: 'window',
+    publicPath: '/dist/'  // Add explicit public path
   },
   module: {
     rules: [

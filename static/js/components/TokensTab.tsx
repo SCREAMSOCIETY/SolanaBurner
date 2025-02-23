@@ -81,71 +81,89 @@ const TokensTab: React.FC = () => {
         // Set tokens immediately to show basic data
         setTokens(tokenData);
 
-        // Fetch detailed token info from Solscan API v2 with improved error handling
-        const enrichedTokens = await Promise.all(
-          tokenData.map(async (token, index) => {
-            try {
-              // Add delay to prevent rate limiting
-              await new Promise(resolve => setTimeout(resolve, index * 500));
+        // Helper function for rate-limited API calls
+        const fetchWithRetry = async (mint: string, retryCount = 0): Promise<any> => {
+          try {
+            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
 
-              console.log(`Fetching metadata for token ${token.mint}`);
-              const response = await axios.get(
-                `https://api.solscan.io/v2/token/meta?token=${token.mint}`,
-                {
-                  headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${solscanApiKey}`
-                  },
-                  timeout: 10000
-                }
-              );
-
-              console.log(`Solscan v2 response for ${token.mint}:`, {
-                status: response.status,
-                hasData: !!response.data
-              });
-
-              if (response.data && response.data.success) {
-                const data = response.data.data;
-                return {
-                  ...token,
-                  symbol: data.symbol || 'Unknown',
-                  name: data.name || 'Unknown Token',
-                  logoURI: data.icon || '/default-token-icon.svg'
-                };
+            console.log(`Fetching metadata for token ${mint} (attempt ${retryCount + 1})`);
+            const response = await axios.get(
+              `https://api.solscan.io/v2/token/meta?token=${mint}`,
+              {
+                headers: {
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${solscanApiKey}`
+                },
+                timeout: 10000
               }
+            );
 
-              console.warn(`No valid data returned for token ${token.mint}`);
-              return {
-                ...token,
-                symbol: 'Unknown',
-                name: 'Unknown Token',
-                logoURI: '/default-token-icon.svg'
-              };
-            } catch (error: any) {
-              console.error(
-                `Error fetching metadata for token ${token.mint}:`,
-                error.response?.data || error.message
-              );
-
-              // Check for specific error types
-              if (error.response?.status === 429) {
-                console.warn('Rate limit hit, will retry after delay');
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                // Could implement retry logic here
-              }
-
-              return {
-                ...token,
-                symbol: 'Unknown',
-                name: 'Unknown Token',
-                logoURI: '/default-token-icon.svg'
-              };
+            if (!response.data?.success) {
+              throw new Error('Invalid response format');
             }
-          })
-        );
 
-        console.log('Enriched tokens:', enrichedTokens.length);
+            return response.data;
+          } catch (error: any) {
+            console.error(
+              `Error fetching metadata for token ${mint}:`,
+              error.response?.data || error.message
+            );
+
+            // Handle rate limiting
+            if (error.response?.status === 429 && retryCount < 3) {
+              console.warn(`Rate limit hit for ${mint}, retrying in ${(retryCount + 1) * 1000}ms`);
+              return fetchWithRetry(mint, retryCount + 1);
+            }
+
+            throw error;
+          }
+        };
+
+        // Fetch token metadata in batches to avoid rate limiting
+        const batchSize = 3;
+        const enrichedTokens = [];
+
+        for (let i = 0; i < tokenData.length; i += batchSize) {
+          const batch = tokenData.slice(i, i + batchSize);
+
+          try {
+            const batchResults = await Promise.all(
+              batch.map(async (token) => {
+                try {
+                  const solscanData = await fetchWithRetry(token.mint);
+                  const metadata = solscanData.data;
+
+                  return {
+                    ...token,
+                    symbol: metadata.symbol || 'Unknown',
+                    name: metadata.name || 'Unknown Token',
+                    logoURI: metadata.icon || '/default-token-icon.svg'
+                  };
+                } catch (error) {
+                  console.warn(`Failed to fetch metadata for token ${token.mint}, using fallback data`);
+                  return {
+                    ...token,
+                    symbol: 'Unknown',
+                    name: 'Unknown Token',
+                    logoURI: '/default-token-icon.svg'
+                  };
+                }
+              })
+            );
+
+            enrichedTokens.push(...batchResults);
+            setTokens([...enrichedTokens]); // Update UI with each batch
+
+            // Add delay between batches to prevent rate limiting
+            if (i + batchSize < tokenData.length) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (error) {
+            console.error(`Error processing batch starting at index ${i}:`, error);
+          }
+        }
+
+        console.log('Token enrichment completed:', enrichedTokens.length);
         setTokens(enrichedTokens);
       } catch (err: any) {
         console.error('Error fetching tokens:', err);

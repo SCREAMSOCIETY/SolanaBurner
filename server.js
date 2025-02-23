@@ -46,11 +46,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files from the static directory
-app.use(express.static(path.join(__dirname, 'static')));
-
-// Serve webpack bundle from dist directory
+// Serve static files with explicit paths
+app.use('/static', express.static(path.join(__dirname, 'static')));
 app.use('/dist', express.static(path.join(__dirname, 'static', 'dist')));
+app.use('/styles.css', express.static(path.join(__dirname, 'styles.css')));
+app.use('/default-token-icon.svg', express.static(path.join(__dirname, 'static', 'default-token-icon.svg')));
 
 // API endpoint to get environment variables safely
 app.get('/api/config', (req, res) => {
@@ -68,64 +68,38 @@ app.get('/ping', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Serve index.html for all routes to support client-side routing
+// Serve index.html for all other routes to support client-side routing
 app.get('*', (req, res) => {
   console.log(`[${new Date().toISOString()}] Serving index.html for path: ${req.path}`);
   const indexPath = path.join(__dirname, 'templates', 'index.html');
 
-  // Check if index.html exists
-  const fs = require('fs');
-  if (!fs.existsSync(indexPath)) {
-    console.error('ERROR: index.html not found at path:', indexPath);
-    return res.status(404).send('Index file not found');
-  }
-
-  res.sendFile(indexPath);
-});
-
-// Enhanced error handling middleware
-app.use((err, req, res, next) => {
-  console.error('[ERROR] Server error details:');
-  console.error('- Timestamp:', new Date().toISOString());
-  console.error('- URL:', req.url);
-  console.error('- Method:', req.method);
-  console.error('- Error name:', err.name);
-  console.error('- Error message:', err.message);
-  console.error('- Stack trace:', err.stack);
-
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('Error sending index.html:', err);
+      res.status(500).send('Error loading application');
+    }
   });
 });
 
-// Start the server with proper error handling
-try {
-  console.log('Starting server with configuration:');
-  console.log('- Port:', port);
-  console.log('- Environment:', process.env.NODE_ENV);
-  console.log('- Static directory:', path.join(__dirname, 'static'));
-  console.log('- Templates directory:', path.join(__dirname, 'templates'));
-
-  const server = app.listen(port, () => {
-    console.log('=================================');
-    console.log(`Server running at http://0.0.0.0:${port}`);
-    console.log('Static files served from:', path.join(__dirname, 'static'));
-    console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
-    console.log('Templates directory:', path.join(__dirname, 'templates'));
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('=================================');
-  });
-
-  // Handle process termination gracefully
-  process.on('SIGTERM', () => {
-    console.log('Received SIGTERM signal. Closing server...');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
-  });
-} catch (error) {
+// Start server with explicit host binding and error handling
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log('=================================');
+  console.log(`Server running at http://0.0.0.0:${port}`);
+  console.log('Static files served from:', path.join(__dirname, 'static'));
+  console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
+  console.log('Templates directory:', path.join(__dirname, 'templates'));
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('=================================');
+}).on('error', (error) => {
   console.error('Failed to start server:', error);
   process.exit(1);
-}
+});
+
+// Handle process termination gracefully
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM signal. Closing server...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});

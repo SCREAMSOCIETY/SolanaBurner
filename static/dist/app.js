@@ -78066,6 +78066,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _solana_spl_token__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @solana/spl-token */ "./node_modules/@solana/spl-token/lib/esm/instructions/burn.js");
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! axios */ "./node_modules/axios/lib/axios.js");
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
+function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
@@ -78152,32 +78156,32 @@ var TokensTab = function TokensTab() {
   }, []);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     var fetchTokens = /*#__PURE__*/function () {
-      var _ref2 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
-        var tokenAccounts, tokenData, _iterator, _step, account, parsedInfo, enrichedTokens;
-        return _regeneratorRuntime().wrap(function _callee3$(_context3) {
-          while (1) switch (_context3.prev = _context3.next) {
+      var _ref2 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
+        var tokenAccounts, tokenData, _iterator, _step, account, parsedInfo, _fetchWithRetry, batchSize, enrichedTokens, i, batch, batchResults;
+        return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+          while (1) switch (_context4.prev = _context4.next) {
             case 0:
               if (!(!publicKey || !solscanApiKey)) {
-                _context3.next = 3;
+                _context4.next = 3;
                 break;
               }
               console.log('Missing required keys:', {
                 hasPublicKey: !!publicKey,
                 hasSolscanKey: !!solscanApiKey
               });
-              return _context3.abrupt("return");
+              return _context4.abrupt("return");
             case 3:
-              _context3.prev = 3;
+              _context4.prev = 3;
               setLoading(true);
               setError(null);
 
               // Fetch token accounts using Solana RPC
-              _context3.next = 8;
+              _context4.next = 8;
               return connection.getParsedTokenAccountsByOwner(publicKey, {
                 programId: _solana_spl_token__WEBPACK_IMPORTED_MODULE_5__.TOKEN_PROGRAM_ID
               });
             case 8:
-              tokenAccounts = _context3.sent;
+              tokenAccounts = _context4.sent;
               console.log('Found token accounts:', tokenAccounts.value.length);
 
               // Transform the data
@@ -78206,103 +78210,158 @@ var TokensTab = function TokensTab() {
               // Set tokens immediately to show basic data
               setTokens(tokenData);
 
-              // Fetch detailed token info from Solscan API v2 with improved error handling
-              _context3.next = 17;
-              return Promise.all(tokenData.map(/*#__PURE__*/function () {
-                var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(token, index) {
-                  var response, data, _error$response, _error$response2;
+              // Helper function for rate-limited API calls
+              _fetchWithRetry = /*#__PURE__*/function () {
+                var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(mint) {
+                  var retryCount,
+                    _response$data,
+                    response,
+                    _error$response,
+                    _error$response2,
+                    _args2 = arguments;
                   return _regeneratorRuntime().wrap(function _callee2$(_context2) {
                     while (1) switch (_context2.prev = _context2.next) {
                       case 0:
-                        _context2.prev = 0;
-                        _context2.next = 3;
+                        retryCount = _args2.length > 1 && _args2[1] !== undefined ? _args2[1] : 0;
+                        _context2.prev = 1;
+                        _context2.next = 4;
                         return new Promise(function (resolve) {
-                          return setTimeout(resolve, index * 500);
+                          return setTimeout(resolve, retryCount * 1000);
                         });
-                      case 3:
-                        console.log("Fetching metadata for token ".concat(token.mint));
-                        _context2.next = 6;
-                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/v2/token/meta?token=".concat(token.mint), {
+                      case 4:
+                        console.log("Fetching metadata for token ".concat(mint, " (attempt ").concat(retryCount + 1, ")"));
+                        _context2.next = 7;
+                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/v2/token/meta?token=".concat(mint), {
                           headers: {
                             'Accept': 'application/json',
                             'Authorization': "Bearer ".concat(solscanApiKey)
                           },
                           timeout: 10000
                         });
-                      case 6:
+                      case 7:
                         response = _context2.sent;
-                        console.log("Solscan v2 response for ".concat(token.mint, ":"), {
-                          status: response.status,
-                          hasData: !!response.data
-                        });
-                        if (!(response.data && response.data.success)) {
-                          _context2.next = 11;
+                        if ((_response$data = response.data) !== null && _response$data !== void 0 && _response$data.success) {
+                          _context2.next = 10;
                           break;
                         }
-                        data = response.data.data;
-                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
-                          symbol: data.symbol || 'Unknown',
-                          name: data.name || 'Unknown Token',
-                          logoURI: data.icon || '/default-token-icon.svg'
-                        }));
-                      case 11:
-                        console.warn("No valid data returned for token ".concat(token.mint));
-                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
-                          symbol: 'Unknown',
-                          name: 'Unknown Token',
-                          logoURI: '/default-token-icon.svg'
-                        }));
-                      case 15:
-                        _context2.prev = 15;
-                        _context2.t0 = _context2["catch"](0);
-                        console.error("Error fetching metadata for token ".concat(token.mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
+                        throw new Error('Invalid response format');
+                      case 10:
+                        return _context2.abrupt("return", response.data);
+                      case 13:
+                        _context2.prev = 13;
+                        _context2.t0 = _context2["catch"](1);
+                        console.error("Error fetching metadata for token ".concat(mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
 
-                        // Check for specific error types
-                        if (!(((_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.status) === 429)) {
-                          _context2.next = 22;
+                        // Handle rate limiting
+                        if (!(((_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.status) === 429 && retryCount < 3)) {
+                          _context2.next = 19;
                           break;
                         }
-                        console.warn('Rate limit hit, will retry after delay');
-                        _context2.next = 22;
-                        return new Promise(function (resolve) {
-                          return setTimeout(resolve, 2000);
-                        });
-                      case 22:
-                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
-                          symbol: 'Unknown',
-                          name: 'Unknown Token',
-                          logoURI: '/default-token-icon.svg'
-                        }));
-                      case 23:
+                        console.warn("Rate limit hit for ".concat(mint, ", retrying in ").concat((retryCount + 1) * 1000, "ms"));
+                        return _context2.abrupt("return", _fetchWithRetry(mint, retryCount + 1));
+                      case 19:
+                        throw _context2.t0;
+                      case 20:
                       case "end":
                         return _context2.stop();
                     }
-                  }, _callee2, null, [[0, 15]]);
+                  }, _callee2, null, [[1, 13]]);
                 }));
-                return function (_x, _x2) {
+                return function fetchWithRetry(_x) {
                   return _ref3.apply(this, arguments);
                 };
+              }(); // Fetch token metadata in batches to avoid rate limiting
+              batchSize = 3;
+              enrichedTokens = [];
+              i = 0;
+            case 19:
+              if (!(i < tokenData.length)) {
+                _context4.next = 38;
+                break;
+              }
+              batch = tokenData.slice(i, i + batchSize);
+              _context4.prev = 21;
+              _context4.next = 24;
+              return Promise.all(batch.map(/*#__PURE__*/function () {
+                var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee3(token) {
+                  var solscanData, metadata;
+                  return _regeneratorRuntime().wrap(function _callee3$(_context3) {
+                    while (1) switch (_context3.prev = _context3.next) {
+                      case 0:
+                        _context3.prev = 0;
+                        _context3.next = 3;
+                        return _fetchWithRetry(token.mint);
+                      case 3:
+                        solscanData = _context3.sent;
+                        metadata = solscanData.data;
+                        return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
+                          symbol: metadata.symbol || 'Unknown',
+                          name: metadata.name || 'Unknown Token',
+                          logoURI: metadata.icon || '/default-token-icon.svg'
+                        }));
+                      case 8:
+                        _context3.prev = 8;
+                        _context3.t0 = _context3["catch"](0);
+                        console.warn("Failed to fetch metadata for token ".concat(token.mint, ", using fallback data"));
+                        return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
+                          symbol: 'Unknown',
+                          name: 'Unknown Token',
+                          logoURI: '/default-token-icon.svg'
+                        }));
+                      case 12:
+                      case "end":
+                        return _context3.stop();
+                    }
+                  }, _callee3, null, [[0, 8]]);
+                }));
+                return function (_x2) {
+                  return _ref4.apply(this, arguments);
+                };
               }()));
-            case 17:
-              enrichedTokens = _context3.sent;
-              console.log('Enriched tokens:', enrichedTokens.length);
-              setTokens(enrichedTokens);
-              _context3.next = 26;
+            case 24:
+              batchResults = _context4.sent;
+              enrichedTokens.push.apply(enrichedTokens, _toConsumableArray(batchResults));
+              setTokens([].concat(enrichedTokens)); // Update UI with each batch
+
+              // Add delay between batches to prevent rate limiting
+              if (!(i + batchSize < tokenData.length)) {
+                _context4.next = 30;
+                break;
+              }
+              _context4.next = 30;
+              return new Promise(function (resolve) {
+                return setTimeout(resolve, 1000);
+              });
+            case 30:
+              _context4.next = 35;
               break;
-            case 22:
-              _context3.prev = 22;
-              _context3.t0 = _context3["catch"](3);
-              console.error('Error fetching tokens:', _context3.t0);
+            case 32:
+              _context4.prev = 32;
+              _context4.t0 = _context4["catch"](21);
+              console.error("Error processing batch starting at index ".concat(i, ":"), _context4.t0);
+            case 35:
+              i += batchSize;
+              _context4.next = 19;
+              break;
+            case 38:
+              console.log('Token enrichment completed:', enrichedTokens.length);
+              setTokens(enrichedTokens);
+              _context4.next = 46;
+              break;
+            case 42:
+              _context4.prev = 42;
+              _context4.t1 = _context4["catch"](3);
+              console.error('Error fetching tokens:', _context4.t1);
               setError('Failed to fetch tokens. Please try again.');
-            case 26:
-              _context3.prev = 26;
+            case 46:
+              _context4.prev = 46;
               setLoading(false);
-              return _context3.finish(26);
-            case 29:
+              return _context4.finish(46);
+            case 49:
             case "end":
-              return _context3.stop();
+              return _context4.stop();
           }
-        }, _callee3, null, [[3, 22, 26, 29]]);
+        }, _callee4, null, [[3, 42, 46, 49], [21, 32]]);
       }));
       return function fetchTokens() {
         return _ref2.apply(this, arguments);
@@ -78317,67 +78376,67 @@ var TokensTab = function TokensTab() {
     }
   }, [publicKey, connection, solscanApiKey]);
   var handleBurnToken = /*#__PURE__*/function () {
-    var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee4(token) {
+    var _ref5 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee5(token) {
       var transaction, burnInstruction, signature;
-      return _regeneratorRuntime().wrap(function _callee4$(_context4) {
-        while (1) switch (_context4.prev = _context4.next) {
-          case 0:
-            if (!(!publicKey || !token.account)) {
-              _context4.next = 2;
-              break;
-            }
-            return _context4.abrupt("return");
-          case 2:
-            _context4.prev = 2;
-            setBurning(true);
-            transaction = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Transaction();
-            burnInstruction = (0,_solana_spl_token__WEBPACK_IMPORTED_MODULE_6__.createBurnInstruction)(new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(token.account), new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(token.mint), publicKey, token.balance);
-            transaction.add(burnInstruction);
-            _context4.next = 9;
-            return sendTransaction(transaction, connection);
-          case 9:
-            signature = _context4.sent;
-            _context4.next = 12;
-            return connection.confirmTransaction(signature, 'confirmed');
-          case 12:
-            // Remove the burned token from the list
-            setTokens(tokens.filter(function (t) {
-              return t.mint !== token.mint;
-            }));
-            _context4.next = 19;
-            break;
-          case 15:
-            _context4.prev = 15;
-            _context4.t0 = _context4["catch"](2);
-            console.error('Error burning token:', _context4.t0);
-            setError('Failed to burn token. Please try again.');
-          case 19:
-            _context4.prev = 19;
-            setBurning(false);
-            return _context4.finish(19);
-          case 22:
-          case "end":
-            return _context4.stop();
-        }
-      }, _callee4, null, [[2, 15, 19, 22]]);
-    }));
-    return function handleBurnToken(_x3) {
-      return _ref4.apply(this, arguments);
-    };
-  }();
-  var handleBulkBurn = /*#__PURE__*/function () {
-    var _ref5 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
-      var transaction, _iterator2, _step2, token, burnInstruction, signature;
       return _regeneratorRuntime().wrap(function _callee5$(_context5) {
         while (1) switch (_context5.prev = _context5.next) {
           case 0:
-            if (!(!publicKey || selectedTokens.size === 0)) {
+            if (!(!publicKey || !token.account)) {
               _context5.next = 2;
               break;
             }
             return _context5.abrupt("return");
           case 2:
             _context5.prev = 2;
+            setBurning(true);
+            transaction = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Transaction();
+            burnInstruction = (0,_solana_spl_token__WEBPACK_IMPORTED_MODULE_6__.createBurnInstruction)(new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(token.account), new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(token.mint), publicKey, token.balance);
+            transaction.add(burnInstruction);
+            _context5.next = 9;
+            return sendTransaction(transaction, connection);
+          case 9:
+            signature = _context5.sent;
+            _context5.next = 12;
+            return connection.confirmTransaction(signature, 'confirmed');
+          case 12:
+            // Remove the burned token from the list
+            setTokens(tokens.filter(function (t) {
+              return t.mint !== token.mint;
+            }));
+            _context5.next = 19;
+            break;
+          case 15:
+            _context5.prev = 15;
+            _context5.t0 = _context5["catch"](2);
+            console.error('Error burning token:', _context5.t0);
+            setError('Failed to burn token. Please try again.');
+          case 19:
+            _context5.prev = 19;
+            setBurning(false);
+            return _context5.finish(19);
+          case 22:
+          case "end":
+            return _context5.stop();
+        }
+      }, _callee5, null, [[2, 15, 19, 22]]);
+    }));
+    return function handleBurnToken(_x3) {
+      return _ref5.apply(this, arguments);
+    };
+  }();
+  var handleBulkBurn = /*#__PURE__*/function () {
+    var _ref6 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee6() {
+      var transaction, _iterator2, _step2, token, burnInstruction, signature;
+      return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+        while (1) switch (_context6.prev = _context6.next) {
+          case 0:
+            if (!(!publicKey || selectedTokens.size === 0)) {
+              _context6.next = 2;
+              break;
+            }
+            return _context6.abrupt("return");
+          case 2:
+            _context6.prev = 2;
             setBurning(true);
             transaction = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Transaction(); // Add burn instructions for all selected tokens
             _iterator2 = _createForOfIteratorHelper(tokens);
@@ -78394,11 +78453,11 @@ var TokensTab = function TokensTab() {
             } finally {
               _iterator2.f();
             }
-            _context5.next = 9;
+            _context6.next = 9;
             return sendTransaction(transaction, connection);
           case 9:
-            signature = _context5.sent;
-            _context5.next = 12;
+            signature = _context6.sent;
+            _context6.next = 12;
             return connection.confirmTransaction(signature, 'confirmed');
           case 12:
             // Remove all burned tokens from the list
@@ -78406,25 +78465,25 @@ var TokensTab = function TokensTab() {
               return !selectedTokens.has(token.mint);
             }));
             setSelectedTokens(new Set());
-            _context5.next = 20;
+            _context6.next = 20;
             break;
           case 16:
-            _context5.prev = 16;
-            _context5.t0 = _context5["catch"](2);
-            console.error('Error burning tokens:', _context5.t0);
+            _context6.prev = 16;
+            _context6.t0 = _context6["catch"](2);
+            console.error('Error burning tokens:', _context6.t0);
             setError('Failed to burn tokens. Please try again.');
           case 20:
-            _context5.prev = 20;
+            _context6.prev = 20;
             setBurning(false);
-            return _context5.finish(20);
+            return _context6.finish(20);
           case 23:
           case "end":
-            return _context5.stop();
+            return _context6.stop();
         }
-      }, _callee5, null, [[2, 16, 20, 23]]);
+      }, _callee6, null, [[2, 16, 20, 23]]);
     }));
     return function handleBulkBurn() {
-      return _ref5.apply(this, arguments);
+      return _ref6.apply(this, arguments);
     };
   }();
   var toggleTokenSelection = function toggleTokenSelection(mint) {
