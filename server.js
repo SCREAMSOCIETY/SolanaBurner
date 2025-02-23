@@ -2,126 +2,56 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 
+// Basic Express setup
 const app = express();
-const port = process.env.PORT || 5000;
+const port = 5000;
 
-// Parse JSON bodies
+console.log('[SERVER] Starting server with configuration:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: port,
+  CWD: process.cwd()
+});
+
+// Basic middleware
 app.use(express.json());
+app.use(cors());
 
-// Enable CORS for all routes
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Enhanced error handling middleware
-app.use((err, req, res, next) => {
-  console.error(`[ERROR] ${err.stack}`);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
-});
-
-// Enhanced request logging middleware
-app.use((req, res, next) => {
-  const startTime = Date.now();
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-
-  // Log request body if present
-  if (req.body && Object.keys(req.body).length > 0) {
-    console.log('Request body:', JSON.stringify(req.body));
-  }
-
-  // Log query parameters if present
-  if (req.query && Object.keys(req.query).length > 0) {
-    console.log('Query params:', req.query);
-  }
-
-  // Add response logging
-  const oldSend = res.send;
-  res.send = function(data) {
-    console.log(`[${new Date().toISOString()}] Response status: ${res.statusCode}`);
-    return oldSend.apply(res, arguments);
-  };
-
-  // Log response time
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} completed in ${duration}ms`);
-  });
-
-  next();
-});
-
-// Serve static files with improved error handling
-const serveStaticWithLogging = (route, dir) => {
-  console.log(`Setting up static route: ${route} -> ${dir}`);
-  app.use(route, express.static(dir, {
-    fallthrough: true,
-    setHeaders: (res, path) => {
-      res.setHeader('Cache-Control', 'no-cache');
-    }
-  }));
-};
-
-// Configure static file serving
-serveStaticWithLogging('/static', path.join(__dirname, 'static'));
-serveStaticWithLogging('/static/dist', path.join(__dirname, 'static', 'dist'));
-serveStaticWithLogging('/dist', path.join(__dirname, 'static', 'dist'));
-
-
-// API endpoint to get environment variables safely
-app.get('/api/config', (req, res) => {
-  console.log('[API] Config endpoint called');
-  const apiKey = process.env.SOLSCAN_API_KEY || '';
-  console.log('[API] Returning config with API key present:', !!apiKey);
-  res.json({
-    solscanApiKey: apiKey
-  });
-});
-
-// Health check endpoint for monitoring
+// Simple test endpoint
 app.get('/ping', (req, res) => {
-  console.log('[Health] Health check endpoint called');
-  res.json({ status: 'ok' });
+  console.log('[SERVER] Ping endpoint hit');
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Serve index.html with improved error handling
-app.get('*', (req, res) => {
-  console.log(`[${new Date().toISOString()}] Serving index.html for path: ${req.path}`);
-  const indexPath = path.join(__dirname, 'templates', 'index.html');
-
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error('[ERROR] Error sending index.html:', err);
-      res.status(500).send('Error loading application');
-    } else {
-      console.log(`[${new Date().toISOString()}] Successfully served index.html`);
-    }
-  });
+// Basic error handler
+app.use((err, req, res, next) => {
+  console.error('[SERVER ERROR]', err);
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Start server with explicit host binding and error handling
+// Start server with explicit host binding
 const server = app.listen(port, '0.0.0.0', () => {
-  console.log('=================================');
-  console.log(`Server running at http://0.0.0.0:${port}`);
-  console.log('Static files served from:', path.join(__dirname, 'static'));
-  console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
-  console.log('Templates directory:', path.join(__dirname, 'templates'));
-  console.log('Environment:', process.env.NODE_ENV);
-  console.log('=================================');
+  console.log(`[SERVER] Running at http://0.0.0.0:${port}`);
 }).on('error', (error) => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
+  console.error('[SERVER FATAL] Failed to start:', error);
+  setTimeout(() => process.exit(1), 1000);
 });
 
-// Handle process termination gracefully
+// Handle process signals
 process.on('SIGTERM', () => {
-  console.log('Received SIGTERM signal. Closing server...');
+  console.log('[SERVER] Received SIGTERM signal. Closing server...');
   server.close(() => {
-    console.log('Server closed');
+    console.log('[SERVER] Server closed');
     process.exit(0);
   });
+});
+
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('[SERVER FATAL] Uncaught Exception:', error);
+  setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[SERVER FATAL] Unhandled Rejection:', reason);
+  setTimeout(() => process.exit(1), 1000);
 });
