@@ -15,6 +15,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Enhanced error handling middleware
+app.use((err, req, res, next) => {
+  console.error(`[ERROR] ${err.stack}`);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
+
 // Enhanced request logging middleware
 app.use((req, res, next) => {
   const startTime = Date.now();
@@ -46,11 +55,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files with explicit paths
-app.use('/static', express.static(path.join(__dirname, 'static')));
-app.use('/dist', express.static(path.join(__dirname, 'static', 'dist')));
-app.use('/styles.css', express.static(path.join(__dirname, 'styles.css')));
-app.use('/default-token-icon.svg', express.static(path.join(__dirname, 'static', 'default-token-icon.svg')));
+// Serve static files with improved error handling
+const serveStaticWithLogging = (route, dir) => {
+  console.log(`Setting up static route: ${route} -> ${dir}`);
+  app.use(route, express.static(dir, {
+    fallthrough: true,
+    setHeaders: (res, path) => {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }));
+};
+
+// Configure static file serving
+serveStaticWithLogging('/static', path.join(__dirname, 'static'));
+serveStaticWithLogging('/static/dist', path.join(__dirname, 'static', 'dist'));
+serveStaticWithLogging('/dist', path.join(__dirname, 'static', 'dist'));
+
 
 // API endpoint to get environment variables safely
 app.get('/api/config', (req, res) => {
@@ -68,15 +88,17 @@ app.get('/ping', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Serve index.html for all other routes to support client-side routing
+// Serve index.html with improved error handling
 app.get('*', (req, res) => {
   console.log(`[${new Date().toISOString()}] Serving index.html for path: ${req.path}`);
   const indexPath = path.join(__dirname, 'templates', 'index.html');
 
   res.sendFile(indexPath, (err) => {
     if (err) {
-      console.error('Error sending index.html:', err);
+      console.error('[ERROR] Error sending index.html:', err);
       res.status(500).send('Error loading application');
+    } else {
+      console.log(`[${new Date().toISOString()}] Successfully served index.html`);
     }
   });
 });

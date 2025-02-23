@@ -77956,6 +77956,89 @@ var CNFTsTab = function CNFTsTab() {
 
 /***/ }),
 
+/***/ "./static/js/components/ErrorBoundary.tsx":
+/*!************************************************!*\
+  !*** ./static/js/components/ErrorBoundary.tsx ***!
+  \************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _classCallCheck(a, n) { if (!(a instanceof n)) throw new TypeError("Cannot call a class as a function"); }
+function _defineProperties(e, r) { for (var t = 0; t < r.length; t++) { var o = r[t]; o.enumerable = o.enumerable || !1, o.configurable = !0, "value" in o && (o.writable = !0), Object.defineProperty(e, _toPropertyKey(o.key), o); } }
+function _createClass(e, r, t) { return r && _defineProperties(e.prototype, r), t && _defineProperties(e, t), Object.defineProperty(e, "prototype", { writable: !1 }), e; }
+function _callSuper(t, o, e) { return o = _getPrototypeOf(o), _possibleConstructorReturn(t, _isNativeReflectConstruct() ? Reflect.construct(o, e || [], _getPrototypeOf(t).constructor) : o.apply(t, e)); }
+function _possibleConstructorReturn(t, e) { if (e && ("object" == _typeof(e) || "function" == typeof e)) return e; if (void 0 !== e) throw new TypeError("Derived constructors may only return object or undefined"); return _assertThisInitialized(t); }
+function _assertThisInitialized(e) { if (void 0 === e) throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); return e; }
+function _isNativeReflectConstruct() { try { var t = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); } catch (t) {} return (_isNativeReflectConstruct = function _isNativeReflectConstruct() { return !!t; })(); }
+function _getPrototypeOf(t) { return _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function (t) { return t.__proto__ || Object.getPrototypeOf(t); }, _getPrototypeOf(t); }
+function _inherits(t, e) { if ("function" != typeof e && null !== e) throw new TypeError("Super expression must either be null or a function"); t.prototype = Object.create(e && e.prototype, { constructor: { value: t, writable: !0, configurable: !0 } }), Object.defineProperty(t, "prototype", { writable: !1 }), e && _setPrototypeOf(t, e); }
+function _setPrototypeOf(t, e) { return _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function (t, e) { return t.__proto__ = e, t; }, _setPrototypeOf(t, e); }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+
+var ErrorBoundary = /*#__PURE__*/function (_Component) {
+  function ErrorBoundary() {
+    var _this;
+    _classCallCheck(this, ErrorBoundary);
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+    _this = _callSuper(this, ErrorBoundary, [].concat(args));
+    _defineProperty(_this, "state", {
+      hasError: false,
+      error: null,
+      errorInfo: null
+    });
+    return _this;
+  }
+  _inherits(ErrorBoundary, _Component);
+  return _createClass(ErrorBoundary, [{
+    key: "componentDidCatch",
+    value: function componentDidCatch(error, errorInfo) {
+      console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+      this.setState({
+        error: error,
+        errorInfo: errorInfo
+      });
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      if (this.state.hasError) {
+        return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+          className: "error-boundary"
+        }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", null, "Something went wrong."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("details", {
+          style: {
+            whiteSpace: 'pre-wrap'
+          }
+        }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("summary", null, "Error Details"), this.state.error && this.state.error.toString(), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("br", null), this.state.errorInfo && this.state.errorInfo.componentStack));
+      }
+      return this.props.children;
+    }
+  }], [{
+    key: "getDerivedStateFromError",
+    value: function getDerivedStateFromError(error) {
+      console.error('[ErrorBoundary] Caught error:', error);
+      return {
+        hasError: true,
+        error: error,
+        errorInfo: null
+      };
+    }
+  }]);
+}(react__WEBPACK_IMPORTED_MODULE_0__.Component);
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ErrorBoundary);
+
+/***/ }),
+
 /***/ "./static/js/components/NFTsTab.tsx":
 /*!******************************************!*\
   !*** ./static/js/components/NFTsTab.tsx ***!
@@ -78091,6 +78174,7 @@ function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 
 
 var TokensTab = function TokensTab() {
+  console.log('[TokensTab] Initializing TokensTab component');
   var _useConnection = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_2__.useConnection)(),
     connection = _useConnection.connection;
   var _useWallet = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_3__.useWallet)(),
@@ -78121,7 +78205,7 @@ var TokensTab = function TokensTab() {
     solscanApiKey = _useState12[0],
     setSolscanApiKey = _useState12[1];
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
-    // Fetch the Solscan API key from our backend
+    console.log('[TokensTab] Fetching API key');
     var fetchApiKey = /*#__PURE__*/function () {
       var _ref = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee() {
         var response;
@@ -78134,13 +78218,13 @@ var TokensTab = function TokensTab() {
             case 3:
               response = _context.sent;
               setSolscanApiKey(response.data.solscanApiKey);
-              console.log('Successfully fetched API key:', response.data.solscanApiKey ? 'Present' : 'Missing');
+              console.log('[TokensTab] API key status:', response.data.solscanApiKey ? 'Present' : 'Missing');
               _context.next = 12;
               break;
             case 8:
               _context.prev = 8;
               _context.t0 = _context["catch"](0);
-              console.error('Error fetching API key:', _context.t0);
+              console.error('[TokensTab] Error fetching API key:', _context.t0);
               setError('Failed to fetch API configuration');
             case 12:
             case "end":
@@ -78155,6 +78239,10 @@ var TokensTab = function TokensTab() {
     fetchApiKey();
   }, []);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    console.log('[TokensTab] Token fetch effect triggered', {
+      hasPublicKey: !!publicKey,
+      hasSolscanKey: !!solscanApiKey
+    });
     var fetchTokens = /*#__PURE__*/function () {
       var _ref2 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
         var tokenAccounts, tokenData, _iterator, _step, account, parsedInfo, _fetchWithRetry, batchSize, enrichedTokens, i, batch, batchResults;
@@ -78165,26 +78253,23 @@ var TokensTab = function TokensTab() {
                 _context4.next = 3;
                 break;
               }
-              console.log('Missing required keys:', {
+              console.log('[TokensTab] Missing required keys:', {
                 hasPublicKey: !!publicKey,
                 hasSolscanKey: !!solscanApiKey
               });
               return _context4.abrupt("return");
             case 3:
               _context4.prev = 3;
+              console.log('[TokensTab] Starting token fetch');
               setLoading(true);
               setError(null);
-
-              // Fetch token accounts using Solana RPC
-              _context4.next = 8;
+              _context4.next = 9;
               return connection.getParsedTokenAccountsByOwner(publicKey, {
                 programId: _solana_spl_token__WEBPACK_IMPORTED_MODULE_5__.TOKEN_PROGRAM_ID
               });
-            case 8:
+            case 9:
               tokenAccounts = _context4.sent;
-              console.log('Found token accounts:', tokenAccounts.value.length);
-
-              // Transform the data
+              console.log('[TokensTab] Found token accounts:', tokenAccounts.value.length);
               tokenData = [];
               _iterator = _createForOfIteratorHelper(tokenAccounts.value);
               try {
@@ -78205,9 +78290,7 @@ var TokensTab = function TokensTab() {
               } finally {
                 _iterator.f();
               }
-              console.log('Filtered token data:', tokenData.length);
-
-              // Set tokens immediately to show basic data
+              console.log('[TokensTab] Filtered token data:', tokenData.length);
               setTokens(tokenData);
 
               // Helper function for rate-limited API calls
@@ -78229,7 +78312,7 @@ var TokensTab = function TokensTab() {
                           return setTimeout(resolve, retryCount * 1000);
                         });
                       case 4:
-                        console.log("Fetching metadata for token ".concat(mint, " (attempt ").concat(retryCount + 1, ")"));
+                        console.log("[TokensTab] Fetching metadata for token ".concat(mint, " (attempt ").concat(retryCount + 1, ")"));
                         _context2.next = 7;
                         return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/v2/token/meta?token=".concat(mint), {
                           headers: {
@@ -78250,14 +78333,12 @@ var TokensTab = function TokensTab() {
                       case 13:
                         _context2.prev = 13;
                         _context2.t0 = _context2["catch"](1);
-                        console.error("Error fetching metadata for token ".concat(mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
-
-                        // Handle rate limiting
+                        console.error("[TokensTab] Error fetching metadata for token ".concat(mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
                         if (!(((_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.status) === 429 && retryCount < 3)) {
                           _context2.next = 19;
                           break;
                         }
-                        console.warn("Rate limit hit for ".concat(mint, ", retrying in ").concat((retryCount + 1) * 1000, "ms"));
+                        console.warn("[TokensTab] Rate limit hit for ".concat(mint, ", retrying in ").concat((retryCount + 1) * 1000, "ms"));
                         return _context2.abrupt("return", _fetchWithRetry(mint, retryCount + 1));
                       case 19:
                         throw _context2.t0;
@@ -78270,18 +78351,19 @@ var TokensTab = function TokensTab() {
                 return function fetchWithRetry(_x) {
                   return _ref3.apply(this, arguments);
                 };
-              }(); // Fetch token metadata in batches to avoid rate limiting
+              }();
               batchSize = 3;
               enrichedTokens = [];
               i = 0;
-            case 19:
+            case 20:
               if (!(i < tokenData.length)) {
-                _context4.next = 38;
+                _context4.next = 40;
                 break;
               }
               batch = tokenData.slice(i, i + batchSize);
-              _context4.prev = 21;
-              _context4.next = 24;
+              console.log("[TokensTab] Processing batch ".concat(i / batchSize + 1));
+              _context4.prev = 23;
+              _context4.next = 26;
               return Promise.all(batch.map(/*#__PURE__*/function () {
                 var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee3(token) {
                   var solscanData, metadata;
@@ -78294,74 +78376,73 @@ var TokensTab = function TokensTab() {
                       case 3:
                         solscanData = _context3.sent;
                         metadata = solscanData.data;
+                        console.log("[TokensTab] Successfully enriched token ".concat(token.mint));
                         return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: metadata.symbol || 'Unknown',
                           name: metadata.name || 'Unknown Token',
                           logoURI: metadata.icon || '/default-token-icon.svg'
                         }));
-                      case 8:
-                        _context3.prev = 8;
+                      case 9:
+                        _context3.prev = 9;
                         _context3.t0 = _context3["catch"](0);
-                        console.warn("Failed to fetch metadata for token ".concat(token.mint, ", using fallback data"));
+                        console.warn("[TokensTab] Failed to fetch metadata for token ".concat(token.mint, ", using fallback data"));
                         return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: 'Unknown',
                           name: 'Unknown Token',
                           logoURI: '/default-token-icon.svg'
                         }));
-                      case 12:
+                      case 13:
                       case "end":
                         return _context3.stop();
                     }
-                  }, _callee3, null, [[0, 8]]);
+                  }, _callee3, null, [[0, 9]]);
                 }));
                 return function (_x2) {
                   return _ref4.apply(this, arguments);
                 };
               }()));
-            case 24:
+            case 26:
               batchResults = _context4.sent;
               enrichedTokens.push.apply(enrichedTokens, _toConsumableArray(batchResults));
-              setTokens([].concat(enrichedTokens)); // Update UI with each batch
-
-              // Add delay between batches to prevent rate limiting
+              setTokens([].concat(enrichedTokens));
               if (!(i + batchSize < tokenData.length)) {
-                _context4.next = 30;
+                _context4.next = 32;
                 break;
               }
-              _context4.next = 30;
+              _context4.next = 32;
               return new Promise(function (resolve) {
                 return setTimeout(resolve, 1000);
               });
-            case 30:
-              _context4.next = 35;
-              break;
             case 32:
-              _context4.prev = 32;
-              _context4.t0 = _context4["catch"](21);
-              console.error("Error processing batch starting at index ".concat(i, ":"), _context4.t0);
-            case 35:
+              _context4.next = 37;
+              break;
+            case 34:
+              _context4.prev = 34;
+              _context4.t0 = _context4["catch"](23);
+              console.error("[TokensTab] Error processing batch starting at index ".concat(i, ":"), _context4.t0);
+            case 37:
               i += batchSize;
-              _context4.next = 19;
+              _context4.next = 20;
               break;
-            case 38:
-              console.log('Token enrichment completed:', enrichedTokens.length);
+            case 40:
+              console.log('[TokensTab] Token enrichment completed:', enrichedTokens.length);
               setTokens(enrichedTokens);
-              _context4.next = 46;
+              _context4.next = 48;
               break;
-            case 42:
-              _context4.prev = 42;
+            case 44:
+              _context4.prev = 44;
               _context4.t1 = _context4["catch"](3);
-              console.error('Error fetching tokens:', _context4.t1);
+              console.error('[TokensTab] Error fetching tokens:', _context4.t1);
               setError('Failed to fetch tokens. Please try again.');
-            case 46:
-              _context4.prev = 46;
+            case 48:
+              _context4.prev = 48;
               setLoading(false);
-              return _context4.finish(46);
-            case 49:
+              return _context4.finish(48);
+            case 51:
             case "end":
               return _context4.stop();
           }
-        }, _callee4, null, [[3, 42, 46, 49], [21, 32]]);
+        }, _callee4, null, [[3, 44, 48, 51], [23, 34]]);
       }));
       return function fetchTokens() {
         return _ref2.apply(this, arguments);
@@ -78856,28 +78937,44 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react_dom_client__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react-dom/client */ "./node_modules/react-dom/client.js");
 /* harmony import */ var _WalletProvider__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./WalletProvider */ "./static/js/WalletProvider.tsx");
 /* harmony import */ var _components_TabsContainer__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/TabsContainer */ "./static/js/components/TabsContainer.tsx");
+/* harmony import */ var _components_ErrorBoundary__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components/ErrorBoundary */ "./static/js/components/ErrorBoundary.tsx");
+
 
 
 
 
 var App = function App() {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+  console.log('[App] Rendering main App component');
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_ErrorBoundary__WEBPACK_IMPORTED_MODULE_4__["default"], null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "app-container"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_WalletProvider__WEBPACK_IMPORTED_MODULE_2__["default"], null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "content"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h1", null, "Solana Asset Manager"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_TabsContainer__WEBPACK_IMPORTED_MODULE_3__["default"], null))));
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h1", null, "Solana Asset Manager"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_TabsContainer__WEBPACK_IMPORTED_MODULE_3__["default"], null)))));
 };
 function initApp() {
-  var container = document.getElementById('root');
+  console.log('[App] Initializing application');
+  var container = document.getElementById('app');
   if (!container) {
-    console.error('Root element not found');
+    console.error('[App] Fatal: Root element #app not found in DOM');
     return;
   }
-  var root = (0,react_dom_client__WEBPACK_IMPORTED_MODULE_1__.createRoot)(container);
-  root.render(/*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().StrictMode), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(App, null)));
+  try {
+    console.log('[App] Creating React root');
+    var root = (0,react_dom_client__WEBPACK_IMPORTED_MODULE_1__.createRoot)(container);
+    console.log('[App] Rendering React application');
+    root.render(/*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().StrictMode), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(App, null)));
+    console.log('[App] React application rendered successfully');
+  } catch (error) {
+    console.error('[App] Fatal: Failed to render React application:', error);
+  }
 }
+// Add initialization logging
+console.log('[App] Script loaded, setting up window.App');
 window.App = {
-  render: initApp
+  render: function render() {
+    console.log('[App] window.App.render called');
+    initApp();
+  }
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (App);
 })();

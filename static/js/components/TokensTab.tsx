@@ -16,6 +16,8 @@ interface TokenData {
 }
 
 const TokensTab: React.FC = () => {
+  console.log('[TokensTab] Initializing TokensTab component');
+
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const [tokens, setTokens] = useState<TokenData[]>([]);
@@ -26,14 +28,14 @@ const TokensTab: React.FC = () => {
   const [solscanApiKey, setSolscanApiKey] = useState<string>('');
 
   useEffect(() => {
-    // Fetch the Solscan API key from our backend
+    console.log('[TokensTab] Fetching API key');
     const fetchApiKey = async () => {
       try {
         const response = await axios.get('/api/config');
         setSolscanApiKey(response.data.solscanApiKey);
-        console.log('Successfully fetched API key:', response.data.solscanApiKey ? 'Present' : 'Missing');
+        console.log('[TokensTab] API key status:', response.data.solscanApiKey ? 'Present' : 'Missing');
       } catch (err) {
-        console.error('Error fetching API key:', err);
+        console.error('[TokensTab] Error fetching API key:', err);
         setError('Failed to fetch API configuration');
       }
     };
@@ -41,28 +43,32 @@ const TokensTab: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    console.log('[TokensTab] Token fetch effect triggered', {
+      hasPublicKey: !!publicKey,
+      hasSolscanKey: !!solscanApiKey
+    });
+
     const fetchTokens = async () => {
       if (!publicKey || !solscanApiKey) {
-        console.log('Missing required keys:', { 
-          hasPublicKey: !!publicKey, 
-          hasSolscanKey: !!solscanApiKey 
+        console.log('[TokensTab] Missing required keys:', {
+          hasPublicKey: !!publicKey,
+          hasSolscanKey: !!solscanApiKey
         });
         return;
       }
 
       try {
+        console.log('[TokensTab] Starting token fetch');
         setLoading(true);
         setError(null);
 
-        // Fetch token accounts using Solana RPC
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
           publicKey,
           { programId: TOKEN_PROGRAM_ID }
         );
 
-        console.log('Found token accounts:', tokenAccounts.value.length);
+        console.log('[TokensTab] Found token accounts:', tokenAccounts.value.length);
 
-        // Transform the data
         const tokenData: TokenData[] = [];
         for (const account of tokenAccounts.value) {
           const parsedInfo = account.account.data.parsed.info;
@@ -76,9 +82,7 @@ const TokensTab: React.FC = () => {
           }
         }
 
-        console.log('Filtered token data:', tokenData.length);
-
-        // Set tokens immediately to show basic data
+        console.log('[TokensTab] Filtered token data:', tokenData.length);
         setTokens(tokenData);
 
         // Helper function for rate-limited API calls
@@ -86,7 +90,7 @@ const TokensTab: React.FC = () => {
           try {
             await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
 
-            console.log(`Fetching metadata for token ${mint} (attempt ${retryCount + 1})`);
+            console.log(`[TokensTab] Fetching metadata for token ${mint} (attempt ${retryCount + 1})`);
             const response = await axios.get(
               `https://api.solscan.io/v2/token/meta?token=${mint}`,
               {
@@ -105,13 +109,12 @@ const TokensTab: React.FC = () => {
             return response.data;
           } catch (error: any) {
             console.error(
-              `Error fetching metadata for token ${mint}:`,
+              `[TokensTab] Error fetching metadata for token ${mint}:`,
               error.response?.data || error.message
             );
 
-            // Handle rate limiting
             if (error.response?.status === 429 && retryCount < 3) {
-              console.warn(`Rate limit hit for ${mint}, retrying in ${(retryCount + 1) * 1000}ms`);
+              console.warn(`[TokensTab] Rate limit hit for ${mint}, retrying in ${(retryCount + 1) * 1000}ms`);
               return fetchWithRetry(mint, retryCount + 1);
             }
 
@@ -119,12 +122,12 @@ const TokensTab: React.FC = () => {
           }
         };
 
-        // Fetch token metadata in batches to avoid rate limiting
         const batchSize = 3;
         const enrichedTokens = [];
 
         for (let i = 0; i < tokenData.length; i += batchSize) {
           const batch = tokenData.slice(i, i + batchSize);
+          console.log(`[TokensTab] Processing batch ${i / batchSize + 1}`);
 
           try {
             const batchResults = await Promise.all(
@@ -132,6 +135,7 @@ const TokensTab: React.FC = () => {
                 try {
                   const solscanData = await fetchWithRetry(token.mint);
                   const metadata = solscanData.data;
+                  console.log(`[TokensTab] Successfully enriched token ${token.mint}`);
 
                   return {
                     ...token,
@@ -140,7 +144,7 @@ const TokensTab: React.FC = () => {
                     logoURI: metadata.icon || '/default-token-icon.svg'
                   };
                 } catch (error) {
-                  console.warn(`Failed to fetch metadata for token ${token.mint}, using fallback data`);
+                  console.warn(`[TokensTab] Failed to fetch metadata for token ${token.mint}, using fallback data`);
                   return {
                     ...token,
                     symbol: 'Unknown',
@@ -152,21 +156,20 @@ const TokensTab: React.FC = () => {
             );
 
             enrichedTokens.push(...batchResults);
-            setTokens([...enrichedTokens]); // Update UI with each batch
+            setTokens([...enrichedTokens]);
 
-            // Add delay between batches to prevent rate limiting
             if (i + batchSize < tokenData.length) {
               await new Promise(resolve => setTimeout(resolve, 1000));
             }
           } catch (error) {
-            console.error(`Error processing batch starting at index ${i}:`, error);
+            console.error(`[TokensTab] Error processing batch starting at index ${i}:`, error);
           }
         }
 
-        console.log('Token enrichment completed:', enrichedTokens.length);
+        console.log('[TokensTab] Token enrichment completed:', enrichedTokens.length);
         setTokens(enrichedTokens);
       } catch (err: any) {
-        console.error('Error fetching tokens:', err);
+        console.error('[TokensTab] Error fetching tokens:', err);
         setError('Failed to fetch tokens. Please try again.');
       } finally {
         setLoading(false);

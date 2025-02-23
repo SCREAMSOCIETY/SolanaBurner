@@ -2,14 +2,27 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>Solana Token Burner</title>
+    <title>Solana Asset Manager</title>
     <link rel="stylesheet" href="/static/styles.css">
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 </head>
 <body>
     <div id="app"></div>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="/static/dist/vendors-node_modules_ledgerhq_hw-transport-webhid_lib-es_TransportWebHID_js.js"></script>
+    <script src="/static/dist/vendors-node_modules_solflare-wallet_sdk_lib_esm_index_js.js"></script>
+    <script src="/static/dist/vendors-node_modules_solflare-wallet_metamask-sdk_lib_esm_index_js.js"></script>
     <script src="/static/dist/app.js"></script>
     <script src="/static/dist/WalletProvider.js"></script>
     <script src="/static/dist/cnft-handler.js"></script>
+    <script>
+        window.addEventListener('load', function() {
+            console.log('[index.html] Document loaded, initializing App');
+            if (window.App && typeof window.App.render === 'function') {
+                window.App.render();
+            } else {
+                console.error('[index.html] App.render not found');
+            }
+        });
+    </script>
 </body>
 </html>
