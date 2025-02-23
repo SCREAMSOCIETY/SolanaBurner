@@ -78,7 +78,6 @@ run = ["sh", "-c", "npm run build && node server.js"]
 
 [[ports]]
 localPort = 3000
-externalPort = 4200
 
 [[ports]]
 localPort = 5000
@@ -86,24 +85,18 @@ externalPort = 5000
 
 [[ports]]
 localPort = 8080
-externalPort = 80
 
 [[ports]]
 localPort = 8081
-externalPort = 8081
 
 [[ports]]
 localPort = 8082
-externalPort = 3000
 
 [[ports]]
 localPort = 8083
-externalPort = 3001
 
 [[ports]]
 localPort = 8084
-externalPort = 3002
 
 [[ports]]
 localPort = 8085
-externalPort = 3003

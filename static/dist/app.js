@@ -78130,17 +78130,19 @@ var TokensTab = function TokensTab() {
             case 3:
               response = _context.sent;
               setSolscanApiKey(response.data.solscanApiKey);
-              _context.next = 10;
+              console.log('Successfully fetched API key configuration');
+              _context.next = 12;
               break;
-            case 7:
-              _context.prev = 7;
+            case 8:
+              _context.prev = 8;
               _context.t0 = _context["catch"](0);
               console.error('Error fetching API key:', _context.t0);
-            case 10:
+              setError('Failed to fetch API configuration');
+            case 12:
             case "end":
               return _context.stop();
           }
-        }, _callee, null, [[0, 7]]);
+        }, _callee, null, [[0, 8]]);
       }));
       return function fetchApiKey() {
         return _ref.apply(this, arguments);
@@ -78208,37 +78210,32 @@ var TokensTab = function TokensTab() {
               _context3.next = 17;
               return Promise.all(tokenData.map(/*#__PURE__*/function () {
                 var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(token, index) {
-                  var _response$data, _response$data2, headers, response, data, _error$response;
+                  var response, data, _error$response, _error$response2;
                   return _regeneratorRuntime().wrap(function _callee2$(_context2) {
                     while (1) switch (_context2.prev = _context2.next) {
                       case 0:
                         _context2.prev = 0;
                         _context2.next = 3;
                         return new Promise(function (resolve) {
-                          return setTimeout(resolve, index * 200);
+                          return setTimeout(resolve, index * 500);
                         });
                       case 3:
-                        headers = {
-                          'Accept': 'application/json',
-                          'User-Agent': 'Solana Asset Manager',
-                          'Authorization': "Bearer ".concat(solscanApiKey) // Changed from 'Token' to 'Authorization: Bearer'
-                        };
-                        console.log("Fetching metadata for token ".concat(token.mint));
-                        console.log('Request headers:', _objectSpread(_objectSpread({}, headers), {}, {
-                          Authorization: 'Bearer [HIDDEN]'
-                        }));
-                        _context2.next = 8;
-                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/token/meta?token=".concat(token.mint), {
-                          headers: headers,
-                          timeout: 5000
+                        _context2.next = 5;
+                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/v2/token/meta?token=".concat(token.mint), {
+                          headers: {
+                            'Accept': 'application/json',
+                            'Authorization': "Bearer ".concat(solscanApiKey)
+                          },
+                          timeout: 10000
                         });
-                      case 8:
+                      case 5:
                         response = _context2.sent;
-                        console.log("Solscan response for ".concat(token.mint, ":"), response.status, _objectSpread(_objectSpread({}, response.data), {}, {
-                          data: (_response$data = response.data) !== null && _response$data !== void 0 && _response$data.data ? 'DATA_EXISTS' : 'NO_DATA'
-                        }));
-                        if (!(response.status === 200 && (_response$data2 = response.data) !== null && _response$data2 !== void 0 && _response$data2.data)) {
-                          _context2.next = 13;
+                        console.log("Solscan response for ".concat(token.mint, ":"), {
+                          status: response.status,
+                          hasData: !!response.data
+                        });
+                        if (!(response.data && response.data.success)) {
+                          _context2.next = 10;
                           break;
                         }
                         data = response.data.data;
@@ -78247,27 +78244,39 @@ var TokensTab = function TokensTab() {
                           name: data.name || 'Unknown Token',
                           logoURI: data.icon || '/default-token-icon.svg'
                         }));
-                      case 13:
-                        console.warn("No data returned for token ".concat(token.mint));
+                      case 10:
+                        console.warn("No valid data returned for token ".concat(token.mint));
                         return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: 'Unknown',
                           name: 'Unknown Token',
                           logoURI: '/default-token-icon.svg'
                         }));
-                      case 17:
-                        _context2.prev = 17;
+                      case 14:
+                        _context2.prev = 14;
                         _context2.t0 = _context2["catch"](0);
                         console.error("Error fetching metadata for token ".concat(token.mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
+
+                        // Check for specific error types
+                        if (!(((_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.status) === 429)) {
+                          _context2.next = 21;
+                          break;
+                        }
+                        console.warn('Rate limit hit, will retry after delay');
+                        _context2.next = 21;
+                        return new Promise(function (resolve) {
+                          return setTimeout(resolve, 2000);
+                        });
+                      case 21:
                         return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: 'Unknown',
                           name: 'Unknown Token',
                           logoURI: '/default-token-icon.svg'
                         }));
-                      case 21:
+                      case 22:
                       case "end":
                         return _context2.stop();
                     }
-                  }, _callee2, null, [[0, 17]]);
+                  }, _callee2, null, [[0, 14]]);
                 }));
                 return function (_x, _x2) {
                   return _ref3.apply(this, arguments);

@@ -31,8 +31,10 @@ const TokensTab: React.FC = () => {
       try {
         const response = await axios.get('/api/config');
         setSolscanApiKey(response.data.solscanApiKey);
+        console.log('Successfully fetched API key configuration');
       } catch (err) {
         console.error('Error fetching API key:', err);
+        setError('Failed to fetch API configuration');
       }
     };
     fetchApiKey();
@@ -84,31 +86,25 @@ const TokensTab: React.FC = () => {
           tokenData.map(async (token, index) => {
             try {
               // Add delay to prevent rate limiting
-              await new Promise(resolve => setTimeout(resolve, index * 200));
-
-              const headers = {
-                'Accept': 'application/json',
-                'User-Agent': 'Solana Asset Manager',
-                'Authorization': `Bearer ${solscanApiKey}` // Changed from 'Token' to 'Authorization: Bearer'
-              };
-
-              console.log(`Fetching metadata for token ${token.mint}`);
-              console.log('Request headers:', { ...headers, Authorization: 'Bearer [HIDDEN]' });
+              await new Promise(resolve => setTimeout(resolve, index * 500));
 
               const response = await axios.get(
-                `https://api.solscan.io/token/meta?token=${token.mint}`,
+                `https://api.solscan.io/v2/token/meta?token=${token.mint}`,
                 {
-                  headers,
-                  timeout: 5000
+                  headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${solscanApiKey}`
+                  },
+                  timeout: 10000
                 }
               );
 
-              console.log(`Solscan response for ${token.mint}:`, response.status, {
-                ...response.data,
-                data: response.data?.data ? 'DATA_EXISTS' : 'NO_DATA'
+              console.log(`Solscan response for ${token.mint}:`, {
+                status: response.status,
+                hasData: !!response.data
               });
 
-              if (response.status === 200 && response.data?.data) {
+              if (response.data && response.data.success) {
                 const data = response.data.data;
                 return {
                   ...token,
@@ -118,15 +114,26 @@ const TokensTab: React.FC = () => {
                 };
               }
 
-              console.warn(`No data returned for token ${token.mint}`);
+              console.warn(`No valid data returned for token ${token.mint}`);
               return {
                 ...token,
                 symbol: 'Unknown',
                 name: 'Unknown Token',
                 logoURI: '/default-token-icon.svg'
               };
-            } catch (error) {
-              console.error(`Error fetching metadata for token ${token.mint}:`, error.response?.data || error.message);
+            } catch (error: any) {
+              console.error(
+                `Error fetching metadata for token ${token.mint}:`,
+                error.response?.data || error.message
+              );
+
+              // Check for specific error types
+              if (error.response?.status === 429) {
+                console.warn('Rate limit hit, will retry after delay');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Could implement retry logic here
+              }
+
               return {
                 ...token,
                 symbol: 'Unknown',
@@ -139,7 +146,7 @@ const TokensTab: React.FC = () => {
 
         console.log('Enriched tokens:', enrichedTokens.length);
         setTokens(enrichedTokens);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching tokens:', err);
         setError('Failed to fetch tokens. Please try again.');
       } finally {
