@@ -3,13 +3,19 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const port = 5000; // ALWAYS use port 5000 for Replit
+const port = process.env.PORT || 5000;
 
 // Enable CORS for all routes
 app.use(cors());
 
 // Parse JSON bodies
 app.use(express.json());
+
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
 // Serve static files from the static directory
 app.use(express.static(path.join(__dirname, 'static')));
@@ -19,6 +25,7 @@ app.use('/dist', express.static(path.join(__dirname, 'static', 'dist')));
 
 // API endpoint to get environment variables safely
 app.get('/api/config', (req, res) => {
+  console.log('Config endpoint called, providing API key safely');
   res.json({
     solscanApiKey: process.env.SOLSCAN_API_KEY || ''
   });
@@ -47,13 +54,12 @@ app.use((err, req, res, next) => {
 
 // Start the server with proper error handling
 const server = app.listen(port, '0.0.0.0', () => {
+  console.log('=================================');
   console.log(`Server running at http://0.0.0.0:${port}`);
   console.log('Static files served from:', path.join(__dirname, 'static'));
   console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
-});
-
-// Handle server startup errors
-server.on('error', (error) => {
+  console.log('=================================');
+}).on('error', (error) => {
   if (error.syscall !== 'listen') {
     throw error;
   }
