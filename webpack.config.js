@@ -13,7 +13,7 @@ module.exports = {
     filename: '[name].js',
     library: '[name]',
     libraryTarget: 'window',
-    publicPath: '/dist/'  // Add explicit public path
+    publicPath: '/static/dist/'  // Update to match server static path
   },
   module: {
     rules: [

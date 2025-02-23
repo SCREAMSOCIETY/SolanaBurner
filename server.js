@@ -20,7 +20,7 @@ app.use((req, res, next) => {
   const startTime = Date.now();
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
 
-  // Log request body if present and not empty
+  // Log request body if present
   if (req.body && Object.keys(req.body).length > 0) {
     console.log('Request body:', JSON.stringify(req.body));
   }
