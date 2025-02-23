@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, createBurnInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
 import axios from 'axios';
-
-// Define the Token Program ID constant since import isn't working
-const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
 interface TokenData {
   mint: string;
@@ -13,14 +11,18 @@ interface TokenData {
   symbol?: string;
   name?: string;
   logoURI?: string;
+  account?: string;
+  selected?: boolean;
 }
 
 const TokensTab: React.FC = () => {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [burning, setBurning] = useState(false);
+  const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchTokens = async () => {
@@ -30,40 +32,49 @@ const TokensTab: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Get all token accounts for the connected wallet
+        // Fetch token accounts using Solana RPC
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
           publicKey,
           { programId: TOKEN_PROGRAM_ID }
         );
 
         // Transform the data
-        const tokenData = tokenAccounts.value.map((account) => {
+        const tokenData: TokenData[] = [];
+        for (const account of tokenAccounts.value) {
           const parsedInfo = account.account.data.parsed.info;
-          return {
-            mint: parsedInfo.mint,
-            balance: Number(parsedInfo.tokenAmount.amount),
-            decimals: parsedInfo.tokenAmount.decimals,
-          };
-        });
-
-        // Filter out tokens with 0 balance
-        const nonZeroTokens = tokenData.filter(token => token.balance > 0);
+          if (Number(parsedInfo.tokenAmount.amount) > 0) {
+            tokenData.push({
+              mint: parsedInfo.mint,
+              balance: Number(parsedInfo.tokenAmount.amount),
+              decimals: parsedInfo.tokenAmount.decimals,
+              account: account.pubkey.toBase58()
+            });
+          }
+        }
 
         // Set tokens immediately to show "no tokens" state faster
-        setTokens(nonZeroTokens);
+        setTokens(tokenData);
 
-        // Fetch token metadata from Jupiter API
+        // Fetch detailed token info from Solscan API for each token
         const enrichedTokens = await Promise.all(
-          nonZeroTokens.map(async (token) => {
+          tokenData.map(async (token) => {
             try {
               const response = await axios.get(
-                `https://token.jup.ag/token/${token.mint}`
+                `https://api.solscan.io/token/meta?token=${token.mint}`,
+                {
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'Solana Asset Manager'
+                  }
+                }
               );
+
+              const data = response.data?.data;
               return {
                 ...token,
-                symbol: response.data?.symbol,
-                name: response.data?.name,
-                logoURI: response.data?.logoURI
+                symbol: data?.symbol || 'Unknown',
+                name: data?.name || 'Unknown Token',
+                logoURI: data?.icon || '/default-token-icon.svg'
               };
             } catch (error) {
               console.log(`Error fetching metadata for token ${token.mint}:`, error);
@@ -90,6 +101,79 @@ const TokensTab: React.FC = () => {
     }
   }, [publicKey, connection]);
 
+  const handleBurnToken = async (token: TokenData) => {
+    if (!publicKey || !token.account) return;
+
+    try {
+      setBurning(true);
+      const transaction = new Transaction();
+
+      const burnInstruction = createBurnInstruction(
+        new PublicKey(token.account),
+        new PublicKey(token.mint),
+        publicKey,
+        token.balance
+      );
+
+      transaction.add(burnInstruction);
+
+      const signature = await sendTransaction(transaction, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      // Remove the burned token from the list
+      setTokens(tokens.filter(t => t.mint !== token.mint));
+    } catch (err) {
+      console.error('Error burning token:', err);
+      setError('Failed to burn token. Please try again.');
+    } finally {
+      setBurning(false);
+    }
+  };
+
+  const handleBulkBurn = async () => {
+    if (!publicKey || selectedTokens.size === 0) return;
+
+    try {
+      setBurning(true);
+      const transaction = new Transaction();
+
+      // Add burn instructions for all selected tokens
+      for (const token of tokens) {
+        if (selectedTokens.has(token.mint) && token.account) {
+          const burnInstruction = createBurnInstruction(
+            new PublicKey(token.account),
+            new PublicKey(token.mint),
+            publicKey,
+            token.balance
+          );
+          transaction.add(burnInstruction);
+        }
+      }
+
+      const signature = await sendTransaction(transaction, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      // Remove all burned tokens from the list
+      setTokens(tokens.filter(token => !selectedTokens.has(token.mint)));
+      setSelectedTokens(new Set());
+    } catch (err) {
+      console.error('Error burning tokens:', err);
+      setError('Failed to burn tokens. Please try again.');
+    } finally {
+      setBurning(false);
+    }
+  };
+
+  const toggleTokenSelection = (mint: string) => {
+    const newSelected = new Set(selectedTokens);
+    if (newSelected.has(mint)) {
+      newSelected.delete(mint);
+    } else {
+      newSelected.add(mint);
+    }
+    setSelectedTokens(newSelected);
+  };
+
   if (!publicKey) {
     return (
       <div className="container">
@@ -102,6 +186,17 @@ const TokensTab: React.FC = () => {
   return (
     <div className="container">
       <h2>Tokens</h2>
+      {selectedTokens.size > 0 && (
+        <div className="bulk-actions">
+          <button 
+            className="burn-button bulk-burn"
+            onClick={handleBulkBurn}
+            disabled={burning}
+          >
+            {burning ? 'Burning...' : `Burn Selected (${selectedTokens.size})`}
+          </button>
+        </div>
+      )}
       {loading && tokens.length === 0 ? (
         <div className="loading-message">Loading tokens...</div>
       ) : error ? (
@@ -116,24 +211,22 @@ const TokensTab: React.FC = () => {
           {tokens.map((token) => (
             <div key={token.mint} className="asset-card token-card">
               <div className="token-header">
+                <input
+                  type="checkbox"
+                  checked={selectedTokens.has(token.mint)}
+                  onChange={() => toggleTokenSelection(token.mint)}
+                  className="token-select"
+                />
                 <div className="token-icon-wrapper">
-                  {token.logoURI ? (
-                    <img 
-                      src={token.logoURI} 
-                      alt={token.symbol || 'token'} 
-                      className="token-icon"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/default-token-icon.svg';
-                      }}
-                    />
-                  ) : (
-                    <img 
-                      src="/default-token-icon.svg" 
-                      alt="default token" 
-                      className="token-icon"
-                    />
-                  )}
+                  <img 
+                    src={token.logoURI || '/default-token-icon.svg'} 
+                    alt={token.symbol || 'token'} 
+                    className="token-icon"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/default-token-icon.svg';
+                    }}
+                  />
                 </div>
                 <div className="token-info">
                   <h4 className="token-name">{token.name || 'Unknown Token'}</h4>
@@ -147,6 +240,15 @@ const TokensTab: React.FC = () => {
                     {(token.balance / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
                   </span>
                 </div>
+              </div>
+              <div className="token-actions">
+                <button 
+                  className="burn-button"
+                  onClick={() => handleBurnToken(token)}
+                  disabled={burning}
+                >
+                  {burning ? 'Burning...' : 'Burn'}
+                </button>
               </div>
               <div className="links-container">
                 <a 

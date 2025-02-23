@@ -17,6 +17,9 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Parse JSON bodies
+app.use(express.json());
+
 // Serve static files from the static directory
 app.use(express.static(path.join(__dirname, 'static')));
 

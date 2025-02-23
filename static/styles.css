@@ -1287,3 +1287,98 @@ p {
     color: var(--text-color);
     opacity: 0.8;
 }
+
+/* Add these styles after the existing .token-card styles */
+
+.token-select {
+  margin-right: 1rem;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary-color);
+}
+
+.bulk-actions {
+  margin-bottom: 2rem;
+  text-align: right;
+}
+
+.bulk-burn {
+  background-color: var(--error-color);
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.bulk-burn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.bulk-burn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.burn-button {
+  background-color: var(--error-color);
+  color: var(--text-color);
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.burn-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.burn-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.burn-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 70, 70, 0.8);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.burn-button:active::after {
+  animation: burnEffect 0.5s ease-out;
+}
+
+@keyframes burnEffect {
+  0% {
+    width: 5px;
+    height: 5px;
+    opacity: 0.8;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
