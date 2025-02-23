@@ -1,20 +1,16 @@
 const express = require('express');
-const path = require('path');
-const cors = require('cors');
 
 // Basic Express setup
 const app = express();
-const port = 5000;
 
 console.log('[SERVER] Starting server with configuration:', {
   NODE_ENV: process.env.NODE_ENV,
-  PORT: port,
+  PORT: process.env.PORT || 8080,
   CWD: process.cwd()
 });
 
 // Basic middleware
 app.use(express.json());
-app.use(cors());
 
 // Simple test endpoint
 app.get('/ping', (req, res) => {
@@ -29,20 +25,11 @@ app.use((err, req, res, next) => {
 });
 
 // Start server with explicit host binding
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`[SERVER] Running at http://0.0.0.0:${port}`);
+const server = app.listen(process.env.PORT || 8080, '0.0.0.0', () => {
+  console.log(`[SERVER] Running at http://0.0.0.0:${process.env.PORT || 8080}`);
 }).on('error', (error) => {
   console.error('[SERVER FATAL] Failed to start:', error);
   setTimeout(() => process.exit(1), 1000);
-});
-
-// Handle process signals
-process.on('SIGTERM', () => {
-  console.log('[SERVER] Received SIGTERM signal. Closing server...');
-  server.close(() => {
-    console.log('[SERVER] Server closed');
-    process.exit(0);
-  });
 });
 
 // Global error handlers
