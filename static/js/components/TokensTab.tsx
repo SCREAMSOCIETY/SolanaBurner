@@ -40,7 +40,13 @@ const TokensTab: React.FC = () => {
 
   useEffect(() => {
     const fetchTokens = async () => {
-      if (!publicKey || !solscanApiKey) return;
+      if (!publicKey || !solscanApiKey) {
+        console.log('Missing required keys:', { 
+          hasPublicKey: !!publicKey, 
+          hasSolscanKey: !!solscanApiKey 
+        });
+        return;
+      }
 
       try {
         setLoading(true);
@@ -51,6 +57,8 @@ const TokensTab: React.FC = () => {
           publicKey,
           { programId: TOKEN_PROGRAM_ID }
         );
+
+        console.log('Found token accounts:', tokenAccounts.value.length);
 
         // Transform the data
         const tokenData: TokenData[] = [];
@@ -66,27 +74,39 @@ const TokensTab: React.FC = () => {
           }
         }
 
+        console.log('Filtered token data:', tokenData.length);
+
         // Set tokens immediately to show basic data
         setTokens(tokenData);
 
-        // Fetch detailed token info from Solscan API with improved error handling and rate limiting
+        // Fetch detailed token info from Solscan API with improved error handling
         const enrichedTokens = await Promise.all(
           tokenData.map(async (token, index) => {
             try {
-              // Add delay to prevent rate limiting issues
+              // Add delay to prevent rate limiting
               await new Promise(resolve => setTimeout(resolve, index * 200));
+
+              const headers = {
+                'Accept': 'application/json',
+                'User-Agent': 'Solana Asset Manager',
+                'Authorization': `Bearer ${solscanApiKey}` // Changed from 'Token' to 'Authorization: Bearer'
+              };
+
+              console.log(`Fetching metadata for token ${token.mint}`);
+              console.log('Request headers:', { ...headers, Authorization: 'Bearer [HIDDEN]' });
 
               const response = await axios.get(
                 `https://api.solscan.io/token/meta?token=${token.mint}`,
                 {
-                  headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'Solana Asset Manager',
-                    'Token': solscanApiKey
-                  },
-                  timeout: 5000 // 5 second timeout
+                  headers,
+                  timeout: 5000
                 }
               );
+
+              console.log(`Solscan response for ${token.mint}:`, response.status, {
+                ...response.data,
+                data: response.data?.data ? 'DATA_EXISTS' : 'NO_DATA'
+              });
 
               if (response.status === 200 && response.data?.data) {
                 const data = response.data.data;
@@ -98,11 +118,15 @@ const TokensTab: React.FC = () => {
                 };
               }
 
-              console.log(`No data returned for token ${token.mint}`);
-              return token;
+              console.warn(`No data returned for token ${token.mint}`);
+              return {
+                ...token,
+                symbol: 'Unknown',
+                name: 'Unknown Token',
+                logoURI: '/default-token-icon.svg'
+              };
             } catch (error) {
-              console.error(`Error fetching metadata for token ${token.mint}:`, error);
-              // Return token with default values on error
+              console.error(`Error fetching metadata for token ${token.mint}:`, error.response?.data || error.message);
               return {
                 ...token,
                 symbol: 'Unknown',
@@ -113,6 +137,7 @@ const TokensTab: React.FC = () => {
           })
         );
 
+        console.log('Enriched tokens:', enrichedTokens.length);
         setTokens(enrichedTokens);
       } catch (err) {
         console.error('Error fetching tokens:', err);

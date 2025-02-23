@@ -78156,22 +78156,28 @@ var TokensTab = function TokensTab() {
           while (1) switch (_context3.prev = _context3.next) {
             case 0:
               if (!(!publicKey || !solscanApiKey)) {
-                _context3.next = 2;
+                _context3.next = 3;
                 break;
               }
+              console.log('Missing required keys:', {
+                hasPublicKey: !!publicKey,
+                hasSolscanKey: !!solscanApiKey
+              });
               return _context3.abrupt("return");
-            case 2:
-              _context3.prev = 2;
+            case 3:
+              _context3.prev = 3;
               setLoading(true);
               setError(null);
 
               // Fetch token accounts using Solana RPC
-              _context3.next = 7;
+              _context3.next = 8;
               return connection.getParsedTokenAccountsByOwner(publicKey, {
                 programId: _solana_spl_token__WEBPACK_IMPORTED_MODULE_5__.TOKEN_PROGRAM_ID
               });
-            case 7:
+            case 8:
               tokenAccounts = _context3.sent;
+              console.log('Found token accounts:', tokenAccounts.value.length);
+
               // Transform the data
               tokenData = [];
               _iterator = _createForOfIteratorHelper(tokenAccounts.value);
@@ -78188,74 +78194,105 @@ var TokensTab = function TokensTab() {
                     });
                   }
                 }
-
-                // Set tokens immediately to show "no tokens" state faster
               } catch (err) {
                 _iterator.e(err);
               } finally {
                 _iterator.f();
               }
+              console.log('Filtered token data:', tokenData.length);
+
+              // Set tokens immediately to show basic data
               setTokens(tokenData);
 
-              // Fetch detailed token info from Solscan API for each token
-              _context3.next = 14;
+              // Fetch detailed token info from Solscan API with improved error handling
+              _context3.next = 17;
               return Promise.all(tokenData.map(/*#__PURE__*/function () {
-                var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(token) {
-                  var _response$data, response, data;
+                var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(token, index) {
+                  var _response$data, _response$data2, headers, response, data, _error$response;
                   return _regeneratorRuntime().wrap(function _callee2$(_context2) {
                     while (1) switch (_context2.prev = _context2.next) {
                       case 0:
                         _context2.prev = 0;
                         _context2.next = 3;
-                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/token/meta?token=".concat(token.mint), {
-                          headers: {
-                            'Accept': 'application/json',
-                            'User-Agent': 'Solana Asset Manager',
-                            'Token': solscanApiKey
-                          }
+                        return new Promise(function (resolve) {
+                          return setTimeout(resolve, index * 200);
                         });
                       case 3:
-                        response = _context2.sent;
-                        data = (_response$data = response.data) === null || _response$data === void 0 ? void 0 : _response$data.data;
-                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
-                          symbol: (data === null || data === void 0 ? void 0 : data.symbol) || 'Unknown',
-                          name: (data === null || data === void 0 ? void 0 : data.name) || 'Unknown Token',
-                          logoURI: (data === null || data === void 0 ? void 0 : data.icon) || '/default-token-icon.svg'
+                        headers = {
+                          'Accept': 'application/json',
+                          'User-Agent': 'Solana Asset Manager',
+                          'Authorization': "Bearer ".concat(solscanApiKey) // Changed from 'Token' to 'Authorization: Bearer'
+                        };
+                        console.log("Fetching metadata for token ".concat(token.mint));
+                        console.log('Request headers:', _objectSpread(_objectSpread({}, headers), {}, {
+                          Authorization: 'Bearer [HIDDEN]'
                         }));
+                        _context2.next = 8;
+                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/token/meta?token=".concat(token.mint), {
+                          headers: headers,
+                          timeout: 5000
+                        });
                       case 8:
-                        _context2.prev = 8;
+                        response = _context2.sent;
+                        console.log("Solscan response for ".concat(token.mint, ":"), response.status, _objectSpread(_objectSpread({}, response.data), {}, {
+                          data: (_response$data = response.data) !== null && _response$data !== void 0 && _response$data.data ? 'DATA_EXISTS' : 'NO_DATA'
+                        }));
+                        if (!(response.status === 200 && (_response$data2 = response.data) !== null && _response$data2 !== void 0 && _response$data2.data)) {
+                          _context2.next = 13;
+                          break;
+                        }
+                        data = response.data.data;
+                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
+                          symbol: data.symbol || 'Unknown',
+                          name: data.name || 'Unknown Token',
+                          logoURI: data.icon || '/default-token-icon.svg'
+                        }));
+                      case 13:
+                        console.warn("No data returned for token ".concat(token.mint));
+                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
+                          symbol: 'Unknown',
+                          name: 'Unknown Token',
+                          logoURI: '/default-token-icon.svg'
+                        }));
+                      case 17:
+                        _context2.prev = 17;
                         _context2.t0 = _context2["catch"](0);
-                        console.log("Error fetching metadata for token ".concat(token.mint, ":"), _context2.t0);
-                        return _context2.abrupt("return", token);
-                      case 12:
+                        console.error("Error fetching metadata for token ".concat(token.mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
+                        return _context2.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
+                          symbol: 'Unknown',
+                          name: 'Unknown Token',
+                          logoURI: '/default-token-icon.svg'
+                        }));
+                      case 21:
                       case "end":
                         return _context2.stop();
                     }
-                  }, _callee2, null, [[0, 8]]);
+                  }, _callee2, null, [[0, 17]]);
                 }));
-                return function (_x) {
+                return function (_x, _x2) {
                   return _ref3.apply(this, arguments);
                 };
               }()));
-            case 14:
+            case 17:
               enrichedTokens = _context3.sent;
+              console.log('Enriched tokens:', enrichedTokens.length);
               setTokens(enrichedTokens);
-              _context3.next = 22;
+              _context3.next = 26;
               break;
-            case 18:
-              _context3.prev = 18;
-              _context3.t0 = _context3["catch"](2);
-              console.error('Error fetching tokens:', _context3.t0);
-              setError('Failed to fetch tokens. Please try again.');
             case 22:
               _context3.prev = 22;
+              _context3.t0 = _context3["catch"](3);
+              console.error('Error fetching tokens:', _context3.t0);
+              setError('Failed to fetch tokens. Please try again.');
+            case 26:
+              _context3.prev = 26;
               setLoading(false);
-              return _context3.finish(22);
-            case 25:
+              return _context3.finish(26);
+            case 29:
             case "end":
               return _context3.stop();
           }
-        }, _callee3, null, [[2, 18, 22, 25]]);
+        }, _callee3, null, [[3, 22, 26, 29]]);
       }));
       return function fetchTokens() {
         return _ref2.apply(this, arguments);
@@ -78314,7 +78351,7 @@ var TokensTab = function TokensTab() {
         }
       }, _callee4, null, [[2, 15, 19, 22]]);
     }));
-    return function handleBurnToken(_x2) {
+    return function handleBurnToken(_x3) {
       return _ref4.apply(this, arguments);
     };
   }();

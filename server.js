@@ -58,6 +58,7 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://0.0.0.0:${port}`);
   console.log('Static files served from:', path.join(__dirname, 'static'));
   console.log('Dist files served from:', path.join(__dirname, 'static', 'dist'));
+  console.log('Environment:', process.env.NODE_ENV);
   console.log('=================================');
 }).on('error', (error) => {
   if (error.syscall !== 'listen') {
