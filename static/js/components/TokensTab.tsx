@@ -31,7 +31,7 @@ const TokensTab: React.FC = () => {
       try {
         const response = await axios.get('/api/config');
         setSolscanApiKey(response.data.solscanApiKey);
-        console.log('Successfully fetched API key configuration');
+        console.log('Successfully fetched API key:', response.data.solscanApiKey ? 'Present' : 'Missing');
       } catch (err) {
         console.error('Error fetching API key:', err);
         setError('Failed to fetch API configuration');
@@ -81,72 +81,43 @@ const TokensTab: React.FC = () => {
         // Set tokens immediately to show basic data
         setTokens(tokenData);
 
-        // Fetch detailed token info from Solscan API with improved error handling
+        // Fetch detailed token info from Solscan API
         const enrichedTokens = await Promise.all(
-          tokenData.map(async (token, index) => {
+          tokenData.map(async (token) => {
             try {
-              // Add delay to prevent rate limiting
-              await new Promise(resolve => setTimeout(resolve, index * 500));
+              console.log(`Fetching metadata for token ${token.mint}`);
 
               const response = await axios.get(
-                `https://api.solscan.io/v2/token/meta?token=${token.mint}`,
+                `https://public-api.solscan.io/token/meta?tokenAddress=${token.mint}`,
                 {
                   headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${solscanApiKey}`
-                  },
-                  timeout: 10000
+                    'token': solscanApiKey
+                  }
                 }
               );
 
-              console.log(`Solscan response for ${token.mint}:`, {
-                status: response.status,
-                hasData: !!response.data
-              });
+              console.log(`Solscan response for ${token.mint}:`, response.data);
 
-              if (response.data && response.data.success) {
-                const data = response.data.data;
+              if (response.data) {
                 return {
                   ...token,
-                  symbol: data.symbol || 'Unknown',
-                  name: data.name || 'Unknown Token',
-                  logoURI: data.icon || '/default-token-icon.svg'
+                  symbol: response.data.symbol || 'Unknown',
+                  name: response.data.name || 'Unknown Token',
+                  logoURI: response.data.icon || '/default-token-icon.svg'
                 };
               }
 
-              console.warn(`No valid data returned for token ${token.mint}`);
-              return {
-                ...token,
-                symbol: 'Unknown',
-                name: 'Unknown Token',
-                logoURI: '/default-token-icon.svg'
-              };
-            } catch (error: any) {
-              console.error(
-                `Error fetching metadata for token ${token.mint}:`,
-                error.response?.data || error.message
-              );
-
-              // Check for specific error types
-              if (error.response?.status === 429) {
-                console.warn('Rate limit hit, will retry after delay');
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                // Could implement retry logic here
-              }
-
-              return {
-                ...token,
-                symbol: 'Unknown',
-                name: 'Unknown Token',
-                logoURI: '/default-token-icon.svg'
-              };
+              return token;
+            } catch (error) {
+              console.error(`Error fetching metadata for token ${token.mint}:`, error);
+              return token;
             }
           })
         );
 
-        console.log('Enriched tokens:', enrichedTokens.length);
+        console.log('Enriched tokens:', enrichedTokens);
         setTokens(enrichedTokens);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching tokens:', err);
         setError('Failed to fetch tokens. Please try again.');
       } finally {
