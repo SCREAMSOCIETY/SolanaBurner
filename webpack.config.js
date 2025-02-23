@@ -6,14 +6,13 @@ module.exports = {
   entry: {
     'app': './static/js/App.tsx',
     'WalletProvider': './static/js/WalletProvider.tsx',
-    'cnft-handler': './static/js/cnft-handler.ts'
+    'cnft-handler': './static/js/cnft-handler.js'
   },
   output: {
     path: path.resolve(__dirname, 'static/dist'),
     filename: '[name].js',
     library: '[name]',
-    libraryTarget: 'umd',
-    globalObject: 'this'
+    libraryTarget: 'window'
   },
   module: {
     rules: [
@@ -21,18 +20,13 @@ module.exports = {
         test: /\.(ts|tsx)$/,
         use: [
           {
-            loader: 'ts-loader',
+            loader: 'babel-loader',
             options: {
-              transpileOnly: true,
-              compilerOptions: {
-                module: 'esnext',
-                moduleResolution: 'node',
-                target: 'es2020',
-                lib: ['es2020', 'dom'],
-                jsx: 'react',
-                esModuleInterop: true,
-                allowSyntheticDefaultImports: true
-              }
+              presets: [
+                '@babel/preset-env',
+                '@babel/preset-react',
+                '@babel/preset-typescript'
+              ]
             }
           }
         ],
