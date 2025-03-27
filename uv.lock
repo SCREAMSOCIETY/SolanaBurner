@@ -605,6 +605,19 @@ wheels = [
 ]
 
 [[package]]
+name = "flask-cors"
+version = "5.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+    { name = "werkzeug" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/d8/667bd90d1ee41c96e938bafe81052494e70b7abd9498c4a0215c103b9667/flask_cors-5.0.1.tar.gz", hash = "sha256:6ccb38d16d6b72bbc156c1c3f192bc435bfcc3c2bc864b2df1eb9b2d97b2403c", size = 11643 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/61/4aea5fb55be1b6f95e604627dc6c50c47d693e39cab2ac086ee0155a0abd/flask_cors-5.0.1-py3-none-any.whl", hash = "sha256:fa5cb364ead54bbf401a26dbf03030c6b18fb2fcaf70408096a572b409586b0c", size = 11296 },
+]
+
+[[package]]
 name = "flask-login"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -834,6 +847,7 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b1/59/93ce612fce25c274efc88ec4d65963ce80fce96b9048e9fc1e430d893a9e/justext-3.0.1.tar.gz", hash = "sha256:b6ed2fb6c5d21618e2e34b2295c4edfc0bcece3bd549ed5c8ef5a8d20f0b3451", size = 828398 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c4/30/2cd44d6cc7541d5a68848250bf2f12c588631f6ff4461421fee34f9b619e/jusText-3.0.1-py2.py3-none-any.whl", hash = "sha256:e0fb882dd7285415709f4b7466aed23d6b98b7b89404c36e8a2e730facfed02b", size = 837839 },
+    { url = "https://files.pythonhosted.org/packages/f4/b2/298d96f6b33fcb5ae7dbcbaea4e054601a575744de0e3edd98ae2a9d78e8/justext-3.0.1-py2.py3-none-any.whl", hash = "sha256:0a5225c5cd7c5a124fec7bfa9a55110a73135e8b58ce784470af67d051ac9fd3", size = 837939 },
 ]
 
 [[package]]
@@ -1329,6 +1343,8 @@ source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
     { name = "asyncio" },
+    { name = "flask" },
+    { name = "flask-cors" },
     { name = "flask-login" },
     { name = "flask-wtf" },
     { name = "httpx" },
@@ -1344,6 +1360,8 @@ dependencies = [
 requires-dist = [
     { name = "asgiref", specifier = "==3.8.1" },
     { name = "asyncio", specifier = ">=3.4.3" },
+    { name = "flask", specifier = ">=3.1.0" },
+    { name = "flask-cors", specifier = ">=5.0.1" },
     { name = "flask-login", specifier = ">=0.6.3" },
     { name = "flask-wtf", specifier = ">=1.2.2" },
     { name = "httpx", specifier = ">=0.23.3" },
