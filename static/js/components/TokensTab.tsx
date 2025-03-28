@@ -108,17 +108,11 @@ const TokensTab: React.FC = () => {
             console.log(`[TokensTab] Fetching metadata for token ${mint} (attempt ${retryCount + 1})`);
             console.log(`[TokensTab] Using Solscan API key: ${solscanApiKey ? 'Present (length: ' + solscanApiKey.length + ')' : 'Missing'}`);
             
-            const url = `https://api.solscan.io/v2/token/meta?token=${mint}`;
-            console.log(`[TokensTab] Request URL: ${url}`);
-            
-            const requestHeaders = {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${solscanApiKey}`
-            };
-            console.log(`[TokensTab] Request headers:`, requestHeaders);
+            // Use our proxy endpoint instead of direct Solscan API call to avoid CORS issues
+            const url = `/api/token-metadata/${mint}`;
+            console.log(`[TokensTab] Using proxy endpoint: ${url}`);
             
             const response = await axios.get(url, {
-              headers: requestHeaders,
               timeout: 10000
             });
 

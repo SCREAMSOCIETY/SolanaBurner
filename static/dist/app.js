@@ -28400,6 +28400,15 @@ class Axios {
       }
     }
 
+    // Set config.allowAbsoluteUrls
+    if (config.allowAbsoluteUrls !== undefined) {
+      // do nothing
+    } else if (this.defaults.allowAbsoluteUrls !== undefined) {
+      config.allowAbsoluteUrls = this.defaults.allowAbsoluteUrls;
+    } else {
+      config.allowAbsoluteUrls = true;
+    }
+
     _helpers_validator_js__WEBPACK_IMPORTED_MODULE_0__["default"].assertOptions(config, {
       baseUrl: validators.spelling('baseURL'),
       withXsrfToken: validators.spelling('withXSRFToken')
@@ -28495,7 +28504,7 @@ class Axios {
 
   getUri(config) {
     config = (0,_mergeConfig_js__WEBPACK_IMPORTED_MODULE_2__["default"])(this.defaults, config);
-    const fullPath = (0,_buildFullPath_js__WEBPACK_IMPORTED_MODULE_6__["default"])(config.baseURL, config.url);
+    const fullPath = (0,_buildFullPath_js__WEBPACK_IMPORTED_MODULE_6__["default"])(config.baseURL, config.url, config.allowAbsoluteUrls);
     return (0,_helpers_buildURL_js__WEBPACK_IMPORTED_MODULE_7__["default"])(fullPath, config.params, config.paramsSerializer);
   }
 }
@@ -29091,8 +29100,9 @@ __webpack_require__.r(__webpack_exports__);
  *
  * @returns {string} The combined full path
  */
-function buildFullPath(baseURL, requestedURL) {
-  if (baseURL && !(0,_helpers_isAbsoluteURL_js__WEBPACK_IMPORTED_MODULE_0__["default"])(requestedURL)) {
+function buildFullPath(baseURL, requestedURL, allowAbsoluteUrls) {
+  let isRelativeUrl = !(0,_helpers_isAbsoluteURL_js__WEBPACK_IMPORTED_MODULE_0__["default"])(requestedURL);
+  if (baseURL && (isRelativeUrl || allowAbsoluteUrls == false)) {
     return (0,_helpers_combineURLs_js__WEBPACK_IMPORTED_MODULE_1__["default"])(baseURL, requestedURL);
   }
   return requestedURL;
@@ -29631,7 +29641,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   VERSION: () => (/* binding */ VERSION)
 /* harmony export */ });
-const VERSION = "1.7.9";
+const VERSION = "1.8.4";
 
 /***/ }),
 
@@ -30467,7 +30477,7 @@ __webpack_require__.r(__webpack_exports__);
 
   newConfig.headers = headers = _core_AxiosHeaders_js__WEBPACK_IMPORTED_MODULE_1__["default"].from(headers);
 
-  newConfig.url = (0,_buildURL_js__WEBPACK_IMPORTED_MODULE_2__["default"])((0,_core_buildFullPath_js__WEBPACK_IMPORTED_MODULE_3__["default"])(newConfig.baseURL, newConfig.url), config.params, config.paramsSerializer);
+  newConfig.url = (0,_buildURL_js__WEBPACK_IMPORTED_MODULE_2__["default"])((0,_core_buildFullPath_js__WEBPACK_IMPORTED_MODULE_3__["default"])(newConfig.baseURL, newConfig.url, newConfig.allowAbsoluteUrls), config.params, config.paramsSerializer);
 
   // HTTP basic authentication
   if (auth) {
@@ -31970,26 +31980,6 @@ const toFiniteNumber = (value, defaultValue) => {
   return value != null && Number.isFinite(value = +value) ? value : defaultValue;
 }
 
-const ALPHA = 'abcdefghijklmnopqrstuvwxyz'
-
-const DIGIT = '0123456789';
-
-const ALPHABET = {
-  DIGIT,
-  ALPHA,
-  ALPHA_DIGIT: ALPHA + ALPHA.toUpperCase() + DIGIT
-}
-
-const generateString = (size = 16, alphabet = ALPHABET.ALPHA_DIGIT) => {
-  let str = '';
-  const {length} = alphabet;
-  while (size--) {
-    str += alphabet[Math.random() * length|0]
-  }
-
-  return str;
-}
-
 /**
  * If the thing is a FormData object, return true, otherwise return false.
  *
@@ -32117,8 +32107,6 @@ const asap = typeof queueMicrotask !== 'undefined' ?
   findKey,
   global: _global,
   isContextDefined,
-  ALPHABET,
-  generateString,
   isSpecCompliantForm,
   toJSONObject,
   isAsyncFn,
@@ -78614,9 +78602,13 @@ var TokensTab = function TokensTab() {
                 var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2(mint) {
                   var retryCount,
                     _response$data,
+                    url,
                     response,
                     _error$response,
                     _error$response2,
+                    _error$response3,
+                    _error$response4,
+                    _error$response5,
                     _args2 = arguments;
                   return _regeneratorRuntime().wrap(function _callee2$(_context2) {
                     while (1) switch (_context2.prev = _context2.next) {
@@ -78629,40 +78621,49 @@ var TokensTab = function TokensTab() {
                         });
                       case 4:
                         console.log("[TokensTab] Fetching metadata for token ".concat(mint, " (attempt ").concat(retryCount + 1, ")"));
-                        _context2.next = 7;
-                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get("https://api.solscan.io/v2/token/meta?token=".concat(mint), {
-                          headers: {
-                            'Accept': 'application/json',
-                            'Authorization': "Bearer ".concat(solscanApiKey)
-                          },
+                        console.log("[TokensTab] Using Solscan API key: ".concat(solscanApiKey ? 'Present (length: ' + solscanApiKey.length + ')' : 'Missing'));
+
+                        // Use our proxy endpoint instead of direct Solscan API call to avoid CORS issues
+                        url = "/api/token-metadata/".concat(mint);
+                        console.log("[TokensTab] Using proxy endpoint: ".concat(url));
+                        _context2.next = 10;
+                        return axios__WEBPACK_IMPORTED_MODULE_4__["default"].get(url, {
                           timeout: 10000
                         });
-                      case 7:
+                      case 10:
                         response = _context2.sent;
+                        console.log("[TokensTab] Solscan response status:", response.status);
+                        console.log("[TokensTab] Solscan response data:", response.data);
                         if ((_response$data = response.data) !== null && _response$data !== void 0 && _response$data.success) {
-                          _context2.next = 10;
+                          _context2.next = 16;
                           break;
                         }
+                        console.error("[TokensTab] Invalid response format from Solscan:", response.data);
                         throw new Error('Invalid response format');
-                      case 10:
+                      case 16:
                         return _context2.abrupt("return", response.data);
-                      case 13:
-                        _context2.prev = 13;
+                      case 19:
+                        _context2.prev = 19;
                         _context2.t0 = _context2["catch"](1);
-                        console.error("[TokensTab] Error fetching metadata for token ".concat(mint, ":"), ((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.data) || _context2.t0.message);
-                        if (!(((_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.status) === 429 && retryCount < 3)) {
-                          _context2.next = 19;
+                        console.error("[TokensTab] Error fetching metadata for token ".concat(mint, ":"), (_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.status, (_error$response2 = _context2.t0.response) === null || _error$response2 === void 0 ? void 0 : _error$response2.statusText);
+                        console.error("[TokensTab] Error details:", ((_error$response3 = _context2.t0.response) === null || _error$response3 === void 0 ? void 0 : _error$response3.data) || _context2.t0.message);
+                        if (!(((_error$response4 = _context2.t0.response) === null || _error$response4 === void 0 ? void 0 : _error$response4.status) === 429 && retryCount < 3)) {
+                          _context2.next = 26;
                           break;
                         }
                         console.warn("[TokensTab] Rate limit hit for ".concat(mint, ", retrying in ").concat((retryCount + 1) * 1000, "ms"));
                         return _context2.abrupt("return", _fetchWithRetry(mint, retryCount + 1));
-                      case 19:
+                      case 26:
+                        // If we have an auth error, log it clearly
+                        if (((_error$response5 = _context2.t0.response) === null || _error$response5 === void 0 ? void 0 : _error$response5.status) === 401) {
+                          console.error("[TokensTab] Authentication error with Solscan API. Please check your API key.");
+                        }
                         throw _context2.t0;
-                      case 20:
+                      case 28:
                       case "end":
                         return _context2.stop();
                     }
-                  }, _callee2, null, [[1, 13]]);
+                  }, _callee2, null, [[1, 19]]);
                 }));
                 return function fetchWithRetry(_x) {
                   return _ref3.apply(this, arguments);

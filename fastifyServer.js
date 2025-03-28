@@ -7,6 +7,7 @@ const fastify = require('fastify')({
 });
 const fastifyStatic = require('@fastify/static');
 const fs = require('fs');
+const axios = require('axios');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
@@ -69,6 +70,49 @@ fastify.get('/api/config', async (request, reply) => {
     quicknodeRpcUrl: process.env.QUICKNODE_RPC_URL || '',
     environment: process.env.NODE_ENV || 'development'
   };
+});
+
+// Proxy endpoint for Solscan API to avoid CORS issues
+fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
+  const { tokenAddress } = request.params;
+  
+  if (!tokenAddress) {
+    return reply.code(400).send({ error: 'Token address is required' });
+  }
+  
+  try {
+    fastify.log.info(`Proxy request for token metadata: ${tokenAddress}`);
+    
+    const solscanApiKey = process.env.SOLSCAN_API_KEY;
+    if (!solscanApiKey) {
+      fastify.log.error('Solscan API key not found');
+      return reply.code(500).send({ error: 'API key not configured' });
+    }
+    
+    const solscanResponse = await axios.get(
+      `https://api.solscan.io/v2/token/meta?token=${tokenAddress}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${solscanApiKey}`
+        },
+        timeout: 10000
+      }
+    );
+    
+    fastify.log.info(`Solscan API response received for ${tokenAddress}`);
+    return solscanResponse.data;
+  } catch (error) {
+    fastify.log.error(`Error proxying request to Solscan: ${error.message}`);
+    if (error.response) {
+      fastify.log.error(`Solscan API error: ${JSON.stringify(error.response.data)}`);
+      return reply.code(error.response.status).send(error.response.data);
+    }
+    return reply.code(500).send({ 
+      error: 'Failed to fetch token metadata',
+      message: error.message
+    });
+  }
 });
 
 // Catch-all route for SPA - always serve index.html
