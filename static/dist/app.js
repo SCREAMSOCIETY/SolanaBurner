@@ -11733,7 +11733,7 @@ const NATIVE_MINT = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_0__.PublicKey('
 const NATIVE_MINT_2022 = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_0__.PublicKey('9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP');
 /** Check that the token program provided is not `Tokenkeg...`, useful when using extensions */
 function programSupportsExtensions(programId) {
-    if (programId === TOKEN_PROGRAM_ID) {
+    if (programId.equals(TOKEN_PROGRAM_ID)) {
         return false;
     }
     else {
@@ -11768,7 +11768,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   TokenOwnerOffCurveError: () => (/* binding */ TokenOwnerOffCurveError),
 /* harmony export */   TokenTransferHookAccountDataNotFound: () => (/* binding */ TokenTransferHookAccountDataNotFound),
 /* harmony export */   TokenTransferHookAccountNotFound: () => (/* binding */ TokenTransferHookAccountNotFound),
+/* harmony export */   TokenTransferHookInvalidPubkeyData: () => (/* binding */ TokenTransferHookInvalidPubkeyData),
 /* harmony export */   TokenTransferHookInvalidSeed: () => (/* binding */ TokenTransferHookInvalidSeed),
+/* harmony export */   TokenTransferHookPubkeyDataTooSmall: () => (/* binding */ TokenTransferHookPubkeyDataTooSmall),
 /* harmony export */   TokenUnsupportedInstructionError: () => (/* binding */ TokenUnsupportedInstructionError)
 /* harmony export */ });
 /** Base class for errors */
@@ -11887,6 +11889,20 @@ class TokenTransferHookAccountDataNotFound extends TokenError {
     constructor() {
         super(...arguments);
         this.name = 'TokenTransferHookAccountDataNotFound';
+    }
+}
+/** Thrown if pubkey data extra accounts config is invalid */
+class TokenTransferHookInvalidPubkeyData extends TokenError {
+    constructor() {
+        super(...arguments);
+        this.name = 'TokenTransferHookInvalidPubkeyData';
+    }
+}
+/** Thrown if pubkey data source is too small for a pubkey */
+class TokenTransferHookPubkeyDataTooSmall extends TokenError {
+    constructor() {
+        super(...arguments);
+        this.name = 'TokenTransferHookPubkeyDataTooSmall';
     }
 }
 //# sourceMappingURL=errors.js.map
@@ -12089,6 +12105,11 @@ var TokenInstruction;
     // ConfidentialTransferFeeExtension = 37,
     // WithdrawalExcessLamports = 38,
     TokenInstruction[TokenInstruction["MetadataPointerExtension"] = 39] = "MetadataPointerExtension";
+    TokenInstruction[TokenInstruction["GroupPointerExtension"] = 40] = "GroupPointerExtension";
+    TokenInstruction[TokenInstruction["GroupMemberPointerExtension"] = 41] = "GroupMemberPointerExtension";
+    // ConfidentialMintBurnExtension = 42,
+    TokenInstruction[TokenInstruction["ScaledUiAmountExtension"] = 43] = "ScaledUiAmountExtension";
+    TokenInstruction[TokenInstruction["PausableExtension"] = 44] = "PausableExtension";
 })(TokenInstruction || (TokenInstruction = {}));
 //# sourceMappingURL=types.js.map
 
