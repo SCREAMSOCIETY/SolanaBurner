@@ -3,6 +3,18 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import axios from 'axios';
 
+// Helper function to find Metadata PDA
+function findMetadataPda(mint: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('metadata'),
+      new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s').toBuffer(),
+      mint.toBuffer(),
+    ],
+    new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s')
+  )[0];
+}
+
 // Define the window interface with our BurnAnimations object for TypeScript
 declare global {
   interface Window {
@@ -95,22 +107,82 @@ const NFTsTab: React.FC = () => {
             const mint = nftAccount.account.data.parsed.info.mint;
             
             try {
-              // Basic NFT info with default image
-              const nft: NFTData = {
+              // Try to fetch the metadata PDA for this NFT
+              const mintPubkey = new PublicKey(mint);
+              const metadataPDA = await findMetadataPda(mintPubkey);
+              
+              // Basic NFT info with default values
+              let nft: NFTData = {
                 mint,
-                name: `NFT ${mint.slice(0, 8)}...`,
+                name: `NFT ${mint.slice(0, 4)}...${mint.slice(-4)}`,
                 image: "/default-nft-image.svg",
                 collection: "Unknown Collection",
-                tokenAddress
+                tokenAddress,
+                metadataAddress: metadataPDA.toString()
               };
+              
+              try {
+                // Fetch the on-chain metadata
+                const metadataAccount = await connection.getAccountInfo(metadataPDA);
+                
+                if (metadataAccount) {
+                  console.log(`[NFTsTab] Found metadata for NFT ${mint.slice(0, 8)}...`);
+                  
+                  // Use the first 4 bytes to check if it's a valid metadata account
+                  // Instead of parsing the metadata fully, we'll just check for an external URI
+                  // This is a simpler approach for the demo
+                  try {
+                    // Try to extract the external URI from metadata
+                    // This is a simplified approach - normally we'd properly deserialize
+                    const metadataString = Buffer.from(metadataAccount.data).toString();
+                    const uriMatch = metadataString.match(/https?:\/\/\S+/g);
+                    
+                    if (uriMatch && uriMatch.length > 0) {
+                      const possibleUri = uriMatch[0].split('\0')[0]; // Remove null terminators
+                      
+                      if (possibleUri) {
+                        console.log(`[NFTsTab] Found possible metadata URI: ${possibleUri}`);
+                        
+                        try {
+                          // Fetch the external metadata
+                          const response = await fetch(possibleUri);
+                          if (response.ok) {
+                            const json = await response.json();
+                            
+                            console.log(`[NFTsTab] Successfully fetched metadata for ${mint.slice(0, 8)}`);
+                            
+                            // Update NFT with external metadata
+                            if (json.name) nft.name = json.name;
+                            if (json.image) nft.image = json.image;
+                            if (json.collection?.name) {
+                              nft.collection = json.collection.name;
+                            } else if (json.collection?.family) {
+                              nft.collection = json.collection.family;
+                            } else if (json.symbol) {
+                              // Use symbol as a fallback collection name
+                              nft.collection = json.symbol;
+                            }
+                          }
+                        } catch (fetchErr) {
+                          console.error(`[NFTsTab] Error fetching external metadata: ${possibleUri}`, fetchErr);
+                        }
+                      }
+                    }
+                  } catch (parseErr) {
+                    console.error(`[NFTsTab] Error parsing metadata for ${mint}:`, parseErr);
+                  }
+                }
+              } catch (metadataErr) {
+                console.error(`[NFTsTab] Error fetching metadata for NFT ${mint}:`, metadataErr);
+              }
               
               return nft;
             } catch (err) {
-              console.error(`[NFTsTab] Error fetching metadata for NFT ${mint}:`, err);
+              console.error(`[NFTsTab] Error processing NFT ${mint}:`, err);
               // Return basic NFT info with default image if metadata fetch fails
               return {
                 mint,
-                name: `NFT ${mint.slice(0, 8)}...`,
+                name: `NFT ${mint.slice(0, 4)}...${mint.slice(-4)}`,
                 image: "/default-nft-image.svg",
                 collection: "Unknown Collection",
                 tokenAddress
