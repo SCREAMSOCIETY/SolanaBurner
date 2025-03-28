@@ -1,4 +1,4 @@
-// Fastify server implementation
+// Simplified fastify server implementation
 const path = require('path');
 const fastify = require('fastify')({
   logger: {
@@ -6,6 +6,7 @@ const fastify = require('fastify')({
   }
 });
 const fastifyStatic = require('@fastify/static');
+const fs = require('fs');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
@@ -13,10 +14,39 @@ console.log('[FASTIFY SERVER] Starting with environment:', {
   cwd: process.cwd()
 });
 
+// Specific endpoint for default token icon SVG
+fastify.get('/default-token-icon.svg', async (request, reply) => {
+  const svgPath = path.join(__dirname, 'static', 'default-token-icon.svg');
+  if (fs.existsSync(svgPath)) {
+    return reply.type('image/svg+xml').send(fs.readFileSync(svgPath));
+  } else {
+    fastify.log.error(`SVG file not found at: ${svgPath}`);
+    return reply.code(404).send({ error: 'SVG not found' });
+  }
+});
+
+// Specific endpoint for default NFT image SVG
+fastify.get('/default-nft-image.svg', async (request, reply) => {
+  const svgPath = path.join(__dirname, 'static', 'default-nft-image.svg');
+  if (fs.existsSync(svgPath)) {
+    return reply.type('image/svg+xml').send(fs.readFileSync(svgPath));
+  } else {
+    fastify.log.error(`SVG file not found at: ${svgPath}`);
+    return reply.code(404).send({ error: 'SVG not found' });
+  }
+});
+
 // Register static files from static directory
 fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'static'),
-  prefix: '/static/',
+  prefix: '/static/'
+});
+
+// Register static files from static/dist directory (webpack output)
+fastify.register(fastifyStatic, {
+  root: path.join(__dirname, 'static', 'dist'),
+  prefix: '/static/dist/',
+  decorateReply: false
 });
 
 // Serve index.html for root route
@@ -66,27 +96,15 @@ process.on('unhandledRejection', (reason, promise) => {
   });
 });
 
-// Start the server - use port 5000 for Replit
-const port = process.env.PORT || 5000;
+// Start the server - use port 5001 for Replit
+const port = process.env.PORT || 5001;
 const start = async () => {
   try {
     await fastify.listen({ port: port, host: '0.0.0.0' });
     fastify.log.info(`Server running at http://0.0.0.0:${port}`);
   } catch (err) {
     fastify.log.error(`Error starting server: ${err}`);
-    if (err.code === 'EADDRINUSE') {
-      const newPort = port + 1;
-      fastify.log.info(`Port ${port} is in use, trying port ${newPort}...`);
-      try {
-        await fastify.listen({ port: newPort, host: '0.0.0.0' });
-        fastify.log.info(`Server running at http://0.0.0.0:${newPort}`);
-      } catch (err2) {
-        fastify.log.error(`Error on retry: ${err2}`);
-        process.exit(1);
-      }
-    } else {
-      process.exit(1);
-    }
+    process.exit(1);
   }
 };
 
