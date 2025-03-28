@@ -31,6 +31,16 @@ fastify.get('/ping', async (request, reply) => {
   return { status: 'ok', time: new Date().toISOString() };
 });
 
+// API Config endpoint
+fastify.get('/api/config', async (request, reply) => {
+  fastify.log.info('API config endpoint hit');
+  return { 
+    solscanApiKey: process.env.SOLSCAN_API_KEY || '',
+    quicknodeRpcUrl: process.env.QUICKNODE_RPC_URL || '',
+    environment: process.env.NODE_ENV || 'development'
+  };
+});
+
 // Catch-all route for SPA - always serve index.html
 fastify.setNotFoundHandler(async (request, reply) => {
   fastify.log.info(`Not found handler for: ${request.url}, serving index.html`);

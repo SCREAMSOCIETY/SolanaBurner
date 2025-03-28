@@ -63,8 +63,9 @@ module.exports = {
     }),
     new webpack.DefinePlugin({
       'process.env': {
-        'NODE_ENV': JSON.stringify('development'),
-        'QUICKNODE_RPC_URL': JSON.stringify(process.env.QUICKNODE_RPC_URL)
+        'NODE_ENV': JSON.stringify('development')
+        // No longer pass environment variables directly
+        // We'll use the API endpoint instead
       }
     })
   ],

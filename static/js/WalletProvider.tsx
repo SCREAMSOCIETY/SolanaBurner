@@ -1,4 +1,4 @@
-import React, { FC, useMemo } from 'react';
+import React, { FC, useMemo, useState, useEffect } from 'react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import {
     ConnectionProvider,
@@ -29,9 +29,29 @@ export const WalletProvider: FC<Props> = ({ children }) => {
     // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
     const network = WalletAdapterNetwork.Mainnet;
 
-    // You can also provide a custom RPC endpoint.
-    const endpoint = process.env.QUICKNODE_RPC_URL || clusterApiUrl(network);
-    console.log('Using endpoint:', endpoint.split('?')[0]); // Log endpoint without query params for security
+    // Fetch RPC endpoint from window for client-side access
+    const [endpoint, setEndpoint] = useState<string>(clusterApiUrl(network));
+    
+    // Effect to fetch the RPC URL from the API
+    useEffect(() => {
+        console.log('[WalletProvider] Fetching RPC config');
+        fetch('/api/config')
+            .then(response => response.json())
+            .then(data => {
+                if (data.quicknodeRpcUrl) {
+                    console.log('[WalletProvider] Using QuickNode RPC endpoint');
+                    setEndpoint(data.quicknodeRpcUrl);
+                } else {
+                    console.log('[WalletProvider] Using public RPC endpoint:', network);
+                    setEndpoint(clusterApiUrl(network));
+                }
+            })
+            .catch(error => {
+                console.error('[WalletProvider] Error fetching config:', error);
+                console.log('[WalletProvider] Falling back to public RPC');
+                setEndpoint(clusterApiUrl(network));
+            });
+    }, [network]);
 
     // Initialize Solana connection
     const connection = useMemo(() => {
