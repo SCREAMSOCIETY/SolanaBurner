@@ -4,6 +4,21 @@ import { PublicKey, Transaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, createBurnInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
 import axios from 'axios';
 
+// Define the window interface with our BurnAnimations object
+declare global {
+  interface Window {
+    BurnAnimations?: {
+      createConfetti: () => void;
+      toggleDarkMode: () => void;
+      applyBurnAnimation: (element: HTMLElement) => void;
+      showAchievement: (title: string, description: string) => void;
+      updateProgress: (currentVal: number, maxVal: number, level: number) => void;
+      checkAchievements: (type: string, value: number) => void;
+      initUIEnhancements: () => void;
+    };
+  }
+}
+
 interface TokenData {
   mint: string;
   balance: number;
@@ -190,6 +205,10 @@ const TokensTab: React.FC = () => {
 
     try {
       setBurning(true);
+      
+      // Find the token card element for animation
+      const tokenElement = document.querySelector(`.token-card[data-mint="${token.mint}"]`) as HTMLElement;
+      
       const transaction = new Transaction();
 
       const burnInstruction = createBurnInstruction(
@@ -202,7 +221,25 @@ const TokensTab: React.FC = () => {
       transaction.add(burnInstruction);
 
       const signature = await sendTransaction(transaction, connection);
+      
+      // Apply burn animation if element exists
+      if (tokenElement && window.BurnAnimations) {
+        window.BurnAnimations.applyBurnAnimation(tokenElement);
+      }
+      
       await connection.confirmTransaction(signature, 'confirmed');
+
+      // Show confetti and trigger achievements if window.BurnAnimations is available
+      if (window.BurnAnimations) {
+        window.BurnAnimations.createConfetti();
+        
+        // Track achievement progress
+        window.BurnAnimations.checkAchievements('token', 1);
+        
+        // Also track value burned (approximate in SOL)
+        const estimatedValue = (token.balance / Math.pow(10, token.decimals)) * 0.01; // Simplified estimate
+        window.BurnAnimations.checkAchievements('value', estimatedValue);
+      }
 
       // Remove the burned token from the list
       setTokens(tokens.filter(t => t.mint !== token.mint));
@@ -221,6 +258,24 @@ const TokensTab: React.FC = () => {
       setBurning(true);
       const transaction = new Transaction();
 
+      // Get all token elements for animation
+      const tokenElements: HTMLElement[] = [];
+      const selectedTokenData = tokens.filter(token => selectedTokens.has(token.mint));
+      let totalValue = 0;
+      
+      document.querySelectorAll('.token-card').forEach(element => {
+        const mintAttribute = (element as HTMLElement).dataset.mint;
+        if (mintAttribute && selectedTokens.has(mintAttribute)) {
+          tokenElements.push(element as HTMLElement);
+          
+          // Calculate estimated value
+          const token = tokens.find(t => t.mint === mintAttribute);
+          if (token) {
+            totalValue += (token.balance / Math.pow(10, token.decimals)) * 0.01; // Simplified estimate
+          }
+        }
+      });
+
       // Add burn instructions for all selected tokens
       for (const token of tokens) {
         if (selectedTokens.has(token.mint) && token.account) {
@@ -235,7 +290,41 @@ const TokensTab: React.FC = () => {
       }
 
       const signature = await sendTransaction(transaction, connection);
+      
+      // Apply burn animations in sequence
+      if (window.BurnAnimations && tokenElements.length > 0) {
+        // Animate each token with a slight delay between them
+        tokenElements.forEach((element, index) => {
+          setTimeout(() => {
+            window.BurnAnimations?.applyBurnAnimation(element);
+          }, index * 200);
+        });
+      }
+      
       await connection.confirmTransaction(signature, 'confirmed');
+
+      // Show mega confetti for bulk burn!
+      if (window.BurnAnimations) {
+        // Create double confetti for bulk burn
+        window.BurnAnimations.createConfetti();
+        setTimeout(() => {
+          window.BurnAnimations?.createConfetti();
+        }, 300);
+        
+        // Track achievement progress for all tokens
+        window.BurnAnimations.checkAchievements('token', selectedTokenData.length);
+        
+        // Track value burned
+        window.BurnAnimations.checkAchievements('value', totalValue);
+        
+        // Show special achievement for bulk burning
+        if (selectedTokenData.length >= 3) {
+          window.BurnAnimations.showAchievement(
+            "Mass Burner!", 
+            `You've burned ${selectedTokenData.length} tokens at once. Efficient!`
+          );
+        }
+      }
 
       // Remove all burned tokens from the list
       setTokens(tokens.filter(token => !selectedTokens.has(token.mint)));
@@ -293,7 +382,7 @@ const TokensTab: React.FC = () => {
       ) : (
         <div className="assets-grid">
           {tokens.map((token) => (
-            <div key={token.mint} className="asset-card token-card">
+            <div key={token.mint} className="asset-card token-card" data-mint={token.mint}>
               <div className="token-header">
                 <input
                   type="checkbox"

@@ -1,0 +1,316 @@
+/* Animation styles for Solana Token Burner */
+
+/* Burn animation */
+@keyframes burn {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+    filter: hue-rotate(120deg) brightness(1.5);
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0;
+    filter: hue-rotate(180deg) brightness(2);
+  }
+}
+
+.burn-animation {
+  animation: burn 1.2s ease-in-out;
+}
+
+/* Hover effects for cards */
+.token-card {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.token-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.token-card:hover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, rgba(114, 9, 183, 0.1), rgba(255, 122, 0, 0.1));
+  z-index: -1;
+}
+
+/* Fun button styles */
+.burn-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background: linear-gradient(45deg, #ff5a00, #ff7a00);
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(255, 122, 0, 0.3);
+}
+
+.burn-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 15px rgba(255, 122, 0, 0.4);
+  background: linear-gradient(45deg, #ff7a00, #ff5a00);
+}
+
+.burn-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 5px rgba(255, 122, 0, 0.4);
+}
+
+/* Pulsating effect for icons */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.token-icon {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+/* Interactive tab selection */
+.tab-button {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-button::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #9945FF, #14F195);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.tab-button:hover::after {
+  width: 100%;
+}
+
+.tab-button.active::after {
+  width: 100%;
+  height: 3px;
+}
+
+/* Confetti animation for successful burns */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  background-color: var(--confetti-color, #9945FF);
+  top: -10px;
+  z-index: 999;
+  animation: confetti-fall var(--fall-duration, 3s) linear forwards;
+  border-radius: var(--shape, 0%);
+}
+
+/* Dark mode toggle */
+.theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #f7f7f7, #e0e0e0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  z-index: 1000;
+}
+
+.theme-toggle.dark {
+  background: linear-gradient(45deg, #333, #222);
+}
+
+.theme-toggle .icon {
+  font-size: 24px;
+  transition: all 0.5s ease;
+  color: #333;
+}
+
+.theme-toggle.dark .icon {
+  color: #f7f7f7;
+  transform: rotate(360deg);
+}
+
+/* Achievement notification */
+@keyframes slideIn {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  10% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  90% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.achievement {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  padding: 15px 20px;
+  background: linear-gradient(45deg, #9945FF, #14F195);
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+  animation: slideIn 5s forwards;
+  max-width: 300px;
+}
+
+.achievement .icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.achievement .content h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.achievement .content p {
+  margin: 5px 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* Progress tracker */
+.progress-tracker {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  z-index: 900;
+  max-width: 250px;
+  transition: all 0.3s ease;
+}
+
+.progress-tracker:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.progress-tracker h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #333;
+}
+
+.progress-bar {
+  height: 10px;
+  background: #e0e0e0;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar .fill {
+  height: 100%;
+  background: linear-gradient(90deg, #9945FF, #14F195);
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+
+.progress-tracker .level {
+  font-size: 14px;
+  color: #555;
+  margin: 5px 0;
+}
+
+/* Dark mode styles */
+.dark-mode {
+  background-color: #121212;
+  color: #f5f5f5;
+}
+
+.dark-mode .token-card {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+.dark-mode .progress-tracker {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+.dark-mode .progress-tracker h3,
+.dark-mode .progress-tracker .level {
+  color: #f5f5f5;
+}
+
+.dark-mode .progress-bar {
+  background: #333;
+}
+
+/* Fun loading animation */
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(255, 122, 0, 0.1);
+  border-top: 5px solid #ff7a00;
+  border-radius: 50%;
+  animation: rotate 1s linear infinite;
+  margin: 20px auto;
+}
