@@ -86,7 +86,18 @@ fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
   try {
     fastify.log.info(`Request for token metadata: ${tokenAddress}`);
     
-    // Get token metadata from local store
+    // Try to get enhanced metadata with URI support first
+    try {
+      const enhancedMetadata = await tokenMetadata.getTokenMetadataWithUri(tokenAddress);
+      if (enhancedMetadata) {
+        fastify.log.info(`Enhanced token metadata for ${tokenAddress}: ${JSON.stringify(enhancedMetadata)}`);
+        return enhancedMetadata;
+      }
+    } catch (enhancedError) {
+      fastify.log.warn(`Enhanced metadata lookup failed, falling back to basic metadata: ${enhancedError.message}`);
+    }
+    
+    // Fallback to basic metadata if enhanced lookup fails
     const metadata = tokenMetadata.getTokenMetadata(tokenAddress);
     
     fastify.log.info(`Token metadata for ${tokenAddress}: ${JSON.stringify(metadata)}`);

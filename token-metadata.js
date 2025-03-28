@@ -1,5 +1,11 @@
-// Simple token metadata store for common Solana tokens
+// Enhanced token metadata store for Solana tokens with URI metadata support
 // This is used as a fallback when external APIs are unavailable
+const axios = require('axios');
+const { Connection, PublicKey } = require('@solana/web3.js');
+const { TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+
+// Cache for metadata to avoid duplicate fetches
+const metadataCache = {};
 
 const COMMON_TOKENS = {
   // Solana
@@ -81,37 +87,197 @@ const COMMON_TOKENS = {
   }
 };
 
+// Create a Solana connection using RPC URL from env vars
+let connection = null;
+try {
+  const rpcUrl = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
+  connection = new Connection(rpcUrl, 'confirmed');
+  console.log(`Connected to Solana RPC at ${rpcUrl}`);
+} catch (error) {
+  console.error('Failed to initialize Solana connection:', error);
+}
+
+// Function to find metadata PDA for a token mint
+function findMetadataPda(mintAddress) {
+  try {
+    const mint = new PublicKey(mintAddress);
+    // Metadata program ID
+    const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+    // Find the metadata account
+    const [metadataPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('metadata'),
+        metadataProgramId.toBuffer(),
+        mint.toBuffer(),
+      ],
+      metadataProgramId
+    );
+    return metadataPda;
+  } catch (error) {
+    console.error('Error finding metadata PDA:', error);
+    return null;
+  }
+}
+
+// Function to extract URI from metadata account data
+async function extractUriFromMetadata(metadataAccount) {
+  if (!metadataAccount || !metadataAccount.data) {
+    return null;
+  }
+
+  try {
+    // Simple regex to extract a URL - this is a simplified approach
+    const metadataString = Buffer.from(metadataAccount.data).toString();
+    const uriMatch = metadataString.match(/https?:\/\/\S+/g);
+    
+    if (uriMatch && uriMatch.length > 0) {
+      // Clean the URI from null terminators or other junk
+      return uriMatch[0].split('\0')[0];
+    }
+  } catch (error) {
+    console.error('Error extracting URI from metadata:', error);
+  }
+  return null;
+}
+
+// Function to fetch external metadata from URI
+async function fetchExternalMetadata(uri) {
+  try {
+    const response = await axios.get(uri, { timeout: 5000 });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching external metadata:', error);
+    return null;
+  }
+}
+
 /**
- * Get metadata for a specific token
+ * Get metadata for a specific token with support for on-chain metadata
  * @param {string} tokenAddress - The token mint address
- * @returns {Object|null} The token metadata or null if not found
+ * @returns {Object} The token metadata 
  */
-function getTokenMetadata(tokenAddress) {
+async function getTokenMetadataWithUri(tokenAddress) {
+  // Check cache first
+  if (metadataCache[tokenAddress]) {
+    return metadataCache[tokenAddress];
+  }
+  
+  // Check if it's a known token
   if (COMMON_TOKENS[tokenAddress]) {
-    return {
+    const result = {
       success: true,
       data: {
         symbol: COMMON_TOKENS[tokenAddress].symbol,
         name: COMMON_TOKENS[tokenAddress].name,
         icon: COMMON_TOKENS[tokenAddress].icon,
-        decimals: COMMON_TOKENS[tokenAddress].decimals
+        decimals: COMMON_TOKENS[tokenAddress].decimals,
+        uri: null
       }
     };
+    metadataCache[tokenAddress] = result;
+    return result;
+  }
+  
+  // Initialize with default data
+  let metadata = {
+    symbol: tokenAddress.slice(0, 4),
+    name: `Token ${tokenAddress.slice(0, 8)}...`,
+    icon: null,
+    decimals: 9,
+    uri: null
+  };
+  
+  // Try to fetch on-chain metadata if we have a connection
+  if (connection) {
+    try {
+      const metadataPda = findMetadataPda(tokenAddress);
+      if (metadataPda) {
+        const metadataAccount = await connection.getAccountInfo(metadataPda);
+        if (metadataAccount) {
+          const uri = await extractUriFromMetadata(metadataAccount);
+          if (uri) {
+            metadata.uri = uri;
+            console.log(`Found metadata URI for token ${tokenAddress}: ${uri}`);
+            
+            // Fetch external metadata
+            const externalData = await fetchExternalMetadata(uri);
+            if (externalData) {
+              if (externalData.name) metadata.name = externalData.name;
+              if (externalData.symbol) metadata.symbol = externalData.symbol;
+              if (externalData.image) metadata.icon = externalData.image;
+              if (externalData.decimals) metadata.decimals = externalData.decimals;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching on-chain metadata for ${tokenAddress}:`, error);
+    }
+  }
+  
+  // Save to cache and return
+  const result = {
+    success: true,
+    data: metadata
+  };
+  metadataCache[tokenAddress] = result;
+  return result;
+}
+
+/**
+ * Synchronous version of getTokenMetadata
+ * @param {string} tokenAddress - The token mint address
+ * @returns {Object} The token metadata (cached or default)
+ */
+function getTokenMetadata(tokenAddress) {
+  // If we already have it in the cache, return that
+  if (metadataCache[tokenAddress]) {
+    return metadataCache[tokenAddress];
+  }
+  
+  // Check if it's a known token
+  if (COMMON_TOKENS[tokenAddress]) {
+    const result = {
+      success: true,
+      data: {
+        symbol: COMMON_TOKENS[tokenAddress].symbol,
+        name: COMMON_TOKENS[tokenAddress].name,
+        icon: COMMON_TOKENS[tokenAddress].icon,
+        decimals: COMMON_TOKENS[tokenAddress].decimals,
+        uri: null
+      }
+    };
+    metadataCache[tokenAddress] = result;
+    return result;
   }
   
   // For unknown tokens, return a basic structure with the mint as the name
-  // Match the structure expected by the frontend
-  return {
+  // and kick off an async process to get full metadata
+  const result = {
     success: true,
     data: {
       symbol: tokenAddress.slice(0, 4),
       name: `Token ${tokenAddress.slice(0, 8)}...`,
       icon: null,
-      decimals: 9  // Default to 9 decimals if unknown
+      decimals: 9,
+      uri: null
     }
   };
+  
+  // Start an async process to get better metadata
+  if (connection) {
+    getTokenMetadataWithUri(tokenAddress).then(updatedData => {
+      // Update the cache with better data when it's available
+      metadataCache[tokenAddress] = updatedData;
+    }).catch(error => {
+      console.error(`Async metadata lookup failed for ${tokenAddress}:`, error);
+    });
+  }
+  
+  return result;
 }
 
 module.exports = {
-  getTokenMetadata
+  getTokenMetadata,
+  getTokenMetadataWithUri
 };

@@ -78933,7 +78933,9 @@ var TokensTab = function TokensTab() {
                           name: metadata.name || "Token ".concat(token.mint.slice(0, 8), "..."),
                           logoURI: metadata.icon || '/default-token-icon.svg',
                           // Ensure we have decimals for display
-                          decimals: token.decimals || metadata.decimals || 9
+                          decimals: token.decimals || metadata.decimals || 9,
+                          // Store the metadata URI for potential future use
+                          metadataUri: metadata.uri || null
                         }));
                       case 10:
                         _context3.prev = 10;
@@ -78942,7 +78944,8 @@ var TokensTab = function TokensTab() {
                         return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: 'Unknown',
                           name: 'Unknown Token',
-                          logoURI: '/default-token-icon.svg'
+                          logoURI: '/default-token-icon.svg',
+                          metadataUri: null
                         }));
                       case 14:
                       case "end":

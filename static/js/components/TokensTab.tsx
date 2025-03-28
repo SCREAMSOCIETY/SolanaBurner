@@ -28,6 +28,7 @@ interface TokenData {
   logoURI?: string;
   account?: string;
   selected?: boolean;
+  metadataUri?: string;
 }
 
 const TokensTab: React.FC = () => {
@@ -172,7 +173,9 @@ const TokensTab: React.FC = () => {
                     name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
                     logoURI: metadata.icon || '/default-token-icon.svg',
                     // Ensure we have decimals for display
-                    decimals: token.decimals || metadata.decimals || 9
+                    decimals: token.decimals || metadata.decimals || 9,
+                    // Store the metadata URI for potential future use
+                    metadataUri: metadata.uri || null
                   };
                 } catch (error) {
                   console.warn(`[TokensTab] Failed to fetch metadata for token ${token.mint}, using fallback data`);
@@ -180,7 +183,8 @@ const TokensTab: React.FC = () => {
                     ...token,
                     symbol: 'Unknown',
                     name: 'Unknown Token',
-                    logoURI: '/default-token-icon.svg'
+                    logoURI: '/default-token-icon.svg',
+                    metadataUri: null
                   };
                 }
               })
