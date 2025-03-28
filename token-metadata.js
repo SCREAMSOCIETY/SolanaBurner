@@ -100,13 +100,14 @@ function getTokenMetadata(tokenAddress) {
   }
   
   // For unknown tokens, return a basic structure with the mint as the name
+  // Match the structure expected by the frontend
   return {
     success: true,
     data: {
       symbol: tokenAddress.slice(0, 4),
       name: `Token ${tokenAddress.slice(0, 8)}...`,
       icon: null,
-      decimals: null
+      decimals: 9  // Default to 9 decimals if unknown
     }
   };
 }

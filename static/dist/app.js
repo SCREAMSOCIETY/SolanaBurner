@@ -78068,8 +78068,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/useConnection.js");
-/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/useWallet.js");
+/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/useConnection.js");
+/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/useWallet.js");
+/* harmony import */ var _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @solana/web3.js */ "./node_modules/@solana/web3.js/lib/index.browser.esm.js");
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _regeneratorRuntime() { "use strict"; /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/facebook/regenerator/blob/main/LICENSE */ _regeneratorRuntime = function _regeneratorRuntime() { return e; }; var t, e = {}, r = Object.prototype, n = r.hasOwnProperty, o = Object.defineProperty || function (t, e, r) { t[e] = r.value; }, i = "function" == typeof Symbol ? Symbol : {}, a = i.iterator || "@@iterator", c = i.asyncIterator || "@@asyncIterator", u = i.toStringTag || "@@toStringTag"; function define(t, e, r) { return Object.defineProperty(t, e, { value: r, enumerable: !0, configurable: !0, writable: !0 }), t[e]; } try { define({}, ""); } catch (t) { define = function define(t, e, r) { return t[e] = r; }; } function wrap(t, e, r, n) { var i = e && e.prototype instanceof Generator ? e : Generator, a = Object.create(i.prototype), c = new Context(n || []); return o(a, "_invoke", { value: makeInvokeMethod(t, r, c) }), a; } function tryCatch(t, e, r) { try { return { type: "normal", arg: t.call(e, r) }; } catch (t) { return { type: "throw", arg: t }; } } e.wrap = wrap; var h = "suspendedStart", l = "suspendedYield", f = "executing", s = "completed", y = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} var p = {}; define(p, a, function () { return this; }); var d = Object.getPrototypeOf, v = d && d(d(values([]))); v && v !== r && n.call(v, a) && (p = v); var g = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(p); function defineIteratorMethods(t) { ["next", "throw", "return"].forEach(function (e) { define(t, e, function (t) { return this._invoke(e, t); }); }); } function AsyncIterator(t, e) { function invoke(r, o, i, a) { var c = tryCatch(t[r], t, o); if ("throw" !== c.type) { var u = c.arg, h = u.value; return h && "object" == _typeof(h) && n.call(h, "__await") ? e.resolve(h.__await).then(function (t) { invoke("next", t, i, a); }, function (t) { invoke("throw", t, i, a); }) : e.resolve(h).then(function (t) { u.value = t, i(u); }, function (t) { return invoke("throw", t, i, a); }); } a(c.arg); } var r; o(this, "_invoke", { value: function value(t, n) { function callInvokeWithMethodAndArg() { return new e(function (e, r) { invoke(t, n, e, r); }); } return r = r ? r.then(callInvokeWithMethodAndArg, callInvokeWithMethodAndArg) : callInvokeWithMethodAndArg(); } }); } function makeInvokeMethod(e, r, n) { var o = h; return function (i, a) { if (o === f) throw Error("Generator is already running"); if (o === s) { if ("throw" === i) throw a; return { value: t, done: !0 }; } for (n.method = i, n.arg = a;;) { var c = n.delegate; if (c) { var u = maybeInvokeDelegate(c, n); if (u) { if (u === y) continue; return u; } } if ("next" === n.method) n.sent = n._sent = n.arg;else if ("throw" === n.method) { if (o === h) throw o = s, n.arg; n.dispatchException(n.arg); } else "return" === n.method && n.abrupt("return", n.arg); o = f; var p = tryCatch(e, r, n); if ("normal" === p.type) { if (o = n.done ? s : l, p.arg === y) continue; return { value: p.arg, done: n.done }; } "throw" === p.type && (o = s, n.method = "throw", n.arg = p.arg); } }; } function maybeInvokeDelegate(e, r) { var n = r.method, o = e.iterator[n]; if (o === t) return r.delegate = null, "throw" === n && e.iterator["return"] && (r.method = "return", r.arg = t, maybeInvokeDelegate(e, r), "throw" === r.method) || "return" !== n && (r.method = "throw", r.arg = new TypeError("The iterator does not provide a '" + n + "' method")), y; var i = tryCatch(o, e.iterator, r.arg); if ("throw" === i.type) return r.method = "throw", r.arg = i.arg, r.delegate = null, y; var a = i.arg; return a ? a.done ? (r[e.resultName] = a.value, r.next = e.nextLoc, "return" !== r.method && (r.method = "next", r.arg = t), r.delegate = null, y) : a : (r.method = "throw", r.arg = new TypeError("iterator result is not an object"), r.delegate = null, y); } function pushTryEntry(t) { var e = { tryLoc: t[0] }; 1 in t && (e.catchLoc = t[1]), 2 in t && (e.finallyLoc = t[2], e.afterLoc = t[3]), this.tryEntries.push(e); } function resetTryEntry(t) { var e = t.completion || {}; e.type = "normal", delete e.arg, t.completion = e; } function Context(t) { this.tryEntries = [{ tryLoc: "root" }], t.forEach(pushTryEntry, this), this.reset(!0); } function values(e) { if (e || "" === e) { var r = e[a]; if (r) return r.call(e); if ("function" == typeof e.next) return e; if (!isNaN(e.length)) { var o = -1, i = function next() { for (; ++o < e.length;) if (n.call(e, o)) return next.value = e[o], next.done = !1, next; return next.value = t, next.done = !0, next; }; return i.next = i; } } throw new TypeError(_typeof(e) + " is not iterable"); } return GeneratorFunction.prototype = GeneratorFunctionPrototype, o(g, "constructor", { value: GeneratorFunctionPrototype, configurable: !0 }), o(GeneratorFunctionPrototype, "constructor", { value: GeneratorFunction, configurable: !0 }), GeneratorFunction.displayName = define(GeneratorFunctionPrototype, u, "GeneratorFunction"), e.isGeneratorFunction = function (t) { var e = "function" == typeof t && t.constructor; return !!e && (e === GeneratorFunction || "GeneratorFunction" === (e.displayName || e.name)); }, e.mark = function (t) { return Object.setPrototypeOf ? Object.setPrototypeOf(t, GeneratorFunctionPrototype) : (t.__proto__ = GeneratorFunctionPrototype, define(t, u, "GeneratorFunction")), t.prototype = Object.create(g), t; }, e.awrap = function (t) { return { __await: t }; }, defineIteratorMethods(AsyncIterator.prototype), define(AsyncIterator.prototype, c, function () { return this; }), e.AsyncIterator = AsyncIterator, e.async = function (t, r, n, o, i) { void 0 === i && (i = Promise); var a = new AsyncIterator(wrap(t, r, n, o), i); return e.isGeneratorFunction(r) ? a : a.next().then(function (t) { return t.done ? t.value : a.next(); }); }, defineIteratorMethods(g), define(g, u, "Generator"), define(g, a, function () { return this; }), define(g, "toString", function () { return "[object Generator]"; }), e.keys = function (t) { var e = Object(t), r = []; for (var n in e) r.push(n); return r.reverse(), function next() { for (; r.length;) { var t = r.pop(); if (t in e) return next.value = t, next.done = !1, next; } return next.done = !0, next; }; }, e.values = values, Context.prototype = { constructor: Context, reset: function reset(e) { if (this.prev = 0, this.next = 0, this.sent = this._sent = t, this.done = !1, this.delegate = null, this.method = "next", this.arg = t, this.tryEntries.forEach(resetTryEntry), !e) for (var r in this) "t" === r.charAt(0) && n.call(this, r) && !isNaN(+r.slice(1)) && (this[r] = t); }, stop: function stop() { this.done = !0; var t = this.tryEntries[0].completion; if ("throw" === t.type) throw t.arg; return this.rval; }, dispatchException: function dispatchException(e) { if (this.done) throw e; var r = this; function handle(n, o) { return a.type = "throw", a.arg = e, r.next = n, o && (r.method = "next", r.arg = t), !!o; } for (var o = this.tryEntries.length - 1; o >= 0; --o) { var i = this.tryEntries[o], a = i.completion; if ("root" === i.tryLoc) return handle("end"); if (i.tryLoc <= this.prev) { var c = n.call(i, "catchLoc"), u = n.call(i, "finallyLoc"); if (c && u) { if (this.prev < i.catchLoc) return handle(i.catchLoc, !0); if (this.prev < i.finallyLoc) return handle(i.finallyLoc); } else if (c) { if (this.prev < i.catchLoc) return handle(i.catchLoc, !0); } else { if (!u) throw Error("try statement without catch or finally"); if (this.prev < i.finallyLoc) return handle(i.finallyLoc); } } } }, abrupt: function abrupt(t, e) { for (var r = this.tryEntries.length - 1; r >= 0; --r) { var o = this.tryEntries[r]; if (o.tryLoc <= this.prev && n.call(o, "finallyLoc") && this.prev < o.finallyLoc) { var i = o; break; } } i && ("break" === t || "continue" === t) && i.tryLoc <= e && e <= i.finallyLoc && (i = null); var a = i ? i.completion : {}; return a.type = t, a.arg = e, i ? (this.method = "next", this.next = i.finallyLoc, y) : this.complete(a); }, complete: function complete(t, e) { if ("throw" === t.type) throw t.arg; return "break" === t.type || "continue" === t.type ? this.next = t.arg : "return" === t.type ? (this.rval = this.arg = t.arg, this.method = "return", this.next = "end") : "normal" === t.type && e && (this.next = e), y; }, finish: function finish(t) { for (var e = this.tryEntries.length - 1; e >= 0; --e) { var r = this.tryEntries[e]; if (r.finallyLoc === t) return this.complete(r.completion, r.afterLoc), resetTryEntry(r), y; } }, "catch": function _catch(t) { for (var e = this.tryEntries.length - 1; e >= 0; --e) { var r = this.tryEntries[e]; if (r.tryLoc === t) { var n = r.completion; if ("throw" === n.type) { var o = n.arg; resetTryEntry(r); } return o; } } throw Error("illegal catch attempt"); }, delegateYield: function delegateYield(e, r, n) { return this.delegate = { iterator: values(e), resultName: r, nextLoc: n }, "next" === this.method && (this.arg = t), y; } }, e; }
 function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
@@ -78083,13 +78084,15 @@ function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 
 
 
+
 // Define the window interface with our BurnAnimations object for TypeScript
 
 var NFTsTab = function NFTsTab() {
-  var _useConnection = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_1__.useConnection)(),
+  var _useConnection = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_2__.useConnection)(),
     connection = _useConnection.connection;
-  var _useWallet = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_2__.useWallet)(),
-    publicKey = _useWallet.publicKey;
+  var _useWallet = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_3__.useWallet)(),
+    publicKey = _useWallet.publicKey,
+    sendTransaction = _useWallet.sendTransaction;
   var _useState = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
     _useState2 = _slicedToArray(_useState, 2),
     nfts = _useState2[0],
@@ -78117,44 +78120,131 @@ var NFTsTab = function NFTsTab() {
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
-  // For demo purposes, we'll generate some placeholder NFTs
-  // In a real app, you would fetch actual NFT data from the wallet
-  var generateDemoNFTs = function generateDemoNFTs() {
-    setLoading(true);
+  // Fetch real NFTs from the wallet
+  var fetchNFTs = /*#__PURE__*/function () {
+    var _ref = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
+      var tokenAccounts, nftAccounts, nftData;
+      return _regeneratorRuntime().wrap(function _callee2$(_context2) {
+        while (1) switch (_context2.prev = _context2.next) {
+          case 0:
+            if (publicKey) {
+              _context2.next = 2;
+              break;
+            }
+            return _context2.abrupt("return");
+          case 2:
+            _context2.prev = 2;
+            setLoading(true);
+            setError(null);
+            console.log('[NFTsTab] Fetching NFTs for wallet:', publicKey.toString());
 
-    // Show special achievement for discovering NFTs
-    if (window.BurnAnimations) {
-      window.BurnAnimations.showAchievement("NFT Explorer", "You've discovered your NFT collection!");
-    }
-    setTimeout(function () {
-      var demoNfts = [{
-        mint: "nft1",
-        name: "Solana Monkey",
-        image: "/default-nft-image.svg",
-        collection: "Solana Monkeys"
-      }, {
-        mint: "nft2",
-        name: "Degenerate Ape",
-        image: "/default-nft-image.svg",
-        collection: "Degenerate Ape Academy"
-      }, {
-        mint: "nft3",
-        name: "Okay Bear #123",
-        image: "/default-nft-image.svg",
-        collection: "Okay Bears"
-      }];
-      setNfts(demoNfts);
-      setLoading(false);
-    }, 2000); // Simulate loading delay
-  };
+            // Using connection.getParsedTokenAccountsByOwner to get token accounts
+            _context2.next = 8;
+            return connection.getParsedTokenAccountsByOwner(publicKey, {
+              programId: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            });
+          case 8:
+            tokenAccounts = _context2.sent;
+            console.log('[NFTsTab] Found token accounts:', tokenAccounts.value.length);
+
+            // Filter for NFTs (tokens with amount 1 and decimals 0)
+            nftAccounts = tokenAccounts.value.filter(function (account) {
+              var parsedInfo = account.account.data.parsed.info;
+              var amount = parsedInfo.tokenAmount.amount;
+              var decimals = parsedInfo.tokenAmount.decimals;
+              // NFTs have amount 1 and 0 decimals
+              return amount === "1" && decimals === 0;
+            });
+            console.log('[NFTsTab] Found NFT accounts:', nftAccounts.length);
+            if (!(nftAccounts.length > 0)) {
+              _context2.next = 21;
+              break;
+            }
+            // Show special achievement for discovering NFTs
+            if (window.BurnAnimations) {
+              window.BurnAnimations.showAchievement("NFT Explorer", "You've discovered your NFT collection!");
+            }
+
+            // Process NFT accounts and fetch metadata
+            _context2.next = 16;
+            return Promise.all(nftAccounts.map(/*#__PURE__*/function () {
+              var _ref2 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee(nftAccount) {
+                var tokenAddress, mint, nft;
+                return _regeneratorRuntime().wrap(function _callee$(_context) {
+                  while (1) switch (_context.prev = _context.next) {
+                    case 0:
+                      tokenAddress = nftAccount.pubkey.toString();
+                      mint = nftAccount.account.data.parsed.info.mint;
+                      _context.prev = 2;
+                      // Basic NFT info with default image
+                      nft = {
+                        mint: mint,
+                        name: "NFT ".concat(mint.slice(0, 8), "..."),
+                        image: "/default-nft-image.svg",
+                        collection: "Unknown Collection",
+                        tokenAddress: tokenAddress
+                      };
+                      return _context.abrupt("return", nft);
+                    case 7:
+                      _context.prev = 7;
+                      _context.t0 = _context["catch"](2);
+                      console.error("[NFTsTab] Error fetching metadata for NFT ".concat(mint, ":"), _context.t0);
+                      // Return basic NFT info with default image if metadata fetch fails
+                      return _context.abrupt("return", {
+                        mint: mint,
+                        name: "NFT ".concat(mint.slice(0, 8), "..."),
+                        image: "/default-nft-image.svg",
+                        collection: "Unknown Collection",
+                        tokenAddress: tokenAddress
+                      });
+                    case 11:
+                    case "end":
+                      return _context.stop();
+                  }
+                }, _callee, null, [[2, 7]]);
+              }));
+              return function (_x) {
+                return _ref2.apply(this, arguments);
+              };
+            }()));
+          case 16:
+            nftData = _context2.sent;
+            console.log('[NFTsTab] Processed NFTs:', nftData.length);
+            setNfts(nftData);
+            _context2.next = 22;
+            break;
+          case 21:
+            setNfts([]);
+          case 22:
+            _context2.next = 28;
+            break;
+          case 24:
+            _context2.prev = 24;
+            _context2.t0 = _context2["catch"](2);
+            console.error('[NFTsTab] Error fetching NFTs:', _context2.t0);
+            setError('Failed to fetch NFTs. Please try again.');
+          case 28:
+            _context2.prev = 28;
+            setLoading(false);
+            return _context2.finish(28);
+          case 31:
+          case "end":
+            return _context2.stop();
+        }
+      }, _callee2, null, [[2, 24, 28, 31]]);
+    }));
+    return function fetchNFTs() {
+      return _ref.apply(this, arguments);
+    };
+  }();
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     if (publicKey) {
-      generateDemoNFTs();
+      fetchNFTs();
     } else {
       setNfts([]);
       setLoading(false);
     }
-  }, [publicKey]);
+  }, [publicKey, connection]);
   var toggleNftSelection = function toggleNftSelection(mint) {
     var newSelected = new Set(selectedNfts);
     if (newSelected.has(mint)) {
@@ -78165,57 +78255,94 @@ var NFTsTab = function NFTsTab() {
     setSelectedNfts(newSelected);
   };
   var handleBurnNft = /*#__PURE__*/function () {
-    var _ref = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee(mint) {
-      var nftElement;
-      return _regeneratorRuntime().wrap(function _callee$(_context) {
-        while (1) switch (_context.prev = _context.next) {
+    var _ref3 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee3(mint) {
+      var nft, nftElement;
+      return _regeneratorRuntime().wrap(function _callee3$(_context3) {
+        while (1) switch (_context3.prev = _context3.next) {
           case 0:
+            if (publicKey) {
+              _context3.next = 2;
+              break;
+            }
+            return _context3.abrupt("return");
+          case 2:
+            _context3.prev = 2;
             setBurning(true);
 
-            // Find the NFT card element for animation
-            nftElement = document.querySelector(".nft-card[data-mint=\"".concat(mint, "\"]")); // Simulate burning transaction with a delay
-            setTimeout(function () {
-              // Apply burn animation if element exists
-              if (nftElement && window.BurnAnimations) {
-                window.BurnAnimations.applyBurnAnimation(nftElement);
-              }
+            // Find the NFT data and NFT element for animation
+            nft = nfts.find(function (n) {
+              return n.mint === mint;
+            });
+            nftElement = document.querySelector(".nft-card[data-mint=\"".concat(mint, "\"]"));
+            if (!(!nft || !nft.tokenAddress)) {
+              _context3.next = 11;
+              break;
+            }
+            console.error('[NFTsTab] NFT data or token address not found for mint:', mint);
+            setError('Failed to burn NFT: Missing token data');
+            setBurning(false);
+            return _context3.abrupt("return");
+          case 11:
+            console.log('[NFTsTab] Burning NFT:', mint);
 
-              // Show confetti for successful burn
-              if (window.BurnAnimations) {
-                window.BurnAnimations.createConfetti();
+            // In a real implementation, we would create and send a burn transaction here
+            // For now, we'll just simulate it with a timeout for the demo
+            _context3.next = 14;
+            return new Promise(function (resolve) {
+              return setTimeout(resolve, 1500);
+            });
+          case 14:
+            // Apply burn animation if element exists
+            if (nftElement && window.BurnAnimations) {
+              window.BurnAnimations.applyBurnAnimation(nftElement);
+            }
 
-                // Track achievement progress
-                window.BurnAnimations.checkAchievements('nft', 1);
-              }
+            // Show confetti for successful burn
+            if (window.BurnAnimations) {
+              window.BurnAnimations.createConfetti();
 
-              // Remove the burned NFT from the list
-              setNfts(nfts.filter(function (nft) {
-                return nft.mint !== mint;
-              }));
-              setBurning(false);
-            }, 1500);
-          case 3:
+              // Track achievement progress
+              window.BurnAnimations.checkAchievements('nft', 1);
+            }
+
+            // Remove the burned NFT from the list
+            setNfts(nfts.filter(function (n) {
+              return n.mint !== mint;
+            }));
+            _context3.next = 23;
+            break;
+          case 19:
+            _context3.prev = 19;
+            _context3.t0 = _context3["catch"](2);
+            console.error('[NFTsTab] Error burning NFT:', _context3.t0);
+            setError('Failed to burn NFT. Please try again.');
+          case 23:
+            _context3.prev = 23;
+            setBurning(false);
+            return _context3.finish(23);
+          case 26:
           case "end":
-            return _context.stop();
+            return _context3.stop();
         }
-      }, _callee);
+      }, _callee3, null, [[2, 19, 23, 26]]);
     }));
-    return function handleBurnNft(_x) {
-      return _ref.apply(this, arguments);
+    return function handleBurnNft(_x2) {
+      return _ref3.apply(this, arguments);
     };
   }();
   var handleBulkBurn = /*#__PURE__*/function () {
-    var _ref2 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
+    var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
       var nftElements, selectedNftData;
-      return _regeneratorRuntime().wrap(function _callee2$(_context2) {
-        while (1) switch (_context2.prev = _context2.next) {
+      return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+        while (1) switch (_context4.prev = _context4.next) {
           case 0:
-            if (!(selectedNfts.size === 0)) {
-              _context2.next = 2;
+            if (!(!publicKey || selectedNfts.size === 0)) {
+              _context4.next = 2;
               break;
             }
-            return _context2.abrupt("return");
+            return _context4.abrupt("return");
           case 2:
+            _context4.prev = 2;
             setBurning(true);
 
             // Get all NFT elements for animation
@@ -78229,53 +78356,68 @@ var NFTsTab = function NFTsTab() {
                 nftElements.push(element);
               }
             });
+            console.log("[NFTsTab] Burning ".concat(selectedNftData.length, " NFTs in bulk"));
 
-            // Simulate burning transaction with a delay
-            setTimeout(function () {
-              // Apply burn animations in sequence
-              if (window.BurnAnimations && nftElements.length > 0) {
-                // Animate each NFT with a slight delay between them
-                nftElements.forEach(function (element, index) {
-                  setTimeout(function () {
-                    var _window$BurnAnimation;
-                    (_window$BurnAnimation = window.BurnAnimations) === null || _window$BurnAnimation === void 0 || _window$BurnAnimation.applyBurnAnimation(element);
-                  }, index * 300);
-                });
-              }
-
-              // Show mega confetti for bulk burn
-              if (window.BurnAnimations) {
-                // Create double confetti for bulk burn
-                window.BurnAnimations.createConfetti();
+            // In a real implementation, we would create and send a burn transaction for each NFT here
+            // For now, we'll just simulate it with a timeout for the demo
+            _context4.next = 10;
+            return new Promise(function (resolve) {
+              return setTimeout(resolve, 2000);
+            });
+          case 10:
+            // Apply burn animations in sequence
+            if (window.BurnAnimations && nftElements.length > 0) {
+              // Animate each NFT with a slight delay between them
+              nftElements.forEach(function (element, index) {
                 setTimeout(function () {
-                  var _window$BurnAnimation2;
-                  (_window$BurnAnimation2 = window.BurnAnimations) === null || _window$BurnAnimation2 === void 0 || _window$BurnAnimation2.createConfetti();
-                }, 300);
+                  var _window$BurnAnimation;
+                  (_window$BurnAnimation = window.BurnAnimations) === null || _window$BurnAnimation === void 0 || _window$BurnAnimation.applyBurnAnimation(element);
+                }, index * 300);
+              });
+            }
 
-                // Track achievement progress for all NFTs
-                window.BurnAnimations.checkAchievements('nft', selectedNftData.length);
+            // Show mega confetti for bulk burn
+            if (window.BurnAnimations) {
+              // Create double confetti for bulk burn
+              window.BurnAnimations.createConfetti();
+              setTimeout(function () {
+                var _window$BurnAnimation2;
+                (_window$BurnAnimation2 = window.BurnAnimations) === null || _window$BurnAnimation2 === void 0 || _window$BurnAnimation2.createConfetti();
+              }, 300);
 
-                // Show special achievement for bulk burning
-                if (selectedNftData.length >= 2) {
-                  window.BurnAnimations.showAchievement("NFT Purge Master!", "You've burned ".concat(selectedNftData.length, " NFTs at once. Making history!"));
-                }
+              // Track achievement progress for all NFTs
+              window.BurnAnimations.checkAchievements('nft', selectedNftData.length);
+
+              // Show special achievement for bulk burning
+              if (selectedNftData.length >= 2) {
+                window.BurnAnimations.showAchievement("NFT Purge Master!", "You've burned ".concat(selectedNftData.length, " NFTs at once. Making history!"));
               }
+            }
 
-              // Remove all burned NFTs from the list
-              setNfts(nfts.filter(function (nft) {
-                return !selectedNfts.has(nft.mint);
-              }));
-              setSelectedNfts(new Set());
-              setBurning(false);
-            }, 2000);
-          case 7:
+            // Remove all burned NFTs from the list
+            setNfts(nfts.filter(function (nft) {
+              return !selectedNfts.has(nft.mint);
+            }));
+            setSelectedNfts(new Set());
+            _context4.next = 20;
+            break;
+          case 16:
+            _context4.prev = 16;
+            _context4.t0 = _context4["catch"](2);
+            console.error('[NFTsTab] Error bulk burning NFTs:', _context4.t0);
+            setError('Failed to burn NFTs. Please try again.');
+          case 20:
+            _context4.prev = 20;
+            setBurning(false);
+            return _context4.finish(20);
+          case 23:
           case "end":
-            return _context2.stop();
+            return _context4.stop();
         }
-      }, _callee2);
+      }, _callee4, null, [[2, 16, 20, 23]]);
     }));
     return function handleBulkBurn() {
-      return _ref2.apply(this, arguments);
+      return _ref4.apply(this, arguments);
     };
   }();
 
@@ -78315,10 +78457,10 @@ var NFTsTab = function NFTsTab() {
     className: "no-assets-subtitle"
   }, "Your connected wallet doesn't have any NFTs yet")) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "nfts-collections"
-  }, Object.entries(groupedNfts).map(function (_ref3) {
-    var _ref4 = _slicedToArray(_ref3, 2),
-      collection = _ref4[0],
-      collectionNfts = _ref4[1];
+  }, Object.entries(groupedNfts).map(function (_ref5) {
+    var _ref6 = _slicedToArray(_ref5, 2),
+      collection = _ref6[0],
+      collectionNfts = _ref6[1];
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
       key: collection,
       className: "nft-collection"
@@ -78696,11 +78838,13 @@ var TokensTab = function TokensTab() {
 
                         // The structure now comes directly from our token metadata service
                         metadata = metadataResponse.data || {};
-                        console.log("[TokensTab] Successfully enriched token ".concat(token.mint));
+                        console.log("[TokensTab] Successfully enriched token ".concat(token.mint, " with metadata:"), metadata);
                         return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
                           symbol: metadata.symbol || token.mint.slice(0, 4),
                           name: metadata.name || "Token ".concat(token.mint.slice(0, 8), "..."),
-                          logoURI: metadata.icon || '/default-token-icon.svg'
+                          logoURI: metadata.icon || '/default-token-icon.svg',
+                          // Ensure we have decimals for display
+                          decimals: token.decimals || metadata.decimals || 9
                         }));
                       case 10:
                         _context3.prev = 10;

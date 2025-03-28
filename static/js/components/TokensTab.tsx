@@ -164,13 +164,15 @@ const TokensTab: React.FC = () => {
                   
                   // The structure now comes directly from our token metadata service
                   const metadata = metadataResponse.data || {};
-                  console.log(`[TokensTab] Successfully enriched token ${token.mint}`);
+                  console.log(`[TokensTab] Successfully enriched token ${token.mint} with metadata:`, metadata);
 
                   return {
                     ...token,
                     symbol: metadata.symbol || token.mint.slice(0, 4),
                     name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
-                    logoURI: metadata.icon || '/default-token-icon.svg'
+                    logoURI: metadata.icon || '/default-token-icon.svg',
+                    // Ensure we have decimals for display
+                    decimals: token.decimals || metadata.decimals || 9
                   };
                 } catch (error) {
                   console.warn(`[TokensTab] Failed to fetch metadata for token ${token.mint}, using fallback data`);

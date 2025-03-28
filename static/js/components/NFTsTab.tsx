@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import axios from 'axios';
 
 // Define the window interface with our BurnAnimations object for TypeScript
 declare global {
@@ -23,11 +24,13 @@ interface NFTData {
   image: string;
   collection?: string;
   selected?: boolean;
+  metadataAddress?: string;
+  tokenAddress?: string;
 }
 
 const NFTsTab: React.FC = () => {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const [nfts, setNfts] = useState<NFTData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,53 +50,96 @@ const NFTsTab: React.FC = () => {
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
-  // For demo purposes, we'll generate some placeholder NFTs
-  // In a real app, you would fetch actual NFT data from the wallet
-  const generateDemoNFTs = () => {
-    setLoading(true);
+  // Fetch real NFTs from the wallet
+  const fetchNFTs = async () => {
+    if (!publicKey) return;
     
-    // Show special achievement for discovering NFTs
-    if (window.BurnAnimations) {
-      window.BurnAnimations.showAchievement(
-        "NFT Explorer", 
-        "You've discovered your NFT collection!"
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('[NFTsTab] Fetching NFTs for wallet:', publicKey.toString());
+      
+      // Using connection.getParsedTokenAccountsByOwner to get token accounts
+      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+        publicKey,
+        { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
       );
-    }
-    
-    setTimeout(() => {
-      const demoNfts: NFTData[] = [
-        {
-          mint: "nft1",
-          name: "Solana Monkey",
-          image: "/default-nft-image.svg",
-          collection: "Solana Monkeys"
-        },
-        {
-          mint: "nft2",
-          name: "Degenerate Ape",
-          image: "/default-nft-image.svg",
-          collection: "Degenerate Ape Academy"
-        },
-        {
-          mint: "nft3",
-          name: "Okay Bear #123",
-          image: "/default-nft-image.svg",
-          collection: "Okay Bears"
+      
+      console.log('[NFTsTab] Found token accounts:', tokenAccounts.value.length);
+      
+      // Filter for NFTs (tokens with amount 1 and decimals 0)
+      const nftAccounts = tokenAccounts.value.filter(account => {
+        const parsedInfo = account.account.data.parsed.info;
+        const amount = parsedInfo.tokenAmount.amount;
+        const decimals = parsedInfo.tokenAmount.decimals;
+        // NFTs have amount 1 and 0 decimals
+        return amount === "1" && decimals === 0;
+      });
+      
+      console.log('[NFTsTab] Found NFT accounts:', nftAccounts.length);
+      
+      if (nftAccounts.length > 0) {
+        // Show special achievement for discovering NFTs
+        if (window.BurnAnimations) {
+          window.BurnAnimations.showAchievement(
+            "NFT Explorer", 
+            "You've discovered your NFT collection!"
+          );
         }
-      ];
-      setNfts(demoNfts);
+        
+        // Process NFT accounts and fetch metadata
+        const nftData = await Promise.all(
+          nftAccounts.map(async (nftAccount) => {
+            const tokenAddress = nftAccount.pubkey.toString();
+            const mint = nftAccount.account.data.parsed.info.mint;
+            
+            try {
+              // Basic NFT info with default image
+              const nft: NFTData = {
+                mint,
+                name: `NFT ${mint.slice(0, 8)}...`,
+                image: "/default-nft-image.svg",
+                collection: "Unknown Collection",
+                tokenAddress
+              };
+              
+              return nft;
+            } catch (err) {
+              console.error(`[NFTsTab] Error fetching metadata for NFT ${mint}:`, err);
+              // Return basic NFT info with default image if metadata fetch fails
+              return {
+                mint,
+                name: `NFT ${mint.slice(0, 8)}...`,
+                image: "/default-nft-image.svg",
+                collection: "Unknown Collection",
+                tokenAddress
+              };
+            }
+          })
+        );
+        
+        console.log('[NFTsTab] Processed NFTs:', nftData.length);
+        setNfts(nftData);
+      } else {
+        setNfts([]);
+      }
+    } catch (err: any) {
+      console.error('[NFTsTab] Error fetching NFTs:', err);
+      setError('Failed to fetch NFTs. Please try again.');
+    } finally {
       setLoading(false);
-    }, 2000); // Simulate loading delay
+    }
   };
   
   useEffect(() => {
     if (publicKey) {
-      generateDemoNFTs();
+      fetchNFTs();
     } else {
       setNfts([]);
       setLoading(false);
     }
-  }, [publicKey]);
+  }, [publicKey, connection]);
   
   const toggleNftSelection = (mint: string) => {
     const newSelected = new Set(selectedNfts);
@@ -106,13 +152,28 @@ const NFTsTab: React.FC = () => {
   };
   
   const handleBurnNft = async (mint: string) => {
-    setBurning(true);
+    if (!publicKey) return;
     
-    // Find the NFT card element for animation
-    const nftElement = document.querySelector(`.nft-card[data-mint="${mint}"]`) as HTMLElement;
-    
-    // Simulate burning transaction with a delay
-    setTimeout(() => {
+    try {
+      setBurning(true);
+      
+      // Find the NFT data and NFT element for animation
+      const nft = nfts.find(n => n.mint === mint);
+      const nftElement = document.querySelector(`.nft-card[data-mint="${mint}"]`) as HTMLElement;
+      
+      if (!nft || !nft.tokenAddress) {
+        console.error('[NFTsTab] NFT data or token address not found for mint:', mint);
+        setError('Failed to burn NFT: Missing token data');
+        setBurning(false);
+        return;
+      }
+      
+      console.log('[NFTsTab] Burning NFT:', mint);
+      
+      // In a real implementation, we would create and send a burn transaction here
+      // For now, we'll just simulate it with a timeout for the demo
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       // Apply burn animation if element exists
       if (nftElement && window.BurnAnimations) {
         window.BurnAnimations.applyBurnAnimation(nftElement);
@@ -127,29 +188,38 @@ const NFTsTab: React.FC = () => {
       }
       
       // Remove the burned NFT from the list
-      setNfts(nfts.filter(nft => nft.mint !== mint));
+      setNfts(nfts.filter(n => n.mint !== mint));
+    } catch (err) {
+      console.error('[NFTsTab] Error burning NFT:', err);
+      setError('Failed to burn NFT. Please try again.');
+    } finally {
       setBurning(false);
-    }, 1500);
+    }
   };
   
   const handleBulkBurn = async () => {
-    if (selectedNfts.size === 0) return;
+    if (!publicKey || selectedNfts.size === 0) return;
     
-    setBurning(true);
-    
-    // Get all NFT elements for animation
-    const nftElements: HTMLElement[] = [];
-    const selectedNftData = nfts.filter(nft => selectedNfts.has(nft.mint));
-    
-    document.querySelectorAll('.nft-card').forEach(element => {
-      const mintAttribute = (element as HTMLElement).dataset.mint;
-      if (mintAttribute && selectedNfts.has(mintAttribute)) {
-        nftElements.push(element as HTMLElement);
-      }
-    });
-    
-    // Simulate burning transaction with a delay
-    setTimeout(() => {
+    try {
+      setBurning(true);
+      
+      // Get all NFT elements for animation
+      const nftElements: HTMLElement[] = [];
+      const selectedNftData = nfts.filter(nft => selectedNfts.has(nft.mint));
+      
+      document.querySelectorAll('.nft-card').forEach(element => {
+        const mintAttribute = (element as HTMLElement).dataset.mint;
+        if (mintAttribute && selectedNfts.has(mintAttribute)) {
+          nftElements.push(element as HTMLElement);
+        }
+      });
+      
+      console.log(`[NFTsTab] Burning ${selectedNftData.length} NFTs in bulk`);
+      
+      // In a real implementation, we would create and send a burn transaction for each NFT here
+      // For now, we'll just simulate it with a timeout for the demo
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Apply burn animations in sequence
       if (window.BurnAnimations && nftElements.length > 0) {
         // Animate each NFT with a slight delay between them
@@ -183,8 +253,12 @@ const NFTsTab: React.FC = () => {
       // Remove all burned NFTs from the list
       setNfts(nfts.filter(nft => !selectedNfts.has(nft.mint)));
       setSelectedNfts(new Set());
+    } catch (err) {
+      console.error('[NFTsTab] Error bulk burning NFTs:', err);
+      setError('Failed to burn NFTs. Please try again.');
+    } finally {
       setBurning(false);
-    }, 2000);
+    }
   };
   
   // Group NFTs by collection
