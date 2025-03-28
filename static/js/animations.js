@@ -755,18 +755,18 @@ document.addEventListener('DOMContentLoaded', () => {
       initUIEnhancements();
     }
   }, 100);
-  
-  // Global access for components to use animations
-  window.BurnAnimations = {
-    createConfetti,
-    toggleDarkMode,
-    applyBurnAnimation,
-    showAchievement,
-    updateProgress,
-    checkAchievements,
-    initUIEnhancements
-  };
 });
+
+// Global access for components to use animations
+window.BurnAnimations = {
+  createConfetti,
+  toggleDarkMode,
+  applyBurnAnimation,
+  showAchievement,
+  updateProgress,
+  checkAchievements,
+  initUIEnhancements
+};
 
 // Export for direct import in other files
 export {
