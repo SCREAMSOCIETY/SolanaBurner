@@ -40,7 +40,8 @@ app.get('*', (req, res) => {
   res.sendFile('templates/index.html', { root: __dirname });
 });
 
-const port = 5000;
+// Try a different port
+const port = process.env.PORT || 8080;
 
 // Start server with detailed logging
 app.listen(port, '0.0.0.0', () => {
@@ -53,4 +54,13 @@ app.listen(port, '0.0.0.0', () => {
     stack: error.stack,
     time: new Date().toISOString()
   });
+  
+  // If port is already in use, try a different port
+  if (error.code === 'EADDRINUSE') {
+    const newPort = port + 1;
+    console.log(`[SERVER] Port ${port} is in use, trying port ${newPort}...`);
+    app.listen(newPort, '0.0.0.0', () => {
+      console.log(`[SERVER] Running at http://0.0.0.0:${newPort}`);
+    });
+  }
 });
