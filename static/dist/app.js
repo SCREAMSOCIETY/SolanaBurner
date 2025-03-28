@@ -78683,7 +78683,7 @@ var TokensTab = function TokensTab() {
               _context4.next = 26;
               return Promise.all(batch.map(/*#__PURE__*/function () {
                 var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee3(token) {
-                  var solscanData, metadata;
+                  var metadataResponse, metadata;
                   return _regeneratorRuntime().wrap(function _callee3$(_context3) {
                     while (1) switch (_context3.prev = _context3.next) {
                       case 0:
@@ -78691,16 +78691,19 @@ var TokensTab = function TokensTab() {
                         _context3.next = 3;
                         return _fetchWithRetry(token.mint);
                       case 3:
-                        solscanData = _context3.sent;
-                        metadata = solscanData.data;
+                        metadataResponse = _context3.sent;
+                        console.log("[TokensTab] Metadata response for token ".concat(token.mint, ":"), metadataResponse);
+
+                        // The structure now comes directly from our token metadata service
+                        metadata = metadataResponse.data || {};
                         console.log("[TokensTab] Successfully enriched token ".concat(token.mint));
                         return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
-                          symbol: metadata.symbol || 'Unknown',
-                          name: metadata.name || 'Unknown Token',
+                          symbol: metadata.symbol || token.mint.slice(0, 4),
+                          name: metadata.name || "Token ".concat(token.mint.slice(0, 8), "..."),
                           logoURI: metadata.icon || '/default-token-icon.svg'
                         }));
-                      case 9:
-                        _context3.prev = 9;
+                      case 10:
+                        _context3.prev = 10;
                         _context3.t0 = _context3["catch"](0);
                         console.warn("[TokensTab] Failed to fetch metadata for token ".concat(token.mint, ", using fallback data"));
                         return _context3.abrupt("return", _objectSpread(_objectSpread({}, token), {}, {
@@ -78708,11 +78711,11 @@ var TokensTab = function TokensTab() {
                           name: 'Unknown Token',
                           logoURI: '/default-token-icon.svg'
                         }));
-                      case 13:
+                      case 14:
                       case "end":
                         return _context3.stop();
                     }
-                  }, _callee3, null, [[0, 9]]);
+                  }, _callee3, null, [[0, 10]]);
                 }));
                 return function (_x2) {
                   return _ref4.apply(this, arguments);

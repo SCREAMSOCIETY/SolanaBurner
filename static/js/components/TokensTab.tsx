@@ -159,14 +159,17 @@ const TokensTab: React.FC = () => {
             const batchResults = await Promise.all(
               batch.map(async (token) => {
                 try {
-                  const solscanData = await fetchWithRetry(token.mint);
-                  const metadata = solscanData.data;
+                  const metadataResponse = await fetchWithRetry(token.mint);
+                  console.log(`[TokensTab] Metadata response for token ${token.mint}:`, metadataResponse);
+                  
+                  // The structure now comes directly from our token metadata service
+                  const metadata = metadataResponse.data || {};
                   console.log(`[TokensTab] Successfully enriched token ${token.mint}`);
 
                   return {
                     ...token,
-                    symbol: metadata.symbol || 'Unknown',
-                    name: metadata.name || 'Unknown Token',
+                    symbol: metadata.symbol || token.mint.slice(0, 4),
+                    name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
                     logoURI: metadata.icon || '/default-token-icon.svg'
                   };
                 } catch (error) {

@@ -72,7 +72,10 @@ fastify.get('/api/config', async (request, reply) => {
   };
 });
 
-// Proxy endpoint for Solscan API to avoid CORS issues
+// Import local token metadata
+const tokenMetadata = require('./token-metadata');
+
+// Endpoint for token metadata that uses local data instead of external API
 fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
   const { tokenAddress } = request.params;
   
@@ -81,33 +84,15 @@ fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
   }
   
   try {
-    fastify.log.info(`Proxy request for token metadata: ${tokenAddress}`);
+    fastify.log.info(`Request for token metadata: ${tokenAddress}`);
     
-    const solscanApiKey = process.env.SOLSCAN_API_KEY;
-    if (!solscanApiKey) {
-      fastify.log.error('Solscan API key not found');
-      return reply.code(500).send({ error: 'API key not configured' });
-    }
+    // Get token metadata from local store
+    const metadata = tokenMetadata.getTokenMetadata(tokenAddress);
     
-    const solscanResponse = await axios.get(
-      `https://api.solscan.io/v2/token/meta?token=${tokenAddress}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${solscanApiKey}`
-        },
-        timeout: 10000
-      }
-    );
-    
-    fastify.log.info(`Solscan API response received for ${tokenAddress}`);
-    return solscanResponse.data;
+    fastify.log.info(`Token metadata for ${tokenAddress}: ${JSON.stringify(metadata)}`);
+    return metadata;
   } catch (error) {
-    fastify.log.error(`Error proxying request to Solscan: ${error.message}`);
-    if (error.response) {
-      fastify.log.error(`Solscan API error: ${JSON.stringify(error.response.data)}`);
-      return reply.code(error.response.status).send(error.response.data);
-    }
+    fastify.log.error(`Error fetching token metadata: ${error.message}`);
     return reply.code(500).send({ 
       error: 'Failed to fetch token metadata',
       message: error.message
