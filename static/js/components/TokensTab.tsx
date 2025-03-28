@@ -106,18 +106,27 @@ const TokensTab: React.FC = () => {
             await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
 
             console.log(`[TokensTab] Fetching metadata for token ${mint} (attempt ${retryCount + 1})`);
-            const response = await axios.get(
-              `https://api.solscan.io/v2/token/meta?token=${mint}`,
-              {
-                headers: {
-                  'Accept': 'application/json',
-                  'Authorization': `Bearer ${solscanApiKey}`
-                },
-                timeout: 10000
-              }
-            );
+            console.log(`[TokensTab] Using Solscan API key: ${solscanApiKey ? 'Present (length: ' + solscanApiKey.length + ')' : 'Missing'}`);
+            
+            const url = `https://api.solscan.io/v2/token/meta?token=${mint}`;
+            console.log(`[TokensTab] Request URL: ${url}`);
+            
+            const requestHeaders = {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${solscanApiKey}`
+            };
+            console.log(`[TokensTab] Request headers:`, requestHeaders);
+            
+            const response = await axios.get(url, {
+              headers: requestHeaders,
+              timeout: 10000
+            });
+
+            console.log(`[TokensTab] Solscan response status:`, response.status);
+            console.log(`[TokensTab] Solscan response data:`, response.data);
 
             if (!response.data?.success) {
+              console.error(`[TokensTab] Invalid response format from Solscan:`, response.data);
               throw new Error('Invalid response format');
             }
 
@@ -125,12 +134,20 @@ const TokensTab: React.FC = () => {
           } catch (error: any) {
             console.error(
               `[TokensTab] Error fetching metadata for token ${mint}:`,
-              error.response?.data || error.message
+              error.response?.status,
+              error.response?.statusText
             );
+            
+            console.error(`[TokensTab] Error details:`, error.response?.data || error.message);
 
             if (error.response?.status === 429 && retryCount < 3) {
               console.warn(`[TokensTab] Rate limit hit for ${mint}, retrying in ${(retryCount + 1) * 1000}ms`);
               return fetchWithRetry(mint, retryCount + 1);
+            }
+            
+            // If we have an auth error, log it clearly
+            if (error.response?.status === 401) {
+              console.error(`[TokensTab] Authentication error with Solscan API. Please check your API key.`);
             }
 
             throw error;
