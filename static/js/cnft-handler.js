@@ -129,18 +129,64 @@ export class CNFTHandler {
             let validProof = proof;
             
             if (!proof || !Array.isArray(proof)) {
-                console.log("Missing or invalid proof data. Fetching from blockchain...");
+                console.log("Missing or invalid proof data. Trying multiple methods to fetch proof...");
+                
+                // Method 1: Try using the bubblegum SDK directly
                 try {
-                    // Fetch the asset with proof from the blockchain
-                    const assetWithProof = await getAssetWithProof(
-                        this.connection,
-                        assetId
-                    );
-                    validProof = assetWithProof.proof;
-                    console.log("Successfully fetched proof data from blockchain");
-                } catch (proofError) {
-                    console.error("Error fetching proof data:", proofError);
-                    throw new Error("Failed to get compression proof data. Cannot burn cNFT without proof.");
+                    console.log("Method 1: Trying to fetch proof via bubblegum SDK");
+                    const assetWithProof = await this.fetchAssetWithProof(assetId);
+                    if (assetWithProof && assetWithProof.proof && Array.isArray(assetWithProof.proof)) {
+                        validProof = assetWithProof.proof;
+                        console.log("Method 1 success: Got proof data via our fetchAssetWithProof method");
+                    } else {
+                        console.log("Method 1 failed: Invalid or missing proof data");
+                    }
+                } catch (method1Error) {
+                    console.error("Method 1 error:", method1Error);
+                }
+                
+                // Method 2: Try the direct backend endpoint if Method 1 failed
+                if (!validProof || !Array.isArray(validProof)) {
+                    try {
+                        console.log("Method 2: Trying dedicated asset-proof endpoint");
+                        const response = await axios.get(`/api/helius/asset-proof/${assetId}`);
+                        
+                        if (response.data?.success && response.data?.data?.proof) {
+                            validProof = response.data.data.proof;
+                            console.log("Method 2 success: Got proof data via dedicated endpoint");
+                        } else {
+                            console.log("Method 2 failed:", response.data?.error || "No valid proof returned");
+                        }
+                    } catch (method2Error) {
+                        console.error("Method 2 error:", method2Error);
+                    }
+                }
+                
+                // Method 3: Last resort, try direct SDK call
+                if (!validProof || !Array.isArray(validProof)) {
+                    try {
+                        console.log("Method 3: Last resort - direct getAssetWithProof call");
+                        const assetWithProof = await getAssetWithProof(
+                            this.connection,
+                            assetId
+                        );
+                        if (assetWithProof && assetWithProof.proof && Array.isArray(assetWithProof.proof)) {
+                            validProof = assetWithProof.proof;
+                            console.log("Method 3 success: Got proof data via direct SDK call");
+                        } else {
+                            console.log("Method 3 failed: Invalid or missing proof data");
+                        }
+                    } catch (method3Error) {
+                        console.error("Method 3 error:", method3Error);
+                    }
+                }
+                
+                // Final check
+                if (!validProof || !Array.isArray(validProof)) {
+                    console.error("All proof fetching methods failed");
+                    throw new Error("Failed to get compression proof data after trying multiple methods. Cannot burn cNFT without proof.");
+                } else {
+                    console.log("Successfully obtained proof data:", validProof);
                 }
             }
             

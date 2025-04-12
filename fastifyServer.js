@@ -331,6 +331,71 @@ process.on('unhandledRejection', (reason, promise) => {
   });
 });
 
+// Endpoint specifically for fetching asset proof data for cNFTs
+fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
+  try {
+    const { assetId } = request.params;
+    
+    if (!assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Asset ID is required'
+      });
+    }
+    
+    // Use Helius API to get the asset details with proof
+    const heliusApiKey = process.env.HELIUS_API_KEY;
+    if (!heliusApiKey) {
+      throw new Error('HELIUS_API_KEY environment variable is not set');
+    }
+    
+    fastify.log.info(`Fetching proof data for asset: ${assetId}`);
+    
+    // Construct the RPC payload to request proof data
+    const payload = {
+      jsonrpc: '2.0',
+      id: 'helius-test',
+      method: 'getAssetProof',
+      params: {
+        id: assetId
+      }
+    };
+    
+    // Make the request to Helius RPC API
+    const response = await axios.post(
+      `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+      payload
+    );
+    
+    if (response.data && response.data.result) {
+      // Extract the proof and return it with some additional metadata
+      const proofData = response.data.result;
+      
+      fastify.log.info(`Successfully fetched proof data for asset ${assetId}`);
+      
+      return {
+        success: true,
+        data: {
+          assetId,
+          proof: proofData.proof,
+          root: proofData.root,
+          tree_id: proofData.tree_id,
+          node_index: proofData.node_index,
+          leaf: proofData.leaf
+        }
+      };
+    } else {
+      throw new Error('Invalid response format from Helius API');
+    }
+  } catch (error) {
+    console.error('Error fetching asset proof:', error);
+    return reply.code(500).send({
+      success: false,
+      error: `Error fetching asset proof: ${error.message}`
+    });
+  }
+});
+
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
 const start = async () => {
