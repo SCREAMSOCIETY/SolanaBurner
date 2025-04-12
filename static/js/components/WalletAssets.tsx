@@ -44,6 +44,15 @@ interface CNFTData {
   explorer_url?: string;
   proof?: any;
   selected?: boolean;
+  compression?: {
+    compressed?: boolean;
+    proof?: any;
+    data_hash?: string;
+    creator_hash?: string;
+    tree?: string;
+    leafId?: number;
+    leaf_id?: number;
+  };
 }
 
 const WalletAssets: React.FC = () => {
@@ -701,7 +710,8 @@ const WalletAssets: React.FC = () => {
     }
     
     // Check for required compression proof data
-    if (!cnft.proof) {
+    const proofData = cnft.proof || cnft.compression?.proof;
+    if (!proofData) {
       console.error('Compression proof data is required for burning cNFTs');
       setError('Missing compression data for this cNFT. Cannot burn compressed NFT without proof data.');
       return;
@@ -717,8 +727,8 @@ const WalletAssets: React.FC = () => {
       // The assetId for cNFTs is the mint address
       const assetId = cnft.mint;
       
-      // Attempt to burn the cNFT using the specialized handler
-      const result = await cnftHandler.burnCNFT(assetId, cnft.proof);
+      // Attempt to burn the cNFT using the specialized handler with the proof data we found
+      const result = await cnftHandler.burnCNFT(assetId, proofData);
       
       if (result.success) {
         console.log('cNFT burn successful with signature:', result.signature);
