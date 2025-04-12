@@ -723,7 +723,7 @@ const WalletAssets: React.FC = () => {
             
             <div className="tokens-grid">
               {tokens.map((token) => (
-                <div key={token.mint} className="token-card">
+                <div key={token.mint} className="token-card" data-mint={token.mint}>
                   <div className="token-info">
                     <img 
                       src={token.logoURI || '/default-token-icon.svg'} 
@@ -762,7 +762,7 @@ const WalletAssets: React.FC = () => {
             
             <div className="nfts-grid">
               {nfts.map((nft) => (
-                <div key={nft.mint} className="nft-card">
+                <div key={nft.mint} className="nft-card" data-mint={nft.mint}>
                   <div className="nft-info">
                     <img 
                       src={nft.image || '/default-nft-image.svg'} 
@@ -798,7 +798,7 @@ const WalletAssets: React.FC = () => {
             
             <div className="cnfts-grid">
               {cnfts.map((cnft) => (
-                <div key={cnft.mint} className="nft-card">
+                <div key={cnft.mint} className="nft-card" data-mint={cnft.mint}>
                   <div className="nft-info">
                     <img 
                       src={cnft.image || '/default-nft-image.svg'} 

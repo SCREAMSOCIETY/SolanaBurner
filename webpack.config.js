@@ -6,7 +6,8 @@ module.exports = {
   entry: {
     'app': './static/js/App.tsx',
     'WalletProvider': './static/js/WalletProvider.tsx',
-    'cnft-handler': './static/js/cnft-handler.js'
+    'cnft-handler': './static/js/cnft-handler.js',
+    'animations': './static/js/animations.js'
   },
   output: {
     path: path.resolve(__dirname, 'static/dist'),
