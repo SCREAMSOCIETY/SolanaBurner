@@ -8,6 +8,7 @@ const fastify = require('fastify')({
 const fastifyStatic = require('@fastify/static');
 const fs = require('fs');
 const axios = require('axios');
+const heliusApi = require('./helius-api');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
@@ -68,6 +69,7 @@ fastify.get('/api/config', async (request, reply) => {
   return { 
     solscanApiKey: process.env.SOLSCAN_API_KEY || '',
     quicknodeRpcUrl: process.env.QUICKNODE_RPC_URL || '',
+    heliusApiKey: process.env.HELIUS_API_KEY ? 'present' : '', // Don't expose actual key
     environment: process.env.NODE_ENV || 'development'
   };
 });
@@ -106,6 +108,98 @@ fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
     fastify.log.error(`Error fetching token metadata: ${error.message}`);
     return reply.code(500).send({ 
       error: 'Failed to fetch token metadata',
+      message: error.message
+    });
+  }
+});
+
+// Helius API endpoints for NFTs and cNFTs
+fastify.get('/api/helius/assets/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  if (!walletAddress) {
+    return reply.code(400).send({ error: 'Wallet address is required' });
+  }
+  
+  try {
+    fastify.log.info(`Fetching all NFT assets for wallet: ${walletAddress}`);
+    const assets = await heliusApi.fetchAllNFTsByOwner(walletAddress);
+    
+    // Format the assets to match our application's format
+    const formattedAssets = assets.map(heliusApi.formatHeliusNFTData);
+    
+    return {
+      success: true,
+      data: formattedAssets
+    };
+  } catch (error) {
+    fastify.log.error(`Error fetching NFT assets: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to fetch NFT assets',
+      message: error.message
+    });
+  }
+});
+
+fastify.get('/api/helius/cnfts/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  if (!walletAddress) {
+    return reply.code(400).send({ error: 'Wallet address is required' });
+  }
+  
+  try {
+    fastify.log.info(`Fetching compressed NFTs for wallet: ${walletAddress}`);
+    const cnfts = await heliusApi.fetchCompressedNFTsByOwner(walletAddress);
+    
+    // Format the cNFTs to match our application's format
+    const formattedCnfts = cnfts.map(heliusApi.formatHeliusNFTData);
+    
+    return {
+      success: true,
+      data: formattedCnfts
+    };
+  } catch (error) {
+    fastify.log.error(`Error fetching compressed NFTs: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to fetch compressed NFTs',
+      message: error.message
+    });
+  }
+});
+
+fastify.get('/api/helius/asset/:assetId', async (request, reply) => {
+  const { assetId } = request.params;
+  
+  if (!assetId) {
+    return reply.code(400).send({ error: 'Asset ID is required' });
+  }
+  
+  try {
+    fastify.log.info(`Fetching details for asset: ${assetId}`);
+    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    
+    if (!assetDetails) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+    
+    // Format the asset to match our application's format
+    const formattedAsset = heliusApi.formatHeliusNFTData(assetDetails);
+    
+    return {
+      success: true,
+      data: formattedAsset
+    };
+  } catch (error) {
+    fastify.log.error(`Error fetching asset details: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to fetch asset details',
       message: error.message
     });
   }
