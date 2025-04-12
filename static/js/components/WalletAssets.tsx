@@ -227,7 +227,7 @@ const WalletAssets: React.FC = () => {
     fetchTokens();
   }, [publicKey, connection, solscanApiKey]);
 
-  // Fetch NFTs when wallet connects
+  // Fetch NFTs when wallet connects using Helius API
   useEffect(() => {
     const fetchNFTs = async () => {
       if (!publicKey) return;
@@ -236,123 +236,204 @@ const WalletAssets: React.FC = () => {
       setError(null);
       
       try {
-        console.log('[WalletAssets] Fetching NFTs...');
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          publicKey,
-          { programId: TOKEN_PROGRAM_ID }
-        );
+        console.log('[WalletAssets] Fetching NFTs using Helius API...');
+        const walletAddress = publicKey.toBase58();
         
-        // Filter for NFTs (tokens with amount = 1 and decimals = 0)
-        const nftAccounts = tokenAccounts.value.filter(
-          item => {
-            const tokenAmount = item.account.data.parsed.info.tokenAmount;
-            return tokenAmount.amount === "1" && tokenAmount.decimals === 0;
-          }
-        );
+        // Use our Helius API endpoint to fetch NFTs
+        const response = await axios.get(`/api/helius/assets/${walletAddress}`);
         
-        console.log(`[WalletAssets] Found ${nftAccounts.length} NFT accounts`);
-        
-        // Process NFTs in batches to prevent rate limiting
-        const batchSize = 3;
-        const processedNFTs: NFTData[] = [];
-        
-        for (let i = 0; i < nftAccounts.length; i += batchSize) {
-          const batch = nftAccounts.slice(i, i + batchSize);
-          console.log(`[WalletAssets] Processing NFT batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(nftAccounts.length / batchSize)}`);
-          
-          const batchPromises = batch.map(async (nftAccount) => {
-            try {
-              const parsedInfo = nftAccount.account.data.parsed.info;
-              const mintAddress = parsedInfo.mint;
-              const metadataAddress = findMetadataPda(new PublicKey(mintAddress));
-              
-              const metadata = await connection.getAccountInfo(metadataAddress);
-              if (!metadata) {
-                console.log(`[WalletAssets] No metadata found for NFT: ${mintAddress}`);
-                return null;
-              }
-              
-              const metadataString = Buffer.from(metadata.data).toString();
-              const uriMatch = metadataString.match(/https?:\/\/\S+/);
-              
-              if (!uriMatch) {
-                console.log(`[WalletAssets] No URI found in metadata for NFT: ${mintAddress}`);
-                return null;
-              }
-              
-              let uri = uriMatch[0].split('\0')[0]; // Clean up null terminators
-              let externalMetadata: any = {};
-              
-              try {
-                // Fetch NFT metadata
-                console.log(`[WalletAssets] Fetching NFT metadata from: ${uri}`);
-                const response = await axios.get(uri);
-                externalMetadata = response.data;
-              } catch (error) {
-                console.error(`[WalletAssets] Error fetching NFT metadata from URI: ${uri}`, error);
-              }
-              
-              // Try to extract a name from the metadata
-              const nameMatch = metadataString.match(/"name":"([^"]+)"/);
-              const name = externalMetadata.name || (nameMatch ? nameMatch[1] : `NFT ${mintAddress.slice(0, 6)}`);
-              
-              // Extract image from external metadata
-              const image = externalMetadata.image || '/default-nft-image.svg';
-              
-              return {
-                mint: mintAddress,
-                name: name,
-                image: image,
-                collection: externalMetadata.collection?.name || externalMetadata.collection?.family || 'Unknown Collection',
-                tokenAddress: nftAccount.pubkey.toBase58(),
-                metadataAddress: metadataAddress.toBase58()
-              };
-            } catch (error) {
-              console.error('[WalletAssets] Error processing NFT:', error);
-              return null;
-            }
-          });
-          
-          const batchResults = await Promise.all(batchPromises);
-          processedNFTs.push(...batchResults.filter(Boolean) as NFTData[]);
-          
-          // Pause between batches to prevent rate limiting
-          if (i + batchSize < nftAccounts.length) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
+        if (!response.data || !response.data.success) {
+          console.error('[WalletAssets] Invalid response from Helius API:', response.data);
+          throw new Error('Invalid response from Helius API');
         }
         
-        console.log(`[WalletAssets] Successfully processed ${processedNFTs.length} NFTs`);
+        const assets = response.data.data || [];
+        console.log(`[WalletAssets] Found ${assets.length} NFTs via Helius API`);
+        
+        // Filter out compressed NFTs (we'll fetch those separately)
+        const regularNfts = assets.filter((asset: any) => !asset.compressed);
+        
+        // Map the assets to our NFTData format
+        const processedNFTs: NFTData[] = regularNfts.map((asset: any) => ({
+          mint: asset.mint,
+          name: asset.name || `NFT ${asset.mint.slice(0, 6)}`,
+          image: asset.image || '/default-nft-image.svg',
+          collection: asset.collection || 'Unknown Collection',
+          tokenAddress: asset.tokenAddress || '',
+          metadataAddress: asset.metadataAddress || '',
+          // Add any other properties we want to keep from the Helius data
+          description: asset.description,
+          attributes: asset.attributes
+        }));
+        
+        console.log(`[WalletAssets] Successfully processed ${processedNFTs.length} NFTs from Helius API`);
         setNfts(processedNFTs);
         setNftsLoading(false);
       } catch (error: any) {
-        console.error('[WalletAssets] Error fetching NFTs:', error);
-        setError(`Error fetching NFTs: ${error.message}`);
-        setNftsLoading(false);
+        console.error('[WalletAssets] Error fetching NFTs via Helius API:', error);
+        
+        // Fallback to original NFT fetching method if Helius API fails
+        try {
+          console.log('[WalletAssets] Falling back to on-chain NFT fetching...');
+          const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+            publicKey,
+            { programId: TOKEN_PROGRAM_ID }
+          );
+          
+          // Filter for NFTs (tokens with amount = 1 and decimals = 0)
+          const nftAccounts = tokenAccounts.value.filter(
+            item => {
+              const tokenAmount = item.account.data.parsed.info.tokenAmount;
+              return tokenAmount.amount === "1" && tokenAmount.decimals === 0;
+            }
+          );
+          
+          console.log(`[WalletAssets] Found ${nftAccounts.length} NFT accounts via on-chain method`);
+          
+          // Process NFTs in batches to prevent rate limiting
+          const batchSize = 3;
+          const processedNFTs: NFTData[] = [];
+          
+          for (let i = 0; i < nftAccounts.length; i += batchSize) {
+            const batch = nftAccounts.slice(i, i + batchSize);
+            console.log(`[WalletAssets] Processing NFT batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(nftAccounts.length / batchSize)}`);
+            
+            const batchPromises = batch.map(async (nftAccount) => {
+              try {
+                const parsedInfo = nftAccount.account.data.parsed.info;
+                const mintAddress = parsedInfo.mint;
+                const metadataAddress = findMetadataPda(new PublicKey(mintAddress));
+                
+                const metadata = await connection.getAccountInfo(metadataAddress);
+                if (!metadata) {
+                  console.log(`[WalletAssets] No metadata found for NFT: ${mintAddress}`);
+                  return null;
+                }
+                
+                const metadataString = Buffer.from(metadata.data).toString();
+                const uriMatch = metadataString.match(/https?:\/\/\S+/);
+                
+                if (!uriMatch) {
+                  console.log(`[WalletAssets] No URI found in metadata for NFT: ${mintAddress}`);
+                  return null;
+                }
+                
+                let uri = uriMatch[0].split('\0')[0]; // Clean up null terminators
+                let externalMetadata: any = {};
+                
+                try {
+                  // Fetch NFT metadata
+                  console.log(`[WalletAssets] Fetching NFT metadata from: ${uri}`);
+                  const response = await axios.get(uri);
+                  externalMetadata = response.data;
+                } catch (error) {
+                  console.error(`[WalletAssets] Error fetching NFT metadata from URI: ${uri}`, error);
+                }
+                
+                // Try to extract a name from the metadata
+                const nameMatch = metadataString.match(/"name":"([^"]+)"/);
+                const name = externalMetadata.name || (nameMatch ? nameMatch[1] : `NFT ${mintAddress.slice(0, 6)}`);
+                
+                // Extract image from external metadata
+                const image = externalMetadata.image || '/default-nft-image.svg';
+                
+                return {
+                  mint: mintAddress,
+                  name: name,
+                  image: image,
+                  collection: externalMetadata.collection?.name || externalMetadata.collection?.family || 'Unknown Collection',
+                  tokenAddress: nftAccount.pubkey.toBase58(),
+                  metadataAddress: metadataAddress.toBase58()
+                };
+              } catch (error) {
+                console.error('[WalletAssets] Error processing NFT:', error);
+                return null;
+              }
+            });
+            
+            const batchResults = await Promise.all(batchPromises);
+            processedNFTs.push(...batchResults.filter(Boolean) as NFTData[]);
+            
+            // Pause between batches to prevent rate limiting
+            if (i + batchSize < nftAccounts.length) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+          
+          console.log(`[WalletAssets] Successfully processed ${processedNFTs.length} NFTs via fallback method`);
+          setNfts(processedNFTs);
+          setNftsLoading(false);
+        } catch (fallbackError: any) {
+          console.error('[WalletAssets] Error in fallback NFT fetching:', fallbackError);
+          setError(`Error fetching NFTs: ${error.message}`);
+          setNftsLoading(false);
+        }
       }
     };
     
     fetchNFTs();
   }, [publicKey, connection]);
 
-  // Fetch cNFTs when wallet connects
+  // Fetch cNFTs when wallet connects using Helius API
   useEffect(() => {
     const fetchCNFTs = async () => {
-      if (!publicKey || !signTransaction) return;
+      if (!publicKey) return;
       
       setCnftsLoading(true);
+      setError(null);
+      
       try {
-        console.log('[WalletAssets] Fetching compressed NFTs...');
-        const cnftHandler = new CNFTHandler(connection, { publicKey, signTransaction });
-        const cnftList = await cnftHandler.fetchCNFTs(publicKey.toBase58());
+        console.log('[WalletAssets] Fetching compressed NFTs via Helius API...');
+        const walletAddress = publicKey.toBase58();
         
-        console.log(`[WalletAssets] Found ${cnftList.length} compressed NFTs`);
-        setCnfts(cnftList);
+        // Use our Helius API endpoint to fetch cNFTs
+        const response = await axios.get(`/api/helius/cnfts/${walletAddress}`);
+        
+        if (!response.data || !response.data.success) {
+          console.error('[WalletAssets] Invalid response from Helius API for cNFTs:', response.data);
+          throw new Error('Invalid response from Helius API for cNFTs');
+        }
+        
+        const compressedNFTs = response.data.data || [];
+        console.log(`[WalletAssets] Found ${compressedNFTs.length} compressed NFTs via Helius API`);
+        
+        // Map the assets to our CNFTData format
+        const processedCNFTs: CNFTData[] = compressedNFTs.map((cnft: any) => ({
+          mint: cnft.mint,
+          name: cnft.name || `cNFT ${cnft.mint.slice(0, 6)}`,
+          symbol: cnft.symbol,
+          image: cnft.image || '/default-nft-image.svg',
+          collection: cnft.collection || 'Unknown Collection',
+          description: cnft.description,
+          attributes: cnft.attributes,
+          explorer_url: cnft.explorer_url,
+          proof: cnft.proof
+        }));
+        
+        console.log(`[WalletAssets] Successfully processed ${processedCNFTs.length} cNFTs from Helius API`);
+        setCnfts(processedCNFTs);
         setCnftsLoading(false);
       } catch (error: any) {
-        console.error('[WalletAssets] Error fetching compressed NFTs:', error);
-        setError(`Error fetching compressed NFTs: ${error.message}`);
-        setCnftsLoading(false);
+        console.error('[WalletAssets] Error fetching cNFTs via Helius API:', error);
+        
+        // Fallback to original cNFT fetching method if Helius API fails
+        try {
+          console.log('[WalletAssets] Falling back to CNFTHandler method...');
+          if (!signTransaction) {
+            throw new Error('Wallet signTransaction capability required for fallback method');
+          }
+          
+          const cnftHandler = new CNFTHandler(connection, { publicKey, signTransaction });
+          const cnftList = await cnftHandler.fetchCNFTs(publicKey.toBase58());
+          
+          console.log(`[WalletAssets] Found ${cnftList.length} compressed NFTs via fallback method`);
+          setCnfts(cnftList);
+          setCnftsLoading(false);
+        } catch (fallbackError: any) {
+          console.error('[WalletAssets] Error in fallback cNFT fetching:', fallbackError);
+          setError(`Error fetching compressed NFTs: ${error.message}`);
+          setCnftsLoading(false);
+        }
       }
     };
     
