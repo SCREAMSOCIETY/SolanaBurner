@@ -6,10 +6,44 @@ const axios = require('axios');
 
 // Configuration for Helius API
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const HELIUS_API_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const HELIUS_REST_URL = `https://mainnet.helius.xyz/v0`;
 
 /**
- * Fetches all NFTs for a given wallet address using Helius API
+ * Fetches all NFTs (both regular and compressed) for a wallet address using Helius API's v0 endpoint
+ * @param {string} walletAddress - The Solana wallet address
+ * @returns {Promise<Array>} - Array of NFT data objects
+ */
+async function fetchAllWalletNFTs(walletAddress) {
+  try {
+    console.log(`[Helius API] Fetching all NFTs (regular + compressed) for wallet: ${walletAddress}`);
+    
+    const url = `${HELIUS_REST_URL}/addresses/${walletAddress}/nfts?api-key=${HELIUS_API_KEY}`;
+    const response = await axios.get(url);
+    
+    if (response.data && Array.isArray(response.data)) {
+      const regularNFTs = response.data.filter(nft => !nft.compression?.compressed);
+      const compressedNFTs = response.data.filter(nft => nft.compression?.compressed);
+      
+      console.log(`[Helius API] Found ${response.data.length} total NFTs (${regularNFTs.length} regular, ${compressedNFTs.length} compressed)`);
+      
+      return {
+        allNfts: response.data,
+        regularNfts: regularNFTs,
+        compressedNfts: compressedNFTs
+      };
+    } else {
+      console.warn('[Helius API] Invalid response format:', response.data);
+      return { allNfts: [], regularNfts: [], compressedNfts: [] };
+    }
+  } catch (error) {
+    console.error('[Helius API] Error fetching wallet NFTs:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetches all NFTs for a given wallet address using Helius RPC API
  * @param {string} walletAddress - The Solana wallet address
  * @returns {Promise<Array>} - Array of NFT data objects
  */
@@ -18,7 +52,7 @@ async function fetchAllNFTsByOwner(walletAddress) {
     console.log(`[Helius API] Fetching all NFTs for wallet: ${walletAddress}`);
     
     const response = await axios.post(
-      HELIUS_API_URL,
+      HELIUS_RPC_URL,
       {
         jsonrpc: '2.0',
         id: 'helius-nft-fetch',
@@ -59,7 +93,7 @@ async function fetchAssetDetails(assetId) {
     console.log(`[Helius API] Fetching asset details for: ${assetId}`);
     
     const response = await axios.post(
-      HELIUS_API_URL,
+      HELIUS_RPC_URL,
       {
         jsonrpc: '2.0',
         id: 'helius-asset-details',
@@ -98,7 +132,7 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
     
     // Using getAssetsByOwner with the compressed filter
     const response = await axios.post(
-      HELIUS_API_URL,
+      HELIUS_RPC_URL,
       {
         jsonrpc: '2.0',
         id: 'helius-cnft-fetch',
@@ -135,8 +169,53 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
 }
 
 /**
- * Converts Helius NFT data to our application's NFT format
- * @param {Object} heliusNFT - NFT data from Helius API
+ * Formats nft data from Helius v0 API to our application format
+ * @param {Object} nft - NFT data from Helius v0 API
+ * @returns {Object} - Formatted NFT data for our application
+ */
+function formatHeliusV0NFTData(nft) {
+  try {
+    const isCompressed = nft.compression?.compressed || false;
+    // For compressed NFTs, the content contains the metadata
+    const content = nft.content || {};
+    const metadata = content.metadata || nft.offChainData || {};
+    
+    return {
+      mint: nft.id || nft.mint,
+      name: metadata.name || `NFT ${(nft.id || nft.mint || '').slice(0, 8)}...`,
+      symbol: metadata.symbol || '',
+      image: metadata.image || content.files?.[0]?.uri || '/default-nft-image.svg',
+      collection: metadata.collection?.name || nft.grouping?.[0]?.group_value || '',
+      description: metadata.description || '',
+      attributes: metadata.attributes || [],
+      compressed: isCompressed,
+      tokenAddress: nft.tokenAccount || '',
+      explorer_url: `https://solscan.io/token/${nft.id || nft.mint}`,
+      metadataAddress: nft.metadataAccount || '',
+      // For compressed NFTs, store the compression data needed for burning
+      ...(isCompressed && {
+        compression: nft.compression,
+        tree: nft.compression?.tree,
+        proof: nft.compression?.proof,
+        leafId: nft.compression?.leaf_id || nft.compression?.leafId,
+        data_hash: nft.compression?.data_hash,
+        creator_hash: nft.compression?.creator_hash,
+      })
+    };
+  } catch (error) {
+    console.error('[Helius API] Error formatting NFT data:', error.message);
+    // Return basic fallback data
+    return {
+      mint: nft.id || nft.mint || 'unknown',
+      name: `NFT ${(nft.id || nft.mint || 'unknown').slice(0, 8)}...`,
+      image: '/default-nft-image.svg'
+    };
+  }
+}
+
+/**
+ * Converts Helius NFT data from RPC API to our application's NFT format
+ * @param {Object} heliusNFT - NFT data from Helius RPC API
  * @returns {Object} - Formatted NFT data for our application
  */
 function formatHeliusNFTData(heliusNFT) {
@@ -157,7 +236,16 @@ function formatHeliusNFTData(heliusNFT) {
       compressed: compression.compressed || false,
       tokenAddress: heliusNFT.token_info?.token_account || '',
       explorer_url: `https://solscan.io/token/${heliusNFT.id}`,
-      metadataAddress: heliusNFT.token_info?.metadata_account || ''
+      metadataAddress: heliusNFT.token_info?.metadata_account || '',
+      // Include compression details for cNFTs
+      ...(compression.compressed && {
+        compression,
+        tree: compression.tree,
+        proof: compression.proof,
+        leafId: compression.leaf_id,
+        data_hash: compression.data_hash,
+        creator_hash: compression.creator_hash
+      })
     };
   } catch (error) {
     console.error('[Helius API] Error formatting NFT data:', error.message);
@@ -171,8 +259,10 @@ function formatHeliusNFTData(heliusNFT) {
 }
 
 module.exports = {
+  fetchAllWalletNFTs,
   fetchAllNFTsByOwner,
   fetchAssetDetails,
   fetchCompressedNFTsByOwner,
-  formatHeliusNFTData
+  formatHeliusNFTData,
+  formatHeliusV0NFTData
 };

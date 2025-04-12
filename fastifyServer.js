@@ -114,6 +114,39 @@ fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
 });
 
 // Helius API endpoints for NFTs and cNFTs
+fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  if (!walletAddress) {
+    return reply.code(400).send({ error: 'Wallet address is required' });
+  }
+  
+  try {
+    fastify.log.info(`Fetching all NFTs (regular + compressed) for wallet: ${walletAddress} using v0 API`);
+    const result = await heliusApi.fetchAllWalletNFTs(walletAddress);
+    
+    // Format all NFTs to match our application's format
+    const formattedRegularNfts = result.regularNfts.map(heliusApi.formatHeliusV0NFTData);
+    const formattedCompressedNfts = result.compressedNfts.map(heliusApi.formatHeliusV0NFTData);
+    
+    return {
+      success: true,
+      data: {
+        regularNfts: formattedRegularNfts,
+        compressedNfts: formattedCompressedNfts
+      }
+    };
+  } catch (error) {
+    fastify.log.error(`Error fetching wallet NFTs: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to fetch wallet NFTs',
+      message: error.message
+    });
+  }
+});
+
+// Legacy endpoints - keeping for backward compatibility
 fastify.get('/api/helius/assets/:walletAddress', async (request, reply) => {
   const { walletAddress } = request.params;
   
@@ -122,7 +155,7 @@ fastify.get('/api/helius/assets/:walletAddress', async (request, reply) => {
   }
   
   try {
-    fastify.log.info(`Fetching all NFT assets for wallet: ${walletAddress}`);
+    fastify.log.info(`Fetching all NFT assets for wallet: ${walletAddress} using RPC API`);
     const assets = await heliusApi.fetchAllNFTsByOwner(walletAddress);
     
     // Format the assets to match our application's format
@@ -150,7 +183,7 @@ fastify.get('/api/helius/cnfts/:walletAddress', async (request, reply) => {
   }
   
   try {
-    fastify.log.info(`Fetching compressed NFTs for wallet: ${walletAddress}`);
+    fastify.log.info(`Fetching compressed NFTs for wallet: ${walletAddress} using RPC API`);
     const cnfts = await heliusApi.fetchCompressedNFTsByOwner(walletAddress);
     
     // Format the cNFTs to match our application's format
