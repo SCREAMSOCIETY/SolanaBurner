@@ -224,6 +224,13 @@ function formatHeliusNFTData(heliusNFT) {
     const metadata = heliusNFT.metadata || {};
     const compression = heliusNFT.compression || {};
     
+    // Determine if this NFT can recover rent
+    // Standard NFTs can recover rent from token accounts when burned
+    // Compressed NFTs don't have token accounts, but use less storage
+    const isCompressed = compression.compressed || false;
+    const canRecoverRent = !isCompressed;
+    const estimatedRentLamports = canRecoverRent ? 2039280 : 0; // Approximate rent for a token account in lamports
+    
     return {
       mint: heliusNFT.id,
       name: metadata.name || `NFT ${heliusNFT.id.slice(0, 8)}...`,
@@ -232,12 +239,18 @@ function formatHeliusNFTData(heliusNFT) {
       collection: metadata.collection?.name || '',
       description: content.metadata?.description || metadata.description || '',
       attributes: content.metadata?.attributes || [],
-      compressed: compression.compressed || false,
+      compressed: isCompressed,
       tokenAddress: heliusNFT.token_info?.token_account || '',
       explorer_url: `https://solscan.io/token/${heliusNFT.id}`,
       metadataAddress: heliusNFT.token_info?.metadata_account || '',
+      // Add rent information
+      rentRecovery: {
+        canRecoverRent,
+        estimatedRentLamports,
+        estimatedRentSol: estimatedRentLamports / 1000000000 // Convert lamports to SOL
+      },
       // Include compression details for cNFTs
-      ...(compression.compressed && {
+      ...(isCompressed && {
         compression,
         tree: compression.tree,
         proof: compression.proof,
@@ -252,7 +265,13 @@ function formatHeliusNFTData(heliusNFT) {
     return {
       mint: heliusNFT.id || 'unknown',
       name: `NFT ${(heliusNFT.id || 'unknown').slice(0, 8)}...`,
-      image: '/default-nft-image.svg'
+      image: '/default-nft-image.svg',
+      compressed: false,
+      rentRecovery: {
+        canRecoverRent: false,
+        estimatedRentLamports: 0,
+        estimatedRentSol: 0
+      }
     };
   }
 }

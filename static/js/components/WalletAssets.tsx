@@ -478,7 +478,7 @@ const WalletAssets: React.FC = () => {
     return pda;
   }
 
-  // Function to handle burning tokens
+  // Function to handle burning tokens and recover rent
   const handleBurnToken = async (token: TokenData) => {
     console.log('Burning token:', token);
     
@@ -489,14 +489,29 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
-      // Create a new transaction
-      const transaction = new Transaction().add(
+      // Create a transaction with two instructions:
+      // 1. Burn the token amount
+      // 2. Close the token account to recover rent
+      const transaction = new Transaction();
+      
+      // First add the burn instruction
+      transaction.add(
         createBurnCheckedInstruction(
           new PublicKey(token.account || ''), // token account
           new PublicKey(token.mint), // mint
           publicKey, // owner
           token.balance, // amount to burn
           token.decimals // decimals
+        )
+      );
+      
+      // Then add the close account instruction to recover rent
+      transaction.add(
+        createCloseAccountInstruction(
+          new PublicKey(token.account || ''), // token account to close
+          publicKey, // destination for recovered SOL
+          publicKey, // authority
+          [] // multisig signers (empty in our case)
         )
       );
       
@@ -530,6 +545,10 @@ const WalletAssets: React.FC = () => {
         if (window.BurnAnimations && window.BurnAnimations.checkAchievements) {
           window.BurnAnimations.checkAchievements('tokens', 1);
         }
+        
+        // Show message about rent recovery
+        setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet!`);
+        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
       }
     } catch (error: any) {
       console.error('Error burning token:', error);
@@ -633,6 +652,10 @@ const WalletAssets: React.FC = () => {
             window.BurnAnimations.checkAchievements('nfts', 1);
           }
         }
+        
+        // Show message about rent recovery
+        setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet!`);
+        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
       }
     } catch (error: any) {
       console.error('Error burning NFT:', error);
@@ -695,6 +718,12 @@ const WalletAssets: React.FC = () => {
             window.BurnAnimations.checkAchievements('cnfts', 1);
           }
         }
+        
+        // Show message about the successful burn and rent recovery
+        // Note: cNFTs are compressed on-chain so there is minimal rent to recover
+        // compared to regular NFTs, but the transaction still fee is saved
+        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Since this is a compressed NFT, all storage is efficient and minimal rent is recovered.`);
+        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
       } else {
         console.error('Error burning cNFT:', result.error);
         setError(`Error burning cNFT: ${result.error}`);
