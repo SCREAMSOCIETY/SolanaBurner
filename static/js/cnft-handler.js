@@ -13,6 +13,21 @@ export class CNFTHandler {
         this.wallet = wallet;
         this.metaplex = new Metaplex(connection);
     }
+    
+    // Add a method to fetch asset with proof directly
+    async fetchAssetWithProof(assetId) {
+        try {
+            console.log(`Fetching asset with proof for ${assetId}`);
+            const asset = await getAssetWithProof(
+                this.connection,
+                assetId
+            );
+            return asset;
+        } catch (error) {
+            console.error(`Error fetching asset with proof: ${error.message}`);
+            throw error;
+        }
+    }
 
     async fetchCNFTs(walletAddress) {
         try {

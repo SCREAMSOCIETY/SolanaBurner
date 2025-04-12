@@ -709,14 +709,6 @@ const WalletAssets: React.FC = () => {
       return;
     }
     
-    // Check for required compression proof data
-    const proofData = cnft.proof || cnft.compression?.proof;
-    if (!proofData) {
-      console.error('Compression proof data is required for burning cNFTs');
-      setError('Missing compression data for this cNFT. Cannot burn compressed NFT without proof data.');
-      return;
-    }
-    
     try {
       // Use the CNFTHandler to burn the compressed NFT
       const cnftHandler = new CNFTHandler(connection, {
@@ -727,43 +719,60 @@ const WalletAssets: React.FC = () => {
       // The assetId for cNFTs is the mint address
       const assetId = cnft.mint;
       
-      // Attempt to burn the cNFT using the specialized handler with the proof data we found
-      const result = await cnftHandler.burnCNFT(assetId, proofData);
+      // First, fetch the asset proof directly using the handler
+      console.log(`Fetching proof data directly for ${assetId}`);
+      setError('Fetching proof data for this cNFT...');
       
-      if (result.success) {
-        console.log('cNFT burn successful with signature:', result.signature);
-        
-        // Update the cNFTs list by removing the burnt cNFT
-        const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
-        setCnfts(updatedCnfts);
-        
-        // Apply animations if available
-        if (window.BurnAnimations) {
-          // Find the cNFT card element for burn animation
-          const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
-          if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
-            window.BurnAnimations.applyBurnAnimation(cnftCard);
-          }
+      try {
+        // Try to fetch the asset with proof first
+        const asset = await cnftHandler.fetchAssetWithProof(assetId);
+        if (asset && asset.proof) {
+          console.log('Successfully fetched proof data from blockchain');
           
-          // Show confetti animation
-          if (window.BurnAnimations.createConfetti) {
-            window.BurnAnimations.createConfetti();
+          // Attempt to burn the cNFT using the specialized handler with the fetched proof data
+          const result = await cnftHandler.burnCNFT(assetId, asset.proof);
+      
+          if (result.success) {
+            console.log('cNFT burn successful with signature:', result.signature);
+            
+            // Update the cNFTs list by removing the burnt cNFT
+            const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
+            setCnfts(updatedCnfts);
+            
+            // Apply animations if available
+            if (window.BurnAnimations) {
+              // Find the cNFT card element for burn animation
+              const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
+              if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
+                window.BurnAnimations.applyBurnAnimation(cnftCard);
+              }
+              
+              // Show confetti animation
+              if (window.BurnAnimations.createConfetti) {
+                window.BurnAnimations.createConfetti();
+              }
+              
+              // Track achievement
+              if (window.BurnAnimations.checkAchievements) {
+                window.BurnAnimations.checkAchievements('cnfts', 1);
+              }
+            }
+            
+            // Show message about the successful burn, rent recovery, and donation
+            // Note: cNFTs are compressed on-chain so there is minimal rent to recover
+            // compared to regular NFTs, but the transaction still fee is saved
+            setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Since this is a compressed NFT, all storage is efficient and minimal rent is recovered. A small donation has been sent to support the project.`);
+            setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+          } else {
+            console.error('Error burning cNFT:', result.error);
+            setError(`Error burning cNFT: ${result.error}`);
           }
-          
-          // Track achievement
-          if (window.BurnAnimations.checkAchievements) {
-            window.BurnAnimations.checkAchievements('cnfts', 1);
-          }
+        } else {
+          setError('Could not fetch proof data for this cNFT. Cannot burn without merkle proof.');
         }
-        
-        // Show message about the successful burn, rent recovery, and donation
-        // Note: cNFTs are compressed on-chain so there is minimal rent to recover
-        // compared to regular NFTs, but the transaction still fee is saved
-        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Since this is a compressed NFT, all storage is efficient and minimal rent is recovered. A small donation has been sent to support the project.`);
-        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
-      } else {
-        console.error('Error burning cNFT:', result.error);
-        setError(`Error burning cNFT: ${result.error}`);
+      } catch (innerError: any) {
+        console.error('Error fetching proof data:', innerError);
+        setError(`Error fetching proof data: ${innerError.message}`);
       }
     } catch (error: any) {
       console.error('Error burning cNFT:', error);
