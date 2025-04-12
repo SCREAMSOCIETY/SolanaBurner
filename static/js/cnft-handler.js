@@ -74,6 +74,26 @@ export class CNFTHandler {
             const publicKey = this.wallet.publicKey;
             const signTransaction = this.wallet.signTransaction;
             
+            // If the proof is missing or invalid (not an array), get it directly from the blockchain
+            console.log("Proof data:", proof);
+            let validProof = proof;
+            
+            if (!proof || !Array.isArray(proof)) {
+                console.log("Missing or invalid proof data. Fetching from blockchain...");
+                try {
+                    // Fetch the asset with proof from the blockchain
+                    const assetWithProof = await getAssetWithProof(
+                        this.connection,
+                        assetId
+                    );
+                    validProof = assetWithProof.proof;
+                    console.log("Successfully fetched proof data from blockchain");
+                } catch (proofError) {
+                    console.error("Error fetching proof data:", proofError);
+                    throw new Error("Failed to get compression proof data. Cannot burn cNFT without proof.");
+                }
+            }
+            
             const leafId = await getLeafAssetId(assetId);
             const tree = await getMerkleTree(this.connection, leafId.treeId);
             
@@ -81,7 +101,7 @@ export class CNFTHandler {
             const { tx } = await this.metaplex.nfts().builders().burn({
                 mintAddress: assetId,
                 collection: tree.collection,
-                proof: proof,
+                proof: validProof,
                 compressed: true
             });
             
