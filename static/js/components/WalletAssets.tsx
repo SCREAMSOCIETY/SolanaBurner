@@ -267,16 +267,19 @@ const WalletAssets: React.FC = () => {
           
           // Fetch regular NFTs 
           try {
-            const regularResponse = await axios.get(`/api/helius/assets/${walletAddress}`);
-            
-            if (regularResponse.data && regularResponse.data.success) {
-              const assets = regularResponse.data.data || [];
-              // Filter out compressed NFTs
-              const regularNfts = assets.filter((asset: any) => !asset.compressed);
+            if (publicKey) {
+              const address = publicKey.toBase58();
+              const regularResponse = await axios.get(`/api/helius/assets/${address}`);
               
-              console.log(`[WalletAssets] Found ${regularNfts.length} regular NFTs via fallback method`);
-              
-              setNfts(regularNfts);
+              if (regularResponse.data && regularResponse.data.success) {
+                const assets = regularResponse.data.data || [];
+                // Filter out compressed NFTs
+                const regularNfts = assets.filter((asset: any) => !asset.compressed);
+                
+                console.log(`[WalletAssets] Found ${regularNfts.length} regular NFTs via fallback method`);
+                
+                setNfts(regularNfts);
+              }
             }
           } catch (regularError) {
             console.error('[WalletAssets] Error in fallback regular NFT fetching:', regularError);
@@ -284,14 +287,17 @@ const WalletAssets: React.FC = () => {
           
           // Fetch compressed NFTs
           try {
-            const compressedResponse = await axios.get(`/api/helius/cnfts/${walletAddress}`);
-            
-            if (compressedResponse.data && compressedResponse.data.success) {
-              const compressedNfts = compressedResponse.data.data || [];
+            if (publicKey) {
+              const address = publicKey.toBase58();
+              const compressedResponse = await axios.get(`/api/helius/cnfts/${address}`);
               
-              console.log(`[WalletAssets] Found ${compressedNfts.length} compressed NFTs via fallback method`);
-              
-              setCnfts(compressedNfts);
+              if (compressedResponse.data && compressedResponse.data.success) {
+                const compressedNfts = compressedResponse.data.data || [];
+                
+                console.log(`[WalletAssets] Found ${compressedNfts.length} compressed NFTs via fallback method`);
+                
+                setCnfts(compressedNfts);
+              }
             }
           } catch (compressedError) {
             console.error('[WalletAssets] Error in fallback compressed NFT fetching:', compressedError);
@@ -318,6 +324,11 @@ const WalletAssets: React.FC = () => {
     // On-chain fallback for regular NFTs
     const fetchNFTsOnChain = async () => {
       try {
+        if (!publicKey) {
+          console.warn('[WalletAssets] Cannot fetch NFTs - no wallet connected');
+          return;
+        }
+        
         console.log('[WalletAssets] Falling back to on-chain NFT fetching...');
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
           publicKey,
@@ -415,6 +426,11 @@ const WalletAssets: React.FC = () => {
     // CNFTHandler fallback for compressed NFTs
     const fetchCNFTsWithHandler = async () => {
       try {
+        if (!publicKey) {
+          console.warn('[WalletAssets] Cannot fetch cNFTs - no wallet connected');
+          return;
+        }
+        
         console.log('[WalletAssets] Falling back to CNFTHandler method...');
         if (!signTransaction) {
           throw new Error('Wallet signTransaction capability required for CNFTHandler');

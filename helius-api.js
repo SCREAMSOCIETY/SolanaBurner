@@ -7,7 +7,7 @@ const axios = require('axios');
 // Configuration for Helius API
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-const HELIUS_REST_URL = `https://mainnet.helius.xyz/v0`;
+const HELIUS_REST_URL = `https://api.helius.xyz/v0`;
 
 /**
  * Fetches all NFTs (both regular and compressed) for a wallet address using Helius API's v0 endpoint
