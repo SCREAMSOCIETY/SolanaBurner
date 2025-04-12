@@ -65,20 +65,60 @@ export class CNFTHandler {
 
     async burnCNFT(assetId, proof) {
         try {
+            console.log(`Burning cNFT with assetId: ${assetId}`);
+            
+            if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+                throw new Error('Wallet not connected or missing signTransaction method');
+            }
+            
+            const publicKey = this.wallet.publicKey;
+            const signTransaction = this.wallet.signTransaction;
+            
             const leafId = await getLeafAssetId(assetId);
             const tree = await getMerkleTree(this.connection, leafId.treeId);
             
-            const burnIx = await this.metaplex.nfts().builders().burn({
+            // Create burn transaction using Metaplex
+            const { tx } = await this.metaplex.nfts().builders().burn({
                 mintAddress: assetId,
                 collection: tree.collection,
                 proof: proof,
                 compressed: true
             });
-
-            return burnIx;
+            
+            // Set the fee payer
+            tx.feePayer = publicKey;
+            
+            // Get recent blockhash
+            const { blockhash } = await this.connection.getLatestBlockhash();
+            tx.recentBlockhash = blockhash;
+            
+            // Sign and send transaction
+            const signedTx = await signTransaction(tx);
+            const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+            
+            // Wait for confirmation
+            const confirmation = await this.connection.confirmTransaction(signature);
+            
+            if (confirmation.value.err) {
+                console.error('Error confirming cNFT burn transaction:', confirmation.value.err);
+                return {
+                    success: false,
+                    error: confirmation.value.err,
+                    signature
+                };
+            }
+            
+            console.log('Successfully burned cNFT with signature:', signature);
+            return {
+                success: true,
+                signature
+            };
         } catch (error) {
-            console.error('Error creating burn instruction for cNFT:', error);
-            throw error;
+            console.error('Error burning cNFT:', error);
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 }

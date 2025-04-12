@@ -113,6 +113,38 @@ fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
   }
 });
 
+// Import the Solana web3.js library
+const { Connection, PublicKey } = require('@solana/web3.js');
+const { TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+
+// Create a Solana connection
+const solanaRpcUrl = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const connection = new Connection(solanaRpcUrl);
+console.log('Connected to Solana RPC at', solanaRpcUrl);
+
+// Helper function to find metadata PDA
+function findMetadataPda(mintAddress) {
+  try {
+    const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+    const seed = Buffer.from('metadata');
+    const mintPubkey = new PublicKey(mintAddress);
+    
+    const [pda] = PublicKey.findProgramAddressSync(
+      [
+        seed,
+        metadataProgramId.toBuffer(),
+        mintPubkey.toBuffer(),
+      ],
+      metadataProgramId
+    );
+    
+    return pda.toBase58();
+  } catch (error) {
+    console.error('Error finding metadata PDA:', error);
+    return null;
+  }
+}
+
 // Helius API endpoints for NFTs and cNFTs
 fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => {
   const { walletAddress } = request.params;
@@ -132,14 +164,43 @@ fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => 
     
     fastify.log.info(`Found ${regularNfts.length} regular NFTs and ${compressedNfts.length} compressed NFTs`);
     
-    // Format the assets to match our application's format
-    const formattedRegularNfts = regularNfts.map(heliusApi.formatHeliusNFTData);
+    // For regular NFTs, also fetch token accounts and metadata accounts
+    const enhancedRegularNfts = await Promise.all(
+      regularNfts.map(async (nft) => {
+        // Format base NFT data
+        const formattedNft = heliusApi.formatHeliusNFTData(nft);
+        
+        try {
+          // Find token account for this NFT
+          const ownerPubkey = new PublicKey(walletAddress);
+          const mintPubkey = new PublicKey(nft.id);
+          
+          const tokenAccounts = await connection.getTokenAccountsByOwner(
+            ownerPubkey,
+            { mint: mintPubkey }
+          );
+          
+          if (tokenAccounts.value.length > 0) {
+            formattedNft.tokenAddress = tokenAccounts.value[0].pubkey.toBase58();
+          }
+          
+          // Find metadata PDA
+          formattedNft.metadataAddress = findMetadataPda(nft.id);
+        } catch (error) {
+          console.error(`Error enhancing NFT data for ${nft.id}:`, error);
+        }
+        
+        return formattedNft;
+      })
+    );
+    
+    // Format compressed NFTs
     const formattedCompressedNfts = compressedNfts.map(heliusApi.formatHeliusNFTData);
     
     return {
       success: true,
       data: {
-        regularNfts: formattedRegularNfts,
+        regularNfts: enhancedRegularNfts,
         compressedNfts: formattedCompressedNfts
       }
     };
