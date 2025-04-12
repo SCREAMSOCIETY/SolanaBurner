@@ -130,7 +130,8 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching compressed NFTs for wallet: ${walletAddress}`);
     
-    // Using getAssetsByOwner with the compressed filter
+    // Using getAssetsByOwner and then filtering the results for compressed NFTs
+    // The displayOptions for compression was causing errors, so we'll get all NFTs and filter
     const response = await axios.post(
       HELIUS_RPC_URL,
       {
@@ -140,11 +141,7 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
         params: {
           ownerAddress: walletAddress,
           page: 1,
-          limit: 100,
-          displayOptions: {
-            showCompressedAssets: true, // Ensure we get compressed assets
-            showNativeAssets: false     // We can filter out native (normal) NFTs
-          }
+          limit: 100
         }
       },
       {
@@ -155,7 +152,9 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
     );
     
     if (response.data && response.data.result && response.data.result.items) {
-      const compressedNFTs = response.data.result.items.filter(item => item.compression && item.compression.compressed);
+      const compressedNFTs = response.data.result.items.filter(item => 
+        item.compression && item.compression.compressed === true
+      );
       console.log(`[Helius API] Found ${compressedNFTs.length} compressed NFTs`);
       return compressedNFTs;
     } else {

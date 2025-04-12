@@ -122,12 +122,19 @@ fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => 
   }
   
   try {
-    fastify.log.info(`Fetching all NFTs (regular + compressed) for wallet: ${walletAddress} using v0 API`);
-    const result = await heliusApi.fetchAllWalletNFTs(walletAddress);
+    // Use RPC API instead of v0 API since the RPC endpoint is more reliable
+    fastify.log.info(`Fetching all NFTs for wallet: ${walletAddress} using RPC API`);
+    const assets = await heliusApi.fetchAllNFTsByOwner(walletAddress);
     
-    // Format all NFTs to match our application's format
-    const formattedRegularNfts = result.regularNfts.map(heliusApi.formatHeliusV0NFTData);
-    const formattedCompressedNfts = result.compressedNfts.map(heliusApi.formatHeliusV0NFTData);
+    // Filter assets by compression
+    const regularNfts = assets.filter(nft => !nft.compression?.compressed);
+    const compressedNfts = assets.filter(nft => nft.compression?.compressed);
+    
+    fastify.log.info(`Found ${regularNfts.length} regular NFTs and ${compressedNfts.length} compressed NFTs`);
+    
+    // Format the assets to match our application's format
+    const formattedRegularNfts = regularNfts.map(heliusApi.formatHeliusNFTData);
+    const formattedCompressedNfts = compressedNfts.map(heliusApi.formatHeliusNFTData);
     
     return {
       success: true,
