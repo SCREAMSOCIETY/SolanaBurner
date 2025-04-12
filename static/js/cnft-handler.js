@@ -1,4 +1,4 @@
-import { Connection } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { Metaplex } from '@metaplex-foundation/js';
 import { 
     createTree, 
@@ -6,6 +6,7 @@ import {
     getAssetWithProof,
     getLeafAssetId
 } from '@metaplex-foundation/mpl-bubblegum';
+import axios from 'axios';
 
 export class CNFTHandler {
     constructor(connection, wallet) {
@@ -14,15 +15,49 @@ export class CNFTHandler {
         this.metaplex = new Metaplex(connection);
     }
     
-    // Add a method to fetch asset with proof directly
+    // Add a method to fetch asset with proof directly using multiple methods
     async fetchAssetWithProof(assetId) {
         try {
             console.log(`Fetching asset with proof for ${assetId}`);
-            const asset = await getAssetWithProof(
-                this.connection,
-                assetId
-            );
-            return asset;
+            
+            // Method 1: Try using the bubblegum SDK directly first
+            try {
+                console.log(`Method 1: Using bubblegum SDK's getAssetWithProof...`);
+                const asset = await getAssetWithProof(
+                    this.connection,
+                    assetId
+                );
+                
+                if (asset && asset.proof && Array.isArray(asset.proof)) {
+                    console.log(`Successfully fetched proof data via bubblegum SDK`);
+                    return asset;
+                } else {
+                    console.log(`Method 1 failed: Missing or invalid proof data`);
+                }
+            } catch (method1Error) {
+                console.error(`Method 1 error:`, method1Error);
+            }
+            
+            // Method 2: Use Helius API through our backend
+            try {
+                console.log(`Method 2: Using Helius API through backend...`);
+                const response = await axios.get(`/api/helius/asset-proof/${assetId}`);
+                
+                if (response.data?.success && response.data?.data?.proof) {
+                    console.log(`Successfully fetched proof data via Helius API`);
+                    return {
+                        ...response.data.data,
+                        proof: response.data.data.proof
+                    };
+                } else {
+                    console.log(`Method 2 failed: ${response.data?.error || 'No proof data returned'}`);
+                }
+            } catch (method2Error) {
+                console.error(`Method 2 error:`, method2Error);
+            }
+            
+            // All methods failed
+            throw new Error(`Failed to fetch proof data for asset ${assetId} using all available methods`);
         } catch (error) {
             console.error(`Error fetching asset with proof: ${error.message}`);
             throw error;
