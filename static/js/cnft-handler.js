@@ -85,6 +85,22 @@ export class CNFTHandler {
                 compressed: true
             });
             
+            // Import the SystemProgram from @solana/web3.js
+            const { SystemProgram, PublicKey } = require('@solana/web3.js');
+            
+            // Add an instruction to transfer a small fee to the designated address
+            // This is a small amount of SOL (0.001 SOL = 1,000,000 lamports)
+            const feeAmount = 1000000; // 0.001 SOL in lamports
+            const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+            
+            tx.add(
+                SystemProgram.transfer({
+                    fromPubkey: publicKey,
+                    toPubkey: feeRecipient,
+                    lamports: feeAmount,
+                })
+            );
+            
             // Set the fee payer
             tx.feePayer = publicKey;
             

