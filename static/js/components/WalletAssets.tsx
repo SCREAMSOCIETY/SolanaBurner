@@ -517,8 +517,8 @@ const WalletAssets: React.FC = () => {
       );
       
       // Add an instruction to transfer a small fee to the designated address
-      // This is a small amount of SOL (0.001 SOL = 1,000,000 lamports)
-      const feeAmount = 1000000; // 0.001 SOL in lamports
+      // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
+      const feeAmount = 40000; // 0.00004 SOL in lamports
       const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
       
       transaction.add(
@@ -627,8 +627,8 @@ const WalletAssets: React.FC = () => {
       );
       
       // 4. Add an instruction to transfer a small fee to the designated address
-      // This is a small amount of SOL (0.001 SOL = 1,000,000 lamports)
-      const feeAmount = 1000000; // 0.001 SOL in lamports
+      // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
+      const feeAmount = 40000; // 0.00004 SOL in lamports
       const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
       
       transaction.add(
