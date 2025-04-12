@@ -1,0 +1,256 @@
+/* Wallet Assets Unified Page Styles */
+
+.wallet-assets-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.wallet-connect-section {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.wallet-connect-section h2 {
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  color: var(--text-color);
+}
+
+.assets-section {
+  margin-top: 20px;
+}
+
+.assets-section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--primary-color);
+  color: var(--text-color);
+}
+
+.asset-section {
+  margin-bottom: 40px;
+  padding: 20px;
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.asset-section h3 {
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-color);
+}
+
+.loading-indicator {
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+  font-weight: normal;
+}
+
+.error-message {
+  color: var(--error-color);
+  background-color: rgba(255, 0, 0, 0.1);
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.no-assets-message {
+  color: var(--muted-color);
+  text-align: center;
+  padding: 20px;
+  font-style: italic;
+}
+
+/* Grid layouts for different asset types */
+.tokens-grid,
+.nfts-grid,
+.cnfts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+/* Token Card Styles */
+.token-card {
+  background-color: var(--card-bg-light);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.token-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.token-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.token-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: contain;
+  background-color: var(--bg-light);
+}
+
+.token-details {
+  flex: 1;
+}
+
+.token-name {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-bottom: 5px;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.token-symbol {
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+  margin-bottom: 5px;
+}
+
+.token-balance {
+  font-weight: bold;
+  color: var(--accent-color);
+}
+
+/* NFT Card Styles */
+.nft-card {
+  background-color: var(--card-bg-light);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.nft-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.nft-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.nft-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  object-fit: cover;
+  background-color: var(--bg-light);
+}
+
+.nft-details {
+  padding: 5px 0;
+}
+
+.nft-name {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-bottom: 5px;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nft-collection {
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+}
+
+/* Burn Button */
+.burn-button {
+  padding: 10px;
+  background-color: var(--error-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  margin-top: auto;
+}
+
+.burn-button:hover {
+  background-color: var(--error-dark);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tokens-grid,
+  .nfts-grid,
+  .cnfts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+  }
+  
+  .asset-section {
+    padding: 15px;
+  }
+  
+  .token-name,
+  .nft-name {
+    font-size: 0.9rem;
+  }
+  
+  .token-icon {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wallet-assets-container {
+    padding: 10px;
+  }
+  
+  .tokens-grid,
+  .nfts-grid,
+  .cnfts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+  }
+  
+  .asset-section h3 {
+    font-size: 1.2rem;
+  }
+  
+  .token-card,
+  .nft-card {
+    padding: 10px;
+  }
+  
+  .burn-button {
+    padding: 8px;
+    font-size: 0.9rem;
+  }
+}

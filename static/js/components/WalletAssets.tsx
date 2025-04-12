@@ -1,0 +1,532 @@
+import React, { useState, useEffect } from 'react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import axios from 'axios';
+import { CNFTHandler } from '../cnft-handler';
+
+// Define asset type interfaces
+interface TokenData {
+  mint: string;
+  balance: number;
+  decimals: number;
+  symbol?: string;
+  name?: string;
+  logoURI?: string;
+  account?: string;
+  selected?: boolean;
+  metadataUri?: string;
+}
+
+interface NFTData {
+  mint: string;
+  name: string;
+  image: string;
+  collection?: string;
+  selected?: boolean;
+  metadataAddress?: string;
+  tokenAddress?: string;
+}
+
+interface CNFTData {
+  mint: string;  // Using mint as the identifier
+  name: string;
+  symbol?: string;
+  image: string;
+  collection?: string;
+  description?: string;
+  attributes?: any[];
+  explorer_url?: string;
+  proof?: any;
+  selected?: boolean;
+}
+
+const WalletAssets: React.FC = () => {
+  const { connection } = useConnection();
+  const { publicKey, signTransaction } = useWallet();
+  
+  // State variables for assets
+  const [tokens, setTokens] = useState<TokenData[]>([]);
+  const [nfts, setNfts] = useState<NFTData[]>([]);
+  const [cnfts, setCnfts] = useState<CNFTData[]>([]);
+  
+  // State variables for loading and errors
+  const [tokensLoading, setTokensLoading] = useState(false);
+  const [nftsLoading, setNftsLoading] = useState(false);
+  const [cnftsLoading, setCnftsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Handle API key for Solscan
+  const [solscanApiKey, setSolscanApiKey] = useState<string | null>(null);
+  
+  // Fetch API key on component load
+  useEffect(() => {
+    // Fetch Solscan API key from our server endpoint
+    const fetchApiKey = async () => {
+      try {
+        const response = await axios.get('/api/config');
+        if (response.data && response.data.solscanApiKey) {
+          console.log('[WalletAssets] API key status:', 'Present');
+          setSolscanApiKey(response.data.solscanApiKey);
+        } else {
+          console.log('[WalletAssets] API key status:', 'Missing');
+        }
+      } catch (error) {
+        console.error('[WalletAssets] Failed to fetch API key:', error);
+      }
+    };
+
+    fetchApiKey();
+  }, []);
+
+  // Fetch tokens when wallet connects
+  useEffect(() => {
+    const fetchTokens = async () => {
+      const hasPublicKey = !!publicKey;
+      const hasSolscanKey = !!solscanApiKey;
+      
+      console.log('[WalletAssets] Token fetch effect triggered', {
+        hasPublicKey,
+        hasSolscanKey
+      });
+      
+      if (!publicKey) return;
+      
+      try {
+        console.log('[WalletAssets] Starting token fetch');
+        setTokensLoading(true);
+        setError(null);
+        
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { programId: TOKEN_PROGRAM_ID }
+        );
+        
+        console.log('[WalletAssets] Found token accounts:', tokenAccounts.value.length);
+        
+        const tokenData: TokenData[] = [];
+        for (const account of tokenAccounts.value) {
+          const parsedInfo = account.account.data.parsed.info;
+          if (Number(parsedInfo.tokenAmount.amount) > 0) {
+            tokenData.push({
+              mint: parsedInfo.mint,
+              balance: Number(parsedInfo.tokenAmount.amount),
+              decimals: parsedInfo.tokenAmount.decimals,
+              account: account.pubkey.toBase58()
+            });
+          }
+        }
+        
+        console.log('[WalletAssets] Filtered token data:', tokenData.length);
+        setTokens(tokenData);
+        
+        // Helper function for rate-limited API calls
+        const fetchWithRetry = async (mint: string, retryCount = 0): Promise<any> => {
+          try {
+            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+            
+            console.log(`[WalletAssets] Fetching metadata for token ${mint} (attempt ${retryCount + 1})`);
+            console.log(`[WalletAssets] Using Solscan API key: ${solscanApiKey ? 'Present (length: ' + solscanApiKey.length + ')' : 'Missing'}`);
+            
+            // Use our proxy endpoint instead of direct Solscan API call to avoid CORS issues
+            const url = `/api/token-metadata/${mint}`;
+            console.log(`[WalletAssets] Using proxy endpoint: ${url}`);
+            
+            const response = await axios.get(url, {
+              timeout: 10000
+            });
+            
+            console.log(`[WalletAssets] Solscan response status:`, response.status);
+            console.log(`[WalletAssets] Solscan response data:`, response.data);
+            
+            if (!response.data?.success) {
+              console.error(`[WalletAssets] Invalid response format from Solscan:`, response.data);
+              throw new Error('Invalid response format');
+            }
+            
+            return response.data;
+          } catch (error: any) {
+            console.error(
+              `[WalletAssets] Error fetching metadata for token ${mint}:`,
+              error.response?.status,
+              error.response?.statusText
+            );
+            
+            console.error(`[WalletAssets] Error details:`, error.response?.data || error.message);
+            
+            if (error.response?.status === 429 && retryCount < 3) {
+              console.warn(`[WalletAssets] Rate limit hit for ${mint}, retrying in ${(retryCount + 1) * 1000}ms`);
+              return fetchWithRetry(mint, retryCount + 1);
+            }
+            
+            if (error.response?.status === 401) {
+              console.error(`[WalletAssets] Authentication error with Solscan API. Please check your API key.`);
+            }
+            
+            throw error;
+          }
+        };
+        
+        const batchSize = 3;
+        const enrichedTokens = [];
+        
+        for (let i = 0; i < tokenData.length; i += batchSize) {
+          const batch = tokenData.slice(i, i + batchSize);
+          console.log(`[WalletAssets] Processing batch ${i / batchSize + 1}`);
+          
+          try {
+            const batchResults = await Promise.all(
+              batch.map(async (token) => {
+                try {
+                  const metadataResponse = await fetchWithRetry(token.mint);
+                  console.log(`[WalletAssets] Metadata response for token ${token.mint}:`, metadataResponse);
+                  
+                  // The structure now comes directly from our token metadata service
+                  const metadata = metadataResponse.data || {};
+                  console.log(`[WalletAssets] Successfully enriched token ${token.mint} with metadata:`, metadata);
+                  
+                  return {
+                    ...token,
+                    symbol: metadata.symbol || token.mint.slice(0, 4),
+                    name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
+                    logoURI: metadata.icon || '/default-token-icon.svg',
+                    // Ensure we have decimals for display
+                    decimals: token.decimals || metadata.decimals || 9,
+                    // Store the metadata URI for potential future use
+                    metadataUri: metadata.uri || null
+                  };
+                } catch (error) {
+                  console.warn(`[WalletAssets] Failed to fetch metadata for token ${token.mint}, using fallback data`);
+                  return {
+                    ...token,
+                    symbol: 'Unknown',
+                    name: 'Unknown Token',
+                    logoURI: '/default-token-icon.svg'
+                  };
+                }
+              })
+            );
+            
+            enrichedTokens.push(...batchResults);
+          } catch (error) {
+            console.error('[WalletAssets] Error processing batch:', error);
+          }
+        }
+        
+        console.log('[WalletAssets] Token enrichment completed:', enrichedTokens.length);
+        setTokens(enrichedTokens);
+        setTokensLoading(false);
+      } catch (err: any) {
+        console.error('[WalletAssets] Error fetching tokens:', err);
+        setError(`Error fetching tokens: ${err.message}`);
+        setTokensLoading(false);
+      }
+    };
+    
+    fetchTokens();
+  }, [publicKey, connection, solscanApiKey]);
+
+  // Fetch NFTs when wallet connects
+  useEffect(() => {
+    const fetchNFTs = async () => {
+      if (!publicKey) return;
+      
+      setNftsLoading(true);
+      setError(null);
+      
+      try {
+        console.log('[WalletAssets] Fetching NFTs...');
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { programId: TOKEN_PROGRAM_ID }
+        );
+        
+        // Filter for NFTs (tokens with amount = 1 and decimals = 0)
+        const nftAccounts = tokenAccounts.value.filter(
+          item => {
+            const tokenAmount = item.account.data.parsed.info.tokenAmount;
+            return tokenAmount.amount === "1" && tokenAmount.decimals === 0;
+          }
+        );
+        
+        console.log(`[WalletAssets] Found ${nftAccounts.length} NFT accounts`);
+        
+        // Process NFTs in batches to prevent rate limiting
+        const batchSize = 3;
+        const processedNFTs: NFTData[] = [];
+        
+        for (let i = 0; i < nftAccounts.length; i += batchSize) {
+          const batch = nftAccounts.slice(i, i + batchSize);
+          console.log(`[WalletAssets] Processing NFT batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(nftAccounts.length / batchSize)}`);
+          
+          const batchPromises = batch.map(async (nftAccount) => {
+            try {
+              const parsedInfo = nftAccount.account.data.parsed.info;
+              const mintAddress = parsedInfo.mint;
+              const metadataAddress = findMetadataPda(new PublicKey(mintAddress));
+              
+              const metadata = await connection.getAccountInfo(metadataAddress);
+              if (!metadata) {
+                console.log(`[WalletAssets] No metadata found for NFT: ${mintAddress}`);
+                return null;
+              }
+              
+              const metadataString = Buffer.from(metadata.data).toString();
+              const uriMatch = metadataString.match(/https?:\/\/\S+/);
+              
+              if (!uriMatch) {
+                console.log(`[WalletAssets] No URI found in metadata for NFT: ${mintAddress}`);
+                return null;
+              }
+              
+              let uri = uriMatch[0].split('\0')[0]; // Clean up null terminators
+              let externalMetadata: any = {};
+              
+              try {
+                // Fetch NFT metadata
+                console.log(`[WalletAssets] Fetching NFT metadata from: ${uri}`);
+                const response = await axios.get(uri);
+                externalMetadata = response.data;
+              } catch (error) {
+                console.error(`[WalletAssets] Error fetching NFT metadata from URI: ${uri}`, error);
+              }
+              
+              // Try to extract a name from the metadata
+              const nameMatch = metadataString.match(/"name":"([^"]+)"/);
+              const name = externalMetadata.name || (nameMatch ? nameMatch[1] : `NFT ${mintAddress.slice(0, 6)}`);
+              
+              // Extract image from external metadata
+              const image = externalMetadata.image || '/default-nft-image.svg';
+              
+              return {
+                mint: mintAddress,
+                name: name,
+                image: image,
+                collection: externalMetadata.collection?.name || externalMetadata.collection?.family || 'Unknown Collection',
+                tokenAddress: nftAccount.pubkey.toBase58(),
+                metadataAddress: metadataAddress.toBase58()
+              };
+            } catch (error) {
+              console.error('[WalletAssets] Error processing NFT:', error);
+              return null;
+            }
+          });
+          
+          const batchResults = await Promise.all(batchPromises);
+          processedNFTs.push(...batchResults.filter(Boolean) as NFTData[]);
+          
+          // Pause between batches to prevent rate limiting
+          if (i + batchSize < nftAccounts.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        console.log(`[WalletAssets] Successfully processed ${processedNFTs.length} NFTs`);
+        setNfts(processedNFTs);
+        setNftsLoading(false);
+      } catch (error: any) {
+        console.error('[WalletAssets] Error fetching NFTs:', error);
+        setError(`Error fetching NFTs: ${error.message}`);
+        setNftsLoading(false);
+      }
+    };
+    
+    fetchNFTs();
+  }, [publicKey, connection]);
+
+  // Fetch cNFTs when wallet connects
+  useEffect(() => {
+    const fetchCNFTs = async () => {
+      if (!publicKey || !signTransaction) return;
+      
+      setCnftsLoading(true);
+      try {
+        console.log('[WalletAssets] Fetching compressed NFTs...');
+        const cnftHandler = new CNFTHandler(connection, { publicKey, signTransaction });
+        const cnftList = await cnftHandler.fetchCNFTs(publicKey.toBase58());
+        
+        console.log(`[WalletAssets] Found ${cnftList.length} compressed NFTs`);
+        setCnfts(cnftList);
+        setCnftsLoading(false);
+      } catch (error: any) {
+        console.error('[WalletAssets] Error fetching compressed NFTs:', error);
+        setError(`Error fetching compressed NFTs: ${error.message}`);
+        setCnftsLoading(false);
+      }
+    };
+    
+    fetchCNFTs();
+  }, [publicKey, connection, signTransaction]);
+
+  // Function to format token amount for display
+  const formatTokenAmount = (balance: number, decimals: number): string => {
+    const divisor = Math.pow(10, decimals);
+    const formattedAmount = balance / divisor;
+    return formattedAmount.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: formattedAmount < 0.001 ? 8 : 4
+    });
+  };
+
+  // Helper function to find metadata PDA
+  function findMetadataPda(mint: PublicKey): PublicKey {
+    const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+    const [pda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('metadata'),
+        metadataProgramId.toBuffer(),
+        mint.toBuffer(),
+      ],
+      metadataProgramId
+    );
+    return pda;
+  }
+
+  // Function to handle burning tokens (placeholder)
+  const handleBurnToken = async (token: TokenData) => {
+    console.log('Burning token:', token);
+    // Will add implementation later
+  };
+
+  // Function to handle burning NFTs (placeholder)
+  const handleBurnNFT = async (nft: NFTData) => {
+    console.log('Burning NFT:', nft);
+    // Will add implementation later
+  };
+
+  // Function to handle burning cNFTs (placeholder)
+  const handleBurnCNFT = async (cnft: CNFTData) => {
+    console.log('Burning cNFT:', cnft);
+    // Will add implementation later
+  };
+
+  return (
+    <div className="wallet-assets-container">
+      <div className="wallet-connect-section">
+        <h2>Connect Wallet to View Assets</h2>
+        <WalletMultiButton />
+      </div>
+
+      {publicKey && (
+        <div className="assets-section">
+          <h2>Your Wallet Assets</h2>
+          
+          {/* Token Section */}
+          <div className="asset-section">
+            <h3>Tokens {tokensLoading && <span className="loading-indicator">Loading...</span>}</h3>
+            {error && <div className="error-message">{error}</div>}
+            
+            <div className="tokens-grid">
+              {tokens.map((token) => (
+                <div key={token.mint} className="token-card">
+                  <div className="token-info">
+                    <img 
+                      src={token.logoURI || '/default-token-icon.svg'} 
+                      alt={token.symbol || 'Token'} 
+                      className="token-icon" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-token-icon.svg';
+                      }}
+                    />
+                    <div className="token-details">
+                      <div className="token-name">{token.name || `Token ${token.mint.slice(0, 8)}...`}</div>
+                      <div className="token-symbol">{token.symbol || token.mint.slice(0, 4)}</div>
+                      <div className="token-balance">
+                        {formatTokenAmount(token.balance, token.decimals)}
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    className="burn-button" 
+                    onClick={() => handleBurnToken(token)}
+                  >
+                    Burn
+                  </button>
+                </div>
+              ))}
+              
+              {!tokensLoading && tokens.length === 0 && (
+                <div className="no-assets-message">No tokens found in this wallet</div>
+              )}
+            </div>
+          </div>
+          
+          {/* NFT Section */}
+          <div className="asset-section">
+            <h3>NFTs {nftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
+            
+            <div className="nfts-grid">
+              {nfts.map((nft) => (
+                <div key={nft.mint} className="nft-card">
+                  <div className="nft-info">
+                    <img 
+                      src={nft.image || '/default-nft-image.svg'} 
+                      alt={nft.name || 'NFT'} 
+                      className="nft-image" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-nft-image.svg';
+                      }}
+                    />
+                    <div className="nft-details">
+                      <div className="nft-name">{nft.name || `NFT ${nft.mint.slice(0, 8)}...`}</div>
+                      {nft.collection && <div className="nft-collection">{nft.collection}</div>}
+                    </div>
+                  </div>
+                  <button 
+                    className="burn-button" 
+                    onClick={() => handleBurnNFT(nft)}
+                  >
+                    Burn
+                  </button>
+                </div>
+              ))}
+              
+              {!nftsLoading && nfts.length === 0 && (
+                <div className="no-assets-message">No NFTs found in this wallet</div>
+              )}
+            </div>
+          </div>
+          
+          {/* Compressed NFT Section */}
+          <div className="asset-section">
+            <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
+            
+            <div className="cnfts-grid">
+              {cnfts.map((cnft) => (
+                <div key={cnft.mint} className="nft-card">
+                  <div className="nft-info">
+                    <img 
+                      src={cnft.image || '/default-nft-image.svg'} 
+                      alt={cnft.name || 'cNFT'} 
+                      className="nft-image" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-nft-image.svg';
+                      }}
+                    />
+                    <div className="nft-details">
+                      <div className="nft-name">{cnft.name || `cNFT ${cnft.mint.slice(0, 8)}...`}</div>
+                      {cnft.collection && <div className="nft-collection">{cnft.collection}</div>}
+                    </div>
+                  </div>
+                  <button 
+                    className="burn-button" 
+                    onClick={() => handleBurnCNFT(cnft)}
+                  >
+                    Burn
+                  </button>
+                </div>
+              ))}
+              
+              {!cnftsLoading && cnfts.length === 0 && (
+                <div className="no-assets-message">No compressed NFTs found in this wallet</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default WalletAssets;
