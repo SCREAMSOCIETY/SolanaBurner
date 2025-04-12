@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import { 
+  TOKEN_PROGRAM_ID, 
+  createBurnCheckedInstruction, 
+  createCloseAccountInstruction
+} from '@solana/spl-token';
 import axios from 'axios';
 import { CNFTHandler } from '../cnft-handler';
 
@@ -474,22 +478,231 @@ const WalletAssets: React.FC = () => {
     return pda;
   }
 
-  // Function to handle burning tokens (placeholder)
+  // Function to handle burning tokens
   const handleBurnToken = async (token: TokenData) => {
     console.log('Burning token:', token);
-    // Will add implementation later
+    
+    if (!publicKey || !signTransaction) {
+      console.error('Wallet connection required for burning tokens');
+      setError('Wallet connection required for burning tokens');
+      return;
+    }
+    
+    try {
+      // Create a new transaction
+      const transaction = new Transaction().add(
+        createBurnCheckedInstruction(
+          new PublicKey(token.account || ''), // token account
+          new PublicKey(token.mint), // mint
+          publicKey, // owner
+          token.balance, // amount to burn
+          token.decimals // decimals
+        )
+      );
+      
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Sign and send the transaction
+      const signedTransaction = await signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction(signature);
+      
+      if (confirmation.value.err) {
+        console.error('Error confirming burn transaction:', confirmation.value.err);
+        setError(`Error burning token: ${confirmation.value.err}`);
+      } else {
+        console.log('Token burn successful with signature:', signature);
+        
+        // Update the token list by removing the burnt token
+        const updatedTokens = tokens.filter(t => t.mint !== token.mint);
+        setTokens(updatedTokens);
+        
+        // Show a success message or perform any additional actions
+        if (window.BurnAnimations && window.BurnAnimations.createConfetti) {
+          window.BurnAnimations.createConfetti();
+        }
+        
+        if (window.BurnAnimations && window.BurnAnimations.checkAchievements) {
+          window.BurnAnimations.checkAchievements('tokens', 1);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error burning token:', error);
+      setError(`Error burning token: ${error.message}`);
+    }
   };
 
-  // Function to handle burning NFTs (placeholder)
+  // Function to handle burning NFTs
   const handleBurnNFT = async (nft: NFTData) => {
     console.log('Burning NFT:', nft);
-    // Will add implementation later
+    
+    if (!publicKey || !signTransaction) {
+      console.error('Wallet connection required for burning NFTs');
+      setError('Wallet connection required for burning NFTs');
+      return;
+    }
+    
+    try {
+      // We need tokenAddress and metadataAddress to burn an NFT
+      if (!nft.tokenAddress) {
+        console.error('Token account address is required for burning NFT');
+        setError('Could not find the token account for this NFT');
+        return;
+      }
+      
+      // Create a transaction to close the token account (burn the NFT)
+      const transaction = new Transaction();
+      
+      // 1. Burn the NFT token
+      transaction.add(
+        createBurnCheckedInstruction(
+          new PublicKey(nft.tokenAddress), // token account
+          new PublicKey(nft.mint), // mint
+          publicKey, // owner
+          1, // amount (NFTs have amount = 1)
+          0 // decimals (NFTs have decimals = 0)
+        )
+      );
+      
+      // 2. If we have the metadata account, close it to get SOL back
+      if (nft.metadataAddress) {
+        try {
+          // Create close account instruction for the metadata
+          const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+          
+          // Add a deleteMetadataAccount instruction to remove the metadata account
+          // Note: This is a complex operation that might require custom instruction creation
+          // depending on the metadata program version, for now we're leaving it out
+        } catch (error) {
+          console.warn('Could not add metadata account closing instruction:', error);
+        }
+      }
+      
+      // 3. Close the token account to recover rent
+      transaction.add(
+        createCloseAccountInstruction(
+          new PublicKey(nft.tokenAddress), // token account to close
+          publicKey, // destination for recovered SOL
+          publicKey, // owner
+          [] // multisig signers (empty in our case)
+        )
+      );
+      
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Sign and send the transaction
+      const signedTransaction = await signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction(signature);
+      
+      if (confirmation.value.err) {
+        console.error('Error confirming NFT burn transaction:', confirmation.value.err);
+        setError(`Error burning NFT: ${confirmation.value.err}`);
+      } else {
+        console.log('NFT burn successful with signature:', signature);
+        
+        // Update the NFTs list by removing the burnt NFT
+        const updatedNfts = nfts.filter(n => n.mint !== nft.mint);
+        setNfts(updatedNfts);
+        
+        // Apply animations if available
+        if (window.BurnAnimations) {
+          // Find the NFT card element for burn animation
+          const nftCard = document.querySelector(`[data-mint="${nft.mint}"]`) as HTMLElement;
+          if (nftCard && window.BurnAnimations.applyBurnAnimation) {
+            window.BurnAnimations.applyBurnAnimation(nftCard);
+          }
+          
+          // Show confetti animation
+          if (window.BurnAnimations.createConfetti) {
+            window.BurnAnimations.createConfetti();
+          }
+          
+          // Track achievement
+          if (window.BurnAnimations.checkAchievements) {
+            window.BurnAnimations.checkAchievements('nfts', 1);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Error burning NFT:', error);
+      setError(`Error burning NFT: ${error.message}`);
+    }
   };
 
-  // Function to handle burning cNFTs (placeholder)
+  // Function to handle burning compressed NFTs (cNFTs)
   const handleBurnCNFT = async (cnft: CNFTData) => {
     console.log('Burning cNFT:', cnft);
-    // Will add implementation later
+    
+    if (!publicKey || !signTransaction) {
+      console.error('Wallet connection required for burning cNFTs');
+      setError('Wallet connection required for burning cNFTs');
+      return;
+    }
+    
+    // Check for required compression proof data
+    if (!cnft.proof) {
+      console.error('Compression proof data is required for burning cNFTs');
+      setError('Missing compression data for this cNFT. Cannot burn compressed NFT without proof data.');
+      return;
+    }
+    
+    try {
+      // Use the CNFTHandler to burn the compressed NFT
+      const cnftHandler = new CNFTHandler(connection, {
+        publicKey, 
+        signTransaction
+      });
+      
+      // The assetId for cNFTs is the mint address
+      const assetId = cnft.mint;
+      
+      // Attempt to burn the cNFT using the specialized handler
+      const result = await cnftHandler.burnCNFT(assetId, cnft.proof);
+      
+      if (result.success) {
+        console.log('cNFT burn successful with signature:', result.signature);
+        
+        // Update the cNFTs list by removing the burnt cNFT
+        const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
+        setCnfts(updatedCnfts);
+        
+        // Apply animations if available
+        if (window.BurnAnimations) {
+          // Find the cNFT card element for burn animation
+          const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
+          if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
+            window.BurnAnimations.applyBurnAnimation(cnftCard);
+          }
+          
+          // Show confetti animation
+          if (window.BurnAnimations.createConfetti) {
+            window.BurnAnimations.createConfetti();
+          }
+          
+          // Track achievement
+          if (window.BurnAnimations.checkAchievements) {
+            window.BurnAnimations.checkAchievements('cnfts', 1);
+          }
+        }
+      } else {
+        console.error('Error burning cNFT:', result.error);
+        setError(`Error burning cNFT: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error('Error burning cNFT:', error);
+      setError(`Error burning cNFT: ${error.message}`);
+    }
   };
 
   return (
