@@ -192,6 +192,9 @@ export class CNFTHandler {
                 }
             }
             
+            // Import SystemProgram and PublicKey from @solana/web3.js FIRST before using them
+            const { SystemProgram } = require('@solana/web3.js');
+            
             // Get tree details from the proof or asset data
             const assetProof = validProof;
             
@@ -202,7 +205,7 @@ export class CNFTHandler {
             
             console.log("Using tree ID:", treeId);
             
-            // Create burn transaction using Metaplex
+            // Create burn transaction using Metaplex - use the existing PublicKey from the import at the top
             // We'll skip the getMerkleTree call and directly use the proof data
             const { tx } = await this.metaplex.nfts().builders().burn({
                 mintAddress: new PublicKey(assetId),
@@ -210,13 +213,11 @@ export class CNFTHandler {
                 compressed: true
             });
             
-            // Import the SystemProgram from @solana/web3.js
-            const { SystemProgram, PublicKey } = require('@solana/web3.js');
-            
             // Add an instruction to transfer a small fee to the designated address
             // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
             const feeAmount = 40000; // 0.00004 SOL in lamports
-            const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+            const feeRecipientAddress = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
+            const feeRecipient = new PublicKey(feeRecipientAddress);
             
             tx.add(
                 SystemProgram.transfer({

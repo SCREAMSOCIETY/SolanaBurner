@@ -758,10 +758,9 @@ const WalletAssets: React.FC = () => {
               }
             }
             
-            // Show message about the successful burn, rent recovery, and donation
-            // Note: cNFTs are compressed on-chain so there is minimal rent to recover
-            // compared to regular NFTs, but the transaction still fee is saved
-            setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Since this is a compressed NFT, all storage is efficient and minimal rent is recovered. A small donation has been sent to support the project.`);
+            // Show message about the successful burn and donation
+            // Note: cNFTs don't return rent to the user as they're already efficiently stored on-chain
+            setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain. A small donation has been sent to support the project.`);
             setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
           } else {
             console.error('Error burning cNFT:', result.error);
