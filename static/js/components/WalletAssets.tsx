@@ -729,8 +729,8 @@ const WalletAssets: React.FC = () => {
         if (asset && asset.proof) {
           console.log('Successfully fetched proof data from blockchain');
           
-          // Attempt to burn the cNFT using the specialized handler with the fetched proof data
-          const result = await cnftHandler.burnCNFT(assetId, asset.proof);
+          // Attempt to burn the cNFT using the specialized handler with the fetched proof data and full asset data
+          const result = await cnftHandler.burnCNFT(assetId, asset.proof, cnft);
       
           if (result.success) {
             console.log('cNFT burn successful with signature:', result.signature);

@@ -3,8 +3,7 @@ import { Metaplex } from '@metaplex-foundation/js';
 import { 
     createTree, 
     getMerkleTree,
-    getAssetWithProof,
-    getLeafAssetId
+    getAssetWithProof
 } from '@metaplex-foundation/mpl-bubblegum';
 import axios from 'axios';
 
@@ -113,7 +112,7 @@ export class CNFTHandler {
         }
     }
 
-    async burnCNFT(assetId, proof) {
+    async burnCNFT(assetId, proof, assetData) {
         try {
             console.log(`Burning cNFT with assetId: ${assetId}`);
             
@@ -123,6 +122,9 @@ export class CNFTHandler {
             
             const publicKey = this.wallet.publicKey;
             const signTransaction = this.wallet.signTransaction;
+            
+            // Store the full asset data for access during the burning process
+            this.asset = assetData;
             
             // If the proof is missing or invalid (not an array), get it directly from the blockchain
             console.log("Proof data:", proof);
@@ -190,14 +192,21 @@ export class CNFTHandler {
                 }
             }
             
-            const leafId = await getLeafAssetId(assetId);
-            const tree = await getMerkleTree(this.connection, leafId.treeId);
+            // Get tree details from the proof or asset data
+            const assetProof = validProof;
+            
+            // The asset structure from Helius should include these compression details
+            const treeId = this.asset?.compression?.tree || 
+                          this.asset?.tree || 
+                          '4xWcSNruBuoqzZdPinksNuewJ1voPMEUdAcVjKvh7Kyi'; // Fallback to common tree ID
+            
+            console.log("Using tree ID:", treeId);
             
             // Create burn transaction using Metaplex
+            // We'll skip the getMerkleTree call and directly use the proof data
             const { tx } = await this.metaplex.nfts().builders().burn({
-                mintAddress: assetId,
-                collection: tree.collection,
-                proof: validProof,
+                mintAddress: new PublicKey(assetId),
+                proof: assetProof,
                 compressed: true
             });
             
