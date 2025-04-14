@@ -205,7 +205,9 @@ export class CNFTHandler {
             
             console.log("Using tree ID:", treeId);
             
-            // Create burn transaction using Metaplex - use the existing PublicKey from the import at the top
+            // Create burn transaction using Metaplex - don't rely on top-level imports for PublicKey
+            // Instead, use the PublicKey from web3.js imported above
+            const { PublicKey } = require('@solana/web3.js');
             // We'll skip the getMerkleTree call and directly use the proof data
             const { tx } = await this.metaplex.nfts().builders().burn({
                 mintAddress: new PublicKey(assetId),
