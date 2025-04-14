@@ -13,7 +13,37 @@ export class CNFTHandler {
     constructor(connection, wallet) {
         this.connection = connection;
         this.wallet = wallet;
+        
+        // Create Metaplex instance with wallet identity
         this.metaplex = new Metaplex(connection);
+        
+        // Set up the identity properly for the Metaplex instance
+        if (wallet && wallet.publicKey) {
+            // Import required classes
+            const { Keypair } = require('@solana/web3.js');
+            const { keypairIdentity, walletAdapterIdentity } = require('@metaplex-foundation/js');
+            
+            // Create a complete wallet adapter that includes all methods Metaplex might need
+            const walletAdapter = {
+                publicKey: wallet.publicKey,
+                signTransaction: wallet.signTransaction?.bind(wallet),
+                signAllTransactions: wallet.signAllTransactions?.bind(wallet),
+                // Add a signMessage method if the wallet has one, otherwise provide a fallback
+                signMessage: wallet.signMessage 
+                    ? wallet.signMessage.bind(wallet)
+                    : (message) => { 
+                        console.warn("Wallet does not support signMessage, using fallback");
+                        // Return a promise that resolves to a Uint8Array (signature format)
+                        return Promise.resolve(new Uint8Array(32));
+                    }
+            };
+            
+            // Set the wallet adapter as the identity for Metaplex
+            this.metaplex.use(walletAdapterIdentity(walletAdapter));
+            console.log("Set wallet adapter identity for Metaplex with public key:", wallet.publicKey.toString());
+        } else {
+            console.warn("No wallet provided to CNFTHandler, Metaplex operations will be limited");
+        }
     }
     
     // Add a method to fetch asset with proof directly using multiple methods
@@ -303,7 +333,71 @@ export class CNFTHandler {
                         console.log("Method 3 succeeded: Created transaction with direct burn instruction");
                     } catch (method3Error) {
                         console.error("Method 3 failed:", method3Error);
-                        throw new Error("Failed to create cNFT burn transaction: All methods failed");
+                        
+                        try {
+                            // Method 4: Direct low-level approach using basic Transaction
+                            console.log("Attempting Method 4: Direct low-level transaction construction");
+                            
+                            // Manually import required modules
+                            const { Transaction, PublicKey, SYSVAR_RENT_PUBKEY, SystemProgram, SYSVAR_CLOCK_PUBKEY } = require('@solana/web3.js');
+                            
+                            // Create transaction manually
+                            tx = new Transaction();
+                            
+                            // Get the Bubblegum program ID
+                            const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+                            
+                            // Create the tree address from the tree ID
+                            const treeAddress = new PublicKey(treeId);
+                            
+                            // Get tree authority PDA
+                            const [treeAuthority] = PublicKey.findProgramAddressSync(
+                                [treeAddress.toBuffer()],
+                                BUBBLEGUM_PROGRAM_ID
+                            );
+                            
+                            // Create instruction accounts
+                            const accounts = [
+                                { pubkey: treeAuthority, isSigner: false, isWritable: true },
+                                { pubkey: publicKey, isSigner: true, isWritable: true },
+                                { pubkey: publicKey, isSigner: true, isWritable: false },
+                                { pubkey: treeAddress, isSigner: false, isWritable: true },
+                                { pubkey: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"), isSigner: false, isWritable: false },
+                                { pubkey: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"), isSigner: false, isWritable: false }
+                            ];
+                            
+                            // Add the proof accounts
+                            assetProof.forEach(node => {
+                                accounts.push({
+                                    pubkey: new PublicKey(node),
+                                    isSigner: false,
+                                    isWritable: false
+                                });
+                            });
+                            
+                            // Create the data for the instruction
+                            const dataLayout = {
+                                index: 13, // burn instruction index
+                                root: assetProof[0],
+                                dataHash: this.asset?.compression?.data_hash,
+                                creatorHash: this.asset?.compression?.creator_hash,
+                                nonce: this.asset?.compression?.leaf_id || 0,
+                                index: this.asset?.compression?.leaf_id || 0
+                            };
+                            
+                            // Add the instruction to the transaction
+                            tx.add({
+                                programId: BUBBLEGUM_PROGRAM_ID,
+                                keys: accounts,
+                                data: Buffer.from(JSON.stringify(dataLayout))
+                            });
+                            
+                            console.log("Method 4 succeeded: Created transaction with direct low-level approach");
+                            
+                        } catch (method4Error) {
+                            console.error("Method 4 failed:", method4Error);
+                            throw new Error("Failed to create cNFT burn transaction: All methods failed");
+                        }
                     }
                 }
             }
