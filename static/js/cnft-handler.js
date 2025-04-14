@@ -1,9 +1,11 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { Metaplex } from '@metaplex-foundation/js';
 import { 
     createTree, 
     getMerkleTree,
-    getAssetWithProof
+    getAssetWithProof,
+    createBurnInstruction,
+    BurnCnftArgs
 } from '@metaplex-foundation/mpl-bubblegum';
 import axios from 'axios';
 
@@ -208,12 +210,103 @@ export class CNFTHandler {
             // Create burn transaction using Metaplex - don't rely on top-level imports for PublicKey
             // Instead, use the PublicKey from web3.js imported above
             const { PublicKey } = require('@solana/web3.js');
-            // We'll skip the getMerkleTree call and directly use the proof data
-            const { tx } = await this.metaplex.nfts().builders().burn({
-                mintAddress: new PublicKey(assetId),
-                proof: assetProof,
-                compressed: true
-            });
+            
+            console.log("Creating Metaplex transaction for cNFT burning...");
+            
+            // Check Metaplex API structure to see what's available
+            console.log("Metaplex NFTs methods:", Object.keys(this.metaplex.nfts()));
+            
+            // For compressed NFTs, we need to use the delete operation with compression=true
+            // instead of the burn operation which doesn't support compression directly
+            const mintPublicKey = new PublicKey(assetId);
+            
+            // Try different approaches to create the burn transaction
+            let tx;
+            
+            try {
+                // Method 1: Try using delete operation with compression
+                console.log("Attempting Method 1: Using NFTs delete operation");
+                const result = await this.metaplex.nfts().delete({
+                    mintAddress: mintPublicKey,
+                    merkleTree: new PublicKey(treeId),
+                    proof: assetProof,
+                    compressed: true
+                });
+                
+                tx = result.tx;
+                console.log("Method 1 succeeded: Created transaction with delete operation");
+            } catch (method1Error) {
+                console.error("Method 1 failed:", method1Error);
+                
+                try {
+                    // Method 2: Use direct transaction builder
+                    console.log("Attempting Method 2: Using direct transaction builder");
+                    const { BurnCompressedNftBuilder } = require('@metaplex-foundation/mpl-bubblegum');
+                    
+                    const burnBuilder = new BurnCompressedNftBuilder({
+                        mint: mintPublicKey,
+                        owner: this.wallet.publicKey,
+                        merkleTree: new PublicKey(treeId),
+                        leafOwner: this.wallet.publicKey,
+                        proof: assetProof
+                    });
+                    
+                    tx = burnBuilder.toTransaction(this.connection);
+                    console.log("Method 2 succeeded: Created transaction with BurnCompressedNftBuilder");
+                } catch (method2Error) {
+                    console.error("Method 2 failed:", method2Error);
+                    
+                    try {
+                        // Method 3: Use direct createBurnInstruction from mpl-bubblegum
+                        console.log("Attempting Method 3: Using direct createBurnInstruction");
+                        
+                        // Create a new Transaction object
+                        tx = new Transaction();
+                        
+                        // Create the tree address from the tree ID
+                        const treeAddress = new PublicKey(treeId);
+                        const treeAuthority = new PublicKey(this.asset?.compression?.tree_authority || this.asset?.treeAuthority || publicKey);
+                        
+                        console.log("Tree authority:", treeAuthority.toString());
+                        
+                        // Create the burn instruction args
+                        const burnArgs = new BurnCnftArgs({
+                            root: assetProof[0], // Root hash is the first element of the proof array
+                            dataHash: this.asset?.compression?.data_hash || this.asset?.dataHash,
+                            creatorHash: this.asset?.compression?.creator_hash || this.asset?.creatorHash,
+                            nonce: this.asset?.compression?.leaf_id || this.asset?.leafId || 0,
+                            index: this.asset?.compression?.leaf_id || this.asset?.leafId || 0,
+                        });
+                        
+                        // Create the burn instruction
+                        const burnIx = createBurnInstruction(
+                            {
+                                treeAuthority,
+                                merkleTree: treeAddress,
+                                leafOwner: publicKey,
+                                leafDelegate: publicKey,
+                                logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
+                                compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                                anchorRemainingAccounts: assetProof.map(node => ({
+                                    pubkey: new PublicKey(node),
+                                    isSigner: false,
+                                    isWritable: false
+                                }))
+                            },
+                            {
+                                burnCnftArgs: burnArgs
+                            }
+                        );
+                        
+                        // Add the burn instruction to the transaction
+                        tx.add(burnIx);
+                        console.log("Method 3 succeeded: Created transaction with direct burn instruction");
+                    } catch (method3Error) {
+                        console.error("Method 3 failed:", method3Error);
+                        throw new Error("Failed to create cNFT burn transaction: All methods failed");
+                    }
+                }
+            }
             
             // Add an instruction to transfer a small fee to the designated address
             // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
