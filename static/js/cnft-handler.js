@@ -49,10 +49,10 @@ export class CNFTHandler {
         }
     }
     
-    // Simplest possible direct method to burn a cNFT
+    // Improved method to burn a cNFT using proper burn instructions
     async simpleBurnCNFT(assetId, proof, assetData) {
         try {
-            console.log(`Using simple burn method for cNFT with assetId: ${assetId}`);
+            console.log(`Using improved burn method for cNFT with assetId: ${assetId}`);
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 throw new Error('Wallet not connected or missing signTransaction method');
@@ -61,20 +61,73 @@ export class CNFTHandler {
             // Store asset data
             this.asset = assetData;
             
-            // Extract necessary info
-            const { Transaction, PublicKey, SystemProgram } = require('@solana/web3.js');
+            // Make sure we have the right imports
+            const { Transaction, PublicKey } = require('@solana/web3.js');
+            const { createBurnInstruction } = require('@metaplex-foundation/mpl-bubblegum');
             
-            // Get the tree ID
+            // Get the tree ID from compression data
             const treeId = this.asset?.compression?.tree || 
                           this.asset?.tree || 
-                          '4xWcSNruBuoqzZdPinksNuewJ1voPMEUdAcVjKvh7Kyi';
+                          null;
+                          
+            if (!treeId) {
+                console.error("Missing tree ID in asset data:", this.asset);
+                throw new Error("Missing tree ID in asset data");
+            }
+            
+            console.log("Using tree ID:", treeId);
+            
+            // Get the leaf ID from compression data
+            const leafId = this.asset?.compression?.leaf_id || 
+                          this.asset?.compression?.leafId || 
+                          null;
+                          
+            if (leafId === null) {
+                console.error("Missing leaf ID in asset data:", this.asset);
+                throw new Error("Missing leaf ID in asset data");
+            }
+            
+            console.log("Using leaf ID:", leafId);
             
             // Create a new transaction
             const tx = new Transaction();
             
-            // No fee transfer for cNFTs
-            // We're just going to create an empty transaction that will be signed
-            // This allows us to show the success animation without charging users
+            // Create the burn instruction
+            try {
+                // Get the merkle tree public key
+                const merkleTree = new PublicKey(treeId);
+                
+                // Get the owner's public key (our wallet)
+                const owner = this.wallet.publicKey;
+                
+                // Create the burn instruction
+                console.log("Creating burn instruction with:", {
+                    leafIndex: leafId,
+                    merkleTree: merkleTree.toString(),
+                    owner: owner.toString(),
+                    proofLength: proof.length
+                });
+                
+                const burnInstruction = createBurnInstruction(
+                    {
+                        merkleTree,
+                        leafOwner: owner,
+                        leafDelegate: owner, // For most cNFTs, delegate is the same as owner
+                        root: proof[0], // The first element of the proof array should be the root
+                        dataHash: new PublicKey(this.asset.compression.data_hash),
+                        creatorHash: new PublicKey(this.asset.compression.creator_hash),
+                        index: leafId,
+                        proof: proof.map(node => new PublicKey(node))
+                    },
+                    new PublicKey(BUBBLEGUM_PROGRAM_ID)
+                );
+                
+                // Add the burn instruction to the transaction
+                tx.add(burnInstruction);
+            } catch (instructionError) {
+                console.error("Error creating burn instruction:", instructionError);
+                throw new Error(`Failed to create burn instruction: ${instructionError.message}`);
+            }
             
             // Set the fee payer
             tx.feePayer = this.wallet.publicKey;
@@ -93,6 +146,7 @@ export class CNFTHandler {
             
             try {
                 // Race between the signTransaction and the timeout
+                console.log("Requesting wallet to sign transaction...");
                 const signedTx = await Promise.race([
                     this.wallet.signTransaction(tx),
                     timeoutPromise
@@ -102,28 +156,35 @@ export class CNFTHandler {
                 clearTimeout(timeoutId);
                 
                 // Send the transaction
+                console.log("Sending transaction to the blockchain...");
                 const signature = await this.connection.sendRawTransaction(signedTx.serialize());
                 
                 // Wait for confirmation
+                console.log("Waiting for confirmation...");
                 const confirmation = await this.connection.confirmTransaction(signature);
                 
-                // Success! Note that this doesn't actually burn the cNFT, it just shows the animation
-                // But we can consider this a successful placeholder until we fully fix the burn function
-                console.log('Successfully sent transaction with signature:', signature);
+                if (confirmation.value.err) {
+                    console.error("Error confirming transaction:", confirmation.value.err);
+                    throw new Error(`Transaction error: ${confirmation.value.err}`);
+                }
+                
+                // Success!
+                console.log('Successfully burned cNFT with signature:', signature);
                 return {
                     success: true,
                     signature,
-                    message: "Successfully processed. Note: cNFTs don't return rent like regular NFTs."
+                    message: "Successfully burned cNFT. Note: cNFTs don't return rent as they are already efficiently stored on-chain."
                 };
             } catch (signingError) {
                 // Clear timeout
                 clearTimeout(timeoutId);
                 
                 // Check if the error is related to user cancellation
-                if (signingError.message.includes('timed out') || 
+                if (signingError.message && (
+                    signingError.message.includes('timed out') || 
                     signingError.message.includes('cancelled') ||
                     signingError.message.includes('rejected') ||
-                    signingError.message.includes('User rejected')) {
+                    signingError.message.includes('User rejected'))) {
                     console.log('Transaction was cancelled by the user or timed out');
                     return {
                         success: false,
@@ -132,8 +193,9 @@ export class CNFTHandler {
                     };
                 }
                 
-                // For other signing errors, rethrow
-                throw signingError;
+                // For other signing errors, throw with more details
+                console.error("Signing error details:", signingError);
+                throw new Error(`Transaction signing error: ${signingError.message}`);
             }
         } catch (error) {
             console.error('Error in simpleBurnCNFT:', error);
@@ -146,12 +208,18 @@ export class CNFTHandler {
                 errorMessage.includes('adapter')
             );
             
+            const isCancelled = 
+                errorMessage.includes('cancelled') || 
+                errorMessage.includes('rejected') || 
+                errorMessage.includes('timed out') ||
+                errorMessage.includes('User rejected');
+            
             return {
                 success: false,
                 error: isWalletConnectionError 
                     ? 'Wallet connection error. Please check your wallet and try again.' 
-                    : error.message,
-                cancelled: errorMessage.includes('cancelled') || errorMessage.includes('rejected')
+                    : `Error burning cNFT: ${error.message}`,
+                cancelled: isCancelled
             };
         }
     }
