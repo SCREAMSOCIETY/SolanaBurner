@@ -903,12 +903,12 @@ const WalletAssets: React.FC = () => {
   // Function to handle burning compressed NFTs (cNFTs)
   const handleBurnCNFT = async (cnft: CNFTData) => {
     if (!publicKey || !signTransaction) {
-      setError('Wallet connection required for burning cNFTs');
+      setError('Wallet connection required for trading cNFTs to burn wallet');
       return;
     }
     
     try {
-      setError(`Starting burn process for "${cnft.name}"...`);
+      setError(`Starting trade-to-burn process for "${cnft.name}"...`);
       
       // Create a CNFTHandler instance
       const cnftHandler = new CNFTHandler(connection, {
@@ -921,13 +921,13 @@ const WalletAssets: React.FC = () => {
       if (typeof window !== 'undefined' && window.debugInfo) {
         window.debugInfo.cnftBurnTriggered = true;
         window.debugInfo.lastCnftData = cnft;
-        window.debugInfo.lastCnftError = 'Starting cNFT burn process';
+        window.debugInfo.lastCnftError = 'Starting cNFT trade-to-burn process';
       }
       
       try {
-        // Strategy 1: Try the server-side burning approach first (newest approach)
-        setError('Trying server-side burning approach...');
-        console.log("Using serverBurnCNFT method for cNFT:", cnft.mint);
+        // Strategy 1: Try the server-side trade-to-burn approach first (newest approach)
+        setError('Trying server-side trade-to-burn approach...');
+        console.log("Using serverBurnCNFT method to trade cNFT to burn wallet:", cnft.mint);
         
         const serverResult = await cnftHandler.serverBurnCNFT(cnft.mint);
         
@@ -944,19 +944,19 @@ const WalletAssets: React.FC = () => {
           setError('First approach failed. Trying direct method...');
         }
         
-        // Strategy 2: Try the direct burning approach next
+        // Strategy 2: Try the direct trade-to-burn approach next
         // First, fetch the asset with proof
         setError('Fetching proof data...');
         const asset = await cnftHandler.fetchAssetWithProof(cnft.mint);
         
         if (!asset || !asset.proof) {
-          setError('Could not fetch proof data. Cannot burn this cNFT.');
+          setError('Could not fetch proof data. Cannot trade this cNFT to burn wallet.');
           return;
         }
         
-        // Try our directBurnCNFT method
-        setError('Trying direct burning approach. Please approve in your wallet...');
-        console.log("Using directBurnCNFT method for cNFT:", cnft.mint);
+        // Try our directBurnCNFT method (actually trades to burn wallet)
+        setError('Trying direct trade-to-burn approach. Please approve in your wallet...');
+        console.log("Using directBurnCNFT method to trade cNFT to burn wallet:", cnft.mint);
         const directResult = await cnftHandler.directBurnCNFT(cnft.mint, asset.proof);
         
         if (directResult.success) {
@@ -972,9 +972,9 @@ const WalletAssets: React.FC = () => {
           setError('Second approach failed. Trying final fallback method...');
         }
         
-        // Strategy 3: Try the original method as last resort
-        setError('Trying original burning approach. Please approve in your wallet...');
-        console.log("Using simpleBurnCNFT method for cNFT:", cnft.mint);
+        // Strategy 3: Try the original trade-to-burn method as last resort
+        setError('Trying original trade-to-burn approach. Please approve in your wallet...');
+        console.log("Using simpleBurnCNFT method to trade cNFT to burn wallet:", cnft.mint);
         const fallbackResult = await cnftHandler.simpleBurnCNFT(cnft.mint, asset.proof, cnft);
         
         if (fallbackResult.success) {
@@ -986,24 +986,24 @@ const WalletAssets: React.FC = () => {
           setError('Transaction was cancelled. Please try again if you want to burn this asset.');
         } else {
           // All methods failed
-          console.error("All methods failed!");
-          setError(`Error burning cNFT: All methods failed. ${fallbackResult.error || 'Unknown error'}`);
+          console.error("All trade-to-burn methods failed!");
+          setError(`Error trading cNFT to burn wallet: All methods failed. ${fallbackResult.error || 'Unknown error'}`);
         }
       } catch (innerError: any) {
-        console.error('Error in cNFT burn operation:', innerError);
+        console.error('Error in cNFT trade-to-burn operation:', innerError);
         
         if (innerError.message && (
             innerError.message.includes('cancel') || 
             innerError.message.includes('reject') || 
             innerError.message.includes('User'))) {
-          setError('Transaction was cancelled. Please try again if you want to burn this asset.');
+          setError('Transaction was cancelled. Please try again if you want to trade this cNFT to burn wallet.');
         } else {
-          setError(`Error burning cNFT: ${innerError.message}`);
+          setError(`Error trading cNFT to burn wallet: ${innerError.message}`);
         }
       }
     } catch (error: any) {
-      console.error('Error burning cNFT:', error);
-      setError(`Error burning cNFT: ${error.message}`);
+      console.error('Error trading cNFT to burn wallet:', error);
+      setError(`Error trading cNFT to burn wallet: ${error.message}`);
     }
   };
   
