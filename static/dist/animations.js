@@ -57,14 +57,7 @@ function createConfetti() {
   confettiContainer.className = 'confetti-container';
   document.body.appendChild(confettiContainer);
   
-  // Use our theme colors - accent, secondary, and variations
-  const colors = [
-    'var(--color-accent, #ff6b6b)',          // Accent
-    'var(--color-accent-light, #ff9c9c)',    // Accent light
-    'var(--color-secondary, #4b3f72)',       // Secondary 
-    'var(--color-secondary-light, #6c5d94)', // Secondary light
-    'var(--color-primary-light, #2a2a3e)'    // Primary light
-  ];
+  const colors = ['#FF5252', '#FFD740', '#00C853', '#448AFF', '#E040FB', '#FF6E40'];
   
   for (let i = 0; i < 150; i++) {
     const confetti = document.createElement('div');
@@ -73,28 +66,13 @@ function createConfetti() {
     confetti.style.left = Math.random() * 100 + 'vw';
     confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
     confetti.style.animationDelay = Math.random() * 2 + 's';
-    
-    // Add some different confetti shapes
-    if (i % 3 === 0) {
-      confetti.style.borderRadius = '0'; // Square
-    } else if (i % 3 === 1) {
-      confetti.style.borderRadius = '50%'; // Circle
-    } else {
-      confetti.style.borderRadius = '3px'; // Rounded square
-    }
-    
-    // Vary the size a bit
-    const size = Math.random() * 5 + 8; // Between 8 and 13px
-    confetti.style.width = `${size}px`;
-    confetti.style.height = `${size}px`;
-    
     confettiContainer.appendChild(confetti);
   }
   
   // Remove confetti after animation completes
   setTimeout(() => {
     confettiContainer.remove();
-  }, 6000); // Slightly longer duration
+  }, 5000);
 }
 
 // Toggle dark mode theme
@@ -184,20 +162,14 @@ function showAchievement(title, description) {
 
 // Update progress bar
 function updateProgress(currentVal, maxVal, level) {
-  const progressBar = document.querySelector('.progress-bar');
+  const progressBar = document.querySelector('.level-progress-bar');
   const levelEl = document.querySelector('.current-level');
-  const levelIcon = document.querySelector('.level-icon');
   
   if (!progressBar || !levelEl) return;
   
   const progress = Math.min((currentVal / maxVal) * 100, 100);
   progressBar.style.width = progress + '%';
   levelEl.textContent = level;
-  
-  // Update the level icon if it exists
-  if (levelIcon) {
-    levelIcon.textContent = level;
-  }
 }
 
 // Save achievements to localStorage
@@ -302,20 +274,12 @@ function initUIEnhancements() {
   if (!document.querySelector('.level-indicator')) {
     const levelEl = document.createElement('div');
     levelEl.className = 'level-indicator';
-    
-    // Create new improved level indicator with icon
     levelEl.innerHTML = `
-      <div class="level-icon">${Math.floor((JSON.parse(localStorage.getItem('burnStats') || '{}')).tokens || 0 + 
-                                          (JSON.parse(localStorage.getItem('burnStats') || '{}')).nfts || 0 + 
-                                          (JSON.parse(localStorage.getItem('burnStats') || '{}')).cnfts || 0) / 5 + 1}</div>
-      <div class="level-info">
-        <div class="level-label">Burn Level <span class="current-level">1</span></div>
-        <div class="progress-container">
-          <div class="progress-bar"></div>
-        </div>
+      <div class="level-label">Level <span class="current-level">1</span></div>
+      <div class="level-progress">
+        <div class="level-progress-bar"></div>
       </div>
     `;
-    
     document.body.appendChild(levelEl);
     
     // Initialize level progress
@@ -381,12 +345,9 @@ function addAnimationStyles() {
         left: 0;
         width: 100%;
         height: 100%;
-        background: linear-gradient(to bottom, 
-                    rgba(255, 107, 107, 0.3), /* Accent color with transparency */
-                    rgba(75, 63, 114, 0.5)); /* Secondary color with transparency */
+        background: linear-gradient(to bottom, rgba(255, 165, 0, 0.3), rgba(255, 0, 0, 0.5));
         z-index: 2;
         animation: burn 2s forwards;
-        border-radius: 8px;
       }
       
       @keyframes burn {
@@ -398,7 +359,7 @@ function addAnimationStyles() {
         }
         100% {
           opacity: 1;
-          background: var(--color-primary-dark, rgba(14, 14, 26, 0.9));
+          background: rgba(0, 0, 0, 0.9);
         }
       }
       
@@ -407,7 +368,7 @@ function addAnimationStyles() {
         bottom: 0;
         width: 3px;
         height: 3px;
-        background-color: var(--color-accent, #ff6b6b);
+        background-color: #ff6a00;
         border-radius: 50%;
         filter: blur(1px);
         animation: rise linear forwards;
@@ -417,11 +378,11 @@ function addAnimationStyles() {
         0% {
           transform: translateY(0) scale(1);
           opacity: 1;
-          background-color: var(--color-accent, #ff6b6b);
+          background-color: #ff6a00;
         }
         75% {
           opacity: 0.7;
-          background-color: var(--color-accent-dark, #ff3a3a);
+          background-color: #ff0000;
         }
         100% {
           transform: translateY(-100px) scale(0);
@@ -431,9 +392,6 @@ function addAnimationStyles() {
       
       .burned {
         transition: all 0.5s ease;
-        opacity: 0.4;
-        filter: grayscale(100%);
-        transform: scale(0.95);
       }
       
       /* Theme Toggle */
@@ -444,8 +402,8 @@ function addAnimationStyles() {
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background-color: var(--color-secondary, #4b3f72);
-        color: var(--color-text-light, #f1f1f6);
+        background-color: #333;
+        color: #fff;
         border: none;
         font-size: 20px;
         cursor: pointer;
@@ -453,39 +411,31 @@ function addAnimationStyles() {
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         transition: all 0.3s ease;
       }
       
       .theme-toggle:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.4);
-        background-color: var(--color-accent, #ff6b6b);
+        transform: scale(1.1);
       }
       
       body.dark-mode {
-        background-color: var(--color-background, #12121e);
-        color: var(--color-text-light, #f1f1f6);
+        background-color: #121212;
+        color: #f0f0f0;
       }
       
       body.dark-mode .token-card,
       body.dark-mode .nft-card {
-        background-color: var(--color-card, #2a2a3e);
-        border-color: var(--color-secondary-dark, #362d52);
-      }
-      
-      body.dark-mode .token-card:hover,
-      body.dark-mode .nft-card:hover {
-        border-color: var(--color-secondary-light, #6c5d94);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        background-color: #1e1e1e;
+        border-color: #333;
       }
       
       body.dark-mode .burn-button {
-        background-color: var(--color-accent-dark, #ff3a3a);
+        background-color: #c62828;
       }
       
       body.dark-mode .asset-section h3 {
-        color: var(--color-secondary-light, #6c5d94);
+        color: #e0e0e0;
       }
       
       /* Achievement Notification */
@@ -494,21 +444,19 @@ function addAnimationStyles() {
         bottom: 30px;
         right: -350px;
         width: 300px;
-        background-color: var(--color-secondary, #4b3f72);
-        color: var(--color-text-light, #f1f1f6);
-        border-radius: 10px;
+        background-color: #333;
+        color: white;
+        border-radius: 8px;
         padding: 15px;
         display: flex;
         align-items: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        transition: all 0.5s ease;
+        transition: transform 0.5s ease;
         z-index: 9999;
-        border-left: 4px solid var(--color-accent, #ff6b6b);
       }
       
       .achievement.show {
         transform: translateX(-370px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
       }
       
       .achievement.hide {
@@ -519,27 +467,17 @@ function addAnimationStyles() {
       .achievement-icon {
         font-size: 24px;
         margin-right: 15px;
-        background-color: var(--color-accent, #ff6b6b);
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
       }
       
       .achievement-content h3 {
         margin: 0 0 5px 0;
         font-size: 16px;
-        color: var(--color-text-light, #f1f1f6);
       }
       
       .achievement-content p {
         margin: 0;
         font-size: 14px;
-        opacity: 0.9;
-        color: var(--color-text-light, #f1f1f6);
+        opacity: 0.8;
       }
       
       /* Level Indicator */
@@ -547,59 +485,32 @@ function addAnimationStyles() {
         position: fixed;
         top: 20px;
         left: 20px;
-        background-color: var(--color-secondary, #4b3f72);
-        padding: 10px;
-        border-radius: 10px;
-        color: var(--color-text-light, #f1f1f6);
+        background-color: rgba(0,0,0,0.7);
+        padding: 10px 15px;
+        border-radius: 20px;
+        color: white;
         z-index: 100;
-        display: flex;
-        align-items: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        transition: all 0.3s ease;
-      }
-      
-      .level-indicator:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.4);
-      }
-      
-      .level-icon {
-        width: 30px;
-        height: 30px;
-        background-color: var(--color-accent, #ff6b6b);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 10px;
-        font-weight: bold;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      }
-      
-      .level-info {
-        display: flex;
-        flex-direction: column;
-        min-width: 100px;
       }
       
       .level-label {
         font-weight: bold;
         margin-bottom: 5px;
+        text-align: center;
       }
       
-      .progress-container {
-        width: 100%;
-        height: 8px;
-        background-color: var(--color-primary-dark, #0e0e1a);
-        border-radius: 4px;
+      .level-progress {
+        width: 100px;
+        height: 6px;
+        background-color: rgba(255,255,255,0.2);
+        border-radius: 3px;
         overflow: hidden;
       }
       
-      .progress-bar {
+      .level-progress-bar {
         height: 100%;
-        background: var(--color-accent, #ff6b6b);
+        background: linear-gradient(to right, #00c6ff, #0072ff);
         width: 0%;
-        transition: width 0.5s ease;
+        transition: width 0.3s ease;
       }
     `;
     document.head.appendChild(styleEl);
