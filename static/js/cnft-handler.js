@@ -249,6 +249,7 @@ export class CNFTHandler {
                 }
                 
                 // Race between the signTransaction and the timeout
+                console.log('[TRADE DEBUG] About to sign transaction');
                 const signedTx = await Promise.race([
                     this.wallet.signTransaction(tx),
                     timeoutPromise
@@ -256,13 +257,25 @@ export class CNFTHandler {
                 
                 // Clear the timeout since we got a response
                 clearTimeout(timeoutId);
+                console.log('[TRADE DEBUG] Transaction signed successfully');
                 
-                // Send the transaction with skipPreflight to avoid client-side checks
-                const signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
-                    skipPreflight: true, // Skip preflight checks
-                    maxRetries: 3, // Retry a few times if needed
-                    preflightCommitment: 'processed' // Lower commitment level
-                });
+                // Variable for storing the signature
+                let signature;
+                
+                try {
+                    // Send the transaction with skipPreflight to avoid client-side checks
+                    console.log('[TRADE DEBUG] Sending transaction to blockchain');
+                    signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
+                        skipPreflight: false, // Keep preflight checks for debugging
+                        maxRetries: 3, // Retry a few times if needed
+                        preflightCommitment: 'processed' // Lower commitment level
+                    });
+                    console.log('[TRADE DEBUG] Transaction sent, signature:', signature);
+                } catch (sendError) {
+                    console.error('[TRADE DEBUG] Error sending transaction:', sendError);
+                    console.error('[TRADE DEBUG] Error details:', sendError?.logs || sendError?.message || 'Unknown error');
+                    throw sendError;
+                }
                 
                 console.log('Transaction sent, waiting for confirmation...');
                 
