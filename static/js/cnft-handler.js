@@ -587,10 +587,10 @@ export class CNFTHandler {
     // Direct burning method using raw transaction instructions without Metaplex
     async directBurnCNFT(assetId, proof) {
         try {
-            console.log('[directBurnCNFT] Starting cNFT burn with completely raw approach');
+            console.log('[directBurnCNFT] Starting cNFT burn with Metaplex SDK approach');
             
             if (typeof window !== 'undefined' && window.debugInfo) {
-                window.debugInfo.lastCnftError = 'Starting raw direct burn method';
+                window.debugInfo.lastCnftError = 'Starting Metaplex SDK burn method';
             }
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
@@ -638,123 +638,97 @@ export class CNFTHandler {
                 return { success: false, error: `Error fetching asset data: ${assetError.message}` };
             }
             
-            // Import required web3 modules
-            const { 
-                Transaction, 
-                PublicKey, 
-                ComputeBudgetProgram,
-                TransactionInstruction,
-                SystemProgram
-            } = require('@solana/web3.js');
+            // Import required modules
+            const { PublicKey } = require('@solana/web3.js');
             
-            // Create a new transaction
-            const transaction = new Transaction();
-            
-            // Add compute budget instructions to avoid insufficient SOL errors
-            transaction.add(
-                ComputeBudgetProgram.setComputeUnitLimit({ 
-                    units: 400000 // Higher compute units for cNFT operations
-                }),
-                ComputeBudgetProgram.setComputeUnitPrice({
-                    microLamports: 1 // Minimum possible fee
-                })
-            );
-            
-            // Convert string public keys to PublicKey objects
-            const treeAddress = new PublicKey(treeId);
-            const bubblegumProgramId = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
-            
-            // Log all the data for debugging
-            console.log('[directBurnCNFT] Using treeId:', treeAddress.toString());
-            
-            // Derive tree authority as a PDA of the tree address
-            const [treeAuthority] = PublicKey.findProgramAddressSync(
-                [treeAddress.toBuffer()],
-                bubblegumProgramId
-            );
-            
-            console.log('[directBurnCNFT] Tree authority:', treeAuthority.toString());
-            
-            // Manual account creation for the burn instruction
-            const logWrapperPubkey = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
-            const compressionProgramId = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
-            
-            // Define the accounts needed
-            const accounts = [
-                { pubkey: treeAuthority, isSigner: false, isWritable: true },
-                { pubkey: treeAddress, isSigner: false, isWritable: true },
-                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false },
-                { pubkey: this.wallet.publicKey, isSigner: false, isWritable: false },
-                { pubkey: logWrapperPubkey, isSigner: false, isWritable: false },
-                { pubkey: compressionProgramId, isSigner: false, isWritable: false },
-                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
-            ];
-            
-            // Add proof accounts
-            proof.forEach(node => {
-                accounts.push({
-                    pubkey: new PublicKey(node),
-                    isSigner: false,
-                    isWritable: false
-                });
-            });
-            
-            // Create a buffer for the instruction data
-            // Anchor programs require 8-byte discriminator
-            // The discriminator is actually a hash of "burn" instruction name
-            // For bubblegum, the burn instruction discriminator is this value:
-            const burnDiscriminator = Buffer.from([153, 230, 48, 185, 246, 252, 185, 193]);
-            
-            // No need for any additional bytes for this instruction
-            const dataBuffer = burnDiscriminator;
-            
-            console.log('[directBurnCNFT] Using burn discriminator:', dataBuffer.toString('hex'));
-            
-            console.log('[directBurnCNFT] Created instruction data buffer:', dataBuffer.toString('hex'));
-            
-            // Create the instruction
-            const instruction = new TransactionInstruction({
-                keys: accounts,
-                programId: bubblegumProgramId,
-                data: dataBuffer
-            });
-            
-            // Add the burn instruction to the transaction
-            transaction.add(instruction);
-            
-            // Set the fee payer and recent blockhash
-            transaction.feePayer = this.wallet.publicKey;
-            const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
-            transaction.recentBlockhash = blockhash;
-            
-            // Sign and send the transaction
-            console.log('[directBurnCNFT] Signing transaction...');
             try {
-                const signedTransaction = await this.wallet.signTransaction(transaction);
-                console.log('[directBurnCNFT] Transaction signed, sending...');
+                // Convert data to proper types
+                const mintPublicKey = new PublicKey(assetId);
+                const treeAddress = new PublicKey(treeId);
+                const proofArray = proof.map(p => new PublicKey(p));
                 
-                const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
-                console.log('[directBurnCNFT] Transaction submitted with signature:', signature);
+                console.log('[directBurnCNFT] Using Metaplex SDK to delete compressed NFT');
+                console.log('[directBurnCNFT] AssetId:', assetId);
+                console.log('[directBurnCNFT] TreeId:', treeId);
+                console.log('[directBurnCNFT] Proof length:', proofArray.length);
                 
-                // Wait for confirmation
-                console.log('[directBurnCNFT] Waiting for confirmation...');
-                const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
+                // Look at what methods are available
+                console.log('[directBurnCNFT] Available methods:', Object.keys(this.metaplex.nfts()));
                 
-                console.log('[directBurnCNFT] Transaction confirmed!', confirmation);
-                return {
-                    success: true,
-                    signature,
-                    message: 'cNFT successfully burned'
+                // Create delete options with all the required parameters
+                const deleteOptions = {
+                    mintAddress: mintPublicKey,
+                    merkleTree: treeAddress,
+                    leafOwner: this.wallet.publicKey,
+                    proof: proofArray,
+                    compressed: true
                 };
-            } catch (signingError) {
-                console.error('[directBurnCNFT] Error during transaction signing or submission:', signingError);
+                
+                // Use the nfts delete method directly
+                console.log('[directBurnCNFT] Calling metaplex.nfts().delete()...');
+                
+                try {
+                    const { ComputeBudgetProgram, Transaction } = require('@solana/web3.js');
+                    
+                    // Create a new transaction
+                    const tx = new Transaction();
+                    
+                    // Add compute budget instructions to avoid insufficient SOL errors
+                    tx.add(
+                        ComputeBudgetProgram.setComputeUnitLimit({ 
+                            units: 400000 // Higher compute units for cNFT operations
+                        }),
+                        ComputeBudgetProgram.setComputeUnitPrice({
+                            microLamports: 1 // Minimum possible fee
+                        })
+                    );
+                    
+                    // Build the delete operation into our transaction
+                    const operation = await this.metaplex.nfts().delete(deleteOptions).builder();
+                    const ix = await operation.getInstructions();
+                    
+                    // Add all instructions from the operation
+                    tx.add(...ix);
+                    
+                    // Set the fee payer and recent blockhash
+                    tx.feePayer = this.wallet.publicKey;
+                    const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+                    tx.recentBlockhash = blockhash;
+                    
+                    // Sign and send the transaction
+                    const signedTx = await this.wallet.signTransaction(tx);
+                    const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+                    
+                    // Wait for confirmation
+                    console.log('[directBurnCNFT] Transaction submitted, waiting for confirmation...');
+                    const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
+                    
+                    // Log success and return
+                    console.log('[directBurnCNFT] Transaction confirmed:', confirmation);
+                    return {
+                        success: true,
+                        signature: signature,
+                        message: 'cNFT successfully burned!'
+                    };
+                } catch (metaplexError) {
+                    console.error('[directBurnCNFT] Error using Metaplex SDK:', metaplexError);
+                    throw metaplexError;
+                }
+            } catch (error) {
+                console.error('[directBurnCNFT] Error in Metaplex delete operation:', error);
+                console.log('[directBurnCNFT] Error details:', error?.logs || error?.message || 'Unknown error');
+                
+                if (typeof window !== 'undefined' && window.debugInfo) {
+                    window.debugInfo.lastCnftError = 'Metaplex delete error: ' + (error?.message || 'Unknown error');
+                }
+                
                 return {
                     success: false,
-                    error: signingError.message,
-                    cancelled: signingError.message && (
-                        signingError.message.includes('cancel') || 
-                        signingError.message.includes('reject') || 
-                        signingError.message.includes('User')
+                    error: error.message || 'Error deleting compressed NFT',
+                    cancelled: error.message && (
+                        error.message.includes('cancel') || 
+                        error.message.includes('reject') || 
+                        error.message.includes('User')
                     )
                 };
             }
