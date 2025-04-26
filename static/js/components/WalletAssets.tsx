@@ -70,6 +70,13 @@ const WalletAssets: React.FC = () => {
   const [cnftsLoading, setCnftsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Bulk burn mode
+  const [bulkBurnMode, setBulkBurnMode] = useState(false);
+  const [selectedTokens, setSelectedTokens] = useState<string[]>([]); 
+  const [selectedNFTs, setSelectedNFTs] = useState<string[]>([]);
+  const [selectedCNFTs, setSelectedCNFTs] = useState<string[]>([]);
+  const [isBurning, setIsBurning] = useState(false);
+  
   // Handle API key for Solscan
   const [solscanApiKey, setSolscanApiKey] = useState<string | null>(null);
   
@@ -790,6 +797,149 @@ const WalletAssets: React.FC = () => {
     }
   };
 
+  // Toggle bulk burn mode
+  const toggleBulkBurnMode = () => {
+    setBulkBurnMode(!bulkBurnMode);
+    // Clear selections when toggling
+    if (bulkBurnMode) {
+      setSelectedTokens([]);
+      setSelectedNFTs([]);
+      setSelectedCNFTs([]);
+    }
+  };
+
+  // Handle selection of tokens
+  const handleTokenSelection = (mint: string) => {
+    setSelectedTokens(prev => 
+      prev.includes(mint) 
+        ? prev.filter(m => m !== mint) 
+        : [...prev, mint]
+    );
+  };
+
+  // Handle selection of NFTs
+  const handleNFTSelection = (mint: string) => {
+    setSelectedNFTs(prev => 
+      prev.includes(mint) 
+        ? prev.filter(m => m !== mint) 
+        : [...prev, mint]
+    );
+  };
+
+  // Handle selection of cNFTs
+  const handleCNFTSelection = (mint: string) => {
+    setSelectedCNFTs(prev => 
+      prev.includes(mint) 
+        ? prev.filter(m => m !== mint) 
+        : [...prev, mint]
+    );
+  };
+
+  // Handle bulk burn of tokens
+  const handleBulkBurnTokens = async () => {
+    if (selectedTokens.length === 0) return;
+    
+    setIsBurning(true);
+    setError("Starting bulk burn operation for tokens...");
+    
+    try {
+      let successCount = 0;
+      
+      for (const mint of selectedTokens) {
+        const token = tokens.find(t => t.mint === mint);
+        if (token) {
+          try {
+            // Burn the token and await result
+            await handleBurnToken(token);
+            successCount++;
+          } catch (error) {
+            console.error(`Error burning token ${mint}:`, error);
+            // Continue with next token
+          }
+        }
+      }
+      
+      setError(`Successfully burned ${successCount} of ${selectedTokens.length} tokens!`);
+      
+      // Clear selections after burning
+      setSelectedTokens([]);
+    } catch (error: any) {
+      setError(`Error in bulk burn operation: ${error.message}`);
+    } finally {
+      setIsBurning(false);
+    }
+  };
+
+  // Handle bulk burn of NFTs
+  const handleBulkBurnNFTs = async () => {
+    if (selectedNFTs.length === 0) return;
+    
+    setIsBurning(true);
+    setError("Starting bulk burn operation for NFTs...");
+    
+    try {
+      let successCount = 0;
+      
+      for (const mint of selectedNFTs) {
+        const nft = nfts.find(n => n.mint === mint);
+        if (nft) {
+          try {
+            // Burn the NFT and await result
+            await handleBurnNFT(nft);
+            successCount++;
+          } catch (error) {
+            console.error(`Error burning NFT ${mint}:`, error);
+            // Continue with next NFT
+          }
+        }
+      }
+      
+      setError(`Successfully burned ${successCount} of ${selectedNFTs.length} NFTs!`);
+      
+      // Clear selections after burning
+      setSelectedNFTs([]);
+    } catch (error: any) {
+      setError(`Error in bulk burn operation: ${error.message}`);
+    } finally {
+      setIsBurning(false);
+    }
+  };
+
+  // Handle bulk burn of cNFTs
+  const handleBulkBurnCNFTs = async () => {
+    if (selectedCNFTs.length === 0) return;
+    
+    setIsBurning(true);
+    setError("Starting bulk burn operation for compressed NFTs...");
+    
+    try {
+      let successCount = 0;
+      
+      for (const mint of selectedCNFTs) {
+        const cnft = cnfts.find(c => c.mint === mint);
+        if (cnft) {
+          try {
+            // Burn the cNFT and await result
+            await handleBurnCNFT(cnft);
+            successCount++;
+          } catch (error) {
+            console.error(`Error burning cNFT ${mint}:`, error);
+            // Continue with next cNFT
+          }
+        }
+      }
+      
+      setError(`Successfully burned ${successCount} of ${selectedCNFTs.length} compressed NFTs!`);
+      
+      // Clear selections after burning
+      setSelectedCNFTs([]);
+    } catch (error: any) {
+      setError(`Error in bulk burn operation: ${error.message}`);
+    } finally {
+      setIsBurning(false);
+    }
+  };
+
   return (
     <div className="wallet-assets-container">
       <div className="wallet-connect-section">
@@ -801,14 +951,84 @@ const WalletAssets: React.FC = () => {
         <div className="assets-section">
           <h2>Your Wallet Assets</h2>
           
+          {/* Bulk Burn Control Panel */}
+          {publicKey && (
+            <div className="bulk-burn-section">
+              <div className="bulk-burn-toggle">
+                <button
+                  className={`toggle-button ${bulkBurnMode ? 'active' : ''}`}
+                  onClick={toggleBulkBurnMode}
+                >
+                  {bulkBurnMode ? 'Exit Bulk Mode' : 'Enter Bulk Burn Mode'}
+                </button>
+              </div>
+              
+              {bulkBurnMode && (
+                <div className="bulk-burn-panel">
+                  <div className="bulk-burn-header">
+                    <h3>Burning</h3>
+                    <span className="selection-count">
+                      {selectedTokens.length + selectedNFTs.length + selectedCNFTs.length} items selected
+                    </span>
+                  </div>
+                  
+                  {selectedTokens.length > 0 && (
+                    <div className="selection-group">
+                      <span>{selectedTokens.length} tokens selected</span>
+                      <button 
+                        className="bulk-burn-button"
+                        disabled={isBurning} 
+                        onClick={handleBulkBurnTokens}
+                      >
+                        Burn Selected Tokens
+                      </button>
+                    </div>
+                  )}
+                  
+                  {selectedNFTs.length > 0 && (
+                    <div className="selection-group">
+                      <span>{selectedNFTs.length} NFTs selected</span>
+                      <button 
+                        className="bulk-burn-button"
+                        disabled={isBurning}
+                        onClick={handleBulkBurnNFTs}
+                      >
+                        Burn Selected NFTs
+                      </button>
+                    </div>
+                  )}
+                  
+                  {selectedCNFTs.length > 0 && (
+                    <div className="selection-group">
+                      <span>{selectedCNFTs.length} cNFTs selected</span>
+                      <button 
+                        className="bulk-burn-button"
+                        disabled={isBurning}
+                        onClick={handleBulkBurnCNFTs}
+                      >
+                        Burn Selected cNFTs
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {error && <div className="error-message">{error}</div>}
+          
           {/* Token Section */}
           <div className="asset-section">
             <h3>Tokens {tokensLoading && <span className="loading-indicator">Loading...</span>}</h3>
-            {error && <div className="error-message">{error}</div>}
             
             <div className="tokens-grid">
               {tokens.map((token) => (
-                <div key={token.mint} className="token-card" data-mint={token.mint}>
+                <div 
+                  key={token.mint} 
+                  className={`token-card ${bulkBurnMode && selectedTokens.includes(token.mint) ? 'selected' : ''}`} 
+                  data-mint={token.mint}
+                  onClick={bulkBurnMode ? () => handleTokenSelection(token.mint) : undefined}
+                >
                   <div className="token-info">
                     <img 
                       src={token.logoURI || '/default-token-icon.svg'} 
@@ -826,12 +1046,22 @@ const WalletAssets: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <button 
-                    className="burn-button" 
-                    onClick={() => handleBurnToken(token)}
-                  >
-                    Burn
-                  </button>
+                  {!bulkBurnMode && (
+                    <button 
+                      className="burn-button" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBurnToken(token);
+                      }}
+                    >
+                      Burn
+                    </button>
+                  )}
+                  {bulkBurnMode && (
+                    <div className="selection-indicator">
+                      {selectedTokens.includes(token.mint) ? '✓' : ''}
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -847,7 +1077,12 @@ const WalletAssets: React.FC = () => {
             
             <div className="nfts-grid">
               {nfts.map((nft) => (
-                <div key={nft.mint} className="nft-card" data-mint={nft.mint}>
+                <div 
+                  key={nft.mint} 
+                  className={`nft-card ${bulkBurnMode && selectedNFTs.includes(nft.mint) ? 'selected' : ''}`} 
+                  data-mint={nft.mint}
+                  onClick={bulkBurnMode ? () => handleNFTSelection(nft.mint) : undefined}
+                >
                   <div className="nft-info">
                     <img 
                       src={nft.image || '/default-nft-image.svg'} 
@@ -862,12 +1097,22 @@ const WalletAssets: React.FC = () => {
                       {nft.collection && <div className="nft-collection">{nft.collection}</div>}
                     </div>
                   </div>
-                  <button 
-                    className="burn-button" 
-                    onClick={() => handleBurnNFT(nft)}
-                  >
-                    Burn
-                  </button>
+                  {!bulkBurnMode && (
+                    <button 
+                      className="burn-button" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBurnNFT(nft);
+                      }}
+                    >
+                      Burn
+                    </button>
+                  )}
+                  {bulkBurnMode && (
+                    <div className="selection-indicator">
+                      {selectedNFTs.includes(nft.mint) ? '✓' : ''}
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -883,7 +1128,12 @@ const WalletAssets: React.FC = () => {
             
             <div className="cnfts-grid">
               {cnfts.map((cnft) => (
-                <div key={cnft.mint} className="nft-card" data-mint={cnft.mint}>
+                <div 
+                  key={cnft.mint} 
+                  className={`nft-card ${bulkBurnMode && selectedCNFTs.includes(cnft.mint) ? 'selected' : ''}`} 
+                  data-mint={cnft.mint}
+                  onClick={bulkBurnMode ? () => handleCNFTSelection(cnft.mint) : undefined}
+                >
                   <div className="nft-info">
                     <img 
                       src={cnft.image || '/default-nft-image.svg'} 
@@ -898,12 +1148,22 @@ const WalletAssets: React.FC = () => {
                       {cnft.collection && <div className="nft-collection">{cnft.collection}</div>}
                     </div>
                   </div>
-                  <button 
-                    className="burn-button" 
-                    onClick={() => handleBurnCNFT(cnft)}
-                  >
-                    Burn
-                  </button>
+                  {!bulkBurnMode && (
+                    <button 
+                      className="burn-button" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBurnCNFT(cnft);
+                      }}
+                    >
+                      Burn
+                    </button>
+                  )}
+                  {bulkBurnMode && (
+                    <div className="selection-indicator">
+                      {selectedCNFTs.includes(cnft.mint) ? '✓' : ''}
+                    </div>
+                  )}
                 </div>
               ))}
               
