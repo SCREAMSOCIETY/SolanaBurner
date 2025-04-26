@@ -1,0 +1,212 @@
+/* 
+   Color Theme with 60-30-10 Rule
+   Primary (60%): Deep blue (#1a1a2e) - Main backgrounds, containers
+   Secondary (30%): Purple (#4b3f72) - Headings, important sections
+   Accent (10%): Vibrant orange (#ff6b6b) - Buttons, highlights, important actions
+   
+   Additional supporting colors:
+   - Light text: #f1f1f6
+   - Dark text: #0a0a14
+   - Success: #4caf50
+   - Warning: #ffab2d
+   - Error: #f03a47
+*/
+
+:root {
+  --color-primary: #1a1a2e;
+  --color-primary-dark: #0e0e1a;
+  --color-primary-light: #2a2a3e;
+  
+  --color-secondary: #4b3f72;
+  --color-secondary-dark: #362d52;
+  --color-secondary-light: #6c5d94;
+  
+  --color-accent: #ff6b6b;
+  --color-accent-dark: #ff3a3a;
+  --color-accent-light: #ff9c9c;
+  
+  --color-text-light: #f1f1f6;
+  --color-text-dark: #0a0a14;
+  
+  --color-success: #4caf50;
+  --color-warning: #ffab2d;
+  --color-error: #f03a47;
+
+  --color-background: #12121e;
+  --color-container: var(--color-primary);
+  --color-header: var(--color-secondary);
+  --color-card: var(--color-primary-light);
+  --color-button: var(--color-accent);
+  --color-highlight: var(--color-accent-light);
+}
+
+/* Apply theme to main elements */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-light);
+}
+
+.wallet-assets-container {
+  background-color: var(--color-container);
+  border-radius: 10px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-secondary-light);
+}
+
+.wallet-connect-section {
+  background-color: var(--color-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.wallet-connect-section h2 {
+  color: var(--color-text-light);
+}
+
+/* Asset cards */
+.token-card, .nft-card {
+  background-color: var(--color-card);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.token-card:hover, .nft-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  border-color: var(--color-secondary-light);
+}
+
+.token-card.selected, .nft-card.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.4);
+}
+
+/* Buttons */
+button {
+  background-color: var(--color-button);
+  color: var(--color-text-light);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background-color: var(--color-accent-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+button:disabled {
+  background-color: #6c6c6c;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Error and status messages */
+.error-message {
+  background-color: rgba(240, 58, 71, 0.1);
+  border-left: 4px solid var(--color-error);
+  color: var(--color-text-light);
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+
+/* Achievement and level styling */
+.achievement-container {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background-color: var(--color-secondary);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.level-indicator {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  background-color: var(--color-secondary);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-light);
+  font-weight: bold;
+}
+
+.level-icon {
+  width: 30px;
+  height: 30px;
+  background-color: var(--color-accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+/* Progress bar styling */
+.progress-container {
+  width: 100%;
+  height: 12px;
+  background-color: var(--color-primary-dark);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.5s ease;
+}
+
+/* Bulk burn panel styling */
+.bulk-burn-section {
+  background-color: var(--color-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.bulk-burn-header h3 {
+  color: var(--color-text-light);
+}
+
+.selection-count {
+  background-color: var(--color-accent);
+}
+
+.selection-group {
+  background-color: var(--color-primary-light);
+  border-left: 3px solid var(--color-accent);
+}
+
+.no-selection-message {
+  background-color: var(--color-primary-light);
+}
+
+/* Asset section headers */
+.asset-section h3 {
+  color: var(--color-secondary-light);
+  border-bottom: 2px solid var(--color-secondary);
+  padding-bottom: 8px;
+  margin-top: 20px;
+}

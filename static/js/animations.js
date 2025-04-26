@@ -113,14 +113,20 @@ function showAchievement(title, description) {
 
 // Update progress bar
 function updateProgress(currentVal, maxVal, level) {
-  const progressBar = document.querySelector('.level-progress-bar');
+  const progressBar = document.querySelector('.progress-bar');
   const levelEl = document.querySelector('.current-level');
+  const levelIcon = document.querySelector('.level-icon');
   
   if (!progressBar || !levelEl) return;
   
   const progress = Math.min((currentVal / maxVal) * 100, 100);
   progressBar.style.width = progress + '%';
   levelEl.textContent = level;
+  
+  // Update the level icon if it exists
+  if (levelIcon) {
+    levelIcon.textContent = level;
+  }
 }
 
 // Save achievements to localStorage
@@ -225,12 +231,20 @@ function initUIEnhancements() {
   if (!document.querySelector('.level-indicator')) {
     const levelEl = document.createElement('div');
     levelEl.className = 'level-indicator';
+    
+    // Create new improved level indicator with icon
     levelEl.innerHTML = `
-      <div class="level-label">Level <span class="current-level">1</span></div>
-      <div class="level-progress">
-        <div class="level-progress-bar"></div>
+      <div class="level-icon">${Math.floor((JSON.parse(localStorage.getItem('burnStats') || '{}')).tokens || 0 + 
+                                          (JSON.parse(localStorage.getItem('burnStats') || '{}')).nfts || 0 + 
+                                          (JSON.parse(localStorage.getItem('burnStats') || '{}')).cnfts || 0) / 5 + 1}</div>
+      <div class="level-info">
+        <div class="level-label">Burn Level <span class="current-level">1</span></div>
+        <div class="progress-container">
+          <div class="progress-bar"></div>
+        </div>
       </div>
     `;
+    
     document.body.appendChild(levelEl);
     
     // Initialize level progress
@@ -353,8 +367,8 @@ function addAnimationStyles() {
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background-color: #333;
-        color: #fff;
+        background-color: var(--color-secondary, #4b3f72);
+        color: var(--color-text-light, #f1f1f6);
         border: none;
         font-size: 20px;
         cursor: pointer;
@@ -362,31 +376,39 @@ function addAnimationStyles() {
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         transition: all 0.3s ease;
       }
       
       .theme-toggle:hover {
-        transform: scale(1.1);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        background-color: var(--color-accent, #ff6b6b);
       }
       
       body.dark-mode {
-        background-color: #121212;
-        color: #f0f0f0;
+        background-color: var(--color-background, #12121e);
+        color: var(--color-text-light, #f1f1f6);
       }
       
       body.dark-mode .token-card,
       body.dark-mode .nft-card {
-        background-color: #1e1e1e;
-        border-color: #333;
+        background-color: var(--color-card, #2a2a3e);
+        border-color: var(--color-secondary-dark, #362d52);
+      }
+      
+      body.dark-mode .token-card:hover,
+      body.dark-mode .nft-card:hover {
+        border-color: var(--color-secondary-light, #6c5d94);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
       }
       
       body.dark-mode .burn-button {
-        background-color: #c62828;
+        background-color: var(--color-accent-dark, #ff3a3a);
       }
       
       body.dark-mode .asset-section h3 {
-        color: #e0e0e0;
+        color: var(--color-secondary-light, #6c5d94);
       }
       
       /* Achievement Notification */
@@ -436,32 +458,59 @@ function addAnimationStyles() {
         position: fixed;
         top: 20px;
         left: 20px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 10px 15px;
-        border-radius: 20px;
-        color: white;
+        background-color: var(--color-secondary, #4b3f72);
+        padding: 10px;
+        border-radius: 10px;
+        color: var(--color-text-light, #f1f1f6);
         z-index: 100;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+      }
+      
+      .level-indicator:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+      }
+      
+      .level-icon {
+        width: 30px;
+        height: 30px;
+        background-color: var(--color-accent, #ff6b6b);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      }
+      
+      .level-info {
+        display: flex;
+        flex-direction: column;
+        min-width: 100px;
       }
       
       .level-label {
         font-weight: bold;
         margin-bottom: 5px;
-        text-align: center;
       }
       
-      .level-progress {
-        width: 100px;
-        height: 6px;
-        background-color: rgba(255,255,255,0.2);
-        border-radius: 3px;
+      .progress-container {
+        width: 100%;
+        height: 8px;
+        background-color: var(--color-primary-dark, #0e0e1a);
+        border-radius: 4px;
         overflow: hidden;
       }
       
-      .level-progress-bar {
+      .progress-bar {
         height: 100%;
-        background: linear-gradient(to right, #00c6ff, #0072ff);
+        background: var(--color-accent, #ff6b6b);
         width: 0%;
-        transition: width 0.3s ease;
+        transition: width 0.5s ease;
       }
     `;
     document.head.appendChild(styleEl);
