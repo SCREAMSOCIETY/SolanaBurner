@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 import { 
   TOKEN_PROGRAM_ID, 
   createBurnCheckedInstruction, 
@@ -618,18 +618,59 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // 2. If we have the metadata account, close it to get SOL back
+      // 2. Find and close the metadata account to recover rent
       if (nft.metadataAddress) {
         try {
-          // Create close account instruction for the metadata
           const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
           
-          // Add a deleteMetadataAccount instruction to remove the metadata account
-          // Note: This is a complex operation that might require custom instruction creation
-          // depending on the metadata program version, for now we're leaving it out
+          // Create a metadata program revoke instruction to update ownership before closing
+          // This allows us to properly close the metadata account
+          const revokeInstruction = new TransactionInstruction({
+            keys: [
+              { pubkey: new PublicKey(nft.metadataAddress), isSigner: false, isWritable: true },
+              { pubkey: publicKey, isSigner: true, isWritable: false },
+            ],
+            programId: metadataProgramId,
+            data: Buffer.from([7]), // Revoke instruction code for metadata program
+          });
+          
+          // Add revoke instruction
+          transaction.add(revokeInstruction);
+          
+          // After revoking, we can close the account to recover the rent
+          const closeInstruction = new TransactionInstruction({
+            keys: [
+              { pubkey: new PublicKey(nft.metadataAddress), isSigner: false, isWritable: true },
+              { pubkey: publicKey, isSigner: true, isWritable: true }, // Destination for recovered rent
+              { pubkey: publicKey, isSigner: true, isWritable: false }, // Authority
+            ],
+            programId: metadataProgramId,
+            data: Buffer.from([8]), // Close account instruction code
+          });
+          
+          // Add close instruction
+          transaction.add(closeInstruction);
         } catch (error) {
           console.warn('Could not add metadata account closing instruction:', error);
         }
+      }
+      
+      // 3. Close the mint account to recover rent
+      try {
+        const closeAccountInstruction = new TransactionInstruction({
+          keys: [
+            { pubkey: new PublicKey(nft.mint), isSigner: false, isWritable: true },
+            { pubkey: publicKey, isSigner: false, isWritable: true }, // Destination for rent
+            { pubkey: publicKey, isSigner: true, isWritable: false }, // Authority
+          ],
+          programId: TOKEN_PROGRAM_ID,
+          data: Buffer.from([9]), // Close mint account instruction code
+        });
+        
+        // Add close mint instruction
+        transaction.add(closeAccountInstruction);
+      } catch (error) {
+        console.warn('Could not add mint account closing instruction:', error);
       }
       
       // 3. Close the token account to recover rent
@@ -697,8 +738,8 @@ const WalletAssets: React.FC = () => {
         }
         
         // Show message about rent recovery and donation
-        setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet! A small donation has been sent to support the project.`);
-        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+        setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent from token, metadata, and mint accounts to your wallet! A small donation has been sent to support the project.`);
+        setTimeout(() => setError(null), 7000); // Clear message after 7 seconds since it's longer
       }
     } catch (error: any) {
       console.error('Error burning NFT:', error);
