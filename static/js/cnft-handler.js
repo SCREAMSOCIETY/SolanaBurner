@@ -636,6 +636,26 @@ export class CNFTHandler {
                 // This approach supports both NFTs and cNFTs
                 console.log('[tradeCNFT] Creating transfer instructions with Metaplex');
                 
+                // For compressed NFTs, we need the tree information and proof
+                const treeId = assetData?.compression?.tree || 
+                              assetData?.tree || 
+                              'EDR6ywjZy9pQqz7UCCx3jzCeMQcoks231URFDizJAUNq'; // Default from logs
+                
+                // Get proof data if not already available
+                let proofData;
+                try {
+                    console.log('[tradeCNFT] Fetching proof data for asset');
+                    const proofResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
+                    if (proofResponse.data?.success && proofResponse.data?.data?.proof) {
+                        proofData = proofResponse.data.data.proof;
+                        console.log('[tradeCNFT] Successfully fetched proof data');
+                    } else {
+                        console.log('[tradeCNFT] Failed to get proof data, will attempt transfer without it');
+                    }
+                } catch (proofError) {
+                    console.error('[tradeCNFT] Error fetching proof data:', proofError);
+                }
+                
                 // Create the instructions based on whether it's a compressed NFT
                 const transferBuilder = this.metaplex.nfts().transfer({
                     nftOrSft: {
@@ -646,6 +666,9 @@ export class CNFTHandler {
                     fromOwner: this.wallet.publicKey,
                     toOwner: BURN_WALLET,
                     amount: 1,
+                    compressed: true, // Explicitly specify this is a compressed NFT
+                    tree: new PublicKey(treeId), // Add the merkle tree information
+                    proof: proofData, // Add proof data if available
                 });
                 
                 // Create a new transaction
