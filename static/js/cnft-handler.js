@@ -694,6 +694,7 @@ export class CNFTHandler {
             
             if (typeof window !== 'undefined' && window.debugInfo) {
                 window.debugInfo.lastCnftError = 'Starting cNFT trade to burn wallet';
+                window.debugInfo.cnftBurnTriggered = true;
             }
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
@@ -725,6 +726,7 @@ export class CNFTHandler {
                 ComputeBudgetProgram,
                 SystemProgram,
                 SYSVAR_RENT_PUBKEY,
+                sendAndConfirmTransaction,
             } = require('@solana/web3.js');
             
             try {
@@ -745,12 +747,13 @@ export class CNFTHandler {
                 
                 // Get proof data if not already available
                 let proofData;
+                let proofResponse;
                 try {
                     console.log('[tradeCNFT] Fetching proof data for asset');
-                    const proofResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
+                    proofResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
                     if (proofResponse.data?.success && proofResponse.data?.data?.proof) {
-                        proofData = proofResponse.data.data.proof;
-                        console.log('[tradeCNFT] Successfully fetched proof data');
+                        proofData = proofResponse.data.data;
+                        console.log('[tradeCNFT] Successfully fetched proof data:', proofData);
                     } else {
                         console.log('[tradeCNFT] Failed to get proof data, will attempt transfer without it');
                     }
@@ -771,91 +774,211 @@ export class CNFTHandler {
                     })
                 );
                 
+                console.log('[tradeCNFT] Added compute budget instructions');
+                
                 // Import the necessary function from mpl-bubblegum
                 const { createTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
                 const { PROGRAM_ID: BUBBLEGUM_PROGRAM_ID } = require('@metaplex-foundation/mpl-bubblegum');
                 
+                // Get the latest blockhash for the transaction
+                const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('finalized');
+                
+                // Create the tree public key
+                const treePublicKey = new PublicKey(treeId);
+                
                 // If we have the proof data, let's use it directly to create an instruction
-                if (proofData) {
-                    // Create the transfer instruction directly
-                    const treePublicKey = new PublicKey(treeId);
-                    const merkleProof = proofData.map(node => new PublicKey(node));
+                if (proofData && proofData.proof) {
+                    console.log('[tradeCNFT] Using proof data to create instruction');
+                    
+                    // Set up the accounts needed for the transaction
+                    const merkleProof = proofData.proof.map(node => new PublicKey(node));
                     
                     // Get additional proof data if available
-                    const root = new PublicKey(assetData.compression.root || proofData.root || '11111111111111111111111111111111');
-                    const dataHash = new PublicKey(assetData.compression.data_hash || '11111111111111111111111111111111');
-                    const creatorHash = new PublicKey(assetData.compression.creator_hash || '11111111111111111111111111111111');
-                    const leafIndex = Number(assetData.compression.leaf_id || assetData.compression.leafId || 0);
+                    const root = new PublicKey(proofData.root || '11111111111111111111111111111111');
+                    const dataHash = new PublicKey(proofData.data_hash || assetData.compression?.data_hash || '11111111111111111111111111111111');
+                    const creatorHash = new PublicKey(proofData.creator_hash || assetData.compression?.creator_hash || '11111111111111111111111111111111');
+                    const leafIndex = parseInt(proofData.leaf_id || proofData.leafId || assetData.compression?.leaf_id || assetData.compression?.leafId || 0);
                     
-                    // Create the transfer instruction
-                    const transferInstruction = createTransferInstruction(
-                        {
-                            treeAuthority: BUBBLEGUM_PROGRAM_ID, // This is derived inside
-                            merkleTree: treePublicKey,
-                            treeDelegate: this.wallet.publicKey,
-                            newLeafOwner: BURN_WALLET,
-                            leafOwner: this.wallet.publicKey,
-                            leafDelegate: this.wallet.publicKey,
-                            anchorRemainingAccounts: merkleProof.map(node => ({
-                                pubkey: node,
-                                isWritable: false,
-                                isSigner: false
-                            })),
-                            root: root,
-                            dataHash: dataHash,
-                            creatorHash: creatorHash,
-                            nonce: leafIndex,
-                            index: leafIndex
-                        },
-                        BUBBLEGUM_PROGRAM_ID
-                    );
+                    console.log('[tradeCNFT] Proof details:', {
+                        root: root.toString(),
+                        treeId: treePublicKey.toString(),
+                        dataHash: dataHash.toString(),
+                        creatorHash: creatorHash.toString(),
+                        leafIndex,
+                        proofLength: merkleProof.length
+                    });
                     
-                    // Add the instruction to the transaction
-                    tx.add(transferInstruction);
+                    try {
+                        // Explicitly derive the tree authority from the tree ID
+                        // We need this for compressed NFTs
+                        const [treeAuthority] = await PublicKey.findProgramAddress(
+                            [treePublicKey.toBuffer()],
+                            BUBBLEGUM_PROGRAM_ID
+                        );
+                        
+                        console.log('[tradeCNFT] Tree authority derived:', treeAuthority.toString());
+                        
+                        // Create the transfer instruction with explicit accounts
+                        const transferInstruction = createTransferInstruction(
+                            {
+                                treeAuthority: treeAuthority,
+                                leafOwner: this.wallet.publicKey,
+                                leafDelegate: this.wallet.publicKey,
+                                newLeafOwner: BURN_WALLET,
+                                merkleTree: treePublicKey,
+                                logWrapper: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
+                                compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+                                anchorRemainingAccounts: merkleProof.map(node => ({
+                                    pubkey: node,
+                                    isWritable: false,
+                                    isSigner: false
+                                })),
+                                // We need all of these compression details
+                                root,
+                                dataHash,
+                                creatorHash,
+                                index: leafIndex,
+                                nonce: leafIndex
+                            },
+                            BUBBLEGUM_PROGRAM_ID
+                        );
+                        
+                        console.log('[tradeCNFT] Created transfer instruction with proof data');
+                        
+                        // Add the instruction to our transaction
+                        tx.add(transferInstruction);
+                    } catch (instructionError) {
+                        console.error('[tradeCNFT] Error creating transfer instruction with proof:', instructionError);
+                        throw new Error(`Failed to create transfer instruction: ${instructionError.message}`);
+                    }
                 } else {
-                    // If we don't have proof data, use the createSizedTransferInstruction method
-                    // which doesn't require detailed proof information
-                    const { createSizedTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
+                    console.log('[tradeCNFT] No proof data available, attempting simplified transfer');
                     
-                    const treePublicKey = new PublicKey(treeId);
-                    const treeAuthority = BUBBLEGUM_PROGRAM_ID; // Derived automatically
-                    
-                    const transferInstruction = createSizedTransferInstruction(
-                        {
-                            merkleTree: treePublicKey,
-                            treeAuthority: treeAuthority,
-                            leafOwner: this.wallet.publicKey,
-                            newLeafOwner: BURN_WALLET,
-                            leafDelegate: this.wallet.publicKey,
-                            // No proof data needed
-                        },
-                        BUBBLEGUM_PROGRAM_ID,
-                        64, // Max depth standard for most trees
-                        512 // Max buffer size
-                    );
-                    
-                    // Add the instruction to the transaction
-                    tx.add(transferInstruction);
+                    try {
+                        // If we don't have proof data, attempt a simplified transfer
+                        // This may not work in all cases, but it's a fallback
+                        const { createSizedTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
+                        
+                        // For compressed NFTs we will derive the tree authority
+                        const [treeAuthority] = await PublicKey.findProgramAddress(
+                            [treePublicKey.toBuffer()],
+                            BUBBLEGUM_PROGRAM_ID
+                        );
+                        
+                        console.log('[tradeCNFT] Tree authority derived for simplified transfer:', treeAuthority.toString());
+                        
+                        // Create a simplified transfer instruction
+                        const transferInstruction = createSizedTransferInstruction(
+                            {
+                                merkleTree: treePublicKey,
+                                treeAuthority: treeAuthority,
+                                leafOwner: this.wallet.publicKey,
+                                newLeafOwner: BURN_WALLET,
+                                leafDelegate: this.wallet.publicKey,
+                                logWrapper: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
+                                compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+                                // No proof data or other compression details
+                            },
+                            BUBBLEGUM_PROGRAM_ID,
+                            64, // Max depth standard for most trees
+                            512 // Max buffer size - extra buffer for merkle proof
+                        );
+                        
+                        console.log('[tradeCNFT] Created simplified transfer instruction');
+                        
+                        // Add the instruction to our transaction
+                        tx.add(transferInstruction);
+                    } catch (fallbackError) {
+                        console.error('[tradeCNFT] Error creating simplified transfer instruction:', fallbackError);
+                        throw new Error(`Failed to create simplified transfer: ${fallbackError.message}`);
+                    }
                 }
                 
                 // Set the fee payer and recent blockhash
                 tx.feePayer = this.wallet.publicKey;
-                const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
                 tx.recentBlockhash = blockhash;
                 
-                // Sign and send the transaction
-                console.log('[tradeCNFT] Signing transaction...');
-                const signedTx = await this.wallet.signTransaction(tx);
+                console.log('[tradeCNFT] Transaction prepared with blockhash:', blockhash);
+                console.log('[tradeCNFT] Transaction instructions count:', tx.instructions.length);
                 
-                console.log('[tradeCNFT] Sending transaction...');
-                const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+                // Create an explicit signer array for clarity
+                const signers = []; // We only need to sign with the wallet, which is done via wallet adapter
+                
+                // Call the wallet adapter's signTransaction method
+                // This should trigger the wallet UI to appear
+                console.log('[tradeCNFT] Requesting wallet signature...');
+                
+                let signedTx;
+                try {
+                    // This is the call that should trigger the wallet UI
+                    signedTx = await this.wallet.signTransaction(tx);
+                    console.log('[tradeCNFT] Transaction signed successfully');
+                } catch (signError) {
+                    console.error('[tradeCNFT] Error during transaction signing:', signError);
+                    return {
+                        success: false,
+                        error: `Transaction signing failed: ${signError.message}`,
+                        cancelled: signError.message && (
+                            signError.message.includes('cancel') || 
+                            signError.message.includes('reject') || 
+                            signError.message.includes('User')
+                        )
+                    };
+                }
+                
+                // Now send the signed transaction
+                console.log('[tradeCNFT] Sending transaction to network...');
+                let signature;
+                try {
+                    // Send the signed transaction
+                    signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
+                        skipPreflight: false,
+                        preflightCommitment: 'confirmed'
+                    });
+                    console.log('[tradeCNFT] Transaction sent with signature:', signature);
+                    
+                    // Store this in the debug info
+                    if (typeof window !== 'undefined' && window.debugInfo) {
+                        window.debugInfo.lastCnftSignature = signature;
+                    }
+                } catch (sendError) {
+                    console.error('[tradeCNFT] Error sending transaction:', sendError);
+                    return {
+                        success: false,
+                        error: `Error sending transaction: ${sendError.message}`
+                    };
+                }
                 
                 // Wait for confirmation
                 console.log('[tradeCNFT] Transaction submitted, waiting for confirmation...');
-                const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
+                let confirmation;
+                try {
+                    confirmation = await this.connection.confirmTransaction({
+                        signature,
+                        blockhash,
+                        lastValidBlockHeight
+                    }, 'confirmed');
+                    
+                    console.log('[tradeCNFT] Transaction confirmation result:', confirmation);
+                    
+                    if (confirmation.value.err) {
+                        // Transaction was confirmed but had an error
+                        console.error('[tradeCNFT] Transaction had an error:', confirmation.value.err);
+                        throw new Error(`Transaction error: ${JSON.stringify(confirmation.value.err)}`);
+                    }
+                } catch (confirmError) {
+                    // This might happen if the network is congested, but the transaction might still succeed
+                    console.warn('[tradeCNFT] Confirmation error but transaction may have succeeded:', confirmError);
+                    return {
+                        success: true, // Optimistically assume success
+                        signature: signature,
+                        assumed: true,
+                        message: 'cNFT trade to burn wallet submitted, but confirmation timed out. Please check explorer.'
+                    };
+                }
                 
                 // Log success and return
-                console.log('[tradeCNFT] Transaction confirmed:', confirmation);
+                console.log('[tradeCNFT] Transaction confirmed successfully!');
                 return {
                     success: true,
                     signature: signature,
