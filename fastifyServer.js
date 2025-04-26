@@ -462,6 +462,7 @@ fastify.post('/api/helius/submit-transaction', async (request, reply) => {
 });
 
 // New endpoint for direct cNFT burning via server-side transaction creation
+// Using a simplified approach with direct Solana web3.js methods
 fastify.post('/api/helius/burn-cnft', async (request, reply) => {
   try {
     const { assetId, walletPublicKey, signedMessage } = request.body;
@@ -475,22 +476,8 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     
     fastify.log.info(`Processing server-side cNFT burn request for asset: ${assetId}`);
     
-    // Verify the signed message to confirm wallet ownership
-    // This would normally involve cryptographic verification
-    // For now we're just logging and proceeding
-    
     // 1. Get the asset proof data
     fastify.log.info(`Fetching proof data for asset: ${assetId}`);
-    
-    // Construct the RPC payload to request proof data
-    const proofPayload = {
-      jsonrpc: '2.0',
-      id: 'helius-proof',
-      method: 'getAssetProof',
-      params: {
-        id: assetId
-      }
-    };
     
     // Get Helius API key
     const heliusApiKey = process.env.HELIUS_API_KEY;
@@ -501,7 +488,12 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     // Make the request to Helius RPC API for proof data
     const proofResponse = await axios.post(
       `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
-      proofPayload
+      {
+        jsonrpc: '2.0',
+        id: 'helius-proof',
+        method: 'getAssetProof',
+        params: { id: assetId }
+      }
     );
     
     if (!proofResponse.data || !proofResponse.data.result) {
@@ -513,19 +505,15 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     // 2. Get the asset details
     fastify.log.info(`Fetching details for asset: ${assetId}`);
     
-    const assetPayload = {
-      jsonrpc: '2.0',
-      id: 'helius-asset',
-      method: 'getAsset',
-      params: {
-        id: assetId
-      }
-    };
-    
     // Make the request to Helius RPC API for asset details
     const assetResponse = await axios.post(
       `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
-      assetPayload
+      {
+        jsonrpc: '2.0',
+        id: 'helius-asset',
+        method: 'getAsset',
+        params: { id: assetId }
+      }
     );
     
     if (!assetResponse.data || !assetResponse.data.result) {
@@ -534,88 +522,80 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     
     const assetData = assetResponse.data.result;
     
-    // 3. Import required libraries for creating and sending the transaction
+    // 3. Import libraries
     const { 
       Transaction, 
       PublicKey, 
       ComputeBudgetProgram, 
-      sendAndConfirmTransaction,
-      Keypair 
+      TransactionInstruction,
+      SystemProgram
     } = require('@solana/web3.js');
-    
-    const { 
-      createBurnInstruction, 
-      BurnCnftArgs 
-    } = require('@metaplex-foundation/mpl-bubblegum');
     
     // 4. Create a new transaction
     const transaction = new Transaction();
     
     // Add compute budget instructions to avoid insufficient SOL errors
-    const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-      units: 400000 // Higher compute units for cNFT operations
-    });
-    
-    const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: 1 // Minimum possible fee
-    });
-    
-    transaction.add(modifyComputeUnits, addPriorityFee);
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+    );
     
     // 5. Extract necessary data for the burn instruction
     const walletPubkey = new PublicKey(walletPublicKey);
     const treeId = proofData.tree_id;
     const treeAddress = new PublicKey(treeId);
+    const bubblegumProgramId = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
     
-    // Derive tree authority as a PDA of the tree address
+    // Derive tree authority PDA
     const [treeAuthority] = PublicKey.findProgramAddressSync(
       [treeAddress.toBuffer()],
-      new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY') // Bubblegum program ID
+      bubblegumProgramId
     );
     
     fastify.log.info(`Using treeId: ${treeId}`);
     fastify.log.info(`Tree authority: ${treeAuthority.toString()}`);
     
-    // 6. Create the burn instruction args
-    const dataHash = assetData.compression?.data_hash || '';
-    const creatorHash = assetData.compression?.creator_hash || '';
-    const leafId = assetData.compression?.leaf_id || 0;
+    // 6. Manual account creation for the burn instruction
+    const logWrapperPubkey = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+    const compressionProgramId = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
     
-    const burnArgs = new BurnCnftArgs({
-      root: proofData.root,
-      dataHash: dataHash,
-      creatorHash: creatorHash,
-      nonce: leafId,
-      index: leafId,
+    // Define the accounts needed
+    const accounts = [
+      { pubkey: treeAuthority, isSigner: false, isWritable: true },
+      { pubkey: treeAddress, isSigner: false, isWritable: true },
+      { pubkey: walletPubkey, isSigner: true, isWritable: false },
+      { pubkey: walletPubkey, isSigner: false, isWritable: false },
+      { pubkey: logWrapperPubkey, isSigner: false, isWritable: false },
+      { pubkey: compressionProgramId, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
+    ];
+    
+    // Add proof accounts
+    proofData.proof.forEach(node => {
+      accounts.push({
+        pubkey: new PublicKey(node),
+        isSigner: false,
+        isWritable: false
+      });
     });
     
-    // 7. Create and add the burn instruction
-    const burnIx = createBurnInstruction(
-      {
-        treeAuthority,
-        merkleTree: treeAddress,
-        leafOwner: walletPubkey,
-        leafDelegate: walletPubkey,
-        logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
-        compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
-        anchorRemainingAccounts: proofData.proof.map(node => ({
-          pubkey: new PublicKey(node),
-          isSigner: false,
-          isWritable: false
-        }))
-      },
-      {
-        burnCnftArgs: burnArgs
-      }
-    );
+    // 7. Create a buffer for the instruction data
+    // Instruction number 5 is the burn instruction
+    const dataBuffer = Buffer.alloc(1);
+    dataBuffer.writeUInt8(5, 0);
     
-    // Add the burn instruction to the transaction
-    transaction.add(burnIx);
+    // 8. Create the instruction
+    const instruction = new TransactionInstruction({
+      keys: accounts,
+      programId: bubblegumProgramId,
+      data: dataBuffer
+    });
     
-    // 8. Set the fee payer
+    // Add burn instruction to transaction
+    transaction.add(instruction);
+    
+    // 9. Set the fee payer and get recent blockhash
     transaction.feePayer = walletPubkey;
-    
-    // 9. Get recent blockhash
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
     transaction.recentBlockhash = blockhash;
     
