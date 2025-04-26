@@ -279,12 +279,12 @@ export class CNFTHandler {
                     throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
                 }
                 
-                // Success! The cNFT has been burned
-                console.log('Successfully burned cNFT with signature:', signature);
+                // Success! The cNFT has been sent to the burn wallet
+                console.log('[simpleBurnCNFT] Successfully traded cNFT to burn wallet with signature:', signature);
                 return {
                     success: true,
                     signature,
-                    message: "Successfully burned cNFT! Note: cNFTs don't return rent like regular NFTs."
+                    message: "Successfully traded cNFT to burn wallet! Note: cNFTs don't return rent like regular NFTs."
                 };
             } catch (signingError) {
                 // Clear timeout
@@ -303,7 +303,7 @@ export class CNFTHandler {
                     console.log('Transaction was cancelled by the user or timed out');
                     return {
                         success: false,
-                        error: 'Transaction was cancelled. Please try again if you want to burn this asset.',
+                        error: 'Transaction was cancelled. Please try again if you want to trade this cNFT to the burn wallet.',
                         cancelled: true
                     };
                 }
@@ -447,20 +447,20 @@ export class CNFTHandler {
         }
     }
 
-    // Server-side approach to burn cNFT with backend transaction generation
+    // Server-side approach to trade cNFT to burn wallet with backend transaction generation
     async serverBurnCNFT(assetId) {
         if (typeof window !== 'undefined' && window.debugInfo) {
-            window.debugInfo.lastCnftError = 'Starting server burn method';
+            window.debugInfo.lastCnftError = 'Starting server trade-to-burn method';
         }
         
-        console.log('----- SERVER BURN METHOD DIAGNOSTICS -----');
+        console.log('----- SERVER TRADE-TO-BURN METHOD DIAGNOSTICS -----');
         console.log('Asset ID:', assetId);
         console.log('Wallet:', this.wallet?.publicKey?.toString());
         console.log('Can sign transaction:', !!this.wallet?.signTransaction);
         console.log('Can sign message:', !!this.wallet?.signMessage);
         
         try {
-            console.log('[serverBurnCNFT] Starting cNFT burn with server-side approach');
+            console.log('[serverBurnCNFT] Starting cNFT trade-to-burn with server-side approach');
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 console.error('[serverBurnCNFT] Missing wallet or signTransaction method');
@@ -471,7 +471,7 @@ export class CNFTHandler {
             console.log('[serverBurnCNFT] Requesting transaction from server for asset:', assetId);
             
             // Create a simple message that the user will sign to verify ownership
-            const message = `I authorize the burning of my cNFT with ID: ${assetId}`;
+            const message = `I authorize trading my cNFT with ID: ${assetId} to the burn wallet`;
             const messageBytes = new TextEncoder().encode(message);
             
             try {
