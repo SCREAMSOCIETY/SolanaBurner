@@ -930,10 +930,73 @@ const WalletAssets: React.FC = () => {
         // Once we have the proof, attempt to burn the cNFT
         setError('Creating burn transaction. Please approve in your wallet...');
         
-        // Call the simpleBurnCNFT method which handles all the complexity
-        const result = await cnftHandler.simpleBurnCNFT(cnft.mint, asset.proof, cnft);
+        // Adding more debugging info
+        if (typeof window !== 'undefined' && window.debugInfo) {
+          window.debugInfo.cnftBurnTriggered = true;
+          window.debugInfo.lastCnftData = cnft;
+          window.debugInfo.lastCnftError = 'Starting direct burn for ' + cnft.mint;
+        }
+        
+        // First try our new directBurnCNFT method which uses a more direct approach
+        console.log("Using directBurnCNFT method for cNFT:", cnft.mint);
+        const result = await cnftHandler.directBurnCNFT(cnft.mint, asset.proof);
+        
+        // If direct method failed, try the legacy method as fallback
+        if (!result.success && !result.cancelled) {
+          console.log("Direct method failed, trying simpleBurnCNFT as fallback...");
+          setError('First attempt failed. Trying alternative method...');
+          
+          try {
+            const fallbackResult = await cnftHandler.simpleBurnCNFT(cnft.mint, asset.proof, cnft);
+            
+            if (fallbackResult.success) {
+              // Legacy method succeeded
+              console.log("Legacy method succeeded!");
+              
+              // Update the cNFTs list by removing the burnt cNFT
+              const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
+              setCnfts(updatedCnfts);
+              
+              // Apply animations
+              if (window.BurnAnimations) {
+                // Find the cNFT card element for burn animation
+                const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
+                if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
+                  window.BurnAnimations.applyBurnAnimation(cnftCard);
+                }
+                
+                // Show confetti animation
+                if (window.BurnAnimations.createConfetti) {
+                  window.BurnAnimations.createConfetti();
+                }
+                
+                // Track achievement
+                if (window.BurnAnimations.checkAchievements) {
+                  window.BurnAnimations.checkAchievements('cnfts', 1);
+                }
+              }
+              
+              // Show success message
+              setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}" using fallback method! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
+              setTimeout(() => setError(null), 5000);
+              return;
+            } else {
+              // Both methods failed
+              console.error("Both methods failed!");
+              setError(`Error burning cNFT: Both methods failed. ${result.error || 'Unknown error'}`);
+              return;
+            }
+          } catch (fallbackError: any) {
+            console.error("Fallback method throw an error:", fallbackError);
+            setError(`Error burning cNFT: Both methods failed. ${result.error || 'Unknown error'}`);
+            return;
+          }
+        }
         
         if (result.success) {
+          // Direct method succeeded
+          console.log("Direct method succeeded!");
+          
           // Update the cNFTs list by removing the burnt cNFT
           const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
           setCnfts(updatedCnfts);
