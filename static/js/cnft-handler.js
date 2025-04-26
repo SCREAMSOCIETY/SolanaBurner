@@ -699,9 +699,19 @@ export class CNFTHandler {
                 });
             });
             
-            // Create a buffer for the instruction data - 5 is the burn instruction index
-            const dataBuffer = Buffer.alloc(1);
-            dataBuffer.writeUInt8(5, 0);
+            // Create a buffer for the instruction data
+            // Anchor programs require 8-byte discriminator
+            // Using the proper Anchor format: [discriminator(8 bytes), ...args]
+            const dataBuffer = Buffer.alloc(9);
+            
+            // First 8 bytes are the discriminator for the burn instruction  
+            // This is the representation of "burn" in Anchor's format
+            dataBuffer.write("burn", 0, "utf8");
+            
+            // The 9th byte is the instruction index (5 for burn)
+            dataBuffer.writeUInt8(5, 8);
+            
+            console.log('[directBurnCNFT] Created instruction data buffer:', dataBuffer.toString('hex'));
             
             // Create the instruction
             const instruction = new TransactionInstruction({

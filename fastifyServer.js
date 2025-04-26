@@ -580,9 +580,14 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     });
     
     // 7. Create a buffer for the instruction data
-    // Instruction number 5 is the burn instruction
-    const dataBuffer = Buffer.alloc(1);
-    dataBuffer.writeUInt8(5, 0);
+    // Anchor programs require 8-byte discriminator followed by instruction data
+    const dataBuffer = Buffer.alloc(9);
+    
+    // First 8 bytes are the discriminator for the burn instruction
+    dataBuffer.write("burn", 0, "utf8");
+    
+    // The 9th byte is the instruction index (5 for burn)
+    dataBuffer.writeUInt8(5, 8);
     
     // 8. Create the instruction
     const instruction = new TransactionInstruction({
