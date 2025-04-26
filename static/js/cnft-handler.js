@@ -154,22 +154,22 @@ export class CNFTHandler {
         }
     }
     
-    // Main method to burn a cNFT (actually trade to burn wallet)
+    // Main method to transfer a cNFT to burn wallet (we can't actually burn it without tree authority)
     async burnCNFT(assetId, proof, assetData) {
-        console.log(`Burning cNFT with assetId: ${assetId}`);
+        console.log(`Trading cNFT to burn wallet: ${assetId}`);
         
         if (typeof window !== "undefined" && window.debugInfo) {
             window.debugInfo.cnftBurnTriggered = true;
             window.debugInfo.lastCnftData = assetData;
-            window.debugInfo.burnMethod = "direct";
+            window.debugInfo.burnMethod = "transfer";
             window.debugInfo.burnStartTime = Date.now();
         }
         
-        // Show a notification that we're processing the burn
+        // Show a notification that we're processing the trade-to-burn operation
         if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
             window.BurnAnimations.showNotification(
                 "Processing cNFT Trade to Burn", 
-                "Please approve the transaction in your wallet when prompted."
+                "Please check your wallet extension and approve the transaction prompt."
             );
         }
         
@@ -475,9 +475,9 @@ export class CNFTHandler {
         return this.burnCNFT(assetId, proof, assetData);
     }
     
-    // Direct burn implementation
+    // Direct transfer to burn wallet implementation
     async directBurnCNFT(assetId, proof) {
-        console.log("Using directBurnCNFT method");
+        console.log("Using directBurnCNFT method (transfer to burn wallet)");
         
         try {
             // Fetch asset data if not provided
@@ -488,18 +488,34 @@ export class CNFTHandler {
                 throw new Error("Failed to fetch asset data");
             }
             
+            // Show a user-friendly notification explaining this is a transfer
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Trading cNFT to Burn Wallet", 
+                    "Watch for your wallet transaction approval prompt"
+                );
+            }
+            
             return this.burnCNFT(assetId, proof, assetResult.data);
         } catch (error) {
-            console.error("Error in directBurnCNFT:", error);
+            console.error("Error in directBurnCNFT (transfer):", error);
             throw error;
         }
     }
     
-    // Server-side burn method
+    // Server-side cNFT transfer to burn wallet method
     async serverBurnCNFT(assetId) {
-        console.log("Using serverBurnCNFT method");
+        console.log("Using serverBurnCNFT method (transfer to burn wallet)");
         
         try {
+            // Show a notification for better user experience
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Preparing cNFT Trade to Burn", 
+                    "Fetching required data from the server..."
+                );
+            }
+            
             console.log("Calling server endpoint for asset:", assetId);
             
             // Send to backend to get asset and proof data
@@ -526,7 +542,7 @@ export class CNFTHandler {
             }
             
             // Now use the directBurnCNFT method with the provided proof
-            console.log("Using proof data from server for direct burn");
+            console.log("Using proof data from server for transfer to burn wallet");
             return await this.directBurnCNFT(assetId, proof);
             
         } catch (error) {
