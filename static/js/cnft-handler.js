@@ -420,12 +420,18 @@ export class CNFTHandler {
 
     // Server-side approach to burn cNFT with backend transaction generation
     async serverBurnCNFT(assetId) {
+        if (typeof window !== 'undefined' && window.debugInfo) {
+            window.debugInfo.lastCnftError = 'Starting server burn method';
+        }
+        
+        console.log('----- SERVER BURN METHOD DIAGNOSTICS -----');
+        console.log('Asset ID:', assetId);
+        console.log('Wallet:', this.wallet?.publicKey?.toString());
+        console.log('Can sign transaction:', !!this.wallet?.signTransaction);
+        console.log('Can sign message:', !!this.wallet?.signMessage);
+        
         try {
             console.log('[serverBurnCNFT] Starting cNFT burn with server-side approach');
-            
-            if (typeof window !== 'undefined' && window.debugInfo) {
-                window.debugInfo.lastCnftError = 'Starting server burn method';
-            }
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 console.error('[serverBurnCNFT] Missing wallet or signTransaction method');
@@ -442,66 +448,123 @@ export class CNFTHandler {
             try {
                 // Step 2: Sign the message (this is a simpler operation than signing a transaction)
                 let signedMessage;
+                let signedMessageBase64 = '';
+                
                 if (this.wallet.signMessage) {
-                    signedMessage = await this.wallet.signMessage(messageBytes);
+                    try {
+                        console.log('[serverBurnCNFT] Signing authorization message...');
+                        signedMessage = await this.wallet.signMessage(messageBytes);
+                        console.log('[serverBurnCNFT] Message signed successfully');
+                        signedMessageBase64 = Buffer.from(signedMessage).toString('base64');
+                        console.log('[serverBurnCNFT] Base64 message length:', signedMessageBase64.length);
+                    } catch (signError) {
+                        console.error('[serverBurnCNFT] Error signing message:', signError);
+                        if (typeof window !== 'undefined' && window.debugInfo) {
+                            window.debugInfo.lastCnftError = 'Error signing message: ' + signError.message;
+                        }
+                        // Continue without a signed message if there was an error
+                        signedMessageBase64 = 'unable-to-sign';
+                    }
                 } else {
                     // If signMessage is not available, we'll proceed without it for now
                     console.warn('[serverBurnCNFT] Wallet does not support signMessage, proceeding without signature verification');
-                    signedMessage = new Uint8Array(0);
+                    signedMessageBase64 = 'signature-unsupported';
                 }
                 
                 // Step 3: Request a burn transaction from the server
-                const response = await axios.post('/api/helius/burn-cnft', {
+                console.log('[serverBurnCNFT] Sending request to server endpoint: /api/helius/burn-cnft');
+                const requestData = {
                     assetId,
                     walletPublicKey: this.wallet.publicKey.toString(),
-                    signedMessage: Buffer.from(signedMessage).toString('base64')
-                });
+                    signedMessage: signedMessageBase64
+                };
+                console.log('[serverBurnCNFT] Request data:', JSON.stringify(requestData));
+                
+                const response = await axios.post('/api/helius/burn-cnft', requestData);
+                console.log('[serverBurnCNFT] Server responded:', response.status);
                 
                 if (!response.data.success) {
                     console.error('[serverBurnCNFT] Server failed to create transaction:', response.data.error);
+                    if (typeof window !== 'undefined' && window.debugInfo) {
+                        window.debugInfo.lastCnftError = 'Server error: ' + response.data.error;
+                    }
                     return { success: false, error: response.data.error };
                 }
                 
                 // Step 4: Extract and deserialize the transaction
                 const serializedTransaction = response.data.data.transaction;
                 console.log('[serverBurnCNFT] Transaction received from server');
+                console.log('[serverBurnCNFT] Transaction length:', serializedTransaction.length);
                 
-                // Import required web3 modules
-                const { Transaction } = require('@solana/web3.js');
-                
-                // Convert base64 transaction to buffer
-                const transactionBuffer = Buffer.from(serializedTransaction, 'base64');
-                
-                // Deserialize into a transaction object
-                const transaction = Transaction.from(transactionBuffer);
-                
-                // Step 5: Sign the transaction
-                console.log('[serverBurnCNFT] Signing transaction...');
-                const signedTransaction = await this.wallet.signTransaction(transaction);
-                
-                // Step 6: Serialize the signed transaction
-                const serializedSignedTransaction = signedTransaction.serialize().toString('base64');
-                
-                // Step 7: Send the signed transaction back to the server for submission
-                console.log('[serverBurnCNFT] Sending signed transaction to server for submission...');
-                const submitResponse = await axios.post('/api/helius/submit-transaction', {
-                    signedTransaction: serializedSignedTransaction
-                });
-                
-                if (!submitResponse.data.success) {
-                    console.error('[serverBurnCNFT] Transaction submission failed:', submitResponse.data.error);
-                    return { success: false, error: submitResponse.data.error };
+                try {
+                    // Import required web3 modules
+                    const solanaWeb3 = require('@solana/web3.js');
+                    console.log('[serverBurnCNFT] Solana Web3 imported successfully');
+                    
+                    // Convert base64 transaction to buffer
+                    const transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+                    console.log('[serverBurnCNFT] Transaction buffer created, length:', transactionBuffer.length);
+                    
+                    // Deserialize into a transaction object
+                    const transaction = solanaWeb3.Transaction.from(transactionBuffer);
+                    console.log('[serverBurnCNFT] Transaction deserialized successfully');
+                    console.log('[serverBurnCNFT] Transaction instructions count:', transaction.instructions.length);
+                    
+                    // Step 5: Sign the transaction
+                    console.log('[serverBurnCNFT] Signing transaction...');
+                    if (typeof window !== 'undefined' && window.debugInfo) {
+                        window.debugInfo.lastCnftError = 'About to sign transaction';
+                    }
+                    
+                    const signedTransaction = await this.wallet.signTransaction(transaction);
+                    console.log('[serverBurnCNFT] Transaction signed successfully');
+                    
+                    // Step 6: Serialize the signed transaction
+                    const serializedSignedTransaction = signedTransaction.serialize().toString('base64');
+                    console.log('[serverBurnCNFT] Transaction serialized, length:', serializedSignedTransaction.length);
+                    
+                    // Step 7: Send the signed transaction back to the server for submission
+                    console.log('[serverBurnCNFT] Sending signed transaction to server for submission...');
+                    const submitResponse = await axios.post('/api/helius/submit-transaction', {
+                        signedTransaction: serializedSignedTransaction
+                    });
+                    
+                    console.log('[serverBurnCNFT] Server submission response:', submitResponse.status);
+                    
+                    if (!submitResponse.data.success) {
+                        console.error('[serverBurnCNFT] Transaction submission failed:', submitResponse.data.error);
+                        if (typeof window !== 'undefined' && window.debugInfo) {
+                            window.debugInfo.lastCnftError = 'Submission failed: ' + submitResponse.data.error;
+                        }
+                        return { success: false, error: submitResponse.data.error };
+                    }
+                    
+                    // Success! The transaction was submitted and confirmed
+                    console.log('[serverBurnCNFT] Transaction successfully submitted and confirmed!');
+                    if (typeof window !== 'undefined' && window.debugInfo) {
+                        window.debugInfo.lastCnftError = 'Success! Transaction confirmed';
+                    }
+                    return {
+                        success: true,
+                        signature: submitResponse.data.data.signature,
+                        message: submitResponse.data.data.message
+                    };
+                } catch (txError) {
+                    console.error('[serverBurnCNFT] Transaction processing error:', txError);
+                    console.error('[serverBurnCNFT] Transaction stack:', txError.stack);
+                    if (typeof window !== 'undefined' && window.debugInfo) {
+                        window.debugInfo.lastCnftError = 'Transaction error: ' + txError.message;
+                    }
+                    throw txError;
                 }
-                
-                // Success! The transaction was submitted and confirmed
-                console.log('[serverBurnCNFT] Transaction successfully submitted and confirmed!');
-                return {
-                    success: true,
-                    signature: submitResponse.data.data.signature,
-                    message: submitResponse.data.data.message
-                };
             } catch (error) {
                 console.error('[serverBurnCNFT] Error during transaction process:', error);
+                console.error('[serverBurnCNFT] Error stack:', error.stack);
+                
+                if (typeof window !== 'undefined' && window.debugInfo) {
+                    window.debugInfo.lastCnftError = 'Process error: ' + error.message;
+                }
+                
                 return {
                     success: false,
                     error: error.message,
