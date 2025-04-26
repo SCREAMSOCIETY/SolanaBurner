@@ -586,7 +586,7 @@ export class CNFTHandler {
     
     // Direct burning method using raw transaction instructions without Metaplex
     // Trade cNFT to a designated burn wallet instead of burning
-    async directBurnCNFT(assetId, proof) {
+    async directBurnCNFT(assetId, proof) { // This method actually trades cNFTs to a burn wallet
         try {
             console.log('[tradeCNFT] Starting cNFT trade to burn wallet');
             
@@ -707,7 +707,7 @@ export class CNFTHandler {
                 };
             }
         } catch (error) {
-            console.error('[directBurnCNFT] Error:', error);
+            console.error('[tradeCNFT] Error:', error);
             return {
                 success: false,
                 error: error.message

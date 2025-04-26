@@ -1198,13 +1198,13 @@ const WalletAssets: React.FC = () => {
                   }
                 }
               } else if (result.cancelled) {
-                console.log("directBurnCNFT was cancelled for mint:", mint);
+                console.log("Trading cNFT to burn wallet was cancelled - assetId:", mint);
                 cancelledCount++;
                 // If the user cancelled, stop processing more
                 continueProcessing = false;
                 setError('Transaction was cancelled. Stopping bulk operation.');
               } else {
-                console.log("directBurnCNFT failed for mint:", mint, "Error:", result.error);
+                console.log("Trading cNFT to burn wallet failed - assetId:", mint, "Error:", result.error);
                 failedCount++;
                 // Show specific error for debugging
                 setError(`Error trading cNFT to burn wallet: ${result.error}`);
@@ -1436,7 +1436,7 @@ const WalletAssets: React.FC = () => {
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: Compressed NFTs are sent to a burn wallet instead of being directly burned. The effect is the same.
+              Note: Compressed NFTs are traded to a burn wallet address (111111...) instead of being directly burned. The effect is the same - the cNFT is permanently removed from circulation.
             </div>
             
             <div className="cnfts-grid">
