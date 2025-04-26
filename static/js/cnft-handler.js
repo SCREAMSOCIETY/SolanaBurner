@@ -51,6 +51,13 @@ export class CNFTHandler {
     
     // Actual burning method for cNFTs with more reliable implementation
     async simpleBurnCNFT(assetId, proof, assetData) {
+        // Define window.debugInfo variable for easier debugging
+        if (typeof window !== 'undefined' && window.debugInfo) {
+            window.debugInfo.cnftBurnTriggered = true;
+            window.debugInfo.lastCnftData = assetData;
+            window.debugInfo.lastCnftError = null;
+        }
+        
         console.log("ENTER simpleBurnCNFT with params:", {
             assetId, 
             proofExists: !!proof,
@@ -104,7 +111,7 @@ export class CNFTHandler {
             
             // Add compute budget instructions to avoid insufficient SOL errors
             const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-                units: 200000 // Sufficient compute units for cNFT operations
+                units: 400000 // Higher compute units for cNFT operations
             });
             
             const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
@@ -186,6 +193,19 @@ export class CNFTHandler {
             });
             
             try {
+                // Add debug for wallet state before signing
+                console.log('Before signTransaction call. Wallet state:', {
+                    publicKey: this.wallet.publicKey.toString(),
+                    hasSignTransaction: !!this.wallet.signTransaction,
+                    txInstructions: tx.instructions.length,
+                    txFeePayer: tx.feePayer.toString(),
+                    blockhash: tx.recentBlockhash,
+                });
+                
+                if (typeof window !== 'undefined' && window.debugInfo) {
+                    window.debugInfo.lastCnftError = 'About to call signTransaction';
+                }
+                
                 // Race between the signTransaction and the timeout
                 const signedTx = await Promise.race([
                     this.wallet.signTransaction(tx),
@@ -227,6 +247,11 @@ export class CNFTHandler {
             } catch (signingError) {
                 // Clear timeout
                 clearTimeout(timeoutId);
+                
+                console.error('Error during transaction signing:', signingError);
+                if (typeof window !== 'undefined' && window.debugInfo) {
+                    window.debugInfo.lastCnftError = `Signing error: ${signingError.message}`;
+                }
                 
                 // Check if the error is related to user cancellation
                 if (signingError.message.includes('timed out') || 
