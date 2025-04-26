@@ -581,13 +581,13 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     
     // 7. Create a buffer for the instruction data
     // Anchor programs require 8-byte discriminator followed by instruction data
-    const dataBuffer = Buffer.alloc(9);
+    // For bubblegum, the burn instruction discriminator is this value:
+    const burnDiscriminator = Buffer.from([153, 230, 48, 185, 246, 252, 185, 193]);
     
-    // First 8 bytes are the discriminator for the burn instruction
-    dataBuffer.write("burn", 0, "utf8");
+    // No need for any additional bytes for this instruction
+    const dataBuffer = burnDiscriminator;
     
-    // The 9th byte is the instruction index (5 for burn)
-    dataBuffer.writeUInt8(5, 8);
+    fastify.log.info(`Using discriminator buffer: ${dataBuffer.toString('hex')}`);
     
     // 8. Create the instruction
     const instruction = new TransactionInstruction({

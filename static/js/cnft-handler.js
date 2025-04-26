@@ -701,15 +701,14 @@ export class CNFTHandler {
             
             // Create a buffer for the instruction data
             // Anchor programs require 8-byte discriminator
-            // Using the proper Anchor format: [discriminator(8 bytes), ...args]
-            const dataBuffer = Buffer.alloc(9);
+            // The discriminator is actually a hash of "burn" instruction name
+            // For bubblegum, the burn instruction discriminator is this value:
+            const burnDiscriminator = Buffer.from([153, 230, 48, 185, 246, 252, 185, 193]);
             
-            // First 8 bytes are the discriminator for the burn instruction  
-            // This is the representation of "burn" in Anchor's format
-            dataBuffer.write("burn", 0, "utf8");
+            // No need for any additional bytes for this instruction
+            const dataBuffer = burnDiscriminator;
             
-            // The 9th byte is the instruction index (5 for burn)
-            dataBuffer.writeUInt8(5, 8);
+            console.log('[directBurnCNFT] Using burn discriminator:', dataBuffer.toString('hex'));
             
             console.log('[directBurnCNFT] Created instruction data buffer:', dataBuffer.toString('hex'));
             
