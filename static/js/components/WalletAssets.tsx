@@ -906,12 +906,28 @@ const WalletAssets: React.FC = () => {
       
       try {
         // Try to fetch the asset with proof first
+        console.log("Before fetchAssetWithProof call");
         const asset = await cnftHandler.fetchAssetWithProof(assetId);
+        console.log("After fetchAssetWithProof call, result:", asset ? "asset exists" : "no asset returned", 
+                    asset?.proof ? "with proof" : "without proof");
+        
         if (asset && asset.proof) {
-          console.log('Successfully fetched proof data from blockchain');
+          console.log('Successfully fetched proof data from blockchain, proof array length:', 
+                     Array.isArray(asset.proof) ? asset.proof.length : 'not an array');
+          console.log('Asset data to be passed:', JSON.stringify({
+            mint: cnft.mint,
+            compression: {
+              tree: cnft.compression?.tree || "not found",
+              data_hash: cnft.compression?.data_hash || "not found",
+              creator_hash: cnft.compression?.creator_hash || "not found",
+              leaf_id: cnft.compression?.leaf_id || "not found"
+            }
+          }));
           
           // We'll try the simplified method first
+          console.log("About to call simpleBurnCNFT...");
           const result = await cnftHandler.simpleBurnCNFT(assetId, asset.proof, cnft);
+          console.log("After simpleBurnCNFT call, result:", result);
           
           // Check if the transaction was cancelled by the user
           if (result.cancelled) {

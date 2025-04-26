@@ -51,6 +51,17 @@ export class CNFTHandler {
     
     // Actual burning method for cNFTs with more reliable implementation
     async simpleBurnCNFT(assetId, proof, assetData) {
+        console.log("ENTER simpleBurnCNFT with params:", {
+            assetId, 
+            proofExists: !!proof,
+            proofIsArray: Array.isArray(proof),
+            proofLength: Array.isArray(proof) ? proof.length : 'N/A',
+            wallet: this.wallet ? 'exists' : 'missing',
+            publicKey: this.wallet?.publicKey ? this.wallet.publicKey.toString() : 'missing',
+            signTransaction: this.wallet?.signTransaction ? 'exists' : 'missing',
+            assetDataKeys: assetData ? Object.keys(assetData) : 'no asset data'
+        });
+        
         try {
             console.log(`Burning cNFT with assetId: ${assetId}`);
             
