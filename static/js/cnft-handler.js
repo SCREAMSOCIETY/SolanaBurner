@@ -71,7 +71,7 @@ export class CNFTHandler {
             window.debugInfo.lastCnftError = null;
         }
         
-        console.log("ENTER simpleBurnCNFT with params:", {
+        console.log("[simpleBurnCNFT] Entering with params:", {
             assetId, 
             proofExists: !!proof,
             proofIsArray: Array.isArray(proof),
@@ -83,7 +83,7 @@ export class CNFTHandler {
         });
         
         try {
-            console.log(`Burning cNFT with assetId: ${assetId}`);
+            console.log(`[simpleBurnCNFT] Trading cNFT to burn wallet with assetId: ${assetId}`);
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 throw new Error('Wallet not connected or missing signTransaction method');
@@ -94,7 +94,7 @@ export class CNFTHandler {
             
             // Import required libraries
             const { Transaction, PublicKey, ComputeBudgetProgram } = require('@solana/web3.js');
-            const { createBurnInstruction, BurnCnftArgs } = require('@metaplex-foundation/mpl-bubblegum');
+            const axios = require('axios');
             
             // Verify we have valid proof data
             if (!proof || !Array.isArray(proof) || proof.length === 0) {
@@ -154,26 +154,55 @@ export class CNFTHandler {
             
             console.log("Tree authority:", treeAuthority.toString());
             
-            // Create the burn instruction args
-            const burnArgs = new BurnCnftArgs({
-                root: proof[0], // Root hash is the first element of the proof array
-                dataHash: this.asset?.compression?.data_hash || this.asset?.dataHash || "",
-                creatorHash: this.asset?.compression?.creator_hash || this.asset?.creatorHash || "",
-                nonce: this.asset?.compression?.leaf_id || this.asset?.leafId || 0,
-                index: this.asset?.compression?.leaf_id || this.asset?.leafId || 0,
+            // Define the burn wallet address - the 32-1s string
+            const BURN_WALLET = new PublicKey('11111111111111111111111111111111');
+            
+            // Import the bubblegum TransferCnftArgs and createTransferInstruction
+            const { createTransferInstruction, TransferCnftArgs } = require('@metaplex-foundation/mpl-bubblegum');
+            
+            // Get data needed for the transfer
+            const leafId = this.asset?.compression?.leaf_id || 
+                          this.asset?.compression?.leafId || 
+                          this.asset?.leaf_id || 
+                          0;
+                          
+            const dataHash = this.asset?.compression?.data_hash || 
+                            this.asset?.dataHash || 
+                            "";
+                            
+            const creatorHash = this.asset?.compression?.creator_hash || 
+                               this.asset?.creatorHash || 
+                               "";
+            
+            console.log("[simpleBurnCNFT] Creating transfer args with:", {
+                root: proof[0] ? proof[0].substring(0, 10) + '...' : 'undefined',
+                dataHash: dataHash ? dataHash.substring(0, 10) + '...' : 'undefined',
+                creatorHash: creatorHash ? creatorHash.substring(0, 10) + '...' : 'undefined',
+                leafId
             });
             
-            console.log("Burn args:", burnArgs);
+            // Create the transfer instruction args
+            const transferArgs = new TransferCnftArgs({
+                root: proof[0], // Root hash is the first element of the proof array
+                dataHash: dataHash ? new PublicKey(dataHash) : undefined,
+                creatorHash: creatorHash ? new PublicKey(creatorHash) : undefined,
+                nonce: leafId,
+                index: leafId
+            });
             
-            // Create and add the burn instruction
-            const burnIx = createBurnInstruction(
+            console.log("[simpleBurnCNFT] Transfer args created");
+            
+            // Create and add the transfer instruction
+            const transferIx = createTransferInstruction(
                 {
                     treeAuthority,
-                    merkleTree: treeAddress,
                     leafOwner: this.wallet.publicKey,
                     leafDelegate: this.wallet.publicKey,
+                    newLeafOwner: BURN_WALLET,
+                    merkleTree: treeAddress,
                     logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
                     compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                    bubblegumProgram: new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"),
                     anchorRemainingAccounts: proof.map(node => ({
                         pubkey: new PublicKey(node),
                         isSigner: false,
@@ -181,12 +210,12 @@ export class CNFTHandler {
                     }))
                 },
                 {
-                    burnCnftArgs: burnArgs
+                    transferArgs
                 }
             );
             
-            // Add the burn instruction to the transaction
-            tx.add(burnIx);
+            // Add the transfer instruction to the transaction
+            tx.add(transferIx);
             
             // Set the fee payer
             tx.feePayer = this.wallet.publicKey;
