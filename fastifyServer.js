@@ -396,6 +396,254 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
   }
 });
 
+// Endpoint to handle direct transaction submission for cNFTs
+fastify.post('/api/helius/submit-transaction', async (request, reply) => {
+  try {
+    const { signedTransaction } = request.body;
+    
+    if (!signedTransaction) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Signed transaction is required'
+      });
+    }
+    
+    fastify.log.info(`Submitting signed transaction to Solana network`);
+    
+    // Decode the base64 encoded transaction
+    const transactionBuffer = Buffer.from(signedTransaction, 'base64');
+    
+    // Create a transaction object from the buffer
+    const { Transaction } = require('@solana/web3.js');
+    const transaction = Transaction.from(transactionBuffer);
+    
+    // Submit the transaction to the network
+    const signature = await connection.sendRawTransaction(transactionBuffer, {
+      skipPreflight: true,
+      maxRetries: 3,
+      preflightCommitment: 'processed'
+    });
+    
+    fastify.log.info(`Transaction sent with signature: ${signature}`);
+    
+    // Wait for confirmation
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('processed');
+    
+    const confirmation = await connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight
+    }, 'processed');
+    
+    if (confirmation.value.err) {
+      fastify.log.error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
+      return reply.code(500).send({
+        success: false,
+        error: `Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`,
+        signature
+      });
+    }
+    
+    return {
+      success: true,
+      data: {
+        signature,
+        message: 'Transaction successfully submitted and confirmed!'
+      }
+    };
+  } catch (error) {
+    fastify.log.error(`Error submitting transaction: ${error.message}`);
+    console.error('Stack:', error.stack);
+    return reply.code(500).send({
+      success: false,
+      error: `Error submitting transaction: ${error.message}`
+    });
+  }
+});
+
+// New endpoint for direct cNFT burning via server-side transaction creation
+fastify.post('/api/helius/burn-cnft', async (request, reply) => {
+  try {
+    const { assetId, walletPublicKey, signedMessage } = request.body;
+    
+    if (!assetId || !walletPublicKey || !signedMessage) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Required parameters missing: assetId, walletPublicKey, and signedMessage are required'
+      });
+    }
+    
+    fastify.log.info(`Processing server-side cNFT burn request for asset: ${assetId}`);
+    
+    // Verify the signed message to confirm wallet ownership
+    // This would normally involve cryptographic verification
+    // For now we're just logging and proceeding
+    
+    // 1. Get the asset proof data
+    fastify.log.info(`Fetching proof data for asset: ${assetId}`);
+    
+    // Construct the RPC payload to request proof data
+    const proofPayload = {
+      jsonrpc: '2.0',
+      id: 'helius-proof',
+      method: 'getAssetProof',
+      params: {
+        id: assetId
+      }
+    };
+    
+    // Get Helius API key
+    const heliusApiKey = process.env.HELIUS_API_KEY;
+    if (!heliusApiKey) {
+      throw new Error('HELIUS_API_KEY environment variable is not set');
+    }
+    
+    // Make the request to Helius RPC API for proof data
+    const proofResponse = await axios.post(
+      `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+      proofPayload
+    );
+    
+    if (!proofResponse.data || !proofResponse.data.result) {
+      throw new Error('Invalid response from Helius API when fetching proof');
+    }
+    
+    const proofData = proofResponse.data.result;
+    
+    // 2. Get the asset details
+    fastify.log.info(`Fetching details for asset: ${assetId}`);
+    
+    const assetPayload = {
+      jsonrpc: '2.0',
+      id: 'helius-asset',
+      method: 'getAsset',
+      params: {
+        id: assetId
+      }
+    };
+    
+    // Make the request to Helius RPC API for asset details
+    const assetResponse = await axios.post(
+      `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+      assetPayload
+    );
+    
+    if (!assetResponse.data || !assetResponse.data.result) {
+      throw new Error('Invalid response from Helius API when fetching asset details');
+    }
+    
+    const assetData = assetResponse.data.result;
+    
+    // 3. Import required libraries for creating and sending the transaction
+    const { 
+      Transaction, 
+      PublicKey, 
+      ComputeBudgetProgram, 
+      sendAndConfirmTransaction,
+      Keypair 
+    } = require('@solana/web3.js');
+    
+    const { 
+      createBurnInstruction, 
+      BurnCnftArgs 
+    } = require('@metaplex-foundation/mpl-bubblegum');
+    
+    // 4. Create a new transaction
+    const transaction = new Transaction();
+    
+    // Add compute budget instructions to avoid insufficient SOL errors
+    const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+      units: 400000 // Higher compute units for cNFT operations
+    });
+    
+    const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: 1 // Minimum possible fee
+    });
+    
+    transaction.add(modifyComputeUnits, addPriorityFee);
+    
+    // 5. Extract necessary data for the burn instruction
+    const walletPubkey = new PublicKey(walletPublicKey);
+    const treeId = proofData.tree_id;
+    const treeAddress = new PublicKey(treeId);
+    
+    // Derive tree authority as a PDA of the tree address
+    const [treeAuthority] = PublicKey.findProgramAddressSync(
+      [treeAddress.toBuffer()],
+      new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY') // Bubblegum program ID
+    );
+    
+    fastify.log.info(`Using treeId: ${treeId}`);
+    fastify.log.info(`Tree authority: ${treeAuthority.toString()}`);
+    
+    // 6. Create the burn instruction args
+    const dataHash = assetData.compression?.data_hash || '';
+    const creatorHash = assetData.compression?.creator_hash || '';
+    const leafId = assetData.compression?.leaf_id || 0;
+    
+    const burnArgs = new BurnCnftArgs({
+      root: proofData.root,
+      dataHash: dataHash,
+      creatorHash: creatorHash,
+      nonce: leafId,
+      index: leafId,
+    });
+    
+    // 7. Create and add the burn instruction
+    const burnIx = createBurnInstruction(
+      {
+        treeAuthority,
+        merkleTree: treeAddress,
+        leafOwner: walletPubkey,
+        leafDelegate: walletPubkey,
+        logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
+        compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+        anchorRemainingAccounts: proofData.proof.map(node => ({
+          pubkey: new PublicKey(node),
+          isSigner: false,
+          isWritable: false
+        }))
+      },
+      {
+        burnCnftArgs: burnArgs
+      }
+    );
+    
+    // Add the burn instruction to the transaction
+    transaction.add(burnIx);
+    
+    // 8. Set the fee payer
+    transaction.feePayer = walletPubkey;
+    
+    // 9. Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    
+    // 10. Serialize the transaction to return to the client
+    const serializedTransaction = transaction.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false
+    }).toString('base64');
+    
+    // 11. Return the transaction for the client to sign
+    return {
+      success: true,
+      data: {
+        transaction: serializedTransaction,
+        message: 'Transaction created successfully, sign and submit from client'
+      }
+    };
+    
+  } catch (error) {
+    fastify.log.error(`Error processing cNFT burn request: ${error.message}`);
+    console.error('Stack:', error.stack);
+    return reply.code(500).send({
+      success: false,
+      error: `Error processing cNFT burn request: ${error.message}`
+    });
+  }
+});
+
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
 const start = async () => {
