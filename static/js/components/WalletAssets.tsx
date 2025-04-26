@@ -16,6 +16,10 @@ declare global {
       lastCnftError: any;
       lastCnftData: any;
       cnftBurnTriggered: boolean;
+      lastCnftSuccess: boolean;
+      lastCnftSignature: string;
+      lastCnftAssumedSuccess: boolean;
+      walletInfo: any;
     };
   }
 }
@@ -25,7 +29,11 @@ if (typeof window !== 'undefined') {
   window.debugInfo = {
     lastCnftError: null,
     lastCnftData: null,
-    cnftBurnTriggered: false
+    cnftBurnTriggered: false,
+    lastCnftSuccess: false,
+    lastCnftSignature: '',
+    lastCnftAssumedSuccess: false,
+    walletInfo: null
   };
 }
 import { CNFTHandler } from '../cnft-handler';
@@ -119,6 +127,17 @@ const WalletAssets: React.FC = () => {
 
     fetchApiKey();
   }, []);
+
+  // Store wallet information in debug object when wallet connects
+  useEffect(() => {
+    if (publicKey && typeof window !== 'undefined' && window.debugInfo) {
+      window.debugInfo.walletInfo = {
+        publicKey: publicKey.toString(),
+        hasSignTransaction: !!signTransaction
+      };
+      console.log('[WalletAssets] Updated wallet debug info:', window.debugInfo.walletInfo);
+    }
+  }, [publicKey, signTransaction]);
 
   // Fetch tokens when wallet connects
   useEffect(() => {
