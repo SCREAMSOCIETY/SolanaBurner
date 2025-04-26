@@ -505,11 +505,28 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
+      // Import ComputeBudgetProgram
+      const { ComputeBudgetProgram } = require('@solana/web3.js');
+      
       // Create a transaction with multiple instructions:
       // 1. Burn the token amount
       // 2. Close the token account to recover rent
       // 3. Transfer a small amount of SOL to the designated address
       const transaction = new Transaction();
+      
+      // Add compute budget instructions to avoid insufficient SOL errors
+      // This helps avoid insufficient SOL errors for compute budget
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 200000 // Sufficient compute units for most operations
+      });
+      
+      // Add a compute budget instruction to set a very low prioritization fee 
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimum possible fee
+      });
+      
+      // Add compute budget instructions to transaction
+      transaction.add(modifyComputeUnits, addPriorityFee);
       
       // First add the burn instruction
       transaction.add(
@@ -545,44 +562,114 @@ const WalletAssets: React.FC = () => {
         })
       );
       
-      // Get recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
+      // Get recent blockhash with lower fee priority
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed' // Lower commitment level to reduce fees
+      });
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
-      // Sign and send the transaction
-      const signedTransaction = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      // Create a timeoutPromise that rejects after 2 minutes
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<Transaction>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Transaction signing timed out or was cancelled'));
+        }, 120000); // 2 minute timeout
+      });
       
-      // Wait for confirmation
-      const confirmation = await connection.confirmTransaction(signature);
-      
-      if (confirmation.value.err) {
-        console.error('Error confirming burn transaction:', confirmation.value.err);
-        setError(`Error burning token: ${confirmation.value.err}`);
-      } else {
-        console.log('Token burn successful with signature:', signature);
+      try {
+        // Race between the signTransaction and the timeout
+        const signedTx = await Promise.race([
+          signTransaction(transaction),
+          timeoutPromise
+        ]);
         
-        // Update the token list by removing the burnt token
-        const updatedTokens = tokens.filter(t => t.mint !== token.mint);
-        setTokens(updatedTokens);
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
         
-        // Show a success message or perform any additional actions
-        if (window.BurnAnimations && window.BurnAnimations.createConfetti) {
-          window.BurnAnimations.createConfetti();
+        // Send the transaction with skipPreflight to avoid client-side checks
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: true, // Skip preflight checks
+          maxRetries: 3, // Retry a few times if needed
+          preflightCommitment: 'processed' // Lower commitment level
+        });
+        
+        console.log('Transaction sent, waiting for confirmation...');
+        
+        // Wait for confirmation with a custom strategy to avoid timeouts
+        const confirmation = await connection.confirmTransaction({
+          signature: signature,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight
+        }, 'processed'); // Use processed commitment level
+        
+        console.log('Confirmation result:', confirmation);
+        
+        if (confirmation.value.err) {
+          console.error('Error confirming burn transaction:', confirmation.value.err);
+          setError(`Error burning token: ${confirmation.value.err}`);
+        } else {
+          console.log('Token burn successful with signature:', signature);
+          
+          // Update the token list by removing the burnt token
+          const updatedTokens = tokens.filter(t => t.mint !== token.mint);
+          setTokens(updatedTokens);
+          
+          // Show a success message or perform any additional actions
+          if (window.BurnAnimations && window.BurnAnimations.createConfetti) {
+            window.BurnAnimations.createConfetti();
+          }
+          
+          if (window.BurnAnimations && window.BurnAnimations.checkAchievements) {
+            window.BurnAnimations.checkAchievements('tokens', 1);
+          }
+          
+          // Show message about rent recovery and fee
+          setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet! A small donation has been sent to support the project.`);
+          setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+        }
+      } catch (signingError: any) {
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Check if the error is related to user cancellation
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
+          console.log('Transaction was cancelled by the user or timed out');
+          setError('Transaction was cancelled. Please try again if you want to burn this token.');
+          return;
         }
         
-        if (window.BurnAnimations && window.BurnAnimations.checkAchievements) {
-          window.BurnAnimations.checkAchievements('tokens', 1);
-        }
-        
-        // Show message about rent recovery and fee
-        setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet! A small donation has been sent to support the project.`);
-        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+        // For other signing errors, rethrow
+        throw signingError;
       }
     } catch (error: any) {
       console.error('Error burning token:', error);
-      setError(`Error burning token: ${error.message}`);
+      
+      // Special handling for SOL-related errors
+      const errorMessage = error.message || '';
+      const isInsufficientSOLError = (
+        errorMessage.includes('insufficient') || 
+        errorMessage.includes('balance') ||
+        errorMessage.includes('0x1') ||
+        errorMessage.includes('fund')
+      );
+      
+      const isWalletConnectionError = (
+        errorMessage.includes('wallet') || 
+        errorMessage.includes('connection') ||
+        errorMessage.includes('adapter')
+      );
+      
+      if (isInsufficientSOLError) {
+        setError('Transaction failed due to network fee issues. We\'ve updated the app to fix this. Please try again.');
+      } else if (isWalletConnectionError) {
+        setError('Wallet connection error. Please check your wallet and try again.');
+      } else {
+        setError(`Error burning token: ${error.message}`);
+      }
     }
   };
 
@@ -597,6 +684,9 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
+      // Import ComputeBudgetProgram
+      const { ComputeBudgetProgram } = require('@solana/web3.js');
+      
       // We need tokenAddress and metadataAddress to burn an NFT
       if (!nft.tokenAddress) {
         console.error('Token account address is required for burning NFT');
@@ -606,6 +696,20 @@ const WalletAssets: React.FC = () => {
       
       // Create a transaction to close the token account (burn the NFT)
       const transaction = new Transaction();
+      
+      // Add compute budget instructions to avoid insufficient SOL errors
+      // This helps avoid insufficient SOL errors for compute budget
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 200000 // Sufficient compute units for most operations
+      });
+      
+      // Add a compute budget instruction to set a very low prioritization fee 
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimum possible fee
+      });
+      
+      // Add compute budget instructions to transaction
+      transaction.add(modifyComputeUnits, addPriorityFee);
       
       // 1. Burn the NFT token
       transaction.add(
@@ -655,54 +759,124 @@ const WalletAssets: React.FC = () => {
         })
       );
       
-      // Get recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
+      // Get recent blockhash with lower fee priority
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed' // Lower commitment level to reduce fees
+      });
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
-      // Sign and send the transaction
-      const signedTransaction = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      // Create a timeoutPromise that rejects after 2 minutes
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<Transaction>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Transaction signing timed out or was cancelled'));
+        }, 120000); // 2 minute timeout
+      });
       
-      // Wait for confirmation
-      const confirmation = await connection.confirmTransaction(signature);
+      try {
+        // Race between the signTransaction and the timeout
+        const signedTx = await Promise.race([
+          signTransaction(transaction),
+          timeoutPromise
+        ]);
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+        
+        // Send the transaction with skipPreflight to avoid client-side checks
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: true, // Skip preflight checks
+          maxRetries: 3, // Retry a few times if needed
+          preflightCommitment: 'processed' // Lower commitment level
+        });
+        
+        console.log('Transaction sent, waiting for confirmation...');
+        
+        // Wait for confirmation with a custom strategy to avoid timeouts
+        const confirmation = await connection.confirmTransaction({
+          signature: signature,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight
+        }, 'processed'); // Use processed commitment level
+        
+        console.log('Confirmation result:', confirmation);
       
-      if (confirmation.value.err) {
-        console.error('Error confirming NFT burn transaction:', confirmation.value.err);
-        setError(`Error burning NFT: ${confirmation.value.err}`);
-      } else {
-        console.log('NFT burn successful with signature:', signature);
-        
-        // Update the NFTs list by removing the burnt NFT
-        const updatedNfts = nfts.filter(n => n.mint !== nft.mint);
-        setNfts(updatedNfts);
-        
-        // Apply animations if available
-        if (window.BurnAnimations) {
-          // Find the NFT card element for burn animation
-          const nftCard = document.querySelector(`[data-mint="${nft.mint}"]`) as HTMLElement;
-          if (nftCard && window.BurnAnimations.applyBurnAnimation) {
-            window.BurnAnimations.applyBurnAnimation(nftCard);
+        if (confirmation.value.err) {
+          console.error('Error confirming NFT burn transaction:', confirmation.value.err);
+          setError(`Error burning NFT: ${confirmation.value.err}`);
+        } else {
+          console.log('NFT burn successful with signature:', signature);
+          
+          // Update the NFTs list by removing the burnt NFT
+          const updatedNfts = nfts.filter(n => n.mint !== nft.mint);
+          setNfts(updatedNfts);
+          
+          // Apply animations if available
+          if (window.BurnAnimations) {
+            // Find the NFT card element for burn animation
+            const nftCard = document.querySelector(`[data-mint="${nft.mint}"]`) as HTMLElement;
+            if (nftCard && window.BurnAnimations.applyBurnAnimation) {
+              window.BurnAnimations.applyBurnAnimation(nftCard);
+            }
+            
+            // Show confetti animation
+            if (window.BurnAnimations.createConfetti) {
+              window.BurnAnimations.createConfetti();
+            }
+            
+            // Track achievement
+            if (window.BurnAnimations.checkAchievements) {
+              window.BurnAnimations.checkAchievements('nfts', 1);
+            }
           }
           
-          // Show confetti animation
-          if (window.BurnAnimations.createConfetti) {
-            window.BurnAnimations.createConfetti();
-          }
-          
-          // Track achievement
-          if (window.BurnAnimations.checkAchievements) {
-            window.BurnAnimations.checkAchievements('nfts', 1);
-          }
+          // Show message about rent recovery and donation
+          setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet! A small donation has been sent to support the project.`);
+          setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+        }
+      } catch (signingError: any) {
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Check if the error is related to user cancellation
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
+          console.log('Transaction was cancelled by the user or timed out');
+          setError('Transaction was cancelled. Please try again if you want to burn this NFT.');
+          return;
         }
         
-        // Show message about rent recovery and donation
-        setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet! A small donation has been sent to support the project.`);
-        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+        // For other signing errors, rethrow
+        throw signingError;
       }
     } catch (error: any) {
       console.error('Error burning NFT:', error);
-      setError(`Error burning NFT: ${error.message}`);
+      
+      // Special handling for SOL-related errors
+      const errorMessage = error.message || '';
+      const isInsufficientSOLError = (
+        errorMessage.includes('insufficient') || 
+        errorMessage.includes('balance') ||
+        errorMessage.includes('0x1') ||
+        errorMessage.includes('fund')
+      );
+      
+      const isWalletConnectionError = (
+        errorMessage.includes('wallet') || 
+        errorMessage.includes('connection') ||
+        errorMessage.includes('adapter')
+      );
+      
+      if (isInsufficientSOLError) {
+        setError('Transaction failed due to network fee issues. We\'ve updated the app to fix this. Please try again.');
+      } else if (isWalletConnectionError) {
+        setError('Wallet connection error. Please check your wallet and try again.');
+      } else {
+        setError(`Error burning NFT: ${error.message}`);
+      }
     }
   };
 

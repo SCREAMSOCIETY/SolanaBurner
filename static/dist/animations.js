@@ -272,14 +272,24 @@ function initUIEnhancements() {
   
   // Add progress bar if it doesn't exist
   if (!document.querySelector('.level-indicator')) {
+    // First remove any existing level indicator
+    const existingIndicator = document.querySelector('.level-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+    
+    // Create new level indicator
     const levelEl = document.createElement('div');
     levelEl.className = 'level-indicator';
+    levelEl.style.cssText = 'position: fixed; bottom: 20px; left: 0; right: 0; margin: 0 auto; max-width: 200px; z-index: 9999;';
     levelEl.innerHTML = `
       <div class="level-label">Level <span class="current-level">1</span></div>
       <div class="level-progress">
         <div class="level-progress-bar"></div>
       </div>
     `;
+    
+    // Append directly to document body
     document.body.appendChild(levelEl);
     
     // Initialize level progress
@@ -438,6 +448,15 @@ function addAnimationStyles() {
         color: #e0e0e0;
       }
       
+      body.dark-mode .level-indicator {
+        background-color: rgba(30, 30, 30, 0.9);
+        color: #f5f5f5;
+      }
+      
+      body.dark-mode .level-progress {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      
       /* Achievement Notification */
       .achievement {
         position: fixed;
@@ -483,13 +502,18 @@ function addAnimationStyles() {
       /* Level Indicator */
       .level-indicator {
         position: fixed;
-        top: 20px;
-        left: 20px;
-        background-color: rgba(0,0,0,0.7);
+        bottom: 20px !important;
+        top: auto !important;
+        left: 0 !important;
+        right: 0 !important;
+        margin: 0 auto !important;
+        max-width: 200px;
+        background-color: rgba(255,255,255,0.9);
         padding: 10px 15px;
-        border-radius: 20px;
-        color: white;
-        z-index: 100;
+        border-radius: 30px;
+        color: #333;
+        z-index: 9999;
+        transform: translateY(0) !important;
       }
       
       .level-label {
