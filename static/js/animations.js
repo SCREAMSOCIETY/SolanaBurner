@@ -1,5 +1,5 @@
 /**
- * Animations and UI enhancements for the Burn Token Application
+ * Animations and UI enhancements for the SolBurn Application
  */
 
 // Create confetti effect when successfully burning tokens/NFTs
@@ -166,8 +166,8 @@ function checkAchievements(type, value) {
   ];
   
   const cnftAchievements = [
-    { count: 1, title: 'cNFT Pioneer', description: 'Burned your first compressed NFT' },
-    { count: 3, title: 'cNFT Master', description: 'Burned 3 compressed NFTs' }
+    { count: 1, title: 'cNFT Pioneer', description: 'Traded your first compressed NFT to burn wallet' },
+    { count: 3, title: 'cNFT Master', description: 'Traded 3 compressed NFTs to burn wallet' }
   ];
   
   // Check for achievements based on type

@@ -1249,7 +1249,7 @@ const WalletAssets: React.FC = () => {
         setError(`No cNFTs were traded to burn wallet. ${failedCount} failed, ${cancelledCount} cancelled.`);
       }
     } catch (error: any) {
-      setError(`Error in bulk burn operation: ${error.message}`);
+      setError(`Error in bulk trade-to-burn operation: ${error.message}`);
     } finally {
       setIsBurning(false);
     }
