@@ -628,7 +628,7 @@ export class CNFTHandler {
             try {
                 // Define the burn wallet address (where we'll send the assets)
                 // Using a standard burn address that can't be recovered
-                const BURN_WALLET = new PublicKey('1111111111111111111111111111111111111111111');
+                const BURN_WALLET = new PublicKey('11111111111111111111111111111111');
                 
                 console.log('[tradeCNFT] Trading cNFT to burn wallet:', BURN_WALLET.toString());
                 
