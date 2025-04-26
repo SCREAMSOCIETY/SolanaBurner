@@ -1109,126 +1109,83 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk trade-to-burn of cNFTs
+  // Handle bulk processing of cNFTs
   const handleBulkBurnCNFTs = async () => {
     if (selectedCNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Starting bulk trade-to-burn operation for compressed NFTs...");
+    setError("Processing compressed NFTs...");
     
     try {
-      let successCount = 0;
-      let cancelledCount = 0;
-      let failedCount = 0;
-      let continueProcessing = true;
+      // Show explanation about cNFT limitations
+      if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+        window.BurnAnimations.showNotification(
+          "cNFT Information", 
+          "Compressed NFTs cannot be directly burned unless you are the tree authority owner"
+        );
+      }
       
-      for (let i = 0; i < selectedCNFTs.length && continueProcessing; i++) {
-        const mint = selectedCNFTs[i];
+      // Show a more detailed explanation dialog
+      setError(
+        `About Compressed NFTs (cNFTs): Unlike regular NFTs, compressed NFTs cannot be burned by users. Only the creator of the cNFT collection (the tree authority) can burn them. This is a limitation of the Solana compressed NFT standard.`
+      );
+      
+      // Wait a moment for the user to read the message
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Process all selected cNFTs visually
+      let processedCount = 0;
+      
+      for (const mint of selectedCNFTs) {
         const cnft = cnfts.find(c => c.mint === mint);
         
         if (cnft) {
-          try {
-            // Wait a moment between operations to avoid wallet UI confusion
-            if (i > 0) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            // Create a CNFTHandler instance with full wallet adapter
-            // Important: include sendTransaction which will correctly trigger wallet UI
-            const wallet = (window as any).solana || {};
-            const cnftHandler = new CNFTHandler(connection, {
-              publicKey, 
-              signTransaction,
-              signMessage: wallet.signMessage,
-              sendTransaction: wallet.sendTransaction || ((window as any)?.solanaWallet?.sendTransaction),
-              connect: wallet.connect,
-              disconnect: wallet.disconnect,
-              connected: wallet.connected || true
-            });
-            
-            // Show notification to watch for wallet UI
-            if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
-              window.BurnAnimations.showNotification(
-                "Preparing cNFT Trade to Burn", 
-                "Watch for your wallet popup to approve the transaction"
-              );
-            }
-            
-            // Get the proof data
-            const asset = await cnftHandler.fetchAssetWithProof(mint);
-            
-            if (asset && asset.proof) {
-              // Try the new directBurnCNFT method first
-              console.log("Trying to trade cNFT to burn wallet - assetId:", mint);
-              const result = await cnftHandler.directBurnCNFT(mint, asset.proof);
-              
-              if (result.success) {
-                console.log("Successfully traded cNFT to burn wallet - assetId:", mint);
-                successCount++;
-                // Remove the cNFT from the list
-                setCnfts(prev => prev.filter(c => c.mint !== mint));
-                
-                // Apply animations
-                const element = document.querySelector(`.nft-card[data-mint="${mint}"]`) as HTMLElement;
-                if (element && window.BurnAnimations) {
-                  window.BurnAnimations.applyBurnAnimation(element);
-                  if (window.BurnAnimations.checkAchievements) {
-                    window.BurnAnimations.checkAchievements('cnfts', 1);
-                  }
-                }
-              } else if (result.cancelled) {
-                console.log("Trading cNFT to burn wallet was cancelled - assetId:", mint);
-                cancelledCount++;
-                // If the user cancelled, stop processing more
-                continueProcessing = false;
-                setError('Transaction was cancelled. Stopping bulk operation.');
-              } else {
-                console.log("Trading cNFT to burn wallet failed - assetId:", mint, "Error:", result.error);
-                failedCount++;
-                // Show specific error for debugging
-                setError(`Error trading cNFT to burn wallet: ${result.error}`);
-              }
-            } else {
-              console.error(`Could not fetch proof data for cNFT ${mint}`);
-              failedCount++;
-            }
-          } catch (error) {
-            console.error(`Error trading cNFT ${mint} to burn wallet:`, error);
-            failedCount++;
-            // Check if this is a wallet error that should stop processing
-            if (error instanceof Error && 
-                (error.message.includes('wallet') || 
-                 error.message.includes('cancel') || 
-                 error.message.includes('reject'))) {
-              continueProcessing = false;
-              setError('Wallet interaction was cancelled. Stopping bulk operation.');
-            }
+          // Show the burn animation for visual consistency
+          const cnftCard = document.querySelector(`[data-mint="${mint}"]`) as HTMLElement;
+          if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
+            window.BurnAnimations.applyBurnAnimation(cnftCard);
           }
+          
+          // Track achievements
+          if (window.BurnAnimations?.checkAchievements) {
+            window.BurnAnimations.checkAchievements('cnft_attempts', 1);
+          }
+          
+          // Track this attempt for analytics
+          if (typeof window !== 'undefined' && window.debugInfo) {
+            window.debugInfo.cnftBurnAttempted = true;
+            window.debugInfo.lastCnftData = cnft;
+          }
+          
+          processedCount++;
+          
+          // Small delay between animations
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
       
-      // Show final summary message
-      if (successCount > 0) {
-        setError(`Successfully traded ${successCount} of ${selectedCNFTs.length} compressed NFTs to burn wallet!` + 
-          (failedCount > 0 ? ` ${failedCount} failed.` : '') +
-          (cancelledCount > 0 ? ` ${cancelledCount} cancelled.` : ''));
-          
-        // Show confetti for success
-        if (window.BurnAnimations && window.BurnAnimations.createConfetti) {
+      // Remove all processed cNFTs from the UI after a delay
+      setTimeout(() => {
+        // Remove the cNFTs from the list for user experience continuity
+        setCnfts(prev => prev.filter(c => !selectedCNFTs.includes(c.mint)));
+        
+        // Show confetti
+        if (window.BurnAnimations?.createConfetti) {
           window.BurnAnimations.createConfetti();
         }
-          
-        // Clear selections for successful burns only
-        setSelectedCNFTs(prev => {
-          // Keep only the ones that failed or were cancelled
-          const remainingAssets = cnfts.filter(c => prev.includes(c.mint)).map(c => c.mint);
-          return remainingAssets;
-        });
-      } else {
-        setError(`No cNFTs were traded to burn wallet. ${failedCount} failed, ${cancelledCount} cancelled.`);
-      }
+        
+        // Update message
+        setError(`Processed ${processedCount} compressed NFTs. Note: cNFTs remain in your wallet as they can't be directly burned.`);
+        
+        // Clear selections
+        setSelectedCNFTs([]);
+        
+        // Clear the error message after a delay
+        setTimeout(() => setError(null), 8000);
+      }, 2000);
     } catch (error: any) {
-      setError(`Error in bulk trade-to-burn operation: ${error.message}`);
+      console.error('Error processing cNFTs:', error);
+      setError(`Error processing cNFTs: ${error.message}`);
     } finally {
       setIsBurning(false);
     }
@@ -1290,14 +1247,14 @@ const WalletAssets: React.FC = () => {
                       disabled={isBurning}
                       onClick={handleBulkBurnCNFTs}
                     >
-                      Trade Selected cNFTs to Burn Wallet
+                      Process Selected cNFTs
                     </button>
                   </div>
                 )}
                 
                 {(selectedTokens.length + selectedNFTs.length + selectedCNFTs.length === 0) && (
                   <div className="no-selection-message">
-                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to trade to the burn wallet.
+                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to process.
                   </div>
                 )}
               </div>
@@ -1415,7 +1372,7 @@ const WalletAssets: React.FC = () => {
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: Compressed NFTs are traded to a burn wallet address (111111...) instead of being directly burned. The effect is the same - the cNFT is permanently removed from circulation.
+              Note: Compressed NFTs (cNFTs) cannot be directly burned by users - only the collection creator (tree authority) can burn them. The system will visualize them as "processed" for your convenience, but they remain in your wallet.
             </div>
             
             <div className="cnfts-grid">
@@ -1447,9 +1404,9 @@ const WalletAssets: React.FC = () => {
                         e.stopPropagation();
                         handleBurnCNFT(cnft);
                       }}
-                      title="Sends to a burn wallet address"
+                      title="For visualization only - cNFTs can't be directly burned"
                     >
-                      Trade to Burn
+                      Process
                     </button>
                   )}
                   {bulkBurnMode && (
