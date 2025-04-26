@@ -577,8 +577,8 @@ const WalletAssets: React.FC = () => {
         }
         
         // Show message about rent recovery and fee
-        setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet! A small donation has been sent to support the project.`);
-        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+        setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent from the token account to your wallet! A small donation has been sent to support the project.`);
+        setTimeout(() => setError(null), 6000); // Clear message after 6 seconds since it's longer
       }
     } catch (error: any) {
       console.error('Error burning token:', error);
