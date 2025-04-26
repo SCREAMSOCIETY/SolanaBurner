@@ -1145,7 +1145,7 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk burn of cNFTs
+  // Handle bulk trade-to-burn of cNFTs
   const handleBulkBurnCNFTs = async () => {
     if (selectedCNFTs.length === 0) return;
     
@@ -1164,7 +1164,7 @@ const WalletAssets: React.FC = () => {
         
         if (cnft) {
           try {
-            // Wait a moment between burns to avoid wallet UI confusion
+            // Wait a moment between operations to avoid wallet UI confusion
             if (i > 0) {
               await new Promise(resolve => setTimeout(resolve, 500));
             }
@@ -1318,7 +1318,7 @@ const WalletAssets: React.FC = () => {
                 
                 {(selectedTokens.length + selectedNFTs.length + selectedCNFTs.length === 0) && (
                   <div className="no-selection-message">
-                    Click on any asset to select it for burning. You can select multiple assets to burn in bulk.
+                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to trade to the burn wallet.
                   </div>
                 )}
               </div>
