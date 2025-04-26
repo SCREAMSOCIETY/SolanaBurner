@@ -49,10 +49,10 @@ export class CNFTHandler {
         }
     }
     
-    // Simplest possible direct method to burn a cNFT
+    // Actual burning method for cNFTs with more reliable implementation
     async simpleBurnCNFT(assetId, proof, assetData) {
         try {
-            console.log(`Using simple burn method for cNFT with assetId: ${assetId}`);
+            console.log(`Burning cNFT with assetId: ${assetId}`);
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 throw new Error('Wallet not connected or missing signTransaction method');
@@ -61,41 +61,101 @@ export class CNFTHandler {
             // Store asset data
             this.asset = assetData;
             
-            // Extract necessary info
-            const { Transaction, PublicKey, SystemProgram, ComputeBudgetProgram } = require('@solana/web3.js');
+            // Import required libraries
+            const { Transaction, PublicKey, ComputeBudgetProgram } = require('@solana/web3.js');
+            const { createBurnInstruction, BurnCnftArgs } = require('@metaplex-foundation/mpl-bubblegum');
             
-            // Get the tree ID
+            // Verify we have valid proof data
+            if (!proof || !Array.isArray(proof) || proof.length === 0) {
+                console.log("Invalid proof data provided, fetching fresh proof...");
+                const assetWithProof = await this.fetchAssetWithProof(assetId);
+                if (assetWithProof?.proof && Array.isArray(assetWithProof.proof)) {
+                    proof = assetWithProof.proof;
+                    console.log("Successfully fetched fresh proof data");
+                } else {
+                    throw new Error("Failed to get valid proof data for this asset");
+                }
+            }
+            
+            // Get the tree ID from asset data
             const treeId = this.asset?.compression?.tree || 
-                          this.asset?.tree || 
-                          '4xWcSNruBuoqzZdPinksNuewJ1voPMEUdAcVjKvh7Kyi';
+                          this.asset?.tree ||
+                          (assetData?.compression?.tree || null);
+                          
+            if (!treeId) {
+                throw new Error("Tree ID not found in asset data, cannot burn cNFT");
+            }
+            
+            console.log("Using tree ID:", treeId);
             
             // Create a new transaction
             const tx = new Transaction();
             
-            // Add a compute budget instruction to increase the compute units
-            // This helps avoid insufficient SOL errors for compute budget
+            // Add compute budget instructions to avoid insufficient SOL errors
             const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-                units: 200000 // Sufficient compute units for most operations
+                units: 200000 // Sufficient compute units for cNFT operations
             });
             
-            // Add a compute budget instruction to set a very low prioritization fee 
-            // This ensures transaction success without extra SOL (only minimum fee)
             const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
                 microLamports: 1 // Minimum possible fee
             });
             
-            // Add compute budget instructions to transaction
             tx.add(modifyComputeUnits, addPriorityFee);
             
-            // Add a simple system program transfer of 0 SOL to self
-            // This creates a valid transaction without actually transferring any value
-            const transferInstruction = SystemProgram.transfer({
-                fromPubkey: this.wallet.publicKey,
-                toPubkey: this.wallet.publicKey,
-                lamports: 0 // Zero lamport transfer (no SOL movement)
+            // Get necessary data for the burn instruction
+            const treeAddress = new PublicKey(treeId);
+            
+            // Get tree authority - this is usually derived from the tree address
+            // but some asset data formats directly include it
+            let treeAuthority;
+            if (this.asset?.compression?.tree_authority) {
+                treeAuthority = new PublicKey(this.asset.compression.tree_authority);
+            } else if (this.asset?.treeAuthority) {
+                treeAuthority = new PublicKey(this.asset.treeAuthority);
+            } else {
+                // Derive tree authority as a PDA of the tree address
+                const [derivedAuthority] = PublicKey.findProgramAddressSync(
+                    [treeAddress.toBuffer()],
+                    new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY") // Bubblegum program ID
+                );
+                treeAuthority = derivedAuthority;
+            }
+            
+            console.log("Tree authority:", treeAuthority.toString());
+            
+            // Create the burn instruction args
+            const burnArgs = new BurnCnftArgs({
+                root: proof[0], // Root hash is the first element of the proof array
+                dataHash: this.asset?.compression?.data_hash || this.asset?.dataHash || "",
+                creatorHash: this.asset?.compression?.creator_hash || this.asset?.creatorHash || "",
+                nonce: this.asset?.compression?.leaf_id || this.asset?.leafId || 0,
+                index: this.asset?.compression?.leaf_id || this.asset?.leafId || 0,
             });
             
-            tx.add(transferInstruction);
+            console.log("Burn args:", burnArgs);
+            
+            // Create and add the burn instruction
+            const burnIx = createBurnInstruction(
+                {
+                    treeAuthority,
+                    merkleTree: treeAddress,
+                    leafOwner: this.wallet.publicKey,
+                    leafDelegate: this.wallet.publicKey,
+                    logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
+                    compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                    anchorRemainingAccounts: proof.map(node => ({
+                        pubkey: new PublicKey(node),
+                        isSigner: false,
+                        isWritable: false
+                    }))
+                },
+                {
+                    burnCnftArgs: burnArgs
+                }
+            );
+            
+            // Add the burn instruction to the transaction
+            tx.add(burnIx);
             
             // Set the fee payer
             tx.feePayer = this.wallet.publicKey;
@@ -125,7 +185,6 @@ export class CNFTHandler {
                 clearTimeout(timeoutId);
                 
                 // Send the transaction with skipPreflight to avoid client-side checks
-                // This helps avoid incorrect "insufficient funds" errors
                 const signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
                     skipPreflight: true, // Skip preflight checks
                     maxRetries: 3, // Retry a few times if needed
@@ -147,13 +206,12 @@ export class CNFTHandler {
                     throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
                 }
                 
-                // Success! Note that this doesn't actually burn the cNFT, it just simulates it
-                // But we can consider this a successful placeholder until we implement actual burning
-                console.log('Successfully sent transaction with signature:', signature);
+                // Success! The cNFT has been burned
+                console.log('Successfully burned cNFT with signature:', signature);
                 return {
                     success: true,
                     signature,
-                    message: "Successfully processed. Note: cNFTs don't return rent like regular NFTs."
+                    message: "Successfully burned cNFT! Note: cNFTs don't return rent like regular NFTs."
                 };
             } catch (signingError) {
                 // Clear timeout
