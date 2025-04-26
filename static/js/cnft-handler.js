@@ -758,21 +758,6 @@ export class CNFTHandler {
                     console.error('[tradeCNFT] Error fetching proof data:', proofError);
                 }
                 
-                // Create the instructions based on whether it's a compressed NFT
-                const transferBuilder = this.metaplex.nfts().transfer({
-                    nftOrSft: {
-                        address: new PublicKey(assetId),
-                        tokenStandard: 'NonFungible'
-                    },
-                    authority: this.wallet,
-                    fromOwner: this.wallet.publicKey,
-                    toOwner: BURN_WALLET,
-                    amount: 1,
-                    compressed: true, // Explicitly specify this is a compressed NFT
-                    tree: new PublicKey(treeId), // Add the merkle tree information
-                    proof: proofData, // Add proof data if available
-                });
-                
                 // Create a new transaction
                 const tx = new Transaction();
                 
@@ -786,9 +771,72 @@ export class CNFTHandler {
                     })
                 );
                 
-                // Get the instructions and add to transaction
-                const transferInstructions = await transferBuilder.getInstructions();
-                tx.add(...transferInstructions);
+                // Import the necessary function from mpl-bubblegum
+                const { createTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
+                const { PROGRAM_ID: BUBBLEGUM_PROGRAM_ID } = require('@metaplex-foundation/mpl-bubblegum');
+                
+                // If we have the proof data, let's use it directly to create an instruction
+                if (proofData) {
+                    // Create the transfer instruction directly
+                    const treePublicKey = new PublicKey(treeId);
+                    const merkleProof = proofData.map(node => new PublicKey(node));
+                    
+                    // Get additional proof data if available
+                    const root = new PublicKey(assetData.compression.root || proofData.root || '11111111111111111111111111111111');
+                    const dataHash = new PublicKey(assetData.compression.data_hash || '11111111111111111111111111111111');
+                    const creatorHash = new PublicKey(assetData.compression.creator_hash || '11111111111111111111111111111111');
+                    const leafIndex = Number(assetData.compression.leaf_id || assetData.compression.leafId || 0);
+                    
+                    // Create the transfer instruction
+                    const transferInstruction = createTransferInstruction(
+                        {
+                            treeAuthority: BUBBLEGUM_PROGRAM_ID, // This is derived inside
+                            merkleTree: treePublicKey,
+                            treeDelegate: this.wallet.publicKey,
+                            newLeafOwner: BURN_WALLET,
+                            leafOwner: this.wallet.publicKey,
+                            leafDelegate: this.wallet.publicKey,
+                            anchorRemainingAccounts: merkleProof.map(node => ({
+                                pubkey: node,
+                                isWritable: false,
+                                isSigner: false
+                            })),
+                            root: root,
+                            dataHash: dataHash,
+                            creatorHash: creatorHash,
+                            nonce: leafIndex,
+                            index: leafIndex
+                        },
+                        BUBBLEGUM_PROGRAM_ID
+                    );
+                    
+                    // Add the instruction to the transaction
+                    tx.add(transferInstruction);
+                } else {
+                    // If we don't have proof data, use the createSizedTransferInstruction method
+                    // which doesn't require detailed proof information
+                    const { createSizedTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
+                    
+                    const treePublicKey = new PublicKey(treeId);
+                    const treeAuthority = BUBBLEGUM_PROGRAM_ID; // Derived automatically
+                    
+                    const transferInstruction = createSizedTransferInstruction(
+                        {
+                            merkleTree: treePublicKey,
+                            treeAuthority: treeAuthority,
+                            leafOwner: this.wallet.publicKey,
+                            newLeafOwner: BURN_WALLET,
+                            leafDelegate: this.wallet.publicKey,
+                            // No proof data needed
+                        },
+                        BUBBLEGUM_PROGRAM_ID,
+                        64, // Max depth standard for most trees
+                        512 // Max buffer size
+                    );
+                    
+                    // Add the instruction to the transaction
+                    tx.add(transferInstruction);
+                }
                 
                 // Set the fee payer and recent blockhash
                 tx.feePayer = this.wallet.publicKey;
