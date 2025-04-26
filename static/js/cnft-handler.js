@@ -42,31 +42,115 @@ export class CNFTHandler {
     async fetchAssetWithProof(assetId) {
         console.log("Fetching asset with proof for", assetId);
         
+        // Store attempts and errors for debugging
+        const attempts = [];
+        const errors = [];
+        
         try {
             // Method 1: Using bubblegum SDK getAssetWithProof
             console.log("Method 1: Using bubblegum SDK getAssetWithProof...");
-            const { getAssetWithProof } = require("@metaplex-foundation/mpl-bubblegum");
-            const asset = await getAssetWithProof(this.connection, assetId);
-            return asset;
-        } catch (error) {
-            console.log("Method 1 error:", error);
+            try {
+                const { getAssetWithProof } = require("@metaplex-foundation/mpl-bubblegum");
+                const asset = await getAssetWithProof(this.connection, assetId);
+                
+                if (asset && asset.proof && Array.isArray(asset.proof)) {
+                    console.log("Successfully fetched proof via bubblegum SDK");
+                    return asset;
+                } else {
+                    throw new Error("Invalid proof data from bubblegum SDK");
+                }
+            } catch (sdkError) {
+                console.log("Method 1 error:", sdkError);
+                attempts.push("bubblegum SDK");
+                errors.push(sdkError.message);
+            }
             
             // Method 2: Using Helius API through backend
+            console.log("Method 2: Using Helius API through backend...");
             try {
-                console.log("Method 2: Using Helius API through backend...");
                 const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
                 const proofData = await proofResponse.json();
                 
-                if (proofData.success && proofData.data) {
+                if (proofData.success && proofData.data && proofData.data.proof && Array.isArray(proofData.data.proof)) {
                     console.log("Successfully fetched proof data via Helius API");
                     return proofData.data;
                 } else {
-                    throw new Error("Failed to fetch proof data");
+                    throw new Error("Invalid proof data from Helius backend API");
                 }
-            } catch (fallbackError) {
-                console.error("Method 2 error:", fallbackError);
-                throw fallbackError;
+            } catch (apiError) {
+                console.log("Method 2 error:", apiError);
+                attempts.push("Helius backend API");
+                errors.push(apiError.message);
             }
+            
+            // Method 3: Try direct Helius API if we have the key
+            console.log("Method 3: Trying direct Helius API access...");
+            if (typeof window !== "undefined" && window.ENV && window.ENV.HELIUS_API_KEY) {
+                try {
+                    const apiKey = window.ENV.HELIUS_API_KEY;
+                    const directResponse = await fetch(`https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${apiKey}`);
+                    const directData = await directResponse.json();
+                    
+                    if (directData && directData.proof && Array.isArray(directData.proof)) {
+                        console.log("Successfully fetched proof via direct Helius API");
+                        return {
+                            ...directData,
+                            assetId: assetId
+                        };
+                    } else {
+                        throw new Error("Invalid proof data from direct Helius API");
+                    }
+                } catch (directError) {
+                    console.log("Method 3 error:", directError);
+                    attempts.push("direct Helius API");
+                    errors.push(directError.message);
+                }
+            } else {
+                console.log("Method 3: Skipped - No Helius API key available");
+                attempts.push("direct Helius API");
+                errors.push("No API key available");
+            }
+            
+            // Method 4: If all else fails, create a minimal asset object with an empty proof
+            // This is a last resort and may not work, but better than crashing
+            console.warn("All proof fetching methods failed, constructing placeholder asset data");
+            console.warn("Attempts:", attempts.join(", "));
+            console.warn("Errors:", errors.join(", "));
+            
+            // Show notification warning to user
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Warning: Limited Proof Data", 
+                    "Could not retrieve complete proof data. Transaction may fail."
+                );
+            }
+            
+            // Log error for debugging
+            if (typeof window !== "undefined" && window.debugInfo) {
+                window.debugInfo.proofFetchFailed = true;
+                window.debugInfo.proofFetchErrors = errors;
+            }
+            
+            // Return minimal data structure
+            return {
+                assetId: assetId,
+                proof: [],  // Empty proof array
+                compression: {
+                    compressed: true,
+                    tree: "EDR6ywjZy9pQqz7UCCx3jzCeMQcoks231URFDizJAUNq",
+                    root: "11111111111111111111111111111111",
+                    proofFailed: true
+                }
+            };
+        } catch (error) {
+            console.error("Fatal error in fetchAssetWithProof:", error);
+            
+            // Log error for debugging
+            if (typeof window !== "undefined" && window.debugInfo) {
+                window.debugInfo.fatalProofError = error.message;
+            }
+            
+            throw error;
         }
     }
     
@@ -232,6 +316,40 @@ export class CNFTHandler {
                 }
                 
                 console.log("Calling wallet.signTransaction...");
+                
+                // Force a small delay to ensure UI is ready
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Explicitly disconnect and reconnect if needed
+                if (this.wallet.connected === false && this.wallet.connect) {
+                    console.log("Wallet is disconnected, attempting to reconnect...");
+                    try {
+                        await this.wallet.connect();
+                    } catch (connectError) {
+                        console.error("Error reconnecting wallet:", connectError);
+                        // Continue anyway
+                    }
+                }
+                
+                // Log transaction details before signing
+                console.log("Transaction to sign:", {
+                    feePayer: tx.feePayer?.toString(),
+                    recentBlockhash: tx.recentBlockhash,
+                    instructions: tx.instructions.length
+                });
+                
+                // Force browser to show a notification that will help trigger wallet attention
+                if (typeof document !== "undefined" && document.hasFocus && !document.hasFocus()) {
+                    console.log("Browser tab not focused, trying to get user attention");
+                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                        window.BurnAnimations.showNotification(
+                            "Wallet Approval Required", 
+                            "Please check your wallet extension for transaction approval dialog"
+                        );
+                    }
+                }
+                
+                // Perform the actual transaction signing - this should prompt wallet UI
                 const signedTx = await this.wallet.signTransaction(tx);
                 console.log("Transaction signed successfully");
                 
