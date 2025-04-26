@@ -77,6 +77,16 @@ export class CNFTHandler {
         if (typeof window !== "undefined" && window.debugInfo) {
             window.debugInfo.cnftBurnTriggered = true;
             window.debugInfo.lastCnftData = assetData;
+            window.debugInfo.burnMethod = "direct";
+            window.debugInfo.burnStartTime = Date.now();
+        }
+        
+        // Show a notification that we're processing the burn
+        if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+            window.BurnAnimations.showNotification(
+                "Processing cNFT Trade to Burn", 
+                "Please approve the transaction in your wallet when prompted."
+            );
         }
         
         try {
@@ -210,9 +220,27 @@ export class CNFTHandler {
             // Sign and send the transaction - THIS SHOULD TRIGGER WALLET UI
             console.log("Requesting wallet signature...");
             try {
+                // Force wallet UI to appear by explicitly using wallet adapter's signTransaction
+                if (!this.wallet.signTransaction) {
+                    throw new Error("Wallet doesn't support signTransaction");
+                }
+                
+                // Set a debug flag to track if signTransaction is called
+                if (typeof window !== "undefined" && window.debugInfo) {
+                    window.debugInfo.signTransactionCalled = true;
+                    window.debugInfo.lastTransaction = tx;
+                }
+                
+                console.log("Calling wallet.signTransaction...");
                 const signedTx = await this.wallet.signTransaction(tx);
                 console.log("Transaction signed successfully");
                 
+                // Verify signature before sending
+                if (!signedTx) {
+                    throw new Error("Transaction was not signed properly");
+                }
+                
+                console.log("Sending raw transaction to network...");
                 const signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
                     skipPreflight: false,
                     preflightCommitment: "confirmed"

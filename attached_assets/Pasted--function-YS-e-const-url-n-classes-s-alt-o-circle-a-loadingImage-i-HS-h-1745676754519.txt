@@ -1,0 +1,2510 @@
+ function YS(e) {
+            const {url: n, classes: s="", alt: o, circle: a, loadingImage: i=HS, haveError: r, setHaveError: c} = e
+              , [l,d] = t.useState(!1)
+              , [m,u] = t.useState(!1)
+              , [g,h] = t.useState(i)
+              , p = t.useCallback((async t => {
+                if (t > 5)
+                    return void console.log(`too many attempts for ${n}`);
+                if (m)
+                    return void console.log(`Image ${n} is already being loaded`);
+                u(!0);
+                const {error: e, image: s, statusCode: o} = await VS.fetchImage(n);
+                if (s && h(s),
+                e) {
+                    console.log(`Error loading image: ${e}`),
+                    c ? c(!0) : d(!0),
+                    h(ZR);
+                    o && ![403, 404, 523, 530].includes(o) && setTimeout(( () => p(t + 1)), 3 * t * 1e3)
+                }
+                u(!1)
+            }
+            ), [n, m, c, d]);
+            t.useEffect(( () => {
+                p(0)
+            }
+            ), [n]);
+            const b = t.useMemo(( () => a || r || l || m ? "rounded-full" : "rounded"), [a, r, l, m]);
+            return Gp("img", {
+                src: m ? i : g,
+                className: `${b} bg-widget border-primary object-cover ${s}`,
+                onError: () => {
+                    c ? c(!0) : d(!0),
+                    h(ZR)
+                }
+                ,
+                alt: o
+            })
+        }
+        const qS = {
+            [nl.Small]: "w-12 h-12",
+            [nl.Default]: "w-12 md:w-20 h-12 md:h-20"
+        };
+        function ZS(e) {
+            const {item: n, markForBurn: s, wide: o, imageSize: a, hover: i=!0} = e
+              , r = dr(QA)
+              , c = ur(tS)
+              , l = ur(OA)
+              , d = ur(rS)
+              , [m,u] = t.useState(!1)
+              , g = t.useMemo(( () => qS[a]), [a])
+              , h = t.useMemo(( () => uA(n, r)), [n, r])
+              , p = t.useMemo(( () => n.mint || ""), [n])
+              , b = t.useMemo(( () => n.mode === $c.Cleanup), [n])
+              , y = t.useMemo(( () => b ? "Reclaim SOL" : p.slice(0, 4) + "..." + p.slice(p.length - 4)), [b, p])
+              , f = t.useMemo(( () => b ? "" : p), [b, p])
+              , w = t.useMemo(( () => b ? `Count: ${n.uiAmount}` : DA(n)), [b, n])
+              , k = t.useMemo(( () => o ? "w-40 md:w-60" : "w-40 md:w-40"), [o])
+              , v = t.useMemo(( () => a !== nl.Default ? null : Gp("span", {
+                className: `text-sm md:text-lg truncate text-primary ${k}`,
+                title: f,
+                children: y
+            })), [k, y, a, f])
+              , x = t.useMemo(( () => dA(n, r)), [n, r])
+              , C = t.useCallback((t => {
+                n.type === Oc.EmptyTokenAccount ? c(!1) : n.type === Oc.SerumAccount ? l(!1) : n.type === Oc.ResizableNFT ? d(!1) : s && s([n.key], !n.markForBurn, t)
+            }
+            ), [n, s, c, l, d]);
+            return Gp(Ef.div, {
+                className: "flex justify-center items-start " + (a === nl.Default ? "ml-4 mb-4" : "mb-3 px-3"),
+                children: [Gp("div", {
+                    className: "relative",
+                    children: Gp(ev, {
+                        children: Gp(Ef.div, {
+                            className: `${g} flex justify-center`,
+                            initial: {
+                                x: 50,
+                                opacity: 0
+                            },
+                            animate: {
+                                x: 0,
+                                opacity: 1
+                            },
+                            whileHover: {
+                                scale: i ? 1.1 : 1
+                            },
+                            whileTap: {
+                                scale: i ? .9 : 1
+                            },
+                            onClick: C,
+                            role: "button",
+                            children: Gp(KS.Ay, {
+                                className: g,
+                                offset: 500,
+                                placeholder: Gp("img", {
+                                    alt: "Loading",
+                                    src: HS,
+                                    className: `${g} ${BA(n) ? "rounded-full" : "rounded"} object-cover`
+                                }),
+                                children: Gp(YS, {
+                                    url: x,
+                                    haveError: m,
+                                    setHaveError: u,
+                                    classes: g,
+                                    alt: h,
+                                    circle: BA(n)
+                                })
+                            })
+                        })
+                    })
+                }), Gp("div", {
+                    className: `flex flex-col items-start justify-start ${k} ${a === nl.Default ? "-mt-1.5 ml-3" : "mt-1 ml-2 md:-mt-1"}`,
+                    children: [Gp("span", {
+                        className: `text-sm md:text-lg ${n.bonfidaData ? "" : "capitalize"} truncate text-primary ${k}`,
+                        title: h,
+                        children: h
+                    }), v, Gp("span", {
+                        className: `text-sm md:text-lg truncate text-primary ${k} ${a === nl.Default ? "" : "-mt-1"}`,
+                        title: w,
+                        children: w
+                    })]
+                })]
+            }, `preview-item-${n.key}`)
+        }
+        function JS(e) {
+            const {item: n, markForBurn: s, imageSize: o, hover: a=!0, wide: i} = e
+              , r = ur(FS)
+              , c = t.useCallback(( (t, e, s) => {
+                console.log("mark domain for burn"),
+                s && s.stopPropagation(),
+                r((t => t.map((t => t.mint === n.mint ? {
+                    ...t,
+                    markForBurn: !t.markForBurn,
+                    markedAt: new Date
+                } : t))))
+            }
+            ), [n, r]);
+            return t.useMemo(( () => {
+                const t = n.bonfidaData ? c : s;
+                return n.combinedName ? Gp(GS, {
+                    domain: n,
+                    hover: a,
+                    wide: i,
+                    imageSize: o
+                }) : Gp(ZS, {
+                    markForBurn: t,
+                    item: n,
+                    wide: i,
+                    imageSize: o
+                })
+            }
+            ), [n, s, a, o, i, c])
+        }
+        const QS = cr({
+            key: "burnProcessInitiated",
+            default: !1
+        })
+          , XS = cr({
+            key: "successfullyBurntState",
+            default: []
+        })
+          , _S = lr({
+            key: "solReclaimedFromBurning",
+            get: t => {
+                let {get: e} = t;
+                return xA(e(XS))
+            }
+        })
+          , OS = cr({
+            key: "jupiterTransactionsState",
+            default: []
+        })
+          , $S = cr({
+            key: "outputTokenAmountState",
+            default: 0
+        })
+          , tT = cr({
+            key: "earliestTransactionSlotState",
+            default: void 0
+        })
+          , eT = cr({
+            key: "jupiterSwapTransactionIdState",
+            default: void 0
+        })
+          , nT = (lr({
+            key: "finishedBurnMethods",
+            get: t => {
+                let {get: e} = t;
+                return e(XS).map((t => t.burnMethod))
+            }
+        }),
+        cr({
+            key: "acceptedBurnDisclaimer",
+            default: !1
+        }));
+        function sT(e) {
+            const {left: n, right: s, onChange: o, isRight: a} = e;
+            return t.default.useEffect(( () => {
+                o && o(a)
+            }
+            ), [a, o]),
+            Gp("div", n || s ? {
+                className: "flex items-center justify-center",
+                children: [Gp("span", {
+                    className: (a ? "text-disabled" : "text-white") + " text-base",
+                    children: n
+                }), Gp("div", {
+                    className: `mx-2 w-10 h-5 flex items-center rounded-full p-0.5 ${a ? "bg-secondary" : "bg-neutral-700"} cursor-pointer`,
+                    onClick: () => o(!a),
+                    children: Gp("div", {
+                        className: "bg-white w-3.5 h-3.5 rounded-full shadow-md transform duration-300 ease-in-out " + (a ? "translate-x-5" : "translate-x-0")
+                    })
+                }), Gp("span", {
+                    className: (a ? "text-white" : "text-disabled") + " text-base",
+                    children: s
+                })]
+            } : {
+                className: "flex items-center justify-center",
+                children: Gp("div", {
+                    className: `w-10 h-5 flex items-center rounded-full p-0.5 ${a ? "bg-secondary" : "bg-neutral-700"} cursor-pointer`,
+                    onClick: () => o(!a),
+                    children: Gp("div", {
+                        className: "bg-white w-3.5 h-3.5 rounded-full shadow-md transform duration-300 ease-in-out " + (a ? "translate-x-5" : "translate-x-0")
+                    })
+                })
+            })
+        }
+        function oT(e) {
+            const {jitoEnabled: n, setJitoEnabled: s, jitoTipConfiguration: o, setJitoTipConfiguration: a, jitoTipCustomValue: i, setJitoTipCustomValue: r, priorityFeeConfiguration: c, setPriorityFeeConfiguration: l, priorityFeeCustomValue: d, setPriorityFeeCustomValue: m, rpc: u, setRpc: g, onClose: h, transactionDescriptionMessage: p} = e
+              , [b,y] = t.useState(!1)
+              , [f,w] = t.useState("")
+              , k = t.useCallback((t => {
+                const e = Number(t.target.value);
+                Number.isNaN(e) || r(e)
+            }
+            ), [r])
+              , v = t.useCallback((t => {
+                const e = Number(t.target.value);
+                Number.isNaN(e) || m(e)
+            }
+            ), [m])
+              , x = t.useMemo(( () => Gp("div", {
+                className: "flex flex-col items-center justify-center sm:justify-start sm:items-start gap-y-3",
+                children: [Gp("div", {
+                    className: "flex flex-row gap-x-3 items-center justify-center sm:items-start flex-wrap gap-y-3 sm:flex-nowrap",
+                    children: Object.values(cl).map((t => Gp("button", {
+                        className: "bg-disabled hover:bg-secondary disabled:bg-primary rounded text-background w-16 md:w-20 text-base md:text-lg",
+                        disabled: o === t,
+                        onClick: () => a(t),
+                        children: t
+                    })))
+                }), o === cl.CUSTOM && Gp("div", {
+                    className: "border rounded border-primary h-8 w-24 flex flex-row items-center",
+                    children: [Gp("input", {
+                        className: "bg-transparent w-16 px-2 text-white focus:outline-none outline-none",
+                        placeholder: "0.001",
+                        type: "tel",
+                        pattern: "[0-9]*",
+                        value: i,
+                        onChange: k
+                    }), Gp("span", {
+                        className: "text-disabled",
+                        children: "SOL"
+                    })]
+                })]
+            })), [o, a, i, k])
+              , C = t.useMemo(( () => Gp("div", {
+                className: "flex flex-col items-center justify-center sm:justify-start sm:items-start gap-y-3",
+                children: [Gp("div", {
+                    className: "flex flex-row gap-x-3 items-center justify-center sm:items-start flex-wrap gap-y-3 sm:flex-nowrap",
+                    children: Object.values(ll).map((t => Gp("button", {
+                        className: "bg-disabled hover:bg-secondary disabled:bg-primary rounded text-background w-16 md:w-20 text-base md:text-lg",
+                        disabled: c === t,
+                        onClick: () => l(t),
+                        children: t
+                    })))
+                }), c === ll.CUSTOM && Gp("div", {
+                    className: "border rounded border-primary h-8 w-24 flex flex-row items-center",
+                    children: [Gp("input", {
+                        className: "bg-transparent w-16 px-2 text-white focus:outline-none outline-none",
+                        placeholder: "0.001",
+                        value: d || "",
+                        type: "tel",
+                        pattern: "[0-9]*",
+                        onChange: v
+                    }), Gp("span", {
+                        className: "text-disabled",
+                        children: "SOL"
+                    })]
+                })]
+            })), [c, l, d, v])
+              , R = t.useCallback((t => {
+                w(t.target.value);
+                try {
+                    new Xc.Connection(t.target.value)
+                } catch (e) {
+                    return void console.log(e)
+                }
+                g(t.target.value)
+            }
+            ), [g, w])
+              , A = t.useMemo(( () => {
+                const t = n ? "When using Jito MEV, transactions must be sent to their custom endpoint" : void 0;
+                return Gp("div", {
+                    className: "flex flex-col items-center justify-center sm:justify-start sm:items-start gap-y-3",
+                    children: [Gp("div", {
+                        className: "flex flex-row gap-x-3 items-center justify-start sm:items-start flex-wrap gap-y-3",
+                        children: [Yl.filter((t => !t.devnet)).map((e => Gp("button", {
+                            className: `bg-disabled hover:bg-secondary ${n ? "disabled:bg-disabled" : "disabled:bg-primary"} rounded text-background w-16 md:w-20 text-base md:text-lg`,
+                            disabled: u === e.url && !b || n,
+                            onClick: () => {
+                                y(!1),
+                                g(e.url)
+                            }
+                            ,
+                            title: t,
+                            children: e.name
+                        }))), Gp("button", {
+                            className: `bg-disabled hover:bg-secondary ${n ? "disabled:bg-disabled" : "disabled:bg-primary"} rounded text-background w-16 md:w-20 text-base md:text-lg`,
+                            disabled: b || n,
+                            onClick: () => y(!0),
+                            title: t,
+                            children: "Custom"
+                        }), n && Gp("button", {
+                            className: "bg-disabled hover:bg-secondary disabled:bg-primary rounded text-background w-16 md:w-20 text-base md:text-lg",
+                            disabled: !0,
+                            title: t,
+                            children: "Jito"
+                        })]
+                    }), b && !n && Gp("div", {
+                        className: "border rounded border-primary h-8 w-full sm:w-[400px] flex flex-row items-center",
+                        children: Gp("input", {
+                            className: "bg-transparent px-2 w-full text-white focus:outline-none outline-none",
+                            value: f,
+                            onChange: R
+                        })
+                    })]
+                })
+            }
+            ), [u, g, n, b, f, R])
+              , S = t.useMemo(( () => n ? Gp("div", {
+                className: "flex flex-col items-center justify-center sm:items-start sm:justify-start",
+                children: [Gp("span", {
+                    className: "text-primary text-lg md:text-xl mb-1",
+                    children: "Jito Tip"
+                }), x]
+            }) : null), [x, n])
+              , T = t.useMemo(( () => Gp("div", {
+                className: "flex flex-col items-center justify-center sm:items-start sm:justify-start",
+                children: [Gp("span", {
+                    className: "text-primary text-lg md:text-xl mb-1",
+                    children: "Priority Fee"
+                }), C]
+            })), [C]);
+            return Gp("div", {
+                className: "py-4 px-5 w-full flex flex-col items-center sm:items-start justify-center gap-y-3",
+                children: [Gp("span", {
+                    className: "text-primary text-lg md:text-2xl lg:text-3xl text-center underline",
+                    children: "Transaction Configuration"
+                }), Gp("div", {
+                    className: "gap-y-5 flex flex-col items-center sm:items-start justify-center",
+                    children: [Gp("div", {
+                        className: "flex flex-col items-start justify-start gap-y-1",
+                        children: [Gp("span", {
+                            className: "text-primary text-lg md:text-xl",
+                            title: "Jito MEV sends a tip to block producers running the custom Jito validator client to incentivise them to include our transactions",
+                            children: ["Enable Jito MEV", Gp("span", {
+                                className: "text-base ml-2",
+                                children: "\u26a1"
+                            })]
+                        }), Gp(sT, {
+                            onChange: s,
+                            isRight: n
+                        })]
+                    }), S, T, Gp("div", {
+                        className: "flex flex-col items-center justify-center sm:items-start sm:justify-start",
+                        children: [Gp("span", {
+                            className: "text-primary text-lg md:text-xl mb-1",
+                            children: "RPC URL"
+                        }), A]
+                    }), Gp("span", {
+                        className: "text-white w-full text-center sm:text-start",
+                        children: `${p || "These fees will be paid for each transaction."}`
+                    }), Gp(Ef.button, {
+                        className: "bg-primary disabled:bg-disabled rounded text-background h-7 w-36 md:w-40 md:h-9 uppercase font-header text-base",
+                        whileHover: {
+                            scale: 1.1
+                        },
+                        whileTap: {
+                            scale: .9
+                        },
+                        onClick: h,
+                        children: "Close"
+                    })]
+                })]
+            })
+        }
+        const aT = cr({
+            key: "jitoSendEnabledState",
+            default: !1
+        })
+          , iT = cr({
+            key: "jitoTipConfigurationState",
+            default: cl.NORMAL
+        })
+          , rT = cr({
+            key: "jitoTipCustomValueState",
+            default: .001
+        })
+          , cT = cr({
+            key: "priorityFeeConfigurationState",
+            default: ll.NORMAL
+        })
+          , lT = cr({
+            key: "priorityFeeCustomValueState",
+            default: 1e-4
+        })
+          , dT = cr({
+            key: "transactionRpcState",
+            default: Yl[0].url
+        })
+          , mT = cr({
+            key: "rpc",
+            default: Yl[0].url
+        });
+        function uT(e) {
+            const {markForBurn: n} = e
+              , s = dr(SS)
+              , o = dr(BS)
+              , a = dr(DS)
+              , i = dr(uS)
+              , [,r] = mr(nT)
+              , [,c] = mr(QS)
+              , [l,d] = t.useState(!1)
+              , m = dr(fS)
+              , [u,g] = mr(aT)
+              , [h,p] = mr(iT)
+              , [b,y] = mr(rT)
+              , [f,w] = mr(cT)
+              , [k,v] = mr(lT)
+              , [x,C] = mr(mT)
+              , R = dr(IS)
+              , A = t.useCallback(( () => {
+                console.log("Transaction confirmed, proceeding."),
+                r(!0),
+                c(!0)
+            }
+            ), [c, r])
+              , S = t.useCallback(( () => {
+                c(!1)
+            }
+            ), [c]);
+            return Gp("div", {
+                className: "flex flex-col items-center justify-center gap-y-1 md:gap-y-3 gap-x-6 mt-4 md:mt-10 sm:w-4/5",
+                children: [Gp("span", {
+                    className: "font-header text-primary uppercase text-sm sm:text-lg md:text-xl text-center",
+                    children: "Summary"
+                }), Object.values(o.burnMethods.reduce(( (t, e) => (t[e.title] ? t[e.title].groupKeys.push(e.groupKey) : t[e.title] = {
+                    ...e,
+                    groupKeys: [e.groupKey]
+                },
+                t)), {})).map(( (t, e) => Gp("div", {
+                    className: "flex flex-col items-center justify-between mt-3 sm:mt-4",
+                    children: [Gp("div", {
+                        className: "flex flex-row w-full justify-between mb-2 items-center",
+                        children: [Gp("span", {
+                            className: "font-header text-primary uppercase text-sm sm:text-lg md:text-xl text-center",
+                            children: `${t.title}`
+                        }), 0 === e && Gp(Ef.button, {
+                            onClick: () => d(!0),
+                            whileHover: {
+                                scale: 1.1
+                            },
+                            whileTap: {
+                                scale: .9
+                            },
+                            className: "bg-transparent rounded border-primary border text-white px-4 text-base sm:text-lg md:text-xl",
+                            children: "Settings"
+                        })]
+                    }), Gp("div", {
+                        className: "rounded border border-primary w-64 md:w-96 flex flex-col items-start justify-start overflow-x-hidden pt-4",
+                        children: Gp("div", {
+                            className: "overflow-y-scroll scroller w-full max-h-[500px]",
+                            children: s.map((e => {
+                                var s;
+                                const o = null === (s = e.count) || void 0 === s ? void 0 : s.isZero()
+                                  , a = `${e.burnMethod}-${o ? "close" : "burn"}`;
+                                return t.groupKeys.includes(a) && Gp(JS, {
+                                    item: e,
+                                    markForBurn: n,
+                                    wide: !0,
+                                    imageSize: nl.Default
+                                }, `confirm-burn-preview-item-${e.key}`)
+                            }
+                            ))
+                        })
+                    })]
+                }))), a && Gp("span", {
+                    className: "text-primary text-lg md:text-2xl text-center mt-1 md:mt-3 -mb-1 md:-mb-3 xl:w-3/5 lg:w-4/5",
+                    children: "Reminder: Unknown items could be NFTs, whitelist tokens, or other valuable items. If you do not know what a item is, do not burn it."
+                }), i && i.address !== Dl && R > 0 && Gp("span", {
+                    className: "text-primary text-lg md:text-2xl text-center mt-1 md:mt-3 -mb-1 md:-mb-3 xl:w-3/5 lg:w-4/5",
+                    children: `Note: You will need to approve 2 transactions: the ${o.hasOnlyResize ? "resize" : "burn"}, and then the conversion to ${i.symbol}.`
+                }), Gp("span", {
+                    className: "text-primary text-lg md:text-2xl mt-1 md:mt-3 text-center",
+                    children: "This process cannot be reversed."
+                }), Gp("div", {
+                    className: "flex-wrap sm:flex-nowrap flex items-center justify-center gap-x-8 gap-y-4 mt-2 md:mt-4",
+                    children: [Gp(Ef.button, {
+                        className: "bg-primary disabled:bg-disabled rounded text-background h-7 w-36 md:w-48 md:h-9 uppercase font-header text-base",
+                        onClick: A,
+                        whileHover: {
+                            scale: 1.1
+                        },
+                        whileTap: {
+                            scale: .9
+                        },
+                        children: "Confirm"
+                    }), Gp(Ef.button, {
+                        className: "bg-primary disabled:bg-disabled rounded text-background h-7 w-36 md:w-48 md:h-9 uppercase font-header text-base",
+                        onClick: S,
+                        whileHover: {
+                            scale: 1.1
+                        },
+                        whileTap: {
+                            scale: .9
+                        },
+                        children: "Cancel"
+                    })]
+                }), Gp(Jk, {
+                    open: l,
+                    onClose: () => d(!1),
+                    children: Gp(Jk.Panel, {
+                        className: "flex flex-col px-4 sm:px-5 py-4 justify-start items-center fixed -translate-y-1/2 -translate-x-1/2 left-1/2 top-1/2 z-30 border border-primary rounded bg-widget h-[650px] max-h-[92vh] w-4/5 sm:w-[500px] overflow-y-scroll",
+                        children: Gp(oT, {
+                            jitoEnabled: u,
+                            setJitoEnabled: g,
+                            jitoTipConfiguration: h,
+                            setJitoTipConfiguration: p,
+                            jitoTipCustomValue: b,
+                            setJitoTipCustomValue: y,
+                            priorityFeeConfiguration: f,
+                            setPriorityFeeConfiguration: w,
+                            priorityFeeCustomValue: k,
+                            setPriorityFeeCustomValue: v,
+                            rpc: x,
+                            setRpc: C,
+                            onClose: () => d(!1),
+                            solPrice: m
+                        })
+                    })
+                })]
+            })
+        }
+        function gT(t, e, n) {
+            return (e = function(t) {
+                var e = function(t, e) {
+                    if ("object" != typeof t || !t)
+                        return t;
+                    var n = t[Symbol.toPrimitive];
+                    if (void 0 !== n) {
+                        var s = n.call(t, e || "default");
+                        if ("object" != typeof s)
+                            return s;
+                        throw new TypeError("@@toPrimitive must return a primitive value.")
+                    }
+                    return ("string" === e ? String : Number)(t)
+                }(t, "string");
+                return "symbol" == typeof e ? e : e + ""
+            }(e))in t ? Object.defineProperty(t, e, {
+                value: n,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : t[e] = n,
+            t
+        }
+        function hT(t, e) {
+            var n = Object.keys(t);
+            if (Object.getOwnPropertySymbols) {
+                var s = Object.getOwnPropertySymbols(t);
+                e && (s = s.filter((function(e) {
+                    return Object.getOwnPropertyDescriptor(t, e).enumerable
+                }
+                ))),
+                n.push.apply(n, s)
+            }
+            return n
+        }
+        function pT(t) {
+            for (var e = 1; e < arguments.length; e++) {
+                var n = null != arguments[e] ? arguments[e] : {};
+                e % 2 ? hT(Object(n), !0).forEach((function(e) {
+                    gT(t, e, n[e])
+                }
+                )) : Object.getOwnPropertyDescriptors ? Object.defineProperties(t, Object.getOwnPropertyDescriptors(n)) : hT(Object(n)).forEach((function(e) {
+                    Object.defineProperty(t, e, Object.getOwnPropertyDescriptor(n, e))
+                }
+                ))
+            }
+            return t
+        }
+        const bT = () => {}
+        ;
+        let yT = {}
+          , fT = {}
+          , wT = null
+          , kT = {
+            mark: bT,
+            measure: bT
+        };
+        try {
+            "undefined" !== typeof window && (yT = window),
+            "undefined" !== typeof document && (fT = document),
+            "undefined" !== typeof MutationObserver && (wT = MutationObserver),
+            "undefined" !== typeof performance && (kT = performance)
+        } catch (dpt) {}
+        const {userAgent: vT=""} = yT.navigator || {}
+          , xT = yT
+          , CT = fT
+          , RT = wT
+          , AT = kT
+          , ST = (xT.document,
+        !!CT.documentElement && !!CT.head && "function" === typeof CT.addEventListener && "function" === typeof CT.createElement)
+          , TT = ~vT.indexOf("MSIE") || ~vT.indexOf("Trident/");
+        var UT = {
+            classic: {
+                fa: "solid",
+                fas: "solid",
+                "fa-solid": "solid",
+                far: "regular",
+                "fa-regular": "regular",
+                fal: "light",
+                "fa-light": "light",
+                fat: "thin",
+                "fa-thin": "thin",
+                fab: "brands",
+                "fa-brands": "brands"
+            },
+            duotone: {
+                fa: "solid",
+                fad: "solid",
+                "fa-solid": "solid",
+                "fa-duotone": "solid",
+                fadr: "regular",
+                "fa-regular": "regular",
+                fadl: "light",
+                "fa-light": "light",
+                fadt: "thin",
+                "fa-thin": "thin"
+            },
+            sharp: {
+                fa: "solid",
+                fass: "solid",
+                "fa-solid": "solid",
+                fasr: "regular",
+                "fa-regular": "regular",
+                fasl: "light",
+                "fa-light": "light",
+                fast: "thin",
+                "fa-thin": "thin"
+            },
+            "sharp-duotone": {
+                fa: "solid",
+                fasds: "solid",
+                "fa-solid": "solid",
+                fasdr: "regular",
+                "fa-regular": "regular",
+                fasdl: "light",
+                "fa-light": "light",
+                fasdt: "thin",
+                "fa-thin": "thin"
+            }
+        }
+          , ET = ["fa-classic", "fa-duotone", "fa-sharp", "fa-sharp-duotone"]
+          , IT = "classic"
+          , DT = "duotone"
+          , PT = [IT, DT, "sharp", "sharp-duotone"]
+          , MT = new Map([["classic", {
+            defaultShortPrefixId: "fas",
+            defaultStyleId: "solid",
+            styleIds: ["solid", "regular", "light", "thin", "brands"],
+            futureStyleIds: [],
+            defaultFontWeight: 900
+        }], ["sharp", {
+            defaultShortPrefixId: "fass",
+            defaultStyleId: "solid",
+            styleIds: ["solid", "regular", "light", "thin"],
+            futureStyleIds: [],
+            defaultFontWeight: 900
+        }], ["duotone", {
+            defaultShortPrefixId: "fad",
+            defaultStyleId: "solid",
+            styleIds: ["solid", "regular", "light", "thin"],
+            futureStyleIds: [],
+            defaultFontWeight: 900
+        }], ["sharp-duotone", {
+            defaultShortPrefixId: "fasds",
+            defaultStyleId: "solid",
+            styleIds: ["solid", "regular", "light", "thin"],
+            futureStyleIds: [],
+            defaultFontWeight: 900
+        }]])
+          , BT = ["fak", "fa-kit", "fakd", "fa-kit-duotone"]
+          , NT = {
+            fak: "kit",
+            "fa-kit": "kit"
+        }
+          , LT = {
+            fakd: "kit-duotone",
+            "fa-kit-duotone": "kit-duotone"
+        }
+          , FT = ["fak", "fakd"]
+          , zT = {
+            kit: "fak"
+        }
+          , WT = {
+            "kit-duotone": "fakd"
+        }
+          , jT = {
+            GROUP: "duotone-group",
+            SWAP_OPACITY: "swap-opacity",
+            PRIMARY: "primary",
+            SECONDARY: "secondary"
+        }
+          , GT = ["fak", "fa-kit", "fakd", "fa-kit-duotone"]
+          , KT = {
+            classic: {
+                fab: "fa-brands",
+                fad: "fa-duotone",
+                fal: "fa-light",
+                far: "fa-regular",
+                fas: "fa-solid",
+                fat: "fa-thin"
+            },
+            duotone: {
+                fadr: "fa-regular",
+                fadl: "fa-light",
+                fadt: "fa-thin"
+            },
+            sharp: {
+                fass: "fa-solid",
+                fasr: "fa-regular",
+                fasl: "fa-light",
+                fast: "fa-thin"
+            },
+            "sharp-duotone": {
+                fasds: "fa-solid",
+                fasdr: "fa-regular",
+                fasdl: "fa-light",
+                fasdt: "fa-thin"
+            }
+        }
+          , HT = ["fa", "fas", "far", "fal", "fat", "fad", "fadr", "fadl", "fadt", "fab", "fass", "fasr", "fasl", "fast", "fasds", "fasdr", "fasdl", "fasdt", "fa-classic", "fa-duotone", "fa-sharp", "fa-sharp-duotone", "fa-solid", "fa-regular", "fa-light", "fa-thin", "fa-duotone", "fa-brands"]
+          , VT = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+          , YT = VT.concat([11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+          , qT = [...Object.keys({
+            classic: ["fas", "far", "fal", "fat", "fad"],
+            duotone: ["fadr", "fadl", "fadt"],
+            sharp: ["fass", "fasr", "fasl", "fast"],
+            "sharp-duotone": ["fasds", "fasdr", "fasdl", "fasdt"]
+        }), "solid", "regular", "light", "thin", "duotone", "brands", "2xs", "xs", "sm", "lg", "xl", "2xl", "beat", "border", "fade", "beat-fade", "bounce", "flip-both", "flip-horizontal", "flip-vertical", "flip", "fw", "inverse", "layers-counter", "layers-text", "layers", "li", "pull-left", "pull-right", "pulse", "rotate-180", "rotate-270", "rotate-90", "rotate-by", "shake", "spin-pulse", "spin-reverse", "spin", "stack-1x", "stack-2x", "stack", "ul", jT.GROUP, jT.SWAP_OPACITY, jT.PRIMARY, jT.SECONDARY].concat(VT.map((t => "".concat(t, "x")))).concat(YT.map((t => "w-".concat(t))));
+        const ZT = "___FONT_AWESOME___"
+          , JT = 16
+          , QT = "svg-inline--fa"
+          , XT = "data-fa-i2svg"
+          , _T = "data-fa-pseudo-element"
+          , OT = "data-prefix"
+          , $T = "data-icon"
+          , tU = "fontawesome-i2svg"
+          , eU = ["HTML", "HEAD", "STYLE", "SCRIPT"]
+          , nU = ( () => {
+            try {
+                return !0
+            } catch (t) {
+                return !1
+            }
+        }
+        )();
+        function sU(t) {
+            return new Proxy(t,{
+                get: (t, e) => e in t ? t[e] : t[IT]
+            })
+        }
+        const oU = pT({}, UT);
+        oU[IT] = pT(pT(pT(pT({}, {
+            "fa-duotone": "duotone"
+        }), UT[IT]), NT), LT);
+        const aU = sU(oU)
+          , iU = pT({}, {
+            classic: {
+                solid: "fas",
+                regular: "far",
+                light: "fal",
+                thin: "fat",
+                brands: "fab"
+            },
+            duotone: {
+                solid: "fad",
+                regular: "fadr",
+                light: "fadl",
+                thin: "fadt"
+            },
+            sharp: {
+                solid: "fass",
+                regular: "fasr",
+                light: "fasl",
+                thin: "fast"
+            },
+            "sharp-duotone": {
+                solid: "fasds",
+                regular: "fasdr",
+                light: "fasdl",
+                thin: "fasdt"
+            }
+        });
+        iU[IT] = pT(pT(pT(pT({}, {
+            duotone: "fad"
+        }), iU[IT]), zT), WT);
+        const rU = sU(iU)
+          , cU = pT({}, KT);
+        cU[IT] = pT(pT({}, cU[IT]), {
+            fak: "fa-kit"
+        });
+        const lU = sU(cU)
+          , dU = pT({}, {
+            classic: {
+                "fa-brands": "fab",
+                "fa-duotone": "fad",
+                "fa-light": "fal",
+                "fa-regular": "far",
+                "fa-solid": "fas",
+                "fa-thin": "fat"
+            },
+            duotone: {
+                "fa-regular": "fadr",
+                "fa-light": "fadl",
+                "fa-thin": "fadt"
+            },
+            sharp: {
+                "fa-solid": "fass",
+                "fa-regular": "fasr",
+                "fa-light": "fasl",
+                "fa-thin": "fast"
+            },
+            "sharp-duotone": {
+                "fa-solid": "fasds",
+                "fa-regular": "fasdr",
+                "fa-light": "fasdl",
+                "fa-thin": "fasdt"
+            }
+        });
+        dU[IT] = pT(pT({}, dU[IT]), {
+            "fa-kit": "fak"
+        });
+        sU(dU);
+        const mU = /fa(s|r|l|t|d|dr|dl|dt|b|k|kd|ss|sr|sl|st|sds|sdr|sdl|sdt)?[\-\ ]/
+          , uU = "fa-layers-text"
+          , gU = /Font ?Awesome ?([56 ]*)(Solid|Regular|Light|Thin|Duotone|Brands|Free|Pro|Sharp Duotone|Sharp|Kit)?.*/i
+          , hU = (sU(pT({}, {
+            classic: {
+                900: "fas",
+                400: "far",
+                normal: "far",
+                300: "fal",
+                100: "fat"
+            },
+            duotone: {
+                900: "fad",
+                400: "fadr",
+                300: "fadl",
+                100: "fadt"
+            },
+            sharp: {
+                900: "fass",
+                400: "fasr",
+                300: "fasl",
+                100: "fast"
+            },
+            "sharp-duotone": {
+                900: "fasds",
+                400: "fasdr",
+                300: "fasdl",
+                100: "fasdt"
+            }
+        })),
+        ["class", "data-prefix", "data-icon", "data-fa-transform", "data-fa-mask"])
+          , pU = {
+            GROUP: "duotone-group",
+            SWAP_OPACITY: "swap-opacity",
+            PRIMARY: "primary",
+            SECONDARY: "secondary"
+        }
+          , bU = ["kit", ...qT]
+          , yU = xT.FontAwesomeConfig || {};
+        if (CT && "function" === typeof CT.querySelector) {
+            [["data-family-prefix", "familyPrefix"], ["data-css-prefix", "cssPrefix"], ["data-family-default", "familyDefault"], ["data-style-default", "styleDefault"], ["data-replacement-class", "replacementClass"], ["data-auto-replace-svg", "autoReplaceSvg"], ["data-auto-add-css", "autoAddCss"], ["data-auto-a11y", "autoA11y"], ["data-search-pseudo-elements", "searchPseudoElements"], ["data-observe-mutations", "observeMutations"], ["data-mutate-approach", "mutateApproach"], ["data-keep-original-source", "keepOriginalSource"], ["data-measure-performance", "measurePerformance"], ["data-show-missing-icons", "showMissingIcons"]].forEach((t => {
+                let[e,n] = t;
+                const s = function(t) {
+                    return "" === t || "false" !== t && ("true" === t || t)
+                }(function(t) {
+                    var e = CT.querySelector("script[" + t + "]");
+                    if (e)
+                        return e.getAttribute(t)
+                }(e));
+                void 0 !== s && null !== s && (yU[n] = s)
+            }
+            ))
+        }
+        const fU = {
+            styleDefault: "solid",
+            familyDefault: IT,
+            cssPrefix: "fa",
+            replacementClass: QT,
+            autoReplaceSvg: !0,
+            autoAddCss: !0,
+            autoA11y: !0,
+            searchPseudoElements: !1,
+            observeMutations: !0,
+            mutateApproach: "async",
+            keepOriginalSource: !0,
+            measurePerformance: !1,
+            showMissingIcons: !0
+        };
+        yU.familyPrefix && (yU.cssPrefix = yU.familyPrefix);
+        const wU = pT(pT({}, fU), yU);
+        wU.autoReplaceSvg || (wU.observeMutations = !1);
+        const kU = {};
+        Object.keys(fU).forEach((t => {
+            Object.defineProperty(kU, t, {
+                enumerable: !0,
+                set: function(e) {
+                    wU[t] = e,
+                    vU.forEach((t => t(kU)))
+                },
+                get: function() {
+                    return wU[t]
+                }
+            })
+        }
+        )),
+        Object.defineProperty(kU, "familyPrefix", {
+            enumerable: !0,
+            set: function(t) {
+                wU.cssPrefix = t,
+                vU.forEach((t => t(kU)))
+            },
+            get: function() {
+                return wU.cssPrefix
+            }
+        }),
+        xT.FontAwesomeConfig = kU;
+        const vU = [];
+        const xU = JT
+          , CU = {
+            size: 16,
+            x: 0,
+            y: 0,
+            rotate: 0,
+            flipX: !1,
+            flipY: !1
+        };
+        function RU() {
+            let t = 12
+              , e = "";
+            for (; t-- > 0; )
+                e += "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"[62 * Math.random() | 0];
+            return e
+        }
+        function AU(t) {
+            const e = [];
+            for (let n = (t || []).length >>> 0; n--; )
+                e[n] = t[n];
+            return e
+        }
+        function SU(t) {
+            return t.classList ? AU(t.classList) : (t.getAttribute("class") || "").split(" ").filter((t => t))
+        }
+        function TU(t) {
+            return "".concat(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        }
+        function UU(t) {
+            return Object.keys(t || {}).reduce(( (e, n) => e + "".concat(n, ": ").concat(t[n].trim(), ";")), "")
+        }
+        function EU(t) {
+            return t.size !== CU.size || t.x !== CU.x || t.y !== CU.y || t.rotate !== CU.rotate || t.flipX || t.flipY
+        }
+        function IU() {
+            const t = "fa"
+              , e = QT
+              , n = kU.cssPrefix
+              , s = kU.replacementClass;
+            let o = ':root, :host {\n  --fa-font-solid: normal 900 1em/1 "Font Awesome 6 Free";\n  --fa-font-regular: normal 400 1em/1 "Font Awesome 6 Free";\n  --fa-font-light: normal 300 1em/1 "Font Awesome 6 Pro";\n  --fa-font-thin: normal 100 1em/1 "Font Awesome 6 Pro";\n  --fa-font-duotone: normal 900 1em/1 "Font Awesome 6 Duotone";\n  --fa-font-duotone-regular: normal 400 1em/1 "Font Awesome 6 Duotone";\n  --fa-font-duotone-light: normal 300 1em/1 "Font Awesome 6 Duotone";\n  --fa-font-duotone-thin: normal 100 1em/1 "Font Awesome 6 Duotone";\n  --fa-font-brands: normal 400 1em/1 "Font Awesome 6 Brands";\n  --fa-font-sharp-solid: normal 900 1em/1 "Font Awesome 6 Sharp";\n  --fa-font-sharp-regular: normal 400 1em/1 "Font Awesome 6 Sharp";\n  --fa-font-sharp-light: normal 300 1em/1 "Font Awesome 6 Sharp";\n  --fa-font-sharp-thin: normal 100 1em/1 "Font Awesome 6 Sharp";\n  --fa-font-sharp-duotone-solid: normal 900 1em/1 "Font Awesome 6 Sharp Duotone";\n  --fa-font-sharp-duotone-regular: normal 400 1em/1 "Font Awesome 6 Sharp Duotone";\n  --fa-font-sharp-duotone-light: normal 300 1em/1 "Font Awesome 6 Sharp Duotone";\n  --fa-font-sharp-duotone-thin: normal 100 1em/1 "Font Awesome 6 Sharp Duotone";\n}\n\nsvg:not(:root).svg-inline--fa, svg:not(:host).svg-inline--fa {\n  overflow: visible;\n  box-sizing: content-box;\n}\n\n.svg-inline--fa {\n  display: var(--fa-display, inline-block);\n  height: 1em;\n  overflow: visible;\n  vertical-align: -0.125em;\n}\n.svg-inline--fa.fa-2xs {\n  vertical-align: 0.1em;\n}\n.svg-inline--fa.fa-xs {\n  vertical-align: 0em;\n}\n.svg-inline--fa.fa-sm {\n  vertical-align: -0.0714285705em;\n}\n.svg-inline--fa.fa-lg {\n  vertical-align: -0.2em;\n}\n.svg-inline--fa.fa-xl {\n  vertical-align: -0.25em;\n}\n.svg-inline--fa.fa-2xl {\n  vertical-align: -0.3125em;\n}\n.svg-inline--fa.fa-pull-left {\n  margin-right: var(--fa-pull-margin, 0.3em);\n  width: auto;\n}\n.svg-inline--fa.fa-pull-right {\n  margin-left: var(--fa-pull-margin, 0.3em);\n  width: auto;\n}\n.svg-inline--fa.fa-li {\n  width: var(--fa-li-width, 2em);\n  top: 0.25em;\n}\n.svg-inline--fa.fa-fw {\n  width: var(--fa-fw-width, 1.25em);\n}\n\n.fa-layers svg.svg-inline--fa {\n  bottom: 0;\n  left: 0;\n  margin: auto;\n  position: absolute;\n  right: 0;\n  top: 0;\n}\n\n.fa-layers-counter, .fa-layers-text {\n  display: inline-block;\n  position: absolute;\n  text-align: center;\n}\n\n.fa-layers {\n  display: inline-block;\n  height: 1em;\n  position: relative;\n  text-align: center;\n  vertical-align: -0.125em;\n  width: 1em;\n}\n.fa-layers svg.svg-inline--fa {\n  transform-origin: center center;\n}\n\n.fa-layers-text {\n  left: 50%;\n  top: 50%;\n  transform: translate(-50%, -50%);\n  transform-origin: center center;\n}\n\n.fa-layers-counter {\n  background-color: var(--fa-counter-background-color, #ff253a);\n  border-radius: var(--fa-counter-border-radius, 1em);\n  box-sizing: border-box;\n  color: var(--fa-inverse, #fff);\n  line-height: var(--fa-counter-line-height, 1);\n  max-width: var(--fa-counter-max-width, 5em);\n  min-width: var(--fa-counter-min-width, 1.5em);\n  overflow: hidden;\n  padding: var(--fa-counter-padding, 0.25em 0.5em);\n  right: var(--fa-right, 0);\n  text-overflow: ellipsis;\n  top: var(--fa-top, 0);\n  transform: scale(var(--fa-counter-scale, 0.25));\n  transform-origin: top right;\n}\n\n.fa-layers-bottom-right {\n  bottom: var(--fa-bottom, 0);\n  right: var(--fa-right, 0);\n  top: auto;\n  transform: scale(var(--fa-layers-scale, 0.25));\n  transform-origin: bottom right;\n}\n\n.fa-layers-bottom-left {\n  bottom: var(--fa-bottom, 0);\n  left: var(--fa-left, 0);\n  right: auto;\n  top: auto;\n  transform: scale(var(--fa-layers-scale, 0.25));\n  transform-origin: bottom left;\n}\n\n.fa-layers-top-right {\n  top: var(--fa-top, 0);\n  right: var(--fa-right, 0);\n  transform: scale(var(--fa-layers-scale, 0.25));\n  transform-origin: top right;\n}\n\n.fa-layers-top-left {\n  left: var(--fa-left, 0);\n  right: auto;\n  top: var(--fa-top, 0);\n  transform: scale(var(--fa-layers-scale, 0.25));\n  transform-origin: top left;\n}\n\n.fa-1x {\n  font-size: 1em;\n}\n\n.fa-2x {\n  font-size: 2em;\n}\n\n.fa-3x {\n  font-size: 3em;\n}\n\n.fa-4x {\n  font-size: 4em;\n}\n\n.fa-5x {\n  font-size: 5em;\n}\n\n.fa-6x {\n  font-size: 6em;\n}\n\n.fa-7x {\n  font-size: 7em;\n}\n\n.fa-8x {\n  font-size: 8em;\n}\n\n.fa-9x {\n  font-size: 9em;\n}\n\n.fa-10x {\n  font-size: 10em;\n}\n\n.fa-2xs {\n  font-size: 0.625em;\n  line-height: 0.1em;\n  vertical-align: 0.225em;\n}\n\n.fa-xs {\n  font-size: 0.75em;\n  line-height: 0.0833333337em;\n  vertical-align: 0.125em;\n}\n\n.fa-sm {\n  font-size: 0.875em;\n  line-height: 0.0714285718em;\n  vertical-align: 0.0535714295em;\n}\n\n.fa-lg {\n  font-size: 1.25em;\n  line-height: 0.05em;\n  vertical-align: -0.075em;\n}\n\n.fa-xl {\n  font-size: 1.5em;\n  line-height: 0.0416666682em;\n  vertical-align: -0.125em;\n}\n\n.fa-2xl {\n  font-size: 2em;\n  line-height: 0.03125em;\n  vertical-align: -0.1875em;\n}\n\n.fa-fw {\n  text-align: center;\n  width: 1.25em;\n}\n\n.fa-ul {\n  list-style-type: none;\n  margin-left: var(--fa-li-margin, 2.5em);\n  padding-left: 0;\n}\n.fa-ul > li {\n  position: relative;\n}\n\n.fa-li {\n  left: calc(-1 * var(--fa-li-width, 2em));\n  position: absolute;\n  text-align: center;\n  width: var(--fa-li-width, 2em);\n  line-height: inherit;\n}\n\n.fa-border {\n  border-color: var(--fa-border-color, #eee);\n  border-radius: var(--fa-border-radius, 0.1em);\n  border-style: var(--fa-border-style, solid);\n  border-width: var(--fa-border-width, 0.08em);\n  padding: var(--fa-border-padding, 0.2em 0.25em 0.15em);\n}\n\n.fa-pull-left {\n  float: left;\n  margin-right: var(--fa-pull-margin, 0.3em);\n}\n\n.fa-pull-right {\n  float: right;\n  margin-left: var(--fa-pull-margin, 0.3em);\n}\n\n.fa-beat {\n  animation-name: fa-beat;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, ease-in-out);\n}\n\n.fa-bounce {\n  animation-name: fa-bounce;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, cubic-bezier(0.28, 0.84, 0.42, 1));\n}\n\n.fa-fade {\n  animation-name: fa-fade;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, cubic-bezier(0.4, 0, 0.6, 1));\n}\n\n.fa-beat-fade {\n  animation-name: fa-beat-fade;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, cubic-bezier(0.4, 0, 0.6, 1));\n}\n\n.fa-flip {\n  animation-name: fa-flip;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, ease-in-out);\n}\n\n.fa-shake {\n  animation-name: fa-shake;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, linear);\n}\n\n.fa-spin {\n  animation-name: fa-spin;\n  animation-delay: var(--fa-animation-delay, 0s);\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 2s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, linear);\n}\n\n.fa-spin-reverse {\n  --fa-animation-direction: reverse;\n}\n\n.fa-pulse,\n.fa-spin-pulse {\n  animation-name: fa-spin;\n  animation-direction: var(--fa-animation-direction, normal);\n  animation-duration: var(--fa-animation-duration, 1s);\n  animation-iteration-count: var(--fa-animation-iteration-count, infinite);\n  animation-timing-function: var(--fa-animation-timing, steps(8));\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .fa-beat,\n.fa-bounce,\n.fa-fade,\n.fa-beat-fade,\n.fa-flip,\n.fa-pulse,\n.fa-shake,\n.fa-spin,\n.fa-spin-pulse {\n    animation-delay: -1ms;\n    animation-duration: 1ms;\n    animation-iteration-count: 1;\n    transition-delay: 0s;\n    transition-duration: 0s;\n  }\n}\n@keyframes fa-beat {\n  0%, 90% {\n    transform: scale(1);\n  }\n  45% {\n    transform: scale(var(--fa-beat-scale, 1.25));\n  }\n}\n@keyframes fa-bounce {\n  0% {\n    transform: scale(1, 1) translateY(0);\n  }\n  10% {\n    transform: scale(var(--fa-bounce-start-scale-x, 1.1), var(--fa-bounce-start-scale-y, 0.9)) translateY(0);\n  }\n  30% {\n    transform: scale(var(--fa-bounce-jump-scale-x, 0.9), var(--fa-bounce-jump-scale-y, 1.1)) translateY(var(--fa-bounce-height, -0.5em));\n  }\n  50% {\n    transform: scale(var(--fa-bounce-land-scale-x, 1.05), var(--fa-bounce-land-scale-y, 0.95)) translateY(0);\n  }\n  57% {\n    transform: scale(1, 1) translateY(var(--fa-bounce-rebound, -0.125em));\n  }\n  64% {\n    transform: scale(1, 1) translateY(0);\n  }\n  100% {\n    transform: scale(1, 1) translateY(0);\n  }\n}\n@keyframes fa-fade {\n  50% {\n    opacity: var(--fa-fade-opacity, 0.4);\n  }\n}\n@keyframes fa-beat-fade {\n  0%, 100% {\n    opacity: var(--fa-beat-fade-opacity, 0.4);\n    transform: scale(1);\n  }\n  50% {\n    opacity: 1;\n    transform: scale(var(--fa-beat-fade-scale, 1.125));\n  }\n}\n@keyframes fa-flip {\n  50% {\n    transform: rotate3d(var(--fa-flip-x, 0), var(--fa-flip-y, 1), var(--fa-flip-z, 0), var(--fa-flip-angle, -180deg));\n  }\n}\n@keyframes fa-shake {\n  0% {\n    transform: rotate(-15deg);\n  }\n  4% {\n    transform: rotate(15deg);\n  }\n  8%, 24% {\n    transform: rotate(-18deg);\n  }\n  12%, 28% {\n    transform: rotate(18deg);\n  }\n  16% {\n    transform: rotate(-22deg);\n  }\n  20% {\n    transform: rotate(22deg);\n  }\n  32% {\n    transform: rotate(-12deg);\n  }\n  36% {\n    transform: rotate(12deg);\n  }\n  40%, 100% {\n    transform: rotate(0deg);\n  }\n}\n@keyframes fa-spin {\n  0% {\n    transform: rotate(0deg);\n  }\n  100% {\n    transform: rotate(360deg);\n  }\n}\n.fa-rotate-90 {\n  transform: rotate(90deg);\n}\n\n.fa-rotate-180 {\n  transform: rotate(180deg);\n}\n\n.fa-rotate-270 {\n  transform: rotate(270deg);\n}\n\n.fa-flip-horizontal {\n  transform: scale(-1, 1);\n}\n\n.fa-flip-vertical {\n  transform: scale(1, -1);\n}\n\n.fa-flip-both,\n.fa-flip-horizontal.fa-flip-vertical {\n  transform: scale(-1, -1);\n}\n\n.fa-rotate-by {\n  transform: rotate(var(--fa-rotate-angle, 0));\n}\n\n.fa-stack {\n  display: inline-block;\n  vertical-align: middle;\n  height: 2em;\n  position: relative;\n  width: 2.5em;\n}\n\n.fa-stack-1x,\n.fa-stack-2x {\n  bottom: 0;\n  left: 0;\n  margin: auto;\n  position: absolute;\n  right: 0;\n  top: 0;\n  z-index: var(--fa-stack-z-index, auto);\n}\n\n.svg-inline--fa.fa-stack-1x {\n  height: 1em;\n  width: 1.25em;\n}\n.svg-inline--fa.fa-stack-2x {\n  height: 2em;\n  width: 2.5em;\n}\n\n.fa-inverse {\n  color: var(--fa-inverse, #fff);\n}\n\n.sr-only,\n.fa-sr-only {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  padding: 0;\n  margin: -1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  white-space: nowrap;\n  border-width: 0;\n}\n\n.sr-only-focusable:not(:focus),\n.fa-sr-only-focusable:not(:focus) {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  padding: 0;\n  margin: -1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  white-space: nowrap;\n  border-width: 0;\n}\n\n.svg-inline--fa .fa-primary {\n  fill: var(--fa-primary-color, currentColor);\n  opacity: var(--fa-primary-opacity, 1);\n}\n\n.svg-inline--fa .fa-secondary {\n  fill: var(--fa-secondary-color, currentColor);\n  opacity: var(--fa-secondary-opacity, 0.4);\n}\n\n.svg-inline--fa.fa-swap-opacity .fa-primary {\n  opacity: var(--fa-secondary-opacity, 0.4);\n}\n\n.svg-inline--fa.fa-swap-opacity .fa-secondary {\n  opacity: var(--fa-primary-opacity, 1);\n}\n\n.svg-inline--fa mask .fa-primary,\n.svg-inline--fa mask .fa-secondary {\n  fill: black;\n}';
+            if (n !== t || s !== e) {
+                const a = new RegExp("\\.".concat(t, "\\-"),"g")
+                  , i = new RegExp("\\--".concat(t, "\\-"),"g")
+                  , r = new RegExp("\\.".concat(e),"g");
+                o = o.replace(a, ".".concat(n, "-")).replace(i, "--".concat(n, "-")).replace(r, ".".concat(s))
+            }
+            return o
+        }
+        let DU = !1;
+        function PU() {
+            kU.autoAddCss && !DU && (!function(t) {
+                if (!t || !ST)
+                    return;
+                const e = CT.createElement("style");
+                e.setAttribute("type", "text/css"),
+                e.innerHTML = t;
+                const n = CT.head.childNodes;
+                let s = null;
+                for (let o = n.length - 1; o > -1; o--) {
+                    const t = n[o]
+                      , e = (t.tagName || "").toUpperCase();
+                    ["STYLE", "LINK"].indexOf(e) > -1 && (s = t)
+                }
+                CT.head.insertBefore(e, s)
+            }(IU()),
+            DU = !0)
+        }
+        var MU = {
+            mixout: () => ({
+                dom: {
+                    css: IU,
+                    insertCss: PU
+                }
+            }),
+            hooks: () => ({
+                beforeDOMElementCreation() {
+                    PU()
+                },
+                beforeI2svg() {
+                    PU()
+                }
+            })
+        };
+        const BU = xT || {};
+        BU[ZT] || (BU[ZT] = {}),
+        BU[ZT].styles || (BU[ZT].styles = {}),
+        BU[ZT].hooks || (BU[ZT].hooks = {}),
+        BU[ZT].shims || (BU[ZT].shims = []);
+        var NU = BU[ZT];
+        const LU = []
+          , FU = function() {
+            CT.removeEventListener("DOMContentLoaded", FU),
+            zU = 1,
+            LU.map((t => t()))
+        };
+        let zU = !1;
+        function WU(t) {
+            const {tag: e, attributes: n={}, children: s=[]} = t;
+            return "string" === typeof t ? TU(t) : "<".concat(e, " ").concat(function(t) {
+                return Object.keys(t || {}).reduce(( (e, n) => e + "".concat(n, '="').concat(TU(t[n]), '" ')), "").trim()
+            }(n), ">").concat(s.map(WU).join(""), "</").concat(e, ">")
+        }
+        function jU(t, e, n) {
+            if (t && t[e] && t[e][n])
+                return {
+                    prefix: e,
+                    iconName: n,
+                    icon: t[e][n]
+                }
+        }
+        ST && (zU = (CT.documentElement.doScroll ? /^loaded|^c/ : /^loaded|^i|^c/).test(CT.readyState),
+        zU || CT.addEventListener("DOMContentLoaded", FU));
+        var GU = function(t, e, n, s) {
+            var o, a, i, r = Object.keys(t), c = r.length, l = void 0 !== s ? function(t, e) {
+                return function(n, s, o, a) {
+                    return t.call(e, n, s, o, a)
+                }
+            }(e, s) : e;
+            for (void 0 === n ? (o = 1,
+            i = t[r[0]]) : (o = 0,
+            i = n); o < c; o++)
+                i = l(i, t[a = r[o]], a, t);
+            return i
+        };
+        function KU(t) {
+            const e = function(t) {
+                const e = [];
+                let n = 0;
+                const s = t.length;
+                for (; n < s; ) {
+                    const o = t.charCodeAt(n++);
+                    if (o >= 55296 && o <= 56319 && n < s) {
+                        const s = t.charCodeAt(n++);
+                        56320 == (64512 & s) ? e.push(((1023 & o) << 10) + (1023 & s) + 65536) : (e.push(o),
+                        n--)
+                    } else
+                        e.push(o)
+                }
+                return e
+            }(t);
+            return 1 === e.length ? e[0].toString(16) : null
+        }
+        function HU(t) {
+            return Object.keys(t).reduce(( (e, n) => {
+                const s = t[n];
+                return !!s.icon ? e[s.iconName] = s.icon : e[n] = s,
+                e
+            }
+            ), {})
+        }
+        function VU(t, e) {
+            let n = arguments.length > 2 && void 0 !== arguments[2] ? arguments[2] : {};
+            const {skipHooks: s=!1} = n
+              , o = HU(e);
+            "function" !== typeof NU.hooks.addPack || s ? NU.styles[t] = pT(pT({}, NU.styles[t] || {}), o) : NU.hooks.addPack(t, HU(e)),
+            "fas" === t && VU("fa", e)
+        }
+        const {styles: YU, shims: qU} = NU
+          , ZU = Object.keys(lU)
+          , JU = ZU.reduce(( (t, e) => (t[e] = Object.keys(lU[e]),
+        t)), {});
+        let QU = null
+          , XU = {}
+          , _U = {}
+          , OU = {}
+          , $U = {}
+          , tE = {};
+        function eE(t, e) {
+            const n = e.split("-")
+              , s = n[0]
+              , o = n.slice(1).join("-");
+            return s !== t || "" === o || (a = o,
+            ~bU.indexOf(a)) ? null : o;
+            var a
+        }
+        const nE = () => {
+            const t = t => GU(YU, ( (e, n, s) => (e[s] = GU(n, t, {}),
+            e)), {});
+            XU = t(( (t, e, n) => {
+                if (e[3] && (t[e[3]] = n),
+                e[2]) {
+                    e[2].filter((t => "number" === typeof t)).forEach((e => {
+                        t[e.toString(16)] = n
+                    }
+                    ))
+                }
+                return t
+            }
+            )),
+            _U = t(( (t, e, n) => {
+                if (t[n] = n,
+                e[2]) {
+                    e[2].filter((t => "string" === typeof t)).forEach((e => {
+                        t[e] = n
+                    }
+                    ))
+                }
+                return t
+            }
+            )),
+            tE = t(( (t, e, n) => {
+                const s = e[2];
+                return t[n] = n,
+                s.forEach((e => {
+                    t[e] = n
+                }
+                )),
+                t
+            }
+            ));
+            const e = "far"in YU || kU.autoFetchSvg
+              , n = GU(qU, ( (t, n) => {
+                const s = n[0];
+                let o = n[1];
+                const a = n[2];
+                return "far" !== o || e || (o = "fas"),
+                "string" === typeof s && (t.names[s] = {
+                    prefix: o,
+                    iconName: a
+                }),
+                "number" === typeof s && (t.unicodes[s.toString(16)] = {
+                    prefix: o,
+                    iconName: a
+                }),
+                t
+            }
+            ), {
+                names: {},
+                unicodes: {}
+            });
+            OU = n.names,
+            $U = n.unicodes,
+            QU = cE(kU.styleDefault, {
+                family: kU.familyDefault
+            })
+        }
+        ;
+        var sE;
+        function oE(t, e) {
+            return (XU[t] || {})[e]
+        }
+        function aE(t, e) {
+            return (tE[t] || {})[e]
+        }
+        function iE(t) {
+            return OU[t] || {
+                prefix: null,
+                iconName: null
+            }
+        }
+        function rE() {
+            return QU
+        }
+        sE = t => {
+            QU = cE(t.styleDefault, {
+                family: kU.familyDefault
+            })
+        }
+        ,
+        vU.push(sE),
+        nE();
+        function cE(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+            const {family: n=IT} = e
+              , s = aU[n][t];
+            if (n === DT && !t)
+                return "fad";
+            const o = rU[n][t] || rU[n][s]
+              , a = t in NU.styles ? t : null;
+            return o || a || null
+        }
+        function lE(t) {
+            return t.sort().filter(( (t, e, n) => n.indexOf(t) === e))
+        }
+        function dE(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+            const {skipLookups: n=!1} = e;
+            let s = null;
+            const o = HT.concat(GT)
+              , a = lE(t.filter((t => o.includes(t))))
+              , i = lE(t.filter((t => !HT.includes(t))))
+              , r = a.filter((t => (s = t,
+            !ET.includes(t))))
+              , [c=null] = r
+              , l = function(t) {
+                let e = IT;
+                const n = ZU.reduce(( (t, e) => (t[e] = "".concat(kU.cssPrefix, "-").concat(e),
+                t)), {});
+                return PT.forEach((s => {
+                    (t.includes(n[s]) || t.some((t => JU[s].includes(t)))) && (e = s)
+                }
+                )),
+                e
+            }(a)
+              , d = pT(pT({}, function(t) {
+                let e = []
+                  , n = null;
+                return t.forEach((t => {
+                    const s = eE(kU.cssPrefix, t);
+                    s ? n = s : t && e.push(t)
+                }
+                )),
+                {
+                    iconName: n,
+                    rest: e
+                }
+            }(i)), {}, {
+                prefix: cE(c, {
+                    family: l
+                })
+            });
+            return pT(pT(pT({}, d), function(t) {
+                const {values: e, family: n, canonical: s, givenPrefix: o="", styles: a={}, config: i={}} = t
+                  , r = n === DT
+                  , c = e.includes("fa-duotone") || e.includes("fad")
+                  , l = "duotone" === i.familyDefault
+                  , d = "fad" === s.prefix || "fa-duotone" === s.prefix;
+                !r && (c || l || d) && (s.prefix = "fad");
+                (e.includes("fa-brands") || e.includes("fab")) && (s.prefix = "fab");
+                if (!s.prefix && mE.includes(n)) {
+                    if (Object.keys(a).find((t => uE.includes(t))) || i.autoFetchSvg) {
+                        const t = MT.get(n).defaultShortPrefixId;
+                        s.prefix = t,
+                        s.iconName = aE(s.prefix, s.iconName) || s.iconName
+                    }
+                }
+                "fa" !== s.prefix && "fa" !== o || (s.prefix = rE() || "fas");
+                return s
+            }({
+                values: t,
+                family: l,
+                styles: YU,
+                config: kU,
+                canonical: d,
+                givenPrefix: s
+            })), function(t, e, n) {
+                let {prefix: s, iconName: o} = n;
+                if (t || !s || !o)
+                    return {
+                        prefix: s,
+                        iconName: o
+                    };
+                const a = "fa" === e ? iE(o) : {}
+                  , i = aE(s, o);
+                o = a.iconName || i || o,
+                s = a.prefix || s,
+                "far" !== s || YU.far || !YU.fas || kU.autoFetchSvg || (s = "fas");
+                return {
+                    prefix: s,
+                    iconName: o
+                }
+            }(n, s, d))
+        }
+        const mE = PT.filter((t => t !== IT || t !== DT))
+          , uE = Object.keys(KT).filter((t => t !== IT)).map((t => Object.keys(KT[t]))).flat();
+        let gE = []
+          , hE = {};
+        const pE = {}
+          , bE = Object.keys(pE);
+        function yE(t, e) {
+            for (var n = arguments.length, s = new Array(n > 2 ? n - 2 : 0), o = 2; o < n; o++)
+                s[o - 2] = arguments[o];
+            return (hE[t] || []).forEach((t => {
+                e = t.apply(null, [e, ...s])
+            }
+            )),
+            e
+        }
+        function fE(t) {
+            for (var e = arguments.length, n = new Array(e > 1 ? e - 1 : 0), s = 1; s < e; s++)
+                n[s - 1] = arguments[s];
+            (hE[t] || []).forEach((t => {
+                t.apply(null, n)
+            }
+            ))
+        }
+        function wE() {
+            const t = arguments[0]
+              , e = Array.prototype.slice.call(arguments, 1);
+            return pE[t] ? pE[t].apply(null, e) : void 0
+        }
+        function kE(t) {
+            "fa" === t.prefix && (t.prefix = "fas");
+            let {iconName: e} = t;
+            const n = t.prefix || rE();
+            if (e)
+                return e = aE(n, e) || e,
+                jU(vE.definitions, n, e) || jU(NU.styles, n, e)
+        }
+        const vE = new class {
+            constructor() {
+                this.definitions = {}
+            }
+            add() {
+                for (var t = arguments.length, e = new Array(t), n = 0; n < t; n++)
+                    e[n] = arguments[n];
+                const s = e.reduce(this._pullDefinitions, {});
+                Object.keys(s).forEach((t => {
+                    this.definitions[t] = pT(pT({}, this.definitions[t] || {}), s[t]),
+                    VU(t, s[t]);
+                    const e = lU[IT][t];
+                    e && VU(e, s[t]),
+                    nE()
+                }
+                ))
+            }
+            reset() {
+                this.definitions = {}
+            }
+            _pullDefinitions(t, e) {
+                const n = e.prefix && e.iconName && e.icon ? {
+                    0: e
+                } : e;
+                return Object.keys(n).map((e => {
+                    const {prefix: s, iconName: o, icon: a} = n[e]
+                      , i = a[2];
+                    t[s] || (t[s] = {}),
+                    i.length > 0 && i.forEach((e => {
+                        "string" === typeof e && (t[s][e] = a)
+                    }
+                    )),
+                    t[s][o] = a
+                }
+                )),
+                t
+            }
+        }
+          , xE = {
+            i2svg: function() {
+                let t = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {};
+                return ST ? (fE("beforeI2svg", t),
+                wE("pseudoElements2svg", t),
+                wE("i2svg", t)) : Promise.reject(new Error("Operation requires a DOM of some kind."))
+            },
+            watch: function() {
+                let t = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {};
+                const {autoReplaceSvgRoot: e} = t;
+                !1 === kU.autoReplaceSvg && (kU.autoReplaceSvg = !0),
+                kU.observeMutations = !0,
+                function(t) {
+                    ST && (zU ? setTimeout(t, 0) : LU.push(t))
+                }(( () => {
+                    RE({
+                        autoReplaceSvgRoot: e
+                    }),
+                    fE("watch", t)
+                }
+                ))
+            }
+        }
+          , CE = {
+            noAuto: () => {
+                kU.autoReplaceSvg = !1,
+                kU.observeMutations = !1,
+                fE("noAuto")
+            }
+            ,
+            config: kU,
+            dom: xE,
+            parse: {
+                icon: t => {
+                    if (null === t)
+                        return null;
+                    if ("object" === typeof t && t.prefix && t.iconName)
+                        return {
+                            prefix: t.prefix,
+                            iconName: aE(t.prefix, t.iconName) || t.iconName
+                        };
+                    if (Array.isArray(t) && 2 === t.length) {
+                        const e = 0 === t[1].indexOf("fa-") ? t[1].slice(3) : t[1]
+                          , n = cE(t[0]);
+                        return {
+                            prefix: n,
+                            iconName: aE(n, e) || e
+                        }
+                    }
+                    if ("string" === typeof t && (t.indexOf("".concat(kU.cssPrefix, "-")) > -1 || t.match(mU))) {
+                        const e = dE(t.split(" "), {
+                            skipLookups: !0
+                        });
+                        return {
+                            prefix: e.prefix || rE(),
+                            iconName: aE(e.prefix, e.iconName) || e.iconName
+                        }
+                    }
+                    if ("string" === typeof t) {
+                        const e = rE();
+                        return {
+                            prefix: e,
+                            iconName: aE(e, t) || t
+                        }
+                    }
+                }
+            },
+            library: vE,
+            findIconDefinition: kE,
+            toHtml: WU
+        }
+          , RE = function() {
+            let t = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {};
+            const {autoReplaceSvgRoot: e=CT} = t;
+            (Object.keys(NU.styles).length > 0 || kU.autoFetchSvg) && ST && kU.autoReplaceSvg && CE.dom.i2svg({
+                node: e
+            })
+        };
+        function AE(t, e) {
+            return Object.defineProperty(t, "abstract", {
+                get: e
+            }),
+            Object.defineProperty(t, "html", {
+                get: function() {
+                    return t.abstract.map((t => WU(t)))
+                }
+            }),
+            Object.defineProperty(t, "node", {
+                get: function() {
+                    if (!ST)
+                        return;
+                    const e = CT.createElement("div");
+                    return e.innerHTML = t.html,
+                    e.children
+                }
+            }),
+            t
+        }
+        function SE(t) {
+            const {icons: {main: e, mask: n}, prefix: s, iconName: o, transform: a, symbol: i, title: r, maskId: c, titleId: l, extra: d, watchable: m=!1} = t
+              , {width: u, height: g} = n.found ? n : e
+              , h = FT.includes(s)
+              , p = [kU.replacementClass, o ? "".concat(kU.cssPrefix, "-").concat(o) : ""].filter((t => -1 === d.classes.indexOf(t))).filter((t => "" !== t || !!t)).concat(d.classes).join(" ");
+            let b = {
+                children: [],
+                attributes: pT(pT({}, d.attributes), {}, {
+                    "data-prefix": s,
+                    "data-icon": o,
+                    class: p,
+                    role: d.attributes.role || "img",
+                    xmlns: "http://www.w3.org/2000/svg",
+                    viewBox: "0 0 ".concat(u, " ").concat(g)
+                })
+            };
+            const y = h && !~d.classes.indexOf("fa-fw") ? {
+                width: "".concat(u / g * 16 * .0625, "em")
+            } : {};
+            m && (b.attributes[XT] = ""),
+            r && (b.children.push({
+                tag: "title",
+                attributes: {
+                    id: b.attributes["aria-labelledby"] || "title-".concat(l || RU())
+                },
+                children: [r]
+            }),
+            delete b.attributes.title);
+            const f = pT(pT({}, b), {}, {
+                prefix: s,
+                iconName: o,
+                main: e,
+                mask: n,
+                maskId: c,
+                transform: a,
+                symbol: i,
+                styles: pT(pT({}, y), d.styles)
+            })
+              , {children: w, attributes: k} = n.found && e.found ? wE("generateAbstractMask", f) || {
+                children: [],
+                attributes: {}
+            } : wE("generateAbstractIcon", f) || {
+                children: [],
+                attributes: {}
+            };
+            return f.children = w,
+            f.attributes = k,
+            i ? function(t) {
+                let {prefix: e, iconName: n, children: s, attributes: o, symbol: a} = t;
+                const i = !0 === a ? "".concat(e, "-").concat(kU.cssPrefix, "-").concat(n) : a;
+                return [{
+                    tag: "svg",
+                    attributes: {
+                        style: "display: none;"
+                    },
+                    children: [{
+                        tag: "symbol",
+                        attributes: pT(pT({}, o), {}, {
+                            id: i
+                        }),
+                        children: s
+                    }]
+                }]
+            }(f) : function(t) {
+                let {children: e, main: n, mask: s, attributes: o, styles: a, transform: i} = t;
+                if (EU(i) && n.found && !s.found) {
+                    const {width: t, height: e} = n
+                      , s = {
+                        x: t / e / 2,
+                        y: .5
+                    };
+                    o.style = UU(pT(pT({}, a), {}, {
+                        "transform-origin": "".concat(s.x + i.x / 16, "em ").concat(s.y + i.y / 16, "em")
+                    }))
+                }
+                return [{
+                    tag: "svg",
+                    attributes: o,
+                    children: e
+                }]
+            }(f)
+        }
+        function TE(t) {
+            const {content: e, width: n, height: s, transform: o, title: a, extra: i, watchable: r=!1} = t
+              , c = pT(pT(pT({}, i.attributes), a ? {
+                title: a
+            } : {}), {}, {
+                class: i.classes.join(" ")
+            });
+            r && (c[XT] = "");
+            const l = pT({}, i.styles);
+            EU(o) && (l.transform = function(t) {
+                let {transform: e, width: n=JT, height: s=JT, startCentered: o=!1} = t
+                  , a = "";
+                return a += o && TT ? "translate(".concat(e.x / xU - n / 2, "em, ").concat(e.y / xU - s / 2, "em) ") : o ? "translate(calc(-50% + ".concat(e.x / xU, "em), calc(-50% + ").concat(e.y / xU, "em)) ") : "translate(".concat(e.x / xU, "em, ").concat(e.y / xU, "em) "),
+                a += "scale(".concat(e.size / xU * (e.flipX ? -1 : 1), ", ").concat(e.size / xU * (e.flipY ? -1 : 1), ") "),
+                a += "rotate(".concat(e.rotate, "deg) "),
+                a
+            }({
+                transform: o,
+                startCentered: !0,
+                width: n,
+                height: s
+            }),
+            l["-webkit-transform"] = l.transform);
+            const d = UU(l);
+            d.length > 0 && (c.style = d);
+            const m = [];
+            return m.push({
+                tag: "span",
+                attributes: c,
+                children: [e]
+            }),
+            a && m.push({
+                tag: "span",
+                attributes: {
+                    class: "sr-only"
+                },
+                children: [a]
+            }),
+            m
+        }
+        const {styles: UE} = NU;
+        function EE(t) {
+            const e = t[0]
+              , n = t[1]
+              , [s] = t.slice(4);
+            let o = null;
+            return o = Array.isArray(s) ? {
+                tag: "g",
+                attributes: {
+                    class: "".concat(kU.cssPrefix, "-").concat(pU.GROUP)
+                },
+                children: [{
+                    tag: "path",
+                    attributes: {
+                        class: "".concat(kU.cssPrefix, "-").concat(pU.SECONDARY),
+                        fill: "currentColor",
+                        d: s[0]
+                    }
+                }, {
+                    tag: "path",
+                    attributes: {
+                        class: "".concat(kU.cssPrefix, "-").concat(pU.PRIMARY),
+                        fill: "currentColor",
+                        d: s[1]
+                    }
+                }]
+            } : {
+                tag: "path",
+                attributes: {
+                    fill: "currentColor",
+                    d: s
+                }
+            },
+            {
+                found: !0,
+                width: e,
+                height: n,
+                icon: o
+            }
+        }
+        const IE = {
+            found: !1,
+            width: 512,
+            height: 512
+        };
+        function DE(t, e) {
+            let n = e;
+            return "fa" === e && null !== kU.styleDefault && (e = rE()),
+            new Promise(( (s, o) => {
+                if ("fa" === n) {
+                    const n = iE(t) || {};
+                    t = n.iconName || t,
+                    e = n.prefix || e
+                }
+                if (t && e && UE[e] && UE[e][t]) {
+                    return s(EE(UE[e][t]))
+                }
+                !function(t, e) {
+                    nU || kU.showMissingIcons || !t || console.error('Icon with name "'.concat(t, '" and prefix "').concat(e, '" is missing.'))
+                }(t, e),
+                s(pT(pT({}, IE), {}, {
+                    icon: kU.showMissingIcons && t && wE("missingIconAbstract") || {}
+                }))
+            }
+            ))
+        }
+        const PE = () => {}
+          , ME = kU.measurePerformance && AT && AT.mark && AT.measure ? AT : {
+            mark: PE,
+            measure: PE
+        }
+          , BE = 'FA "6.7.2"'
+          , NE = t => {
+            ME.mark("".concat(BE, " ").concat(t, " ends")),
+            ME.measure("".concat(BE, " ").concat(t), "".concat(BE, " ").concat(t, " begins"), "".concat(BE, " ").concat(t, " ends"))
+        }
+        ;
+        var LE = t => (ME.mark("".concat(BE, " ").concat(t, " begins")),
+        () => NE(t));
+        const FE = () => {}
+        ;
+        function zE(t) {
+            return "string" === typeof (t.getAttribute ? t.getAttribute(XT) : null)
+        }
+        function WE(t) {
+            return CT.createElementNS("http://www.w3.org/2000/svg", t)
+        }
+        function jE(t) {
+            return CT.createElement(t)
+        }
+        function GE(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+            const {ceFn: n=("svg" === t.tag ? WE : jE)} = e;
+            if ("string" === typeof t)
+                return CT.createTextNode(t);
+            const s = n(t.tag);
+            Object.keys(t.attributes || []).forEach((function(e) {
+                s.setAttribute(e, t.attributes[e])
+            }
+            ));
+            return (t.children || []).forEach((function(t) {
+                s.appendChild(GE(t, {
+                    ceFn: n
+                }))
+            }
+            )),
+            s
+        }
+        const KE = {
+            replace: function(t) {
+                const e = t[0];
+                if (e.parentNode)
+                    if (t[1].forEach((t => {
+                        e.parentNode.insertBefore(GE(t), e)
+                    }
+                    )),
+                    null === e.getAttribute(XT) && kU.keepOriginalSource) {
+                        let t = CT.createComment(function(t) {
+                            let e = " ".concat(t.outerHTML, " ");
+                            return e = "".concat(e, "Font Awesome fontawesome.com "),
+                            e
+                        }(e));
+                        e.parentNode.replaceChild(t, e)
+                    } else
+                        e.remove()
+            },
+            nest: function(t) {
+                const e = t[0]
+                  , n = t[1];
+                if (~SU(e).indexOf(kU.replacementClass))
+                    return KE.replace(t);
+                const s = new RegExp("".concat(kU.cssPrefix, "-.*"));
+                if (delete n[0].attributes.id,
+                n[0].attributes.class) {
+                    const t = n[0].attributes.class.split(" ").reduce(( (t, e) => (e === kU.replacementClass || e.match(s) ? t.toSvg.push(e) : t.toNode.push(e),
+                    t)), {
+                        toNode: [],
+                        toSvg: []
+                    });
+                    n[0].attributes.class = t.toSvg.join(" "),
+                    0 === t.toNode.length ? e.removeAttribute("class") : e.setAttribute("class", t.toNode.join(" "))
+                }
+                const o = n.map((t => WU(t))).join("\n");
+                e.setAttribute(XT, ""),
+                e.innerHTML = o
+            }
+        };
+        function HE(t) {
+            t()
+        }
+        function VE(t, e) {
+            const n = "function" === typeof e ? e : FE;
+            if (0 === t.length)
+                n();
+            else {
+                let e = HE;
+                "async" === kU.mutateApproach && (e = xT.requestAnimationFrame || HE),
+                e(( () => {
+                    const e = !0 === kU.autoReplaceSvg ? KE.replace : KE[kU.autoReplaceSvg] || KE.replace
+                      , s = LE("mutate");
+                    t.map(e),
+                    s(),
+                    n()
+                }
+                ))
+            }
+        }
+        let YE = !1;
+        function qE() {
+            YE = !0
+        }
+        function ZE() {
+            YE = !1
+        }
+        let JE = null;
+        function QE(t) {
+            if (!RT)
+                return;
+            if (!kU.observeMutations)
+                return;
+            const {treeCallback: e=FE, nodeCallback: n=FE, pseudoElementsCallback: s=FE, observeMutationsRoot: o=CT} = t;
+            JE = new RT((t => {
+                if (YE)
+                    return;
+                const o = rE();
+                AU(t).forEach((t => {
+                    if ("childList" === t.type && t.addedNodes.length > 0 && !zE(t.addedNodes[0]) && (kU.searchPseudoElements && s(t.target),
+                    e(t.target)),
+                    "attributes" === t.type && t.target.parentNode && kU.searchPseudoElements && s(t.target.parentNode),
+                    "attributes" === t.type && zE(t.target) && ~hU.indexOf(t.attributeName))
+                        if ("class" === t.attributeName && function(t) {
+                            const e = t.getAttribute ? t.getAttribute(OT) : null
+                              , n = t.getAttribute ? t.getAttribute($T) : null;
+                            return e && n
+                        }(t.target)) {
+                            const {prefix: e, iconName: n} = dE(SU(t.target));
+                            t.target.setAttribute(OT, e || o),
+                            n && t.target.setAttribute($T, n)
+                        } else
+                            (a = t.target) && a.classList && a.classList.contains && a.classList.contains(kU.replacementClass) && n(t.target);
+                    var a
+                }
+                ))
+            }
+            )),
+            ST && JE.observe(o, {
+                childList: !0,
+                attributes: !0,
+                characterData: !0,
+                subtree: !0
+            })
+        }
+        function XE(t) {
+            const e = t.getAttribute("data-prefix")
+              , n = t.getAttribute("data-icon")
+              , s = void 0 !== t.innerText ? t.innerText.trim() : "";
+            let o = dE(SU(t));
+            return o.prefix || (o.prefix = rE()),
+            e && n && (o.prefix = e,
+            o.iconName = n),
+            o.iconName && o.prefix || (o.prefix && s.length > 0 && (o.iconName = function(t, e) {
+                return (_U[t] || {})[e]
+            }(o.prefix, t.innerText) || oE(o.prefix, KU(t.innerText))),
+            !o.iconName && kU.autoFetchSvg && t.firstChild && t.firstChild.nodeType === Node.TEXT_NODE && (o.iconName = t.firstChild.data)),
+            o
+        }
+        function _E(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {
+                styleParser: !0
+            };
+            const {iconName: n, prefix: s, rest: o} = XE(t)
+              , a = function(t) {
+                const e = AU(t.attributes).reduce(( (t, e) => ("class" !== t.name && "style" !== t.name && (t[e.name] = e.value),
+                t)), {})
+                  , n = t.getAttribute("title")
+                  , s = t.getAttribute("data-fa-title-id");
+                return kU.autoA11y && (n ? e["aria-labelledby"] = "".concat(kU.replacementClass, "-title-").concat(s || RU()) : (e["aria-hidden"] = "true",
+                e.focusable = "false")),
+                e
+            }(t)
+              , i = yE("parseNodeAttributes", {}, t);
+            let r = e.styleParser ? function(t) {
+                const e = t.getAttribute("style");
+                let n = [];
+                return e && (n = e.split(";").reduce(( (t, e) => {
+                    const n = e.split(":")
+                      , s = n[0]
+                      , o = n.slice(1);
+                    return s && o.length > 0 && (t[s] = o.join(":").trim()),
+                    t
+                }
+                ), {})),
+                n
+            }(t) : [];
+            return pT({
+                iconName: n,
+                title: t.getAttribute("title"),
+                titleId: t.getAttribute("data-fa-title-id"),
+                prefix: s,
+                transform: CU,
+                mask: {
+                    iconName: null,
+                    prefix: null,
+                    rest: []
+                },
+                maskId: null,
+                symbol: !1,
+                extra: {
+                    classes: o,
+                    styles: r,
+                    attributes: a
+                }
+            }, i)
+        }
+        const {styles: OE} = NU;
+        function $E(t) {
+            const e = "nest" === kU.autoReplaceSvg ? _E(t, {
+                styleParser: !1
+            }) : _E(t);
+            return ~e.extra.classes.indexOf(uU) ? wE("generateLayersText", t, e) : wE("generateSvgReplacementMutation", t, e)
+        }
+        function tI(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : null;
+            if (!ST)
+                return Promise.resolve();
+            const n = CT.documentElement.classList
+              , s = t => n.add("".concat(tU, "-").concat(t))
+              , o = t => n.remove("".concat(tU, "-").concat(t))
+              , a = kU.autoFetchSvg ? [...BT, ...HT] : ET.concat(Object.keys(OE));
+            a.includes("fa") || a.push("fa");
+            const i = [".".concat(uU, ":not([").concat(XT, "])")].concat(a.map((t => ".".concat(t, ":not([").concat(XT, "])")))).join(", ");
+            if (0 === i.length)
+                return Promise.resolve();
+            let r = [];
+            try {
+                r = AU(t.querySelectorAll(i))
+            } catch (d) {}
+            if (!(r.length > 0))
+                return Promise.resolve();
+            s("pending"),
+            o("complete");
+            const c = LE("onTree")
+              , l = r.reduce(( (t, e) => {
+                try {
+                    const n = $E(e);
+                    n && t.push(n)
+                } catch (d) {
+                    nU || "MissingIcon" === d.name && console.error(d)
+                }
+                return t
+            }
+            ), []);
+            return new Promise(( (t, n) => {
+                Promise.all(l).then((n => {
+                    VE(n, ( () => {
+                        s("active"),
+                        s("complete"),
+                        o("pending"),
+                        "function" === typeof e && e(),
+                        c(),
+                        t()
+                    }
+                    ))
+                }
+                )).catch((t => {
+                    c(),
+                    n(t)
+                }
+                ))
+            }
+            ))
+        }
+        function eI(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : null;
+            $E(t).then((t => {
+                t && VE([t], e)
+            }
+            ))
+        }
+        const nI = function(t) {
+            let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+            const {transform: n=CU, symbol: s=!1, mask: o=null, maskId: a=null, title: i=null, titleId: r=null, classes: c=[], attributes: l={}, styles: d={}} = e;
+            if (!t)
+                return;
+            const {prefix: m, iconName: u, icon: g} = t;
+            return AE(pT({
+                type: "icon"
+            }, t), ( () => (fE("beforeDOMElementCreation", {
+                iconDefinition: t,
+                params: e
+            }),
+            kU.autoA11y && (i ? l["aria-labelledby"] = "".concat(kU.replacementClass, "-title-").concat(r || RU()) : (l["aria-hidden"] = "true",
+            l.focusable = "false")),
+            SE({
+                icons: {
+                    main: EE(g),
+                    mask: o ? EE(o.icon) : {
+                        found: !1,
+                        width: null,
+                        height: null,
+                        icon: {}
+                    }
+                },
+                prefix: m,
+                iconName: u,
+                transform: pT(pT({}, CU), n),
+                symbol: s,
+                title: i,
+                maskId: a,
+                titleId: r,
+                extra: {
+                    attributes: l,
+                    styles: d,
+                    classes: c
+                }
+            }))))
+        };
+        var sI = {
+            mixout() {
+                return {
+                    icon: (t = nI,
+                    function(e) {
+                        let n = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+                        const s = (e || {}).icon ? e : kE(e || {});
+                        let {mask: o} = n;
+                        return o && (o = (o || {}).icon ? o : kE(o || {})),
+                        t(s, pT(pT({}, n), {}, {
+                            mask: o
+                        }))
+                    }
+                    )
+                };
+                var t
+            },
+            hooks: () => ({
+                mutationObserverCallbacks: t => (t.treeCallback = tI,
+                t.nodeCallback = eI,
+                t)
+            }),
+            provides(t) {
+                t.i2svg = function(t) {
+                    const {node: e=CT, callback: n= () => {}
+                    } = t;
+                    return tI(e, n)
+                }
+                ,
+                t.generateSvgReplacementMutation = function(t, e) {
+                    const {iconName: n, title: s, titleId: o, prefix: a, transform: i, symbol: r, mask: c, maskId: l, extra: d} = e;
+                    return new Promise(( (e, m) => {
+                        Promise.all([DE(n, a), c.iconName ? DE(c.iconName, c.prefix) : Promise.resolve({
+                            found: !1,
+                            width: 512,
+                            height: 512,
+                            icon: {}
+                        })]).then((c => {
+                            let[m,u] = c;
+                            e([t, SE({
+                                icons: {
+                                    main: m,
+                                    mask: u
+                                },
+                                prefix: a,
+                                iconName: n,
+                                transform: i,
+                                symbol: r,
+                                maskId: l,
+                                title: s,
+                                titleId: o,
+                                extra: d,
+                                watchable: !0
+                            })])
+                        }
+                        )).catch(m)
+                    }
+                    ))
+                }
+                ,
+                t.generateAbstractIcon = function(t) {
+                    let {children: e, attributes: n, main: s, transform: o, styles: a} = t;
+                    const i = UU(a);
+                    let r;
+                    return i.length > 0 && (n.style = i),
+                    EU(o) && (r = wE("generateAbstractTransformGrouping", {
+                        main: s,
+                        transform: o,
+                        containerWidth: s.width,
+                        iconWidth: s.width
+                    })),
+                    e.push(r || s.icon),
+                    {
+                        children: e,
+                        attributes: n
+                    }
+                }
+            }
+        }
+          , oI = {
+            mixout: () => ({
+                layer(t) {
+                    let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+                    const {classes: n=[]} = e;
+                    return AE({
+                        type: "layer"
+                    }, ( () => {
+                        fE("beforeDOMElementCreation", {
+                            assembler: t,
+                            params: e
+                        });
+                        let s = [];
+                        return t((t => {
+                            Array.isArray(t) ? t.map((t => {
+                                s = s.concat(t.abstract)
+                            }
+                            )) : s = s.concat(t.abstract)
+                        }
+                        )),
+                        [{
+                            tag: "span",
+                            attributes: {
+                                class: ["".concat(kU.cssPrefix, "-layers"), ...n].join(" ")
+                            },
+                            children: s
+                        }]
+                    }
+                    ))
+                }
+            })
+        }
+          , aI = {
+            mixout: () => ({
+                counter(t) {
+                    let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+                    const {title: n=null, classes: s=[], attributes: o={}, styles: a={}} = e;
+                    return AE({
+                        type: "counter",
+                        content: t
+                    }, ( () => (fE("beforeDOMElementCreation", {
+                        content: t,
+                        params: e
+                    }),
+                    function(t) {
+                        const {content: e, title: n, extra: s} = t
+                          , o = pT(pT(pT({}, s.attributes), n ? {
+                            title: n
+                        } : {}), {}, {
+                            class: s.classes.join(" ")
+                        })
+                          , a = UU(s.styles);
+                        a.length > 0 && (o.style = a);
+                        const i = [];
+                        return i.push({
+                            tag: "span",
+                            attributes: o,
+                            children: [e]
+                        }),
+                        n && i.push({
+                            tag: "span",
+                            attributes: {
+                                class: "sr-only"
+                            },
+                            children: [n]
+                        }),
+                        i
+                    }({
+                        content: t.toString(),
+                        title: n,
+                        extra: {
+                            attributes: o,
+                            styles: a,
+                            classes: ["".concat(kU.cssPrefix, "-layers-counter"), ...s]
+                        }
+                    }))))
+                }
+            })
+        }
+          , iI = {
+            mixout: () => ({
+                text(t) {
+                    let e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {};
+                    const {transform: n=CU, title: s=null, classes: o=[], attributes: a={}, styles: i={}} = e;
+                    return AE({
+                        type: "text",
+                        content: t
+                    }, ( () => (fE("beforeDOMElementCreation", {
+                        content: t,
+                        params: e
+                    }),
+                    TE({
+                        content: t,
+                        transform: pT(pT({}, CU), n),
+                        title: s,
+                        extra: {
+                            attributes: a,
+                            styles: i,
+                            classes: ["".concat(kU.cssPrefix, "-layers-text"), ...o]
+                        }
+                    }))))
+                }
+            }),
+            provides(t) {
+                t.generateLayersText = function(t, e) {
+                    const {title: n, transform: s, extra: o} = e;
+                    let a = null
+                      , i = null;
+                    if (TT) {
+                        const e = parseInt(getComputedStyle(t).fontSize, 10)
+                          , n = t.getBoundingClientRect();
+                        a = n.width / e,
+                        i = n.height / e
+                    }
+                    return kU.autoA11y && !n && (o.attributes["aria-hidden"] = "true"),
+                    Promise.resolve([t, TE({
+                        content: t.innerHTML,
+                        width: a,
+                        height: i,
+                        transform: s,
+                        title: n,
+                        extra: o,
+                        watchable: !0
+                    })])
+                }
+            }
+        };
+        const rI = new RegExp('"',"ug")
+          , cI = [1105920, 1112319]
+          , lI = pT(pT(pT(pT({}, {
+            FontAwesome: {
+                normal: "fas",
+                400: "fas"
+            }
+        }), {
+            "Font Awesome 6 Free": {
+                900: "fas",
+                400: "far"
+            },
+            "Font Awesome 6 Pro": {
+                900: "fas",
+                400: "far",
+                normal: "far",
+                300: "fal",
+                100: "fat"
+            },
+            "Font Awesome 6 Brands": {
+                400: "fab",
+                normal: "fab"
+            },
+            "Font Awesome 6 Duotone": {
+                900: "fad",
+                400: "fadr",
+                normal: "fadr",
+                300: "fadl",
+                100: "fadt"
+            },
+            "Font Awesome 6 Sharp": {
+                900: "fass",
+                400: "fasr",
+                normal: "fasr",
+                300: "fasl",
+                100: "fast"
+            },
+            "Font Awesome 6 Sharp Duotone": {
+                900: "fasds",
+                400: "fasdr",
+                normal: "fasdr",
+                300: "fasdl",
+                100: "fasdt"
+            }
+        }), {
+            "Font Awesome 5 Free": {
+                900: "fas",
+                400: "far"
+            },
+            "Font Awesome 5 Pro": {
+                900: "fas",
+                400: "far",
+                normal: "far",
+                300: "fal"
+            },
+            "Font Awesome 5 Brands": {
+                400: "fab",
+                normal: "fab"
+            },
+            "Font Awesome 5 Duotone": {
+                900: "fad"
+            }
+        }), {
+            "Font Awesome Kit": {
+                400: "fak",
+                normal: "fak"
+            },
+            "Font Awesome Kit Duotone": {
+                400: "fakd",
+                normal: "fakd"
+            }
+        })
+          , dI = Object.keys(lI).reduce(( (t, e) => (t[e.toLowerCase()] = lI[e],
+        t)), {})
+          , mI = Object.keys(dI).reduce(( (t, e) => {
+            const n = dI[e];
+            return t[e] = n[900] || [...Object.entries(n)][0][1],
+            t
+        }
+        ), {});
+        function uI(t, e) {
+            const n = "".concat("data-fa-pseudo-element-pending").concat(e.replace(":", "-"));
+            return new Promise(( (s, o) => {
+                if (null !== t.getAttribute(n))
+                    return s();
+                const a = AU(t.children).filter((t => t.getAttribute(_T) === e))[0]
+                  , i = xT.getComputedStyle(t, e)
+                  , r = i.getPropertyValue("font-family")
+                  , c = r.match(gU)
+                  , l = i.getPropertyValue("font-weight")
+                  , d = i.getPropertyValue("content");
+                if (a && !c)
+                    return t.removeChild(a),
+                    s();
+                if (c && "none" !== d && "" !== d) {
+                    const d = i.getPropertyValue("content");
+                    let m = function(t, e) {
+                        const n = t.replace(/^['"]|['"]$/g, "").toLowerCase()
+                          , s = parseInt(e)
+                          , o = isNaN(s) ? "normal" : s;
+                        return (dI[n] || {})[o] || mI[n]
+                    }(r, l);
+                    const {value: u, isSecondary: g} = function(t) {
+                        const e = t.replace(rI, "")
+                          , n = function(t, e) {
+                            const n = t.length;
+                            let s, o = t.charCodeAt(e);
+                            return o >= 55296 && o <= 56319 && n > e + 1 && (s = t.charCodeAt(e + 1),
+                            s >= 56320 && s <= 57343) ? 1024 * (o - 55296) + s - 56320 + 65536 : o
+                        }(e, 0)
+                          , s = n >= cI[0] && n <= cI[1]
+                          , o = 2 === e.length && e[0] === e[1];
+                        return {
+                            value: KU(o ? e[0] : e),
+                            isSecondary: s || o
+                        }
+                    }(d)
+                      , h = c[0].startsWith("FontAwesome");
+                    let p = oE(m, u)
+                      , b = p;
+                    if (h) {
+                        const t = function(t) {
+                            const e = $U[t]
+                              , n = oE("fas", t);
+                            return e || (n ? {
+                                prefix: "fas",
+                                iconName: n
+                            } : null) || {
+                                prefix: null,
+                                iconName: null
+                            }
+                        }(u);
+                        t.iconName && t.prefix && (p = t.iconName,
+                        m = t.prefix)
+                    }
+                    if (!p || g || a && a.getAttribute(OT) === m && a.getAttribute($T) === b)
+                        s();
+                    else {
+                        t.setAttribute(n, b),
+                        a && t.removeChild(a);
+                        const i = {
+                            iconName: null,
+                            title: null,
+                            titleId: null,
+                            prefix: null,
+                            transform: CU,
+                            symbol: !1,
+                            mask: {
+                                iconName: null,
+                                prefix: null,
+                                rest: []
+                            },
+                            maskId: null,
+                            extra: {
+                                classes: [],
+                                styles: {},
+                                attributes: {}
+                            }
+                        }
+                          , {extra: r} = i;
+                        r.attributes[_T] = e,
+                        DE(p, m).then((o => {
+                            const a = SE(pT(pT({}, i), {}, {
+                                icons: {
+                                    main: o,
+                                    mask: {
+                                        prefix: null,
+                                        iconName: null,
+                                        rest: []
+                                    }
+                                },
+                                prefix: m,
+                                iconName: b,
+                                extra: r,
+                                watchable: !0
+                            }))
+                              , c = CT.createElementNS("http://www.w3.org/2000/svg", "svg");
+                            "::before" === e ? t.insertBefore(c, t.firstChild) : t.appendChild(c),
+                            c.outerHTML = a.map((t => WU(t))).join("\n"),
+                            t.removeAttribute(n),
+                            s()
+                        }
+                        )).catch(o)
+                    }
+                } else
+                    s()
+            }
+            ))
+        }
+        function gI(t) {
+            return Promise.all([uI(t, "::before"), uI(t, "::after")])
+        }
+        function hI(t) {
+            return t.parentNode !== document.head && !~eU.indexOf(t.tagName.toUpperCase()) && !t.getAttribute(_T) && (!t.parentNode || "svg" !== t.parentNode.tagName)
+        }
+        function pI(t) {
+            if (ST)
+                return new Promise(( (e, n) => {
+                    const s = AU(t.querySelectorAll("*")).filter(hI).map(gI)
+                      , o = LE("searchPseudoElements");
+                    qE(),
+                    Promise.all(s).then(( () => {
+                        o(),
+                        ZE(),
+                        e()
+                    }
+                    )).catch(( () => {
+                        o(),
+                        ZE(),
+                        n()
+                    }
+                    ))
+                }
+                ))
+        }
+        let bI = !1;
+        const yI = t => t.toLowerCase().split(" ").reduce(( (t, e) => {
+            const n = e.toLowerCase().split("-")
+              , s = n[0];
+            let o = n.slice(1).join("-");
+            if (s && "h" === o)
+                return t.flipX = !0,
+                t;
+            if (s && "v" === o)
+                return t.flipY = !0,
+                t;
+            if (o = parseFloat(o),
+            isNaN(o))
+                return t;
+            switch (s) {
+            case "grow":
+                t.size = t.size + o;
+                break;
+            case "shrink":
+                t.size = t.size - o;
+                break;
+            case "left":
+                t.x = t.x - o;
+                break;
+            case "right":
+                t.x = t.x + o;
+                break;
+            case "up":
+                t.y = t.y - o;
+                break;
+            case "down":
+                t.y = t.y + o;
+                break;
+            case "rotate":
+                t.rotate = t.rotate + o
+            }
+            return t
+        }
+        ), {
+            size: 16,
+            x: 0,
+            y: 0,
+            flipX: !1,
+            flipY: !1,
+            rotate: 0
+        });
+        const fI = {
+            x: 0,
+            y: 0,
+            width: "100%",
+            height: "100%"
+        };
+        function wI(t) {
+            let e = !(arguments.length > 1 && void 0 !== arguments[1]) || arguments[1];
+            return t.attributes && (t.attributes.fill || e) && (t.attributes.fill = "black"),
+            t
+        }
+        !function(t, e) {
+            let {mixoutsTo: n} = e;
+            gE = t,
+            hE = {},
+            Object.keys(pE).forEach((t => {
+                -1 === bE.indexOf(t) && delete pE[t]
+            }
+            )),
+            gE.forEach((t => {
+                const e = t.mixout ? t.mixout() : {};
+                if (Object.keys(e).forEach((t => {
+                    "function" === typeof e[t] && (n[t] = e[t]),
+                    "object" === typeof e[t] && Object.keys(e[t]).forEach((s => {
+                        n[t] || (n[t] = {}),
+                        n[t][s] = e[t][s]
+                    }
+                    ))
+                }
+                )),
+                t.hooks) {
+                    const e = t.hooks();
+                    Object.keys(e).forEach((t => {
+                        hE[t] || (hE[t] = []),
+                        hE[t].push(e[t])
+                    }
+                    ))
+                }
+                t.provides && t.provides(pE)
+            }
+            ))
+        }([MU, sI, oI, aI, iI, {
+            hooks: () => ({
+                mutationObserverCallbacks: t => (t.pseudoElementsCallback = pI,
+                t)
+            }),
+            provides(t) {
+                t.pseudoElements2svg = function(t) {
+                    const {node: e=CT} = t;
+                    kU.searchPseudoElements && pI(e)
+                }
+            }
+        }, {
+            mixout: () => ({
+                dom: {
+                    unwatch() {
+                        qE(),
+                        bI = !0
+                    }
+                }
+            }),
+            hooks: () => ({
+                bootstrap() {
+                    QE(yE("mutationObserverCallbacks", {}))
+                },
+                noAuto() {
+                    JE && JE.disconnect()

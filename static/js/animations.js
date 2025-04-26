@@ -450,6 +450,16 @@ function addAnimationStyles() {
         opacity: 0.8;
       }
       
+      /* Notification style (variant of achievement) */
+      .achievement.notification {
+        background-color: #1a237e;
+        border-left: 4px solid #5c6bc0;
+      }
+      
+      .achievement.notification .achievement-icon {
+        color: #c5cae9;
+      }
+      
       /* Level Indicator */
       .level-indicator {
         position: fixed;
@@ -501,6 +511,38 @@ if (typeof document !== 'undefined') {
   }
 }
 
+// Show notification message
+function showNotification(title, message) {
+  // Use the achievement notification system with a different style
+  const notificationEl = document.createElement('div');
+  notificationEl.className = 'achievement notification';
+  notificationEl.innerHTML = `
+    <div class="achievement-icon">💬</div>
+    <div class="achievement-content">
+      <h3>${title}</h3>
+      <p>${message}</p>
+    </div>
+  `;
+  
+  document.body.appendChild(notificationEl);
+  
+  // Animate in
+  setTimeout(() => {
+    notificationEl.classList.add('show');
+  }, 100);
+  
+  // Animate out after 10 seconds
+  setTimeout(() => {
+    notificationEl.classList.remove('show');
+    notificationEl.classList.add('hide');
+    
+    // Remove from DOM after animation
+    setTimeout(() => {
+      notificationEl.remove();
+    }, 1000);
+  }, 10000);
+}
+
 // Export functions for global use
 if (typeof window !== 'undefined') {
   window.BurnAnimations = {
@@ -508,6 +550,7 @@ if (typeof window !== 'undefined') {
     toggleDarkMode,
     applyBurnAnimation,
     showAchievement,
+    showNotification,
     updateProgress,
     checkAchievements,
     initUIEnhancements
@@ -520,6 +563,7 @@ export {
   toggleDarkMode,
   applyBurnAnimation,
   showAchievement,
+  showNotification,
   updateProgress,
   checkAchievements,
   initUIEnhancements
