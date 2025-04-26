@@ -1125,10 +1125,12 @@ const WalletAssets: React.FC = () => {
             const asset = await cnftHandler.fetchAssetWithProof(mint);
             
             if (asset && asset.proof) {
-              // Call the simpleBurnCNFT method directly
-              const result = await cnftHandler.simpleBurnCNFT(mint, asset.proof, cnft);
+              // Try the new directBurnCNFT method first
+              console.log("Trying directBurnCNFT method for cNFT:", mint);
+              const result = await cnftHandler.directBurnCNFT(mint, asset.proof);
               
               if (result.success) {
+                console.log("directBurnCNFT succeeded for mint:", mint);
                 successCount++;
                 // Remove the cNFT from the list
                 setCnfts(prev => prev.filter(c => c.mint !== mint));
@@ -1142,12 +1144,16 @@ const WalletAssets: React.FC = () => {
                   }
                 }
               } else if (result.cancelled) {
+                console.log("directBurnCNFT was cancelled for mint:", mint);
                 cancelledCount++;
                 // If the user cancelled, stop processing more
                 continueProcessing = false;
                 setError('Transaction was cancelled. Stopping bulk operation.');
               } else {
+                console.log("directBurnCNFT failed for mint:", mint, "Error:", result.error);
                 failedCount++;
+                // Show specific error for debugging
+                setError(`Error burning cNFT: ${result.error}`);
               }
             } else {
               console.error(`Could not fetch proof data for cNFT ${mint}`);

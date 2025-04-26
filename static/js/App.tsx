@@ -46,20 +46,15 @@ function initApp() {
   }
 }
 
+// Add initialization logging
+console.log('[App] Script loaded, setting up window.App');
+
+// Define global window interfaces
 declare global {
   interface Window {
     App: {
       render: () => void;
     };
-  }
-}
-
-// Add initialization logging
-console.log('[App] Script loaded, setting up window.App');
-
-// Fix the App.tsx types
-declare global {
-  interface Window {
     debugInfo: {
       lastCnftError: any;
       lastCnftData: any;

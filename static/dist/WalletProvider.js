@@ -44660,6 +44660,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @solana/wallet-adapter-base */ "./node_modules/@solana/wallet-adapter-base/lib/esm/types.js");
 /* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/ConnectionProvider.js");
 /* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/WalletProvider.js");
+/* harmony import */ var _solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @solana/wallet-adapter-react */ "./node_modules/@solana/wallet-adapter-react/lib/esm/useWallet.js");
 /* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-phantom/lib/esm/adapter.js");
 /* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-solflare/lib/esm/adapter.js");
 /* harmony import */ var _solana_wallet_adapter_wallets__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @solana/wallet-adapter-wallets */ "./node_modules/@solana/wallet-adapter-ledger/lib/esm/adapter.js");
@@ -44738,12 +44739,43 @@ var WalletProvider = function WalletProvider(_ref) {
     endpoint: endpoint
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_7__.WalletProvider, {
     wallets: wallets,
-    autoConnect: true
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_8__.WalletModalProvider, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    autoConnect: true,
+    onError: function onError(error) {
+      console.error('[WalletProvider] Wallet adapter error:', error);
+      if (typeof window !== 'undefined' && window.debugInfo) {
+        window.debugInfo.lastCnftError = "Wallet adapter error: ".concat(error.message);
+      }
+    }
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_8__.WalletModalProvider, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(WalletLogger, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "wallet-container"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "wallet-buttons"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_9__.WalletMultiButton, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__.WalletDisconnectButton, null)), children))));
+};
+
+// Component to log wallet state changes and capture them for debugging
+var WalletLogger = function WalletLogger() {
+  var wallet = (0,_solana_wallet_adapter_react__WEBPACK_IMPORTED_MODULE_11__.useWallet)();
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    var _wallet$publicKey, _wallet$wallet, _wallet$wallet2;
+    console.log('[WalletLogger] Wallet state updated:', {
+      connected: wallet.connected,
+      publicKey: ((_wallet$publicKey = wallet.publicKey) === null || _wallet$publicKey === void 0 ? void 0 : _wallet$publicKey.toString()) || 'none',
+      adapterName: ((_wallet$wallet = wallet.wallet) === null || _wallet$wallet === void 0 ? void 0 : _wallet$wallet.adapter.name) || 'none',
+      readyState: (_wallet$wallet2 = wallet.wallet) === null || _wallet$wallet2 === void 0 ? void 0 : _wallet$wallet2.adapter.readyState
+    });
+    if (typeof window !== 'undefined' && window.debugInfo) {
+      var _wallet$publicKey2, _wallet$wallet3, _wallet$wallet4;
+      window.debugInfo.walletInfo = {
+        connected: wallet.connected,
+        publicKey: ((_wallet$publicKey2 = wallet.publicKey) === null || _wallet$publicKey2 === void 0 ? void 0 : _wallet$publicKey2.toString()) || 'none',
+        adapterName: ((_wallet$wallet3 = wallet.wallet) === null || _wallet$wallet3 === void 0 ? void 0 : _wallet$wallet3.adapter.name) || 'none',
+        readyState: (_wallet$wallet4 = wallet.wallet) === null || _wallet$wallet4 === void 0 ? void 0 : _wallet$wallet4.adapter.readyState,
+        hasSignTransaction: !!wallet.signTransaction
+      };
+    }
+  }, [wallet.connected, wallet.publicKey, wallet.wallet, wallet.signTransaction]);
+  return null;
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (WalletProvider);
 })();
