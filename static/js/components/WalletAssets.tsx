@@ -1033,7 +1033,7 @@ const WalletAssets: React.FC = () => {
     }
     
     // Show success message
-    setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
+    setError(`Successfully traded compressed NFT "${cnft.name || 'cNFT'}" to burn wallet! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
     setTimeout(() => setError(null), 5000);
   };
 
@@ -1150,7 +1150,7 @@ const WalletAssets: React.FC = () => {
     if (selectedCNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Starting bulk burn operation for compressed NFTs...");
+    setError("Starting bulk trade-to-burn operation for compressed NFTs...");
     
     try {
       let successCount = 0;
@@ -1180,11 +1180,11 @@ const WalletAssets: React.FC = () => {
             
             if (asset && asset.proof) {
               // Try the new directBurnCNFT method first
-              console.log("Trying directBurnCNFT method for cNFT:", mint);
+              console.log("Trying to trade cNFT to burn wallet - assetId:", mint);
               const result = await cnftHandler.directBurnCNFT(mint, asset.proof);
               
               if (result.success) {
-                console.log("directBurnCNFT succeeded for mint:", mint);
+                console.log("Successfully traded cNFT to burn wallet - assetId:", mint);
                 successCount++;
                 // Remove the cNFT from the list
                 setCnfts(prev => prev.filter(c => c.mint !== mint));
@@ -1207,14 +1207,14 @@ const WalletAssets: React.FC = () => {
                 console.log("directBurnCNFT failed for mint:", mint, "Error:", result.error);
                 failedCount++;
                 // Show specific error for debugging
-                setError(`Error burning cNFT: ${result.error}`);
+                setError(`Error trading cNFT to burn wallet: ${result.error}`);
               }
             } else {
               console.error(`Could not fetch proof data for cNFT ${mint}`);
               failedCount++;
             }
           } catch (error) {
-            console.error(`Error burning cNFT ${mint}:`, error);
+            console.error(`Error trading cNFT ${mint} to burn wallet:`, error);
             failedCount++;
             // Check if this is a wallet error that should stop processing
             if (error instanceof Error && 
@@ -1230,7 +1230,7 @@ const WalletAssets: React.FC = () => {
       
       // Show final summary message
       if (successCount > 0) {
-        setError(`Successfully burned ${successCount} of ${selectedCNFTs.length} compressed NFTs!` + 
+        setError(`Successfully traded ${successCount} of ${selectedCNFTs.length} compressed NFTs to burn wallet!` + 
           (failedCount > 0 ? ` ${failedCount} failed.` : '') +
           (cancelledCount > 0 ? ` ${cancelledCount} cancelled.` : ''));
           
@@ -1246,7 +1246,7 @@ const WalletAssets: React.FC = () => {
           return remainingAssets;
         });
       } else {
-        setError(`No cNFTs were burned. ${failedCount} failed, ${cancelledCount} cancelled.`);
+        setError(`No cNFTs were traded to burn wallet. ${failedCount} failed, ${cancelledCount} cancelled.`);
       }
     } catch (error: any) {
       setError(`Error in bulk burn operation: ${error.message}`);
@@ -1311,7 +1311,7 @@ const WalletAssets: React.FC = () => {
                       disabled={isBurning}
                       onClick={handleBulkBurnCNFTs}
                     >
-                      Burn Selected cNFTs
+                      Trade Selected cNFTs to Burn Wallet
                     </button>
                   </div>
                 )}
@@ -1435,6 +1435,9 @@ const WalletAssets: React.FC = () => {
           {/* Compressed NFT Section */}
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
+            <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
+              Note: Compressed NFTs are sent to a burn wallet instead of being directly burned. The effect is the same.
+            </div>
             
             <div className="cnfts-grid">
               {cnfts.map((cnft) => (
