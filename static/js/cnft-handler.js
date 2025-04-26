@@ -108,16 +108,51 @@ export class CNFTHandler {
                     proofLength: proof.length
                 });
                 
+                // Helper function to ensure proper PublicKey conversion
+                const ensurePubkey = (keyString) => {
+                    try {
+                        if (keyString instanceof PublicKey) return keyString;
+                        return new PublicKey(keyString.toString());
+                    } catch (e) {
+                        console.error("Invalid public key:", keyString, e);
+                        throw new Error(`Invalid public key: ${keyString}`);
+                    }
+                };
+
+                // First proof element should be the root
+                const root = ensurePubkey(proof[0]);
+                
+                // Convert all proof elements to PublicKey
+                const proofPublicKeys = proof.slice(1).map(node => ensurePubkey(node));
+                
+                // Make sure we have data hash and creator hash
+                const dataHash = ensurePubkey(this.asset.compression.data_hash);
+                const creatorHash = ensurePubkey(this.asset.compression.creator_hash);
+                
+                // Log detailed parameters for better debugging
+                console.log("Burn instruction parameters:", {
+                    merkleTree: merkleTree.toString(),
+                    leafOwner: owner.toString(),
+                    root: root.toString(),
+                    dataHash: dataHash.toString(),
+                    creatorHash: creatorHash.toString(),
+                    nonce: leafId,
+                    index: leafId,
+                    proofLength: proofPublicKeys.length
+                });
+                
+                // Simplified burn instruction - this should properly format the parameters
                 const burnInstruction = createBurnInstruction(
                     {
                         merkleTree,
                         leafOwner: owner,
-                        leafDelegate: owner, // For most cNFTs, delegate is the same as owner
-                        root: proof[0], // The first element of the proof array should be the root
-                        dataHash: new PublicKey(this.asset.compression.data_hash),
-                        creatorHash: new PublicKey(this.asset.compression.creator_hash),
+                        leafDelegate: owner, // Usually the same as owner
+                        root: root,
+                        dataHash: dataHash,
+                        creatorHash: creatorHash,
+                        nonce: BigInt(leafId), // Convert leaf ID to BigInt for compatibility
                         index: leafId,
-                        proof: proof.map(node => new PublicKey(node))
+                        proof: proofPublicKeys
                     },
                     new PublicKey(BUBBLEGUM_PROGRAM_ID)
                 );
@@ -147,21 +182,70 @@ export class CNFTHandler {
             try {
                 // Race between the signTransaction and the timeout
                 console.log("Requesting wallet to sign transaction...");
-                const signedTx = await Promise.race([
-                    this.wallet.signTransaction(tx),
-                    timeoutPromise
-                ]);
+                console.log("Transaction details:", {
+                    instructions: tx.instructions.length,
+                    signers: tx.signers?.length || 0,
+                    feePayer: tx.feePayer?.toString(),
+                    recentBlockhash: tx.recentBlockhash
+                });
+                
+                // Make sure any status messages are visible to the user
+                if (typeof window !== 'undefined') {
+                    if (document.getElementById('burn-status')) {
+                        document.getElementById('burn-status').textContent = 'Waiting for wallet approval...';
+                        document.getElementById('burn-status').style.display = 'block';
+                    }
+                }
+                
+                // Sign the transaction - we don't use Promise.race here to avoid timing issues
+                console.log("Calling signTransaction method directly...");
+                let signedTx;
+                try {
+                    // Directly call the wallet's signTransaction method
+                    signedTx = await this.wallet.signTransaction(tx);
+                    console.log("Transaction signed successfully!");
+                } catch (signErr) {
+                    console.error("Error during signing:", signErr);
+                    
+                    // Check for user cancellation
+                    if (signErr.message && (
+                        signErr.message.toLowerCase().includes('user rejected') ||
+                        signErr.message.toLowerCase().includes('cancelled') ||
+                        signErr.message.toLowerCase().includes('canceled') ||
+                        signErr.message.toLowerCase().includes('rejected')
+                    )) {
+                        return {
+                            success: false,
+                            cancelled: true,
+                            error: 'Transaction was cancelled by the user'
+                        };
+                    }
+                    
+                    // Rethrow other errors
+                    throw signErr;
+                }
                 
                 // Clear the timeout since we got a response
                 clearTimeout(timeoutId);
                 
-                // Send the transaction
+                // Send the transaction with options for better reliability
                 console.log("Sending transaction to the blockchain...");
-                const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+                const signature = await this.connection.sendRawTransaction(
+                    signedTx.serialize(),
+                    {
+                        skipPreflight: false,
+                        preflightCommitment: 'finalized',
+                        maxRetries: 3
+                    }
+                );
+                console.log("Transaction sent with signature:", signature);
                 
-                // Wait for confirmation
+                // Wait for confirmation with a specified commitment level
                 console.log("Waiting for confirmation...");
-                const confirmation = await this.connection.confirmTransaction(signature);
+                const confirmation = await this.connection.confirmTransaction(
+                    signature, 
+                    'confirmed'  // Use 'confirmed' instead of default to ensure faster finality
+                );
                 
                 if (confirmation.value.err) {
                     console.error("Error confirming transaction:", confirmation.value.err);

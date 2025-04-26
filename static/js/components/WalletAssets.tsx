@@ -758,7 +758,12 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
+      // Log detailed information for debugging
+      console.log('CNFT Data Structure:', JSON.stringify(cnft, null, 2));
+      console.log('Compression data:', cnft.compression);
+      
       // Use the CNFTHandler to burn the compressed NFT
+      console.log('Creating CNFTHandler with wallet:', publicKey.toString());
       const cnftHandler = new CNFTHandler(connection, {
         publicKey, 
         signTransaction
@@ -773,12 +778,26 @@ const WalletAssets: React.FC = () => {
       
       try {
         // Try to fetch the asset with proof first
+        console.log('About to call fetchAssetWithProof');
         const asset = await cnftHandler.fetchAssetWithProof(assetId);
+        console.log('Returned from fetchAssetWithProof:', asset ? 'Data received' : 'No data');
+        
         if (asset && asset.proof) {
           console.log('Successfully fetched proof data from blockchain');
+          console.log('Proof array length:', asset.proof.length);
+          console.log('First proof element:', asset.proof[0]);
+          
+          // Add more detailed info from the asset
+          if (asset.compression) {
+            console.log('Asset compression data:', asset.compression);
+          }
+          
+          setError('Proof data fetched. Attempting to burn cNFT...');
           
           // We'll try the simplified method first
+          console.log('Starting simpleBurnCNFT...');
           const result = await cnftHandler.simpleBurnCNFT(assetId, asset.proof, cnft);
+          console.log('simpleBurnCNFT result:', result);
           
           // Check if the transaction was cancelled by the user
           if (result.cancelled) {
