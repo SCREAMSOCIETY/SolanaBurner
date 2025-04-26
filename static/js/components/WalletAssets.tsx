@@ -1465,8 +1465,9 @@ const WalletAssets: React.FC = () => {
                         e.stopPropagation();
                         handleBurnCNFT(cnft);
                       }}
+                      title="Sends to a burn wallet address"
                     >
-                      Burn
+                      Trade to Burn
                     </button>
                   )}
                   {bulkBurnMode && (

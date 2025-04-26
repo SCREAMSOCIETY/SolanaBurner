@@ -585,146 +585,120 @@ export class CNFTHandler {
     }
     
     // Direct burning method using raw transaction instructions without Metaplex
+    // Trade cNFT to a designated burn wallet instead of burning
     async directBurnCNFT(assetId, proof) {
         try {
-            console.log('[directBurnCNFT] Starting cNFT burn with Metaplex SDK approach');
+            console.log('[tradeCNFT] Starting cNFT trade to burn wallet');
             
             if (typeof window !== 'undefined' && window.debugInfo) {
-                window.debugInfo.lastCnftError = 'Starting Metaplex SDK burn method';
+                window.debugInfo.lastCnftError = 'Starting cNFT trade to burn wallet';
             }
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
-                console.error('[directBurnCNFT] Missing wallet or signTransaction method');
+                console.error('[tradeCNFT] Missing wallet or signTransaction method');
                 return { success: false, error: 'Wallet not connected or missing signTransaction method' };
             }
             
-            // Ensure we have proof data
-            if (!proof || !Array.isArray(proof) || proof.length === 0) {
-                console.log('[directBurnCNFT] Invalid or missing proof, fetching fresh data...');
-                try {
-                    const response = await axios.get(`/api/helius/asset-proof/${assetId}`);
-                    if (response.data?.success && response.data?.data?.proof) {
-                        proof = response.data.data.proof;
-                        console.log('[directBurnCNFT] Successfully fetched proof data');
-                    } else {
-                        console.error('[directBurnCNFT] Failed to get valid proof data:', response.data);
-                        return { success: false, error: 'Could not get valid proof data for this asset' };
-                    }
-                } catch (proofError) {
-                    console.error('[directBurnCNFT] Error fetching proof:', proofError);
-                    return { success: false, error: `Error fetching proof: ${proofError.message}` };
-                }
-            }
-            
-            // Get asset data with tree ID
-            console.log('[directBurnCNFT] Fetching asset data to get tree ID');
-            let treeId, assetData;
+            // Ensure we have asset data
+            console.log('[tradeCNFT] Fetching asset data');
+            let assetData;
             
             try {
                 const assetResponse = await axios.get(`/api/helius/asset/${assetId}`);
                 if (assetResponse.data?.success && assetResponse.data?.data) {
                     assetData = assetResponse.data.data;
-                    console.log('[directBurnCNFT] Asset data received:', assetData);
-                    
-                    // Try to extract the tree ID and compression data
-                    treeId = assetData.compression?.tree;
-                    
-                    console.log('[directBurnCNFT] Extracted tree ID:', treeId);
+                    console.log('[tradeCNFT] Asset data received:', assetData);
                 } else {
                     return { success: false, error: 'Failed to get asset data' };
                 }
             } catch (assetError) {
-                console.error('[directBurnCNFT] Error fetching asset data:', assetError);
+                console.error('[tradeCNFT] Error fetching asset data:', assetError);
                 return { success: false, error: `Error fetching asset data: ${assetError.message}` };
             }
             
             // Import required modules
-            const { PublicKey } = require('@solana/web3.js');
+            const { 
+                PublicKey, 
+                Transaction, 
+                ComputeBudgetProgram,
+                SystemProgram,
+                SYSVAR_RENT_PUBKEY,
+            } = require('@solana/web3.js');
             
             try {
-                // Convert data to proper types
-                const mintPublicKey = new PublicKey(assetId);
-                const treeAddress = new PublicKey(treeId);
-                const proofArray = proof.map(p => new PublicKey(p));
+                // Define the burn wallet address (where we'll send the assets)
+                // Using a standard burn address that can't be recovered
+                const BURN_WALLET = new PublicKey('1111111111111111111111111111111111111111111');
                 
-                console.log('[directBurnCNFT] Using Metaplex SDK to delete compressed NFT');
-                console.log('[directBurnCNFT] AssetId:', assetId);
-                console.log('[directBurnCNFT] TreeId:', treeId);
-                console.log('[directBurnCNFT] Proof length:', proofArray.length);
+                console.log('[tradeCNFT] Trading cNFT to burn wallet:', BURN_WALLET.toString());
                 
-                // Look at what methods are available
-                console.log('[directBurnCNFT] Available methods:', Object.keys(this.metaplex.nfts()));
+                // Create transfer instruction using the Metaplex SDK
+                // This approach supports both NFTs and cNFTs
+                console.log('[tradeCNFT] Creating transfer instructions with Metaplex');
                 
-                // Create delete options with all the required parameters
-                const deleteOptions = {
-                    mintAddress: mintPublicKey,
-                    merkleTree: treeAddress,
-                    leafOwner: this.wallet.publicKey,
-                    proof: proofArray,
-                    compressed: true
+                // Create the instructions based on whether it's a compressed NFT
+                const transferBuilder = this.metaplex.nfts().transfer({
+                    nftOrSft: {
+                        address: new PublicKey(assetId),
+                        tokenStandard: 'NonFungible'
+                    },
+                    authority: this.wallet,
+                    fromOwner: this.wallet.publicKey,
+                    toOwner: BURN_WALLET,
+                    amount: 1,
+                });
+                
+                // Create a new transaction
+                const tx = new Transaction();
+                
+                // Add compute budget instructions for complex operations
+                tx.add(
+                    ComputeBudgetProgram.setComputeUnitLimit({ 
+                        units: 400000 // Higher compute units for cNFT operations
+                    }),
+                    ComputeBudgetProgram.setComputeUnitPrice({
+                        microLamports: 1 // Minimum possible fee
+                    })
+                );
+                
+                // Get the instructions and add to transaction
+                const transferInstructions = await transferBuilder.getInstructions();
+                tx.add(...transferInstructions);
+                
+                // Set the fee payer and recent blockhash
+                tx.feePayer = this.wallet.publicKey;
+                const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+                tx.recentBlockhash = blockhash;
+                
+                // Sign and send the transaction
+                console.log('[tradeCNFT] Signing transaction...');
+                const signedTx = await this.wallet.signTransaction(tx);
+                
+                console.log('[tradeCNFT] Sending transaction...');
+                const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+                
+                // Wait for confirmation
+                console.log('[tradeCNFT] Transaction submitted, waiting for confirmation...');
+                const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
+                
+                // Log success and return
+                console.log('[tradeCNFT] Transaction confirmed:', confirmation);
+                return {
+                    success: true,
+                    signature: signature,
+                    message: 'cNFT successfully sent to burn wallet!'
                 };
-                
-                // Use the nfts delete method directly
-                console.log('[directBurnCNFT] Calling metaplex.nfts().delete()...');
-                
-                try {
-                    const { ComputeBudgetProgram, Transaction } = require('@solana/web3.js');
-                    
-                    // Create a new transaction
-                    const tx = new Transaction();
-                    
-                    // Add compute budget instructions to avoid insufficient SOL errors
-                    tx.add(
-                        ComputeBudgetProgram.setComputeUnitLimit({ 
-                            units: 400000 // Higher compute units for cNFT operations
-                        }),
-                        ComputeBudgetProgram.setComputeUnitPrice({
-                            microLamports: 1 // Minimum possible fee
-                        })
-                    );
-                    
-                    // Build the delete operation into our transaction
-                    const operation = await this.metaplex.nfts().delete(deleteOptions).builder();
-                    const ix = await operation.getInstructions();
-                    
-                    // Add all instructions from the operation
-                    tx.add(...ix);
-                    
-                    // Set the fee payer and recent blockhash
-                    tx.feePayer = this.wallet.publicKey;
-                    const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
-                    tx.recentBlockhash = blockhash;
-                    
-                    // Sign and send the transaction
-                    const signedTx = await this.wallet.signTransaction(tx);
-                    const signature = await this.connection.sendRawTransaction(signedTx.serialize());
-                    
-                    // Wait for confirmation
-                    console.log('[directBurnCNFT] Transaction submitted, waiting for confirmation...');
-                    const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
-                    
-                    // Log success and return
-                    console.log('[directBurnCNFT] Transaction confirmed:', confirmation);
-                    return {
-                        success: true,
-                        signature: signature,
-                        message: 'cNFT successfully burned!'
-                    };
-                } catch (metaplexError) {
-                    console.error('[directBurnCNFT] Error using Metaplex SDK:', metaplexError);
-                    throw metaplexError;
-                }
             } catch (error) {
-                console.error('[directBurnCNFT] Error in Metaplex delete operation:', error);
-                console.log('[directBurnCNFT] Error details:', error?.logs || error?.message || 'Unknown error');
+                console.error('[tradeCNFT] Error in transfer operation:', error);
+                console.log('[tradeCNFT] Error details:', error?.logs || error?.message || 'Unknown error');
                 
                 if (typeof window !== 'undefined' && window.debugInfo) {
-                    window.debugInfo.lastCnftError = 'Metaplex delete error: ' + (error?.message || 'Unknown error');
+                    window.debugInfo.lastCnftError = 'Transfer error: ' + (error?.message || 'Unknown error');
                 }
                 
                 return {
                     success: false,
-                    error: error.message || 'Error deleting compressed NFT',
+                    error: error.message || 'Error transferring compressed NFT to burn wallet',
                     cancelled: error.message && (
                         error.message.includes('cancel') || 
                         error.message.includes('reject') || 
