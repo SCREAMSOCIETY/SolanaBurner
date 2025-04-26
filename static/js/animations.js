@@ -8,7 +8,14 @@ function createConfetti() {
   confettiContainer.className = 'confetti-container';
   document.body.appendChild(confettiContainer);
   
-  const colors = ['#FF5252', '#FFD740', '#00C853', '#448AFF', '#E040FB', '#FF6E40'];
+  // Use our theme colors - accent, secondary, and variations
+  const colors = [
+    'var(--color-accent, #ff6b6b)',          // Accent
+    'var(--color-accent-light, #ff9c9c)',    // Accent light
+    'var(--color-secondary, #4b3f72)',       // Secondary 
+    'var(--color-secondary-light, #6c5d94)', // Secondary light
+    'var(--color-primary-light, #2a2a3e)'    // Primary light
+  ];
   
   for (let i = 0; i < 150; i++) {
     const confetti = document.createElement('div');
@@ -17,13 +24,28 @@ function createConfetti() {
     confetti.style.left = Math.random() * 100 + 'vw';
     confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
     confetti.style.animationDelay = Math.random() * 2 + 's';
+    
+    // Add some different confetti shapes
+    if (i % 3 === 0) {
+      confetti.style.borderRadius = '0'; // Square
+    } else if (i % 3 === 1) {
+      confetti.style.borderRadius = '50%'; // Circle
+    } else {
+      confetti.style.borderRadius = '3px'; // Rounded square
+    }
+    
+    // Vary the size a bit
+    const size = Math.random() * 5 + 8; // Between 8 and 13px
+    confetti.style.width = `${size}px`;
+    confetti.style.height = `${size}px`;
+    
     confettiContainer.appendChild(confetti);
   }
   
   // Remove confetti after animation completes
   setTimeout(() => {
     confettiContainer.remove();
-  }, 5000);
+  }, 6000); // Slightly longer duration
 }
 
 // Toggle dark mode theme
@@ -310,9 +332,12 @@ function addAnimationStyles() {
         left: 0;
         width: 100%;
         height: 100%;
-        background: linear-gradient(to bottom, rgba(255, 165, 0, 0.3), rgba(255, 0, 0, 0.5));
+        background: linear-gradient(to bottom, 
+                    rgba(255, 107, 107, 0.3), /* Accent color with transparency */
+                    rgba(75, 63, 114, 0.5)); /* Secondary color with transparency */
         z-index: 2;
         animation: burn 2s forwards;
+        border-radius: 8px;
       }
       
       @keyframes burn {
@@ -324,7 +349,7 @@ function addAnimationStyles() {
         }
         100% {
           opacity: 1;
-          background: rgba(0, 0, 0, 0.9);
+          background: var(--color-primary-dark, rgba(14, 14, 26, 0.9));
         }
       }
       
@@ -333,7 +358,7 @@ function addAnimationStyles() {
         bottom: 0;
         width: 3px;
         height: 3px;
-        background-color: #ff6a00;
+        background-color: var(--color-accent, #ff6b6b);
         border-radius: 50%;
         filter: blur(1px);
         animation: rise linear forwards;
@@ -343,11 +368,11 @@ function addAnimationStyles() {
         0% {
           transform: translateY(0) scale(1);
           opacity: 1;
-          background-color: #ff6a00;
+          background-color: var(--color-accent, #ff6b6b);
         }
         75% {
           opacity: 0.7;
-          background-color: #ff0000;
+          background-color: var(--color-accent-dark, #ff3a3a);
         }
         100% {
           transform: translateY(-100px) scale(0);
@@ -357,6 +382,9 @@ function addAnimationStyles() {
       
       .burned {
         transition: all 0.5s ease;
+        opacity: 0.4;
+        filter: grayscale(100%);
+        transform: scale(0.95);
       }
       
       /* Theme Toggle */
@@ -417,19 +445,21 @@ function addAnimationStyles() {
         bottom: 30px;
         right: -350px;
         width: 300px;
-        background-color: #333;
-        color: white;
-        border-radius: 8px;
+        background-color: var(--color-secondary, #4b3f72);
+        color: var(--color-text-light, #f1f1f6);
+        border-radius: 10px;
         padding: 15px;
         display: flex;
         align-items: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        transition: transform 0.5s ease;
+        transition: all 0.5s ease;
         z-index: 9999;
+        border-left: 4px solid var(--color-accent, #ff6b6b);
       }
       
       .achievement.show {
         transform: translateX(-370px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
       }
       
       .achievement.hide {
@@ -440,17 +470,27 @@ function addAnimationStyles() {
       .achievement-icon {
         font-size: 24px;
         margin-right: 15px;
+        background-color: var(--color-accent, #ff6b6b);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
       }
       
       .achievement-content h3 {
         margin: 0 0 5px 0;
         font-size: 16px;
+        color: var(--color-text-light, #f1f1f6);
       }
       
       .achievement-content p {
         margin: 0;
         font-size: 14px;
-        opacity: 0.8;
+        opacity: 0.9;
+        color: var(--color-text-light, #f1f1f6);
       }
       
       /* Level Indicator */
