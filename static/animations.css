@@ -331,6 +331,7 @@
   max-width: 200px;
   margin: 0 auto;
   z-index: 900;
+  transform: translateY(0) !important;
 }
 
 .dark-mode .level-indicator {
