@@ -351,37 +351,82 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
     
     fastify.log.info(`Fetching proof data for asset: ${assetId}`);
     
-    // Construct the RPC payload to request proof data
-    const payload = {
+    // First - get asset details to get compression and hash information
+    const assetPayload = {
       jsonrpc: '2.0',
-      id: 'helius-test',
+      id: 'helius-get-asset',
+      method: 'getAsset',
+      params: {
+        id: assetId
+      }
+    };
+    
+    // Make asset details request
+    const assetResponse = await axios.post(
+      `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+      assetPayload
+    );
+    
+    let compressionData = null;
+    let dataHash = null;
+    let creatorHash = null;
+    
+    if (assetResponse.data && assetResponse.data.result && assetResponse.data.result.compression) {
+      const assetData = assetResponse.data.result;
+      compressionData = assetData.compression;
+      
+      // Store these critical values
+      dataHash = compressionData.data_hash;
+      creatorHash = compressionData.creator_hash;
+      
+      fastify.log.info(`Asset ${assetId} compression data retrieved:`, {
+        compressed: compressionData.compressed,
+        tree_id: compressionData.tree_id,
+        leaf_id: compressionData.leaf_id
+      });
+    } else {
+      fastify.log.warn(`Asset ${assetId} does not appear to be compressed or is missing compression data`);
+    }
+    
+    // Now - construct the RPC payload to request proof data
+    const proofPayload = {
+      jsonrpc: '2.0',
+      id: 'helius-get-proof',
       method: 'getAssetProof',
       params: {
         id: assetId
       }
     };
     
-    // Make the request to Helius RPC API
-    const response = await axios.post(
+    // Make the request to Helius RPC API for proof data
+    const proofResponse = await axios.post(
       `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
-      payload
+      proofPayload
     );
     
-    if (response.data && response.data.result) {
+    if (proofResponse.data && proofResponse.data.result) {
       // Extract the proof and return it with some additional metadata
-      const proofData = response.data.result;
+      const proofData = proofResponse.data.result;
       
       fastify.log.info(`Successfully fetched proof data for asset ${assetId}`);
       
+      // Return combined data
       return {
         success: true,
         data: {
           assetId,
           proof: proofData.proof,
           root: proofData.root,
-          tree_id: proofData.tree_id,
+          tree_id: proofData.tree_id || (compressionData ? compressionData.tree_id : null),
           node_index: proofData.node_index,
-          leaf: proofData.leaf
+          leaf: proofData.leaf,
+          compression: {
+            tree_id: compressionData ? compressionData.tree_id : null,
+            leaf_id: compressionData ? compressionData.leaf_id : null,
+            compressed: compressionData ? compressionData.compressed : false,
+            data_hash: dataHash,
+            creator_hash: creatorHash
+          }
         }
       };
     } else {

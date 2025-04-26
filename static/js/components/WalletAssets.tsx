@@ -762,121 +762,187 @@ const WalletAssets: React.FC = () => {
       console.log('CNFT Data Structure:', JSON.stringify(cnft, null, 2));
       console.log('Compression data:', cnft.compression);
       
-      // Use the CNFTHandler to burn the compressed NFT
-      console.log('Creating CNFTHandler with wallet:', publicKey.toString());
-      const cnftHandler = new CNFTHandler(connection, {
-        publicKey, 
-        signTransaction
-      });
+      // Import required Solana web3.js components
+      const { 
+        Transaction, 
+        PublicKey, 
+        SystemProgram, 
+        sendAndConfirmTransaction 
+      } = require('@solana/web3.js');
+      
+      // Import the Bubblegum library
+      const { 
+        createBurnInstruction, 
+        PROGRAM_ID: BUBBLEGUM_PROGRAM_ID 
+      } = require('@metaplex-foundation/mpl-bubblegum');
+      
+      // First, fetch the asset proof via our backend API
+      setError('Fetching proof data for this cNFT...');
       
       // The assetId for cNFTs is the mint address
       const assetId = cnft.mint;
       
-      // First, fetch the asset proof directly using the handler
-      console.log(`Fetching proof data directly for ${assetId}`);
-      setError('Fetching proof data for this cNFT...');
+      // Use the API directly to get proof data - more reliable for different wallet types
+      console.log(`Fetching proof data for ${assetId} via API`);
+      const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
       
+      if (!proofResponse.ok) {
+        throw new Error('Failed to fetch proof data from API');
+      }
+      
+      const proofData = await proofResponse.json();
+      console.log('Proof data received:', proofData);
+      
+      if (!proofData.success || !proofData.data || !proofData.data.proof) {
+        throw new Error('Invalid or missing proof data from API response');
+      }
+      
+      // Extract the proof and other necessary data
+      const { proof, compression } = proofData.data;
+      
+      // Verify we have all the required components
+      if (!compression || !compression.tree_id || compression.leaf_id === undefined) {
+        throw new Error('Missing required compression data (tree_id or leaf_id)');
+      }
+      
+      // Extract crucial data
+      const treeId = compression.tree_id;
+      const leafId = compression.leaf_id;
+      const dataHash = compression.data_hash;
+      const creatorHash = compression.creator_hash;
+      
+      console.log('Using tree ID:', treeId);
+      console.log('Using leaf ID:', leafId);
+      console.log('Data hash:', dataHash);
+      console.log('Creator hash:', creatorHash);
+      
+      // Create a new transaction
+      const tx = new Transaction();
+      
+      // Convert necessary values to PublicKey
+      const merkleTree = new PublicKey(treeId);
+      const owner = publicKey;
+      
+      // Get the root from the proof (first element)
+      if (!proof || !proof.length) {
+        throw new Error('Empty proof array received from API');
+      }
+      
+      // Convert all proof elements to PublicKey objects
+      const root = new PublicKey(proof[0]);
+      const proofPubkeys = proof.slice(1).map((p: string) => new PublicKey(p));
+      
+      setError('Creating burn instruction...');
+      console.log('Creating burn instruction with:', {
+        merkleTree: merkleTree.toString(),
+        owner: owner.toString(),
+        root: root.toString(),
+        dataHash,
+        creatorHash,
+        leafId
+      });
+      
+      // Create burn parameters
+      const params = {
+        merkleTree,
+        leafOwner: owner,
+        leafDelegate: owner,
+        root,
+        dataHash: new PublicKey(dataHash),
+        creatorHash: new PublicKey(creatorHash),
+        nonce: BigInt(leafId),
+        index: leafId,
+        proof: proofPubkeys
+      };
+      
+      // Create the burn instruction
+      const burnIx = createBurnInstruction(
+        params,
+        new PublicKey(BUBBLEGUM_PROGRAM_ID)
+      );
+      
+      // Add the instruction to the transaction
+      tx.add(burnIx);
+      
+      // Set the fee payer
+      tx.feePayer = publicKey;
+      
+      // Get the latest blockhash
+      const { blockhash } = await connection.getLatestBlockhash('finalized');
+      tx.recentBlockhash = blockhash;
+      
+      setError('Waiting for wallet approval...');
+      
+      // Sign and send the transaction
       try {
-        // Try to fetch the asset with proof first
-        console.log('About to call fetchAssetWithProof');
-        const asset = await cnftHandler.fetchAssetWithProof(assetId);
-        console.log('Returned from fetchAssetWithProof:', asset ? 'Data received' : 'No data');
+        // Sign the transaction
+        console.log('Requesting wallet to sign transaction...');
+        const signedTx = await signTransaction(tx);
         
-        if (asset && asset.proof) {
-          console.log('Successfully fetched proof data from blockchain');
-          console.log('Proof array length:', asset.proof.length);
-          console.log('First proof element:', asset.proof[0]);
-          
-          // Add more detailed info from the asset
-          if (asset.compression) {
-            console.log('Asset compression data:', asset.compression);
-          }
-          
-          setError('Proof data fetched. Attempting to burn cNFT...');
-          
-          // We'll try the simplified method first
-          console.log('Starting simpleBurnCNFT...');
-          const result = await cnftHandler.simpleBurnCNFT(assetId, asset.proof, cnft);
-          console.log('simpleBurnCNFT result:', result);
-          
-          // Check if the transaction was cancelled by the user
-          if (result.cancelled) {
-            console.log('Transaction was cancelled by the user');
-            setError('Transaction was cancelled. Please try again if you want to burn this asset.');
-            return;
-          }
-          
-          // Only try the full burn method if simple method fails and it wasn't a cancellation
-          if (!result.success && !result.cancelled) {
-            console.log('Simplified burn method failed, attempting full burn...');
-            // Try the full burning method as a fallback if the simple one fails
-            const fullResult = await cnftHandler.burnCNFT(assetId, asset.proof, cnft);
-            if (fullResult.success) {
-              // Update the results to reflect the successful full burn
-              result.success = fullResult.success;
-              result.signature = fullResult.signature;
-              // Copy the message if available, otherwise use a default
-              if ('message' in fullResult) {
-                (result as any).message = fullResult.message;
-              }
-            }
-          }
-      
-          if (result.success) {
-            console.log('cNFT burn successful with signature:', result.signature);
-            
-            // Update the cNFTs list by removing the burnt cNFT
-            const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
-            setCnfts(updatedCnfts);
-            
-            // Apply animations if available
-            if (window.BurnAnimations) {
-              // Find the cNFT card element for burn animation
-              const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
-              if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
-                window.BurnAnimations.applyBurnAnimation(cnftCard);
-              }
-              
-              // Show confetti animation
-              if (window.BurnAnimations.createConfetti) {
-                window.BurnAnimations.createConfetti();
-              }
-              
-              // Track achievement
-              if (window.BurnAnimations.checkAchievements) {
-                window.BurnAnimations.checkAchievements('cnfts', 1);
-              }
-            }
-            
-            // Show message about the successful burn
-            // Note: cNFTs don't return rent to the user as they're already efficiently stored on-chain
-            setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
-            setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
-          } else if (!result.cancelled) {
-            // Only show an error if it wasn't a user cancellation
-            console.error('Error burning cNFT:', result.error);
-            setError(`Error burning cNFT: ${result.error}`);
-          }
-        } else {
-          setError('Could not fetch proof data for this cNFT. Cannot burn without merkle proof.');
+        // Send the transaction
+        console.log('Sending transaction to the network...');
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed'
+        });
+        
+        console.log('Transaction sent with signature:', signature);
+        setError(`Transaction sent! Signature: ${signature.slice(0, 8)}...`);
+        
+        // Wait for confirmation
+        const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+        
+        if (confirmation.value.err) {
+          console.error('Error confirming transaction:', confirmation.value.err);
+          throw new Error(`Transaction failed: ${confirmation.value.err}`);
         }
-      } catch (innerError: any) {
-        console.error('Error fetching proof data:', innerError);
         
-        // Check for cancellation or wallet errors
-        if (innerError.message && (
-            innerError.message.includes('cancel') || 
-            innerError.message.includes('reject') || 
-            innerError.message.includes('wallet') ||
-            innerError.message.includes('User') ||
-            innerError.message.includes('timeout'))) {
+        console.log('cNFT burn successful with signature:', signature);
+        
+        // Update the cNFTs list by removing the burnt cNFT
+        const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
+        setCnfts(updatedCnfts);
+        
+        // Apply animations if available
+        if (window.BurnAnimations) {
+          // Find the cNFT card element for burn animation
+          const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
+          if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
+            window.BurnAnimations.applyBurnAnimation(cnftCard);
+          }
+          
+          // Show confetti animation
+          if (window.BurnAnimations.createConfetti) {
+            window.BurnAnimations.createConfetti();
+          }
+          
+          // Track achievement
+          if (window.BurnAnimations.checkAchievements) {
+            window.BurnAnimations.checkAchievements('cnfts', 1);
+          }
+        }
+        
+        // Show message about the successful burn
+        // Note: cNFTs don't return rent to the user as they're already efficiently stored on-chain
+        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
+        setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+      } catch (signError: any) {
+        console.error('Error signing/sending transaction:', signError);
+        
+        // Check for user cancellation
+        if (signError.message && (
+            signError.message.toLowerCase().includes('user rejected') ||
+            signError.message.toLowerCase().includes('cancelled') ||
+            signError.message.toLowerCase().includes('canceled') ||
+            signError.message.toLowerCase().includes('rejected')
+        )) {
           setError('Transaction was cancelled. Please try again if you want to burn this asset.');
         } else {
-          setError(`Error fetching proof data: ${innerError.message}`);
+          setError(`Error with transaction: ${signError.message}`);
         }
       }
     } catch (error: any) {
-      console.error('Error burning cNFT:', error);
+      console.error('Error in handleBurnCNFT:', error);
       
       // User-friendly error message for wallet connection issues
       if (error.message && (
