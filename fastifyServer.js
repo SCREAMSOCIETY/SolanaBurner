@@ -461,6 +461,85 @@ fastify.post('/api/helius/submit-transaction', async (request, reply) => {
   }
 });
 
+// Endpoint specifically for burning a single cNFT
+fastify.post('/api/burn-cnft/:assetId', async (request, reply) => {
+  try {
+    const { assetId } = request.params;
+    
+    if (!assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Asset ID is required'
+      });
+    }
+    
+    fastify.log.info(`Processing burn request for cNFT asset: ${assetId}`);
+    
+    // First get the asset data with proof
+    try {
+      // Get asset details first
+      const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+      
+      if (!assetDetails) {
+        return reply.code(404).send({
+          success: false,
+          error: 'Asset not found'
+        });
+      }
+      
+      // Now get the proof data
+      const heliusApiKey = process.env.HELIUS_API_KEY;
+      if (!heliusApiKey) {
+        throw new Error('HELIUS_API_KEY environment variable is not set');
+      }
+      
+      // Make the request to Helius RPC API for proof data
+      const proofResponse = await axios.post(
+        `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+        {
+          jsonrpc: '2.0',
+          id: 'helius-proof',
+          method: 'getAssetProof',
+          params: { id: assetId }
+        }
+      );
+      
+      if (!proofResponse.data || !proofResponse.data.result) {
+        throw new Error('Invalid response from Helius API when fetching proof');
+      }
+      
+      const proofData = proofResponse.data.result;
+      
+      fastify.log.info(`Successfully fetched proof data for cNFT ${assetId}`);
+      
+      // Return everything the client needs to complete the burn
+      return {
+        success: true,
+        message: "Asset and proof data ready for client-side burning",
+        data: {
+          asset: assetDetails,
+          proof: proofData
+        }
+      };
+      
+    } catch (error) {
+      fastify.log.error(`Error processing burn-cnft request: ${error.message}`);
+      console.error('Stack:', error.stack);
+      return reply.code(500).send({
+        success: false,
+        error: `Error processing burn-cnft request: ${error.message}`
+      });
+    }
+  } catch (error) {
+    fastify.log.error(`Error in burn-cnft endpoint: ${error.message}`);
+    console.error('Stack:', error.stack);
+    return reply.code(500).send({
+      success: false,
+      error: `Error in burn-cnft endpoint: ${error.message}`
+    });
+  }
+});
+
 // New endpoint for direct cNFT burning via server-side transaction creation
 // Using a simplified approach with direct Solana web3.js methods
 fastify.post('/api/helius/burn-cnft', async (request, reply) => {

@@ -362,12 +362,48 @@ export class CNFTHandler {
                     throw new Error("Wallet doesn't support sendTransaction method");
                 }
                 
-                // This will handle both signing AND sending in one call
-                // Much more likely to trigger the wallet UI
-                const signature = await this.wallet.sendTransaction(tx, this.connection, {
-                    skipPreflight: false,
-                    preflightCommitment: "confirmed"
-                });
+                // Access the original wallet provider directly from window
+                // This bypasses any adapter layers that might be preventing the UI from showing
+                const solanaProvider = 
+                    (typeof window !== "undefined" && window.solana) || 
+                    (typeof window !== "undefined" && window.phantom?.solana) ||
+                    null;
+                    
+                console.log("Direct provider access:", solanaProvider ? "available" : "not available");
+                
+                let signature;
+                
+                // Try direct provider first if available
+                if (solanaProvider && typeof solanaProvider.signAndSendTransaction === 'function') {
+                    console.log("Using direct solana.signAndSendTransaction() method");
+                    
+                    // This calls directly into the wallet extension
+                    const { signature: directSig } = await solanaProvider.signAndSendTransaction(tx);
+                    signature = directSig;
+                    console.log("Transaction signed and sent directly via wallet provider:", signature);
+                }
+                else if (solanaProvider && typeof solanaProvider.signTransaction === 'function') {
+                    console.log("Using direct solana.signTransaction() method");
+                    
+                    // Sign with direct provider
+                    const signedTx = await solanaProvider.signTransaction(tx);
+                    
+                    // Send the signed transaction
+                    signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
+                        skipPreflight: false,
+                        preflightCommitment: "confirmed"
+                    });
+                    console.log("Transaction signed with direct wallet and sent via connection:", signature);
+                }
+                else {
+                    // Fall back to wallet adapter if direct access isn't available
+                    console.log("Falling back to wallet adapter sendTransaction");
+                    signature = await this.wallet.sendTransaction(tx, this.connection, {
+                        skipPreflight: false,
+                        preflightCommitment: "confirmed"
+                    });
+                    console.log("Transaction sent via wallet adapter:", signature);
+                }
                 
                 console.log("Transaction sent directly via wallet.sendTransaction:", signature);
                 console.log("Transaction sent with signature:", signature);
@@ -464,21 +500,56 @@ export class CNFTHandler {
         console.log("Using serverBurnCNFT method");
         
         try {
-            // Send to backend
+            console.log("Calling server endpoint for asset:", assetId);
+            
+            // Send to backend to get asset and proof data
             const response = await fetch(`/api/burn-cnft/${assetId}`, {
-                method: "POST"
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                }
             });
             
             const result = await response.json();
             
-            if (result.success) {
-                return result;
-            } else {
-                throw new Error(result.error || "Server burn failed");
+            if (!result.success) {
+                throw new Error(result.error || "Server failed to fetch asset data");
             }
+            
+            console.log("Server returned asset and proof data:", result);
+            
+            // We now have both the asset data and proof data
+            const { asset, proof } = result.data;
+            
+            if (!asset || !proof) {
+                throw new Error("Server returned incomplete data");
+            }
+            
+            // Now use the directBurnCNFT method with the provided proof
+            console.log("Using proof data from server for direct burn");
+            return await this.directBurnCNFT(assetId, proof);
+            
         } catch (error) {
             console.error("Error in serverBurnCNFT:", error);
-            throw error;
+            
+            // Check if user cancelled
+            if (error.message && (
+                error.message.includes("User rejected") || 
+                error.message.includes("cancelled") || 
+                error.message.includes("declined")
+            )) {
+                return {
+                    success: false,
+                    error: "Transaction was cancelled by the user",
+                    cancelled: true
+                };
+            }
+            
+            return {
+                success: false,
+                error: error.message || "Unknown error in serverBurnCNFT",
+                cancelled: false
+            };
         }
     }
     
