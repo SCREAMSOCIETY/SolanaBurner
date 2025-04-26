@@ -43,8 +43,8 @@ export class CNFTHandler {
         console.log('Fetching asset with proof for', assetId);
         
         try {
-            // Method 1: Using bubblegum SDK's getAssetWithProof
-            console.log('Method 1: Using bubblegum SDK's getAssetWithProof...');
+            // Method 1: Using bubblegum SDK getAssetWithProof
+            console.log("Method 1: Using bubblegum SDK getAssetWithProof...");
             const { getAssetWithProof } = require('@metaplex-foundation/mpl-bubblegum');
             const asset = await getAssetWithProof(this.connection, assetId);
             return asset;
