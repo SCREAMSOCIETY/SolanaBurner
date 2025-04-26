@@ -8,6 +8,26 @@ import {
   createCloseAccountInstruction
 } from '@solana/spl-token';
 import axios from 'axios';
+
+// Add global variable to global window object to access in console for debugging
+declare global {
+  interface Window {
+    debugInfo: {
+      lastCnftError: any;
+      lastCnftData: any;
+      cnftBurnTriggered: boolean;
+    };
+  }
+}
+
+// Initialize debug object
+if (typeof window !== 'undefined') {
+  window.debugInfo = {
+    lastCnftError: null,
+    lastCnftData: null,
+    cnftBurnTriggered: false
+  };
+}
 import { CNFTHandler } from '../cnft-handler';
 
 // Define asset type interfaces
@@ -884,9 +904,17 @@ const WalletAssets: React.FC = () => {
   const handleBurnCNFT = async (cnft: CNFTData) => {
     console.log('[CNFT-DEBUG] Starting burn process for cNFT:', cnft.mint);
     
+    // Store debug info for console inspection
+    if (window.debugInfo) {
+      window.debugInfo.cnftBurnTriggered = true;
+      window.debugInfo.lastCnftData = cnft;
+      window.debugInfo.lastCnftError = null;
+    }
+    
     if (!publicKey || !signTransaction) {
       console.error('[CNFT-DEBUG] Wallet connection required for burning cNFTs');
       setError('Wallet connection required for burning cNFTs');
+      if (window.debugInfo) window.debugInfo.lastCnftError = 'No wallet connection';
       return;
     }
     
@@ -1051,8 +1079,10 @@ const WalletAssets: React.FC = () => {
         
         try {
           console.log('[CNFT-DEBUG] Right before signTransaction call');
+          if (window.debugInfo) window.debugInfo.lastCnftError = 'About to call signTransaction';
           const signedTx = await signTransaction(tx);
           console.log('[CNFT-DEBUG] Transaction signed successfully');
+          if (window.debugInfo) window.debugInfo.lastCnftError = 'Transaction signed successfully';
           
           // Send the transaction
           setError('Sending transaction to the network...');
