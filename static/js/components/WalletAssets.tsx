@@ -929,11 +929,25 @@ const WalletAssets: React.FC = () => {
     try {
       setError(`Starting trade-to-burn process for "${cnft.name}"...`);
       
-      // Create a CNFTHandler instance
+      // Create notification
+      if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+        window.BurnAnimations.showNotification(
+          "Preparing cNFT Trade to Burn", 
+          "Watch for your wallet popup to approve the transaction. You may need to check your wallet extension."
+        );
+      }
+      
+      // Create a CNFTHandler instance with full wallet adapter
+      // Important: include sendTransaction which will correctly trigger wallet UI
+      const wallet = (window as any).solana || {};
       const cnftHandler = new CNFTHandler(connection, {
         publicKey, 
         signTransaction,
-        signMessage: (window as any).solana?.signMessage
+        signMessage: wallet.signMessage,
+        sendTransaction: wallet.sendTransaction || ((window as any)?.solanaWallet?.sendTransaction),
+        connect: wallet.connect,
+        disconnect: wallet.disconnect,
+        connected: wallet.connected || true // Assume connected if we got this far
       });
       
       // Let's track our debug info
@@ -941,6 +955,12 @@ const WalletAssets: React.FC = () => {
         window.debugInfo.cnftBurnTriggered = true;
         window.debugInfo.lastCnftData = cnft;
         window.debugInfo.lastCnftError = 'Starting cNFT trade-to-burn process';
+        window.debugInfo.wallet = {
+          provider: (window as any).solana?.isPhantom ? 'Phantom' : 
+                   (window as any).solana?.isSolflare ? 'Solflare' : 'Unknown',
+          hasSendTransaction: typeof wallet.sendTransaction === 'function',
+          hasConnect: typeof wallet.connect === 'function'
+        };
       }
       
       try {
@@ -1188,11 +1208,26 @@ const WalletAssets: React.FC = () => {
               await new Promise(resolve => setTimeout(resolve, 500));
             }
             
-            // Get the cNFT handler
+            // Create a CNFTHandler instance with full wallet adapter
+            // Important: include sendTransaction which will correctly trigger wallet UI
+            const wallet = (window as any).solana || {};
             const cnftHandler = new CNFTHandler(connection, {
               publicKey, 
-              signTransaction
+              signTransaction,
+              signMessage: wallet.signMessage,
+              sendTransaction: wallet.sendTransaction || ((window as any)?.solanaWallet?.sendTransaction),
+              connect: wallet.connect,
+              disconnect: wallet.disconnect,
+              connected: wallet.connected || true
             });
+            
+            // Show notification to watch for wallet UI
+            if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+              window.BurnAnimations.showNotification(
+                "Preparing cNFT Trade to Burn", 
+                "Watch for your wallet popup to approve the transaction"
+              );
+            }
             
             // Get the proof data
             const asset = await cnftHandler.fetchAssetWithProof(mint);

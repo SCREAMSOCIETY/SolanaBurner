@@ -349,20 +349,27 @@ export class CNFTHandler {
                     }
                 }
                 
-                // Perform the actual transaction signing - this should prompt wallet UI
-                const signedTx = await this.wallet.signTransaction(tx);
-                console.log("Transaction signed successfully");
+                console.log("Using wallet.sendTransaction instead of signTransaction to ensure wallet UI appears...");
                 
-                // Verify signature before sending
-                if (!signedTx) {
-                    throw new Error("Transaction was not signed properly");
+                // Use sendTransaction method instead of signTransaction + send separately
+                // This helps ensure the wallet UI appears as it's more commonly implemented
+                console.log("Transaction to send:", {
+                    instructions: tx.instructions.length,
+                    feePayer: tx.feePayer?.toString()
+                });
+                
+                if (!this.wallet.sendTransaction) {
+                    throw new Error("Wallet doesn't support sendTransaction method");
                 }
                 
-                console.log("Sending raw transaction to network...");
-                const signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
+                // This will handle both signing AND sending in one call
+                // Much more likely to trigger the wallet UI
+                const signature = await this.wallet.sendTransaction(tx, this.connection, {
                     skipPreflight: false,
                     preflightCommitment: "confirmed"
                 });
+                
+                console.log("Transaction sent directly via wallet.sendTransaction:", signature);
                 console.log("Transaction sent with signature:", signature);
                 
                 // Store signature for debugging
