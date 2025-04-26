@@ -900,7 +900,7 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Function to handle burning compressed NFTs (cNFTs)
+  // Function to handle trading compressed NFTs (cNFTs) to burn wallet
   const handleBurnCNFT = async (cnft: CNFTData) => {
     if (!publicKey || !signTransaction) {
       setError('Wallet connection required for trading cNFTs to burn wallet');
@@ -937,7 +937,7 @@ const WalletAssets: React.FC = () => {
           handleBurnSuccess(cnft);
           return;
         } else if (serverResult.cancelled) {
-          setError('Transaction was cancelled. Please try again if you want to burn this asset.');
+          setError('Transaction was cancelled. Please try again if you want to trade this cNFT to burn wallet.');
           return;
         } else {
           console.log("Server method failed, falling back to direct method...");
@@ -965,7 +965,7 @@ const WalletAssets: React.FC = () => {
           handleBurnSuccess(cnft);
           return;
         } else if (directResult.cancelled) {
-          setError('Transaction was cancelled. Please try again if you want to burn this asset.');
+          setError('Transaction was cancelled. Please try again if you want to trade this cNFT to burn wallet.');
           return;
         } else {
           console.log("Direct method failed, trying simpleBurnCNFT as final fallback...");
@@ -983,7 +983,7 @@ const WalletAssets: React.FC = () => {
           handleBurnSuccess(cnft);
           return;
         } else if (fallbackResult.cancelled) {
-          setError('Transaction was cancelled. Please try again if you want to burn this asset.');
+          setError('Transaction was cancelled. Please try again if you want to trade this cNFT to burn wallet.');
         } else {
           // All methods failed
           console.error("All trade-to-burn methods failed!");
@@ -1007,15 +1007,15 @@ const WalletAssets: React.FC = () => {
     }
   };
   
-  // Helper function to handle successful cNFT burns
+  // Helper function to handle successful cNFT trades to burn wallet
   const handleBurnSuccess = (cnft: CNFTData) => {
-    // Update the cNFTs list by removing the burnt cNFT
+    // Update the cNFTs list by removing the traded cNFT
     const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
     setCnfts(updatedCnfts);
     
     // Apply animations
     if (window.BurnAnimations) {
-      // Find the cNFT card element for burn animation
+      // Find the cNFT card element for trade-to-burn animation
       const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
       if (cnftCard && window.BurnAnimations.applyBurnAnimation) {
         window.BurnAnimations.applyBurnAnimation(cnftCard);
