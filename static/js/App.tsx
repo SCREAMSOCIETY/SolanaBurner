@@ -56,6 +56,28 @@ declare global {
 
 // Add initialization logging
 console.log('[App] Script loaded, setting up window.App');
+
+// Fix the App.tsx types
+declare global {
+  interface Window {
+    debugInfo: {
+      lastCnftError: any;
+      lastCnftData: any;
+      cnftBurnTriggered: boolean;
+      walletInfo: any;
+    };
+  }
+}
+
+// Initialize debug info object
+window.debugInfo = {
+  lastCnftError: null,
+  lastCnftData: null,
+  cnftBurnTriggered: false,
+  walletInfo: null
+};
+console.log('[App] Debug object initialized');
+
 window.App = {
   render: () => {
     console.log('[App] window.App.render called');

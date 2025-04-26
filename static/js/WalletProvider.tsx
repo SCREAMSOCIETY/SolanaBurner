@@ -3,6 +3,7 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import {
     ConnectionProvider,
     WalletProvider as SolanaWalletProvider,
+    useWallet
 } from '@solana/wallet-adapter-react';
 import {
     PhantomWalletAdapter,
@@ -83,8 +84,18 @@ export const WalletProvider: FC<Props> = ({ children }) => {
     console.log('Rendering WalletProvider component structure');
     return (
         <ConnectionProvider endpoint={endpoint}>
-            <SolanaWalletProvider wallets={wallets} autoConnect>
+            <SolanaWalletProvider 
+                wallets={wallets} 
+                autoConnect
+                onError={(error) => {
+                    console.error('[WalletProvider] Wallet adapter error:', error);
+                    if (typeof window !== 'undefined' && window.debugInfo) {
+                        window.debugInfo.lastCnftError = `Wallet adapter error: ${error.message}`;
+                    }
+                }}
+            >
                 <WalletModalProvider>
+                    <WalletLogger />
                     <div className="wallet-container">
                         <div className="wallet-buttons">
                             <WalletMultiButton />
@@ -96,6 +107,37 @@ export const WalletProvider: FC<Props> = ({ children }) => {
             </SolanaWalletProvider>
         </ConnectionProvider>
     );
+};
+
+// Component to log wallet state changes and capture them for debugging
+const WalletLogger: FC = () => {
+    const wallet = useWallet();
+    
+    useEffect(() => {
+        console.log('[WalletLogger] Wallet state updated:', {
+            connected: wallet.connected,
+            publicKey: wallet.publicKey?.toString() || 'none',
+            adapterName: wallet.wallet?.adapter.name || 'none',
+            readyState: wallet.wallet?.adapter.readyState
+        });
+        
+        if (typeof window !== 'undefined' && window.debugInfo) {
+            window.debugInfo.walletInfo = {
+                connected: wallet.connected,
+                publicKey: wallet.publicKey?.toString() || 'none',
+                adapterName: wallet.wallet?.adapter.name || 'none',
+                readyState: wallet.wallet?.adapter.readyState,
+                hasSignTransaction: !!wallet.signTransaction
+            };
+        }
+    }, [
+        wallet.connected, 
+        wallet.publicKey, 
+        wallet.wallet, 
+        wallet.signTransaction
+    ]);
+    
+    return null;
 };
 
 export default WalletProvider;
