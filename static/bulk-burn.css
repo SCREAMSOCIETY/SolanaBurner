@@ -1,73 +1,40 @@
-/* Bulk Burn Panel Styles */
+/* Styling for bulk burn functionality */
+
 .bulk-burn-section {
-  margin-bottom: 2rem;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.bulk-burn-toggle {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.toggle-button {
-  background-color: var(--primary-color);
-  color: var(--text-color);
-  border: none;
-  padding: 0.8rem 1.5rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.toggle-button.active {
-  background-color: var(--error-color);
-}
-
-.toggle-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 5px 15px rgba(153, 69, 255, 0.3);
+  background-color: #1e1e2a;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .bulk-burn-panel {
-  background-color: rgba(255, 70, 70, 0.1);
-  border: 1px solid var(--error-color);
-  border-radius: 10px;
-  padding: 1.5rem;
-  margin-top: 1rem;
-  animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .bulk-burn-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 0.5rem;
 }
 
 .bulk-burn-header h3 {
   margin: 0;
-  color: var(--error-color);
+  color: #ff6b6b;
+  font-size: 1.2rem;
 }
 
 .selection-count {
+  background-color: #ff6b6b;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 20px;
   font-size: 0.9rem;
-  color: var(--text-color);
   font-weight: bold;
 }
 
@@ -75,45 +42,61 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
-  padding: 0.75rem;
+  padding: 10px;
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
+  border-left: 3px solid #ff6b6b;
+}
+
+.selection-group span {
+  font-weight: 500;
 }
 
 .bulk-burn-button {
-  background-color: var(--error-color);
-  color: var(--text-color);
+  background-color: #ff6b6b;
+  color: white;
   border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
-.bulk-burn-button:hover:not(:disabled) {
-  transform: scale(1.05);
-  opacity: 0.9;
+.bulk-burn-button:hover {
+  background-color: #ff3a3a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
 }
 
 .bulk-burn-button:disabled {
-  opacity: 0.5;
+  background-color: #6c6c6c;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-/* Selection styles for tokens and NFTs */
+.no-selection-message {
+  padding: 15px;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-style: italic;
+  color: #aaa;
+}
+
+/* Styles for asset cards in selection mode */
 .token-card, .nft-card {
-  cursor: pointer;
   position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
   border: 2px solid transparent;
-  transition: all 0.3s ease;
 }
 
 .token-card.selected, .nft-card.selected {
-  border-color: var(--error-color);
-  box-shadow: 0 0 15px rgba(255, 70, 70, 0.3);
-  transform: scale(1.02);
+  border-color: #ff6b6b;
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.4);
+  transform: translateY(-2px);
 }
 
 .selection-indicator {
@@ -122,17 +105,12 @@
   right: 10px;
   width: 24px;
   height: 24px;
-  background-color: var(--error-color);
+  background-color: #ff6b6b;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-weight: bold;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.selected .selection-indicator {
-  opacity: 1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }

@@ -70,8 +70,8 @@ const WalletAssets: React.FC = () => {
   const [cnftsLoading, setCnftsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Bulk burn mode
-  const [bulkBurnMode, setBulkBurnMode] = useState(false);
+  // Bulk burn mode - always enabled by default
+  const [bulkBurnMode, setBulkBurnMode] = useState(true);
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]); 
   const [selectedNFTs, setSelectedNFTs] = useState<string[]>([]);
   const [selectedCNFTs, setSelectedCNFTs] = useState<string[]>([]);
@@ -755,7 +755,10 @@ const WalletAssets: React.FC = () => {
               // Update the results to reflect the successful full burn
               result.success = fullResult.success;
               result.signature = fullResult.signature;
-              result.message = fullResult.message;
+              // Copy the message if available, otherwise use a default
+              if ('message' in fullResult) {
+                (result as any).message = fullResult.message;
+              }
             }
           }
       
@@ -1050,67 +1053,62 @@ const WalletAssets: React.FC = () => {
         <div className="assets-section">
           <h2>Your Wallet Assets</h2>
           
-          {/* Bulk Burn Control Panel */}
+          {/* Bulk Burn Selection Panel - Always Visible */}
           {publicKey && (
             <div className="bulk-burn-section">
-              <div className="bulk-burn-toggle">
-                <button
-                  className={`toggle-button ${bulkBurnMode ? 'active' : ''}`}
-                  onClick={toggleBulkBurnMode}
-                >
-                  {bulkBurnMode ? 'Exit Bulk Mode' : 'Enter Bulk Burn Mode'}
-                </button>
-              </div>
-              
-              {bulkBurnMode && (
-                <div className="bulk-burn-panel">
-                  <div className="bulk-burn-header">
-                    <h3>Burning</h3>
-                    <span className="selection-count">
-                      {selectedTokens.length + selectedNFTs.length + selectedCNFTs.length} items selected
-                    </span>
-                  </div>
-                  
-                  {selectedTokens.length > 0 && (
-                    <div className="selection-group">
-                      <span>{selectedTokens.length} tokens selected</span>
-                      <button 
-                        className="bulk-burn-button"
-                        disabled={isBurning} 
-                        onClick={handleBulkBurnTokens}
-                      >
-                        Burn Selected Tokens
-                      </button>
-                    </div>
-                  )}
-                  
-                  {selectedNFTs.length > 0 && (
-                    <div className="selection-group">
-                      <span>{selectedNFTs.length} NFTs selected</span>
-                      <button 
-                        className="bulk-burn-button"
-                        disabled={isBurning}
-                        onClick={handleBulkBurnNFTs}
-                      >
-                        Burn Selected NFTs
-                      </button>
-                    </div>
-                  )}
-                  
-                  {selectedCNFTs.length > 0 && (
-                    <div className="selection-group">
-                      <span>{selectedCNFTs.length} cNFTs selected</span>
-                      <button 
-                        className="bulk-burn-button"
-                        disabled={isBurning}
-                        onClick={handleBulkBurnCNFTs}
-                      >
-                        Burn Selected cNFTs
-                      </button>
-                    </div>
-                  )}
+              <div className="bulk-burn-panel">
+                <div className="bulk-burn-header">
+                  <h3>Selected Assets</h3>
+                  <span className="selection-count">
+                    {selectedTokens.length + selectedNFTs.length + selectedCNFTs.length} items selected
+                  </span>
                 </div>
-              )}
+                
+                {selectedTokens.length > 0 && (
+                  <div className="selection-group">
+                    <span>{selectedTokens.length} tokens selected</span>
+                    <button 
+                      className="bulk-burn-button"
+                      disabled={isBurning} 
+                      onClick={handleBulkBurnTokens}
+                    >
+                      Burn Selected Tokens
+                    </button>
+                  </div>
+                )}
+                
+                {selectedNFTs.length > 0 && (
+                  <div className="selection-group">
+                    <span>{selectedNFTs.length} NFTs selected</span>
+                    <button 
+                      className="bulk-burn-button"
+                      disabled={isBurning}
+                      onClick={handleBulkBurnNFTs}
+                    >
+                      Burn Selected NFTs
+                    </button>
+                  </div>
+                )}
+                
+                {selectedCNFTs.length > 0 && (
+                  <div className="selection-group">
+                    <span>{selectedCNFTs.length} cNFTs selected</span>
+                    <button 
+                      className="bulk-burn-button"
+                      disabled={isBurning}
+                      onClick={handleBulkBurnCNFTs}
+                    >
+                      Burn Selected cNFTs
+                    </button>
+                  </div>
+                )}
+                
+                {(selectedTokens.length + selectedNFTs.length + selectedCNFTs.length === 0) && (
+                  <div className="no-selection-message">
+                    Click on any asset to select it for burning. You can select multiple assets to burn in bulk.
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
