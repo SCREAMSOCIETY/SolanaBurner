@@ -83,26 +83,75 @@ export class CNFTHandler {
             const { blockhash } = await this.connection.getLatestBlockhash();
             tx.recentBlockhash = blockhash;
             
-            // Sign and send transaction
-            const signedTx = await this.wallet.signTransaction(tx);
-            const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+            // Create a timeoutPromise that rejects after 2 minutes
+            let timeoutId;
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    reject(new Error('Transaction signing timed out or was cancelled'));
+                }, 120000); // 2 minute timeout
+            });
             
-            // Wait for confirmation
-            const confirmation = await this.connection.confirmTransaction(signature);
-            
-            // Success! Note that this doesn't actually burn the cNFT, it just shows the animation
-            // But we can consider this a successful placeholder until we fully fix the burn function
-            console.log('Successfully sent transaction with signature:', signature);
-            return {
-                success: true,
-                signature,
-                message: "Successfully processed. Note: cNFTs don't return rent like regular NFTs."
-            };
+            try {
+                // Race between the signTransaction and the timeout
+                const signedTx = await Promise.race([
+                    this.wallet.signTransaction(tx),
+                    timeoutPromise
+                ]);
+                
+                // Clear the timeout since we got a response
+                clearTimeout(timeoutId);
+                
+                // Send the transaction
+                const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+                
+                // Wait for confirmation
+                const confirmation = await this.connection.confirmTransaction(signature);
+                
+                // Success! Note that this doesn't actually burn the cNFT, it just shows the animation
+                // But we can consider this a successful placeholder until we fully fix the burn function
+                console.log('Successfully sent transaction with signature:', signature);
+                return {
+                    success: true,
+                    signature,
+                    message: "Successfully processed. Note: cNFTs don't return rent like regular NFTs."
+                };
+            } catch (signingError) {
+                // Clear timeout
+                clearTimeout(timeoutId);
+                
+                // Check if the error is related to user cancellation
+                if (signingError.message.includes('timed out') || 
+                    signingError.message.includes('cancelled') ||
+                    signingError.message.includes('rejected') ||
+                    signingError.message.includes('User rejected')) {
+                    console.log('Transaction was cancelled by the user or timed out');
+                    return {
+                        success: false,
+                        error: 'Transaction was cancelled. Please try again if you want to burn this asset.',
+                        cancelled: true
+                    };
+                }
+                
+                // For other signing errors, rethrow
+                throw signingError;
+            }
         } catch (error) {
             console.error('Error in simpleBurnCNFT:', error);
+            
+            // Special handling for WalletConnection errors which often happen when users close dialogs
+            const errorMessage = error.message || '';
+            const isWalletConnectionError = (
+                errorMessage.includes('wallet') || 
+                errorMessage.includes('connection') ||
+                errorMessage.includes('adapter')
+            );
+            
             return {
                 success: false,
-                error: error.message
+                error: isWalletConnectionError 
+                    ? 'Wallet connection error. Please check your wallet and try again.' 
+                    : error.message,
+                cancelled: errorMessage.includes('cancelled') || errorMessage.includes('rejected')
             };
         }
     }

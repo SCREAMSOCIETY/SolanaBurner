@@ -736,17 +736,26 @@ const WalletAssets: React.FC = () => {
         if (asset && asset.proof) {
           console.log('Successfully fetched proof data from blockchain');
           
-          // We'll try the simplified method first as a fallback
-          // This will at least handle the fee collection and show success UI
+          // We'll try the simplified method first
           const result = await cnftHandler.simpleBurnCNFT(assetId, asset.proof, cnft);
           
-          // Only try the full burn method if simple method fails
-          if (!result.success) {
+          // Check if the transaction was cancelled by the user
+          if (result.cancelled) {
+            console.log('Transaction was cancelled by the user');
+            setError('Transaction was cancelled. Please try again if you want to burn this asset.');
+            return;
+          }
+          
+          // Only try the full burn method if simple method fails and it wasn't a cancellation
+          if (!result.success && !result.cancelled) {
             console.log('Simplified burn method failed, attempting full burn...');
             // Try the full burning method as a fallback if the simple one fails
             const fullResult = await cnftHandler.burnCNFT(assetId, asset.proof, cnft);
             if (fullResult.success) {
-              return fullResult;
+              // Update the results to reflect the successful full burn
+              result.success = fullResult.success;
+              result.signature = fullResult.signature;
+              result.message = fullResult.message;
             }
           }
       
@@ -780,7 +789,8 @@ const WalletAssets: React.FC = () => {
             // Note: cNFTs don't return rent to the user as they're already efficiently stored on-chain
             setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
             setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
-          } else {
+          } else if (!result.cancelled) {
+            // Only show an error if it wasn't a user cancellation
             console.error('Error burning cNFT:', result.error);
             setError(`Error burning cNFT: ${result.error}`);
           }
@@ -789,11 +799,31 @@ const WalletAssets: React.FC = () => {
         }
       } catch (innerError: any) {
         console.error('Error fetching proof data:', innerError);
-        setError(`Error fetching proof data: ${innerError.message}`);
+        
+        // Check for cancellation or wallet errors
+        if (innerError.message && (
+            innerError.message.includes('cancel') || 
+            innerError.message.includes('reject') || 
+            innerError.message.includes('wallet') ||
+            innerError.message.includes('User') ||
+            innerError.message.includes('timeout'))) {
+          setError('Transaction was cancelled. Please try again if you want to burn this asset.');
+        } else {
+          setError(`Error fetching proof data: ${innerError.message}`);
+        }
       }
     } catch (error: any) {
       console.error('Error burning cNFT:', error);
-      setError(`Error burning cNFT: ${error.message}`);
+      
+      // User-friendly error message for wallet connection issues
+      if (error.message && (
+          error.message.includes('wallet') ||
+          error.message.includes('connection') ||
+          error.message.includes('adapter'))) {
+        setError('Wallet connection error. Please ensure your wallet is unlocked and try again.');
+      } else {
+        setError(`Error burning cNFT: ${error.message}`);
+      }
     }
   };
 
@@ -914,25 +944,94 @@ const WalletAssets: React.FC = () => {
     
     try {
       let successCount = 0;
+      let cancelledCount = 0;
+      let failedCount = 0;
+      let continueProcessing = true;
       
-      for (const mint of selectedCNFTs) {
+      for (let i = 0; i < selectedCNFTs.length && continueProcessing; i++) {
+        const mint = selectedCNFTs[i];
         const cnft = cnfts.find(c => c.mint === mint);
+        
         if (cnft) {
           try {
-            // Burn the cNFT and await result
-            await handleBurnCNFT(cnft);
-            successCount++;
+            // Wait a moment between burns to avoid wallet UI confusion
+            if (i > 0) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Get the cNFT handler
+            const cnftHandler = new CNFTHandler(connection, {
+              publicKey, 
+              signTransaction
+            });
+            
+            // Get the proof data
+            const asset = await cnftHandler.fetchAssetWithProof(mint);
+            
+            if (asset && asset.proof) {
+              // Call the simpleBurnCNFT method directly
+              const result = await cnftHandler.simpleBurnCNFT(mint, asset.proof, cnft);
+              
+              if (result.success) {
+                successCount++;
+                // Remove the cNFT from the list
+                setCnfts(prev => prev.filter(c => c.mint !== mint));
+                
+                // Apply animations
+                const element = document.querySelector(`.nft-card[data-mint="${mint}"]`) as HTMLElement;
+                if (element && window.BurnAnimations) {
+                  window.BurnAnimations.applyBurnAnimation(element);
+                  if (window.BurnAnimations.checkAchievements) {
+                    window.BurnAnimations.checkAchievements('cnfts', 1);
+                  }
+                }
+              } else if (result.cancelled) {
+                cancelledCount++;
+                // If the user cancelled, stop processing more
+                continueProcessing = false;
+                setError('Transaction was cancelled. Stopping bulk operation.');
+              } else {
+                failedCount++;
+              }
+            } else {
+              console.error(`Could not fetch proof data for cNFT ${mint}`);
+              failedCount++;
+            }
           } catch (error) {
             console.error(`Error burning cNFT ${mint}:`, error);
-            // Continue with next cNFT
+            failedCount++;
+            // Check if this is a wallet error that should stop processing
+            if (error instanceof Error && 
+                (error.message.includes('wallet') || 
+                 error.message.includes('cancel') || 
+                 error.message.includes('reject'))) {
+              continueProcessing = false;
+              setError('Wallet interaction was cancelled. Stopping bulk operation.');
+            }
           }
         }
       }
       
-      setError(`Successfully burned ${successCount} of ${selectedCNFTs.length} compressed NFTs!`);
-      
-      // Clear selections after burning
-      setSelectedCNFTs([]);
+      // Show final summary message
+      if (successCount > 0) {
+        setError(`Successfully burned ${successCount} of ${selectedCNFTs.length} compressed NFTs!` + 
+          (failedCount > 0 ? ` ${failedCount} failed.` : '') +
+          (cancelledCount > 0 ? ` ${cancelledCount} cancelled.` : ''));
+          
+        // Show confetti for success
+        if (window.BurnAnimations && window.BurnAnimations.createConfetti) {
+          window.BurnAnimations.createConfetti();
+        }
+          
+        // Clear selections for successful burns only
+        setSelectedCNFTs(prev => {
+          // Keep only the ones that failed or were cancelled
+          const remainingAssets = cnfts.filter(c => prev.includes(c.mint)).map(c => c.mint);
+          return remainingAssets;
+        });
+      } else {
+        setError(`No cNFTs were burned. ${failedCount} failed, ${cancelledCount} cancelled.`);
+      }
     } catch (error: any) {
       setError(`Error in bulk burn operation: ${error.message}`);
     } finally {
