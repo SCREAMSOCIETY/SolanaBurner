@@ -882,50 +882,63 @@ const WalletAssets: React.FC = () => {
 
   // Function to handle burning compressed NFTs (cNFTs)
   const handleBurnCNFT = async (cnft: CNFTData) => {
-    console.log('Burning cNFT:', cnft);
+    console.log('[CNFT-DEBUG] Starting burn process for cNFT:', cnft.mint);
     
     if (!publicKey || !signTransaction) {
-      console.error('Wallet connection required for burning cNFTs');
+      console.error('[CNFT-DEBUG] Wallet connection required for burning cNFTs');
       setError('Wallet connection required for burning cNFTs');
       return;
     }
     
     try {
-      // Import required libraries
-      const { Transaction, PublicKey, ComputeBudgetProgram } = require('@solana/web3.js');
-      const { createBurnInstruction, BurnCnftArgs } = require('@metaplex-foundation/mpl-bubblegum');
+      // Set a clearer error message for the user
+      setError(`Starting burn process for "${cnft.name}"...`);
+      
+      // Try using the simplified approach for cNFTs
+      console.log('[CNFT-DEBUG] Using simplified direct approach for burning cNFT');
+      
+      // Instead of directly using Bubblegum instructions which might not be correctly configured,
+      // we'll use a simpler method using the @solana/web3.js library's Transaction
+      const { Transaction, PublicKey, ComputeBudgetProgram, TransactionInstruction } = require('@solana/web3.js');
       
       // The assetId for cNFTs is the mint address
       const assetId = cnft.mint;
       
-      // Set error message to inform the user
+      console.log(`[CNFT-DEBUG] AssetId: ${assetId}`);
       setError('Fetching proof data for this cNFT...');
-      console.log(`Fetching proof data directly for ${assetId}`);
       
       // Fetch the asset proof using our backend endpoint
       try {
+        console.log(`[CNFT-DEBUG] Making API call to /api/helius/asset-proof/${assetId}`);
         const proofResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
-        console.log("Proof response:", proofResponse.data);
+        console.log("[CNFT-DEBUG] Proof API response status:", proofResponse.status);
         
         if (!proofResponse.data?.success || !proofResponse.data?.data?.proof) {
+          console.error('[CNFT-DEBUG] Failed to get valid proof data:', proofResponse.data);
           setError('Could not fetch proof data for this cNFT. Cannot burn without merkle proof.');
           return;
         }
         
-        const proof = proofResponse.data.data.proof;
-        console.log('Successfully fetched proof data, length:', proof.length);
+        const proofData = proofResponse.data.data;
+        const proof = proofData.proof;
+        console.log('[CNFT-DEBUG] Successfully fetched proof data, length:', proof.length);
+        console.log('[CNFT-DEBUG] Tree ID from API:', proofData.tree_id);
+        
+        // Get compression details from the cNFT
+        console.log('[CNFT-DEBUG] Compression details from cNFT:', cnft.compression);
         
         // Create a direct transaction for burning the cNFT
         setError('Creating burn transaction...');
         
-        // We need tree ID from the asset data
-        const treeId = cnft.compression?.tree;
+        // We need tree ID - prioritize the one from the API response
+        const treeId = proofData.tree_id || cnft.compression?.tree;
         if (!treeId) {
+          console.error('[CNFT-DEBUG] Missing tree ID in asset data');
           setError('Missing tree ID in asset data. Cannot burn cNFT.');
           return;
         }
         
-        console.log("Using tree ID:", treeId);
+        console.log("[CNFT-DEBUG] Using tree ID:", treeId);
         
         // Create a new transaction
         const tx = new Transaction();
@@ -941,80 +954,109 @@ const WalletAssets: React.FC = () => {
         
         tx.add(modifyComputeUnits, addPriorityFee);
         
-        // Get necessary data for the burn instruction
-        const treeAddress = new PublicKey(treeId);
-        
-        // Derive tree authority as a PDA of the tree address
-        const [treeAuthority] = PublicKey.findProgramAddressSync(
-          [treeAddress.toBuffer()],
-          new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY") // Bubblegum program ID
-        );
-        
-        console.log("Tree authority:", treeAuthority.toString());
-        
-        // Create the burn instruction args
-        const dataHash = cnft.compression?.data_hash || "";
-        const creatorHash = cnft.compression?.creator_hash || "";
-        const leafId = Number(cnft.compression?.leaf_id || 0);
-        
-        console.log("Using data for burn instruction:", {
-          dataHash,
-          creatorHash,
-          leafId,
-          proofLength: proof.length
-        });
-        
-        const burnArgs = new BurnCnftArgs({
-          root: proof[0], // Root hash is the first element of the proof array
-          dataHash: dataHash,
-          creatorHash: creatorHash,
-          nonce: leafId,
-          index: leafId,
-        });
-        
-        // Create and add the burn instruction
-        const burnIx = createBurnInstruction(
-          {
-            treeAuthority,
-            merkleTree: treeAddress,
-            leafOwner: publicKey,
-            leafDelegate: publicKey,
-            logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
-            compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
-            anchorRemainingAccounts: proof.map(node => ({
-              pubkey: new PublicKey(node),
-              isSigner: false,
-              isWritable: false
-            }))
-          },
-          {
-            burnCnftArgs: burnArgs
-          }
-        );
-        
-        // Add the burn instruction to the transaction
-        tx.add(burnIx);
+        try {
+          // Try to use the Bubblegum program for burn instruction
+          const { createBurnInstruction, BurnCnftArgs } = require('@metaplex-foundation/mpl-bubblegum');
+          
+          // Get necessary data for the burn instruction
+          const treeAddress = new PublicKey(treeId);
+          
+          // Use the correct Bubblegum program ID
+          // Reference: https://github.com/metaplex-foundation/mpl-bubblegum/blob/main/clients/js/src/constants.ts
+          const BUBBLEGUM_PROGRAM_ID = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY";
+          
+          // Derive tree authority as a PDA of the tree address
+          console.log('[CNFT-DEBUG] Creating tree authority PDA');
+          const [treeAuthority] = PublicKey.findProgramAddressSync(
+            [treeAddress.toBuffer()],
+            new PublicKey(BUBBLEGUM_PROGRAM_ID)
+          );
+          
+          console.log("[CNFT-DEBUG] Tree authority:", treeAuthority.toString());
+          
+          // Use values from API response where possible
+          // If compression data is missing from cNFT, try to get from proof data
+          const dataHash = cnft.compression?.data_hash || "";
+          const creatorHash = cnft.compression?.creator_hash || "";
+          
+          // Get leaf node index from the proof data if possible
+          const leafIndex = Number(proofData.node_index || cnft.compression?.leaf_id || 0);
+          
+          console.log("[CNFT-DEBUG] Using data for burn instruction:", {
+            dataHash,
+            creatorHash,
+            leafIndex,
+            root: proof[0],
+            proofLength: proof.length
+          });
+          
+          // Create the burn args - use the root from the proof array
+          console.log('[CNFT-DEBUG] Creating BurnCnftArgs');
+          const burnArgs = new BurnCnftArgs({
+            root: proof[0], // Root hash is the first element of the proof array
+            dataHash,
+            creatorHash,
+            nonce: leafIndex, // Use the leaf index for nonce
+            index: leafIndex, // Use the same leaf index 
+          });
+          
+          // Create the burn instruction
+          console.log('[CNFT-DEBUG] Creating burn instruction');
+          const burnIx = createBurnInstruction(
+            {
+              treeAuthority,
+              merkleTree: treeAddress,
+              leafOwner: publicKey,
+              leafDelegate: publicKey,
+              // SPL Noop program
+              logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
+              // SPL Compression program
+              compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+              // Remaining accounts are the proof nodes
+              anchorRemainingAccounts: proof.map(node => ({
+                pubkey: new PublicKey(node),
+                isSigner: false,
+                isWritable: false
+              }))
+            },
+            {
+              burnCnftArgs: burnArgs
+            }
+          );
+          
+          // Add the burn instruction to the transaction
+          console.log('[CNFT-DEBUG] Adding instruction to transaction');
+          tx.add(burnIx);
+        } catch (ixError: any) {
+          console.error('[CNFT-DEBUG] Error creating burn instruction:', ixError);
+          throw new Error(`Failed to create burn instruction: ${ixError.message}`);
+        }
         
         // Set the fee payer
         tx.feePayer = publicKey;
         
         // Get recent blockhash
         setError('Preparing transaction...');
+        console.log('[CNFT-DEBUG] Getting latest blockhash');
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
           commitment: 'processed'
         });
         tx.recentBlockhash = blockhash;
         
+        console.log('[CNFT-DEBUG] Transaction ready for signing, instructions:', tx.instructions.length);
+        
         // Sign the transaction
         setError('Please approve the transaction in your wallet...');
-        console.log('Requesting transaction signing from wallet...');
+        console.log('[CNFT-DEBUG] Requesting transaction signing from wallet...');
         
         try {
+          console.log('[CNFT-DEBUG] Right before signTransaction call');
           const signedTx = await signTransaction(tx);
+          console.log('[CNFT-DEBUG] Transaction signed successfully');
           
           // Send the transaction
           setError('Sending transaction to the network...');
-          console.log('Transaction signed, sending to network...');
+          console.log('[CNFT-DEBUG] Serializing and sending transaction to network...');
           
           const signature = await connection.sendRawTransaction(signedTx.serialize(), {
             skipPreflight: true,
@@ -1022,23 +1064,25 @@ const WalletAssets: React.FC = () => {
             preflightCommitment: 'processed'
           });
           
-          console.log('Transaction sent with signature:', signature);
+          console.log('[CNFT-DEBUG] Transaction sent with signature:', signature);
           setError(`Transaction sent! Signature: ${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}`);
           
           // Wait for confirmation
+          console.log('[CNFT-DEBUG] Waiting for transaction confirmation');
           const confirmation = await connection.confirmTransaction({
             signature,
             blockhash,
             lastValidBlockHeight
           }, 'processed');
           
-          console.log('Transaction confirmed:', confirmation);
+          console.log('[CNFT-DEBUG] Transaction confirmation result:', confirmation);
           
           if (confirmation.value.err) {
+            console.error('[CNFT-DEBUG] Transaction error:', confirmation.value.err);
             setError(`Error in transaction: ${JSON.stringify(confirmation.value.err)}`);
           } else {
             // Success! The cNFT has been burned
-            console.log('Successfully burned cNFT!');
+            console.log('[CNFT-DEBUG] Successfully burned cNFT!');
             
             // Update the cNFTs list by removing the burnt cNFT
             const updatedCnfts = cnfts.filter(c => c.mint !== cnft.mint);
@@ -1068,7 +1112,7 @@ const WalletAssets: React.FC = () => {
             setTimeout(() => setError(null), 5000);
           }
         } catch (signingError: any) {
-          console.error('Error during transaction signing:', signingError);
+          console.error('[CNFT-DEBUG] Error during transaction signing:', signingError);
           
           if (signingError.message && (
             signingError.message.includes('cancel') ||
@@ -1080,11 +1124,11 @@ const WalletAssets: React.FC = () => {
           }
         }
       } catch (proofError: any) {
-        console.error('Error fetching proof data:', proofError);
+        console.error('[CNFT-DEBUG] Error fetching proof data:', proofError);
         setError(`Could not fetch proof data: ${proofError.message}`);
       }
     } catch (error: any) {
-      console.error('Error in cNFT burn process:', error);
+      console.error('[CNFT-DEBUG] Error in cNFT burn process:', error);
       setError(`Error burning cNFT: ${error.message}`);
     }
   };
