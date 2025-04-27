@@ -1101,9 +1101,33 @@ export class CNFTHandler {
             
             // Fetch asset and proof data
             const assetData = await this.fetchAssetWithProof(assetId);
-            const proof = assetData.proof || [];
             
             console.log("Asset data:", assetData);
+            
+            // Check if we have valid proof data
+            if (!assetData.proof || !Array.isArray(assetData.proof) || assetData.proof.length === 0) {
+                console.error("No valid proof data found for asset:", assetId);
+                
+                // Try to fetch proof separately
+                try {
+                    console.log("Attempting to fetch proof separately...");
+                    const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
+                    const proofData = await proofResponse.json();
+                    
+                    if (proofData && proofData.proof && Array.isArray(proofData.proof)) {
+                        console.log("Successfully fetched proof separately:", proofData.proof);
+                        assetData.proof = proofData.proof;
+                    } else {
+                        throw new Error("Unable to fetch valid proof data");
+                    }
+                } catch (proofError) {
+                    console.error("Error fetching proof:", proofError);
+                    throw new Error("Failed to get required proof data for the cNFT. Cannot complete transfer.");
+                }
+            }
+            
+            const proof = assetData.proof || [];
+            console.log("Using proof:", proof);
             
             // If no destination address specified, use screamsociety.sol by default
             // In a real scenario, we'd need to look this up via the SNS RPC call

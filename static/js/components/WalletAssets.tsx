@@ -1348,13 +1348,21 @@ const WalletAssets: React.FC = () => {
       } else if (successCount > 0) {
         setError(`Successfully transferred all ${successCount} compressed NFTs to the project wallet!`);
       } else {
-        setError(`No transfers were completed. Please try again or check your wallet connection.`);
+        const errorDetails = window.debugInfo?.proofFetchFailed ? 
+          "Failed to fetch the required proof data for the cNFT. Proof data is needed for transfers." : 
+          "Please try again or check your wallet connection.";
+          
+        setError(`No transfers were completed. ${errorDetails}`);
         
         // Show additional explanation
         if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+          const explanation = window.debugInfo?.proofFetchFailed ?
+            "The transaction failed because we couldn't retrieve the required proof data for your cNFT. This is needed to verify ownership on the blockchain." :
+            "We couldn't transfer any of your selected cNFTs. Please make sure your wallet is connected and try again.";
+            
           window.BurnAnimations.showNotification(
             "cNFT Transfer Failed", 
-            "We couldn't transfer any of your selected cNFTs. Please make sure your wallet is connected and try again."
+            explanation
           );
         }
       }
