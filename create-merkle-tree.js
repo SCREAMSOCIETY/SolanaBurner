@@ -32,9 +32,10 @@ const {
 const bs58 = require('bs58');
 require('dotenv').config();
 
-// Check for RPC URL in environment
-const RPC_URL = process.env.QUICKNODE_RPC_URL || process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
-console.log(`Using RPC URL: ${RPC_URL}`);
+// For creating trees, we'll use devnet which has a working airdrop faucet
+const RPC_URL = clusterApiUrl('devnet');
+console.log(`Using RPC URL for tree creation: ${RPC_URL} (devnet)`);
+console.log('Note: Trees are being created on devnet for testing purposes');
 
 // Constants for tree creation
 const MAX_DEPTH = 14; // Max tree depth (14 can store up to 16,384 cNFTs)
@@ -108,6 +109,7 @@ async function createMerkleTree() {
     );
     
     console.log(`Tree created successfully! Transaction signature: ${txSignature}`);
+    console.log(`Explorer URL: https://solscan.io/tx/${txSignature}?cluster=devnet`);
     
     // Output the tree information
     console.log('\n=== TREE INFORMATION ===');

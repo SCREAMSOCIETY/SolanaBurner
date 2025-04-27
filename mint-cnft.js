@@ -33,8 +33,9 @@ const {
 const bs58 = require('bs58');
 require('dotenv').config();
 
-// Check for environment variables
-const RPC_URL = process.env.QUICKNODE_RPC_URL || process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
+// For creating and minting cNFTs, we'll use devnet which has a working airdrop
+const RPC_URL = clusterApiUrl('devnet');
+console.log(`Using RPC URL for minting: ${RPC_URL} (devnet)`);
 const TREE_ADDRESS = process.env.TREE_ADDRESS;
 const TREE_AUTHORITY_SECRET_KEY = process.env.TREE_AUTHORITY_SECRET_KEY;
 
@@ -236,7 +237,7 @@ async function mintCompressedNFT(recipientWalletAddress) {
     
     console.log('cNFT minted successfully!');
     console.log(`Transaction signature: ${signature}`);
-    console.log(`Explorer URL: https://solscan.io/tx/${signature}`);
+    console.log(`Explorer URL: https://solscan.io/tx/${signature}?cluster=devnet`);
     
     return {
       success: true,
