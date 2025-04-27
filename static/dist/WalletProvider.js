@@ -6451,7 +6451,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _solana_web3_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @solana/web3.js */ "./node_modules/@solana/web3.js/lib/index.browser.esm.js");
 /* harmony import */ var _solana_mobile_mobile_wallet_adapter_protocol__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @solana-mobile/mobile-wallet-adapter-protocol */ "./node_modules/@solana-mobile/mobile-wallet-adapter-protocol/lib/esm/index.js");
-/* harmony import */ var bs58__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! bs58 */ "./node_modules/bs58/index.js");
+/* harmony import */ var bs58__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! bs58 */ "./node_modules/@solana-mobile/mobile-wallet-adapter-protocol-web3js/node_modules/bs58/index.js");
 
 
 
@@ -6666,6 +6666,156 @@ function transactRemote(callback, config) {
 }
 
 
+
+
+/***/ }),
+
+/***/ "./node_modules/@solana-mobile/mobile-wallet-adapter-protocol-web3js/node_modules/base-x/src/index.js":
+/*!************************************************************************************************************!*\
+  !*** ./node_modules/@solana-mobile/mobile-wallet-adapter-protocol-web3js/node_modules/base-x/src/index.js ***!
+  \************************************************************************************************************/
+/***/ ((module) => {
+
+"use strict";
+
+// base-x encoding / decoding
+// Copyright (c) 2018 base-x contributors
+// Copyright (c) 2014-2018 The Bitcoin Core developers (base58.cpp)
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+function base (ALPHABET) {
+  if (ALPHABET.length >= 255) { throw new TypeError('Alphabet too long') }
+  var BASE_MAP = new Uint8Array(256)
+  for (var j = 0; j < BASE_MAP.length; j++) {
+    BASE_MAP[j] = 255
+  }
+  for (var i = 0; i < ALPHABET.length; i++) {
+    var x = ALPHABET.charAt(i)
+    var xc = x.charCodeAt(0)
+    if (BASE_MAP[xc] !== 255) { throw new TypeError(x + ' is ambiguous') }
+    BASE_MAP[xc] = i
+  }
+  var BASE = ALPHABET.length
+  var LEADER = ALPHABET.charAt(0)
+  var FACTOR = Math.log(BASE) / Math.log(256) // log(BASE) / log(256), rounded up
+  var iFACTOR = Math.log(256) / Math.log(BASE) // log(256) / log(BASE), rounded up
+  function encode (source) {
+    if (source instanceof Uint8Array) {
+    } else if (ArrayBuffer.isView(source)) {
+      source = new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
+    } else if (Array.isArray(source)) {
+      source = Uint8Array.from(source)
+    }
+    if (!(source instanceof Uint8Array)) { throw new TypeError('Expected Uint8Array') }
+    if (source.length === 0) { return '' }
+        // Skip & count leading zeroes.
+    var zeroes = 0
+    var length = 0
+    var pbegin = 0
+    var pend = source.length
+    while (pbegin !== pend && source[pbegin] === 0) {
+      pbegin++
+      zeroes++
+    }
+        // Allocate enough space in big-endian base58 representation.
+    var size = ((pend - pbegin) * iFACTOR + 1) >>> 0
+    var b58 = new Uint8Array(size)
+        // Process the bytes.
+    while (pbegin !== pend) {
+      var carry = source[pbegin]
+            // Apply "b58 = b58 * 256 + ch".
+      var i = 0
+      for (var it1 = size - 1; (carry !== 0 || i < length) && (it1 !== -1); it1--, i++) {
+        carry += (256 * b58[it1]) >>> 0
+        b58[it1] = (carry % BASE) >>> 0
+        carry = (carry / BASE) >>> 0
+      }
+      if (carry !== 0) { throw new Error('Non-zero carry') }
+      length = i
+      pbegin++
+    }
+        // Skip leading zeroes in base58 result.
+    var it2 = size - length
+    while (it2 !== size && b58[it2] === 0) {
+      it2++
+    }
+        // Translate the result into a string.
+    var str = LEADER.repeat(zeroes)
+    for (; it2 < size; ++it2) { str += ALPHABET.charAt(b58[it2]) }
+    return str
+  }
+  function decodeUnsafe (source) {
+    if (typeof source !== 'string') { throw new TypeError('Expected String') }
+    if (source.length === 0) { return new Uint8Array() }
+    var psz = 0
+        // Skip and count leading '1's.
+    var zeroes = 0
+    var length = 0
+    while (source[psz] === LEADER) {
+      zeroes++
+      psz++
+    }
+        // Allocate enough space in big-endian base256 representation.
+    var size = (((source.length - psz) * FACTOR) + 1) >>> 0 // log(58) / log(256), rounded up.
+    var b256 = new Uint8Array(size)
+        // Process the characters.
+    while (source[psz]) {
+            // Find code of next character
+      var charCode = source.charCodeAt(psz)
+            // Base map can not be indexed using char code
+      if (charCode > 255) { return }
+            // Decode character
+      var carry = BASE_MAP[charCode]
+            // Invalid character
+      if (carry === 255) { return }
+      var i = 0
+      for (var it3 = size - 1; (carry !== 0 || i < length) && (it3 !== -1); it3--, i++) {
+        carry += (BASE * b256[it3]) >>> 0
+        b256[it3] = (carry % 256) >>> 0
+        carry = (carry / 256) >>> 0
+      }
+      if (carry !== 0) { throw new Error('Non-zero carry') }
+      length = i
+      psz++
+    }
+        // Skip leading zeroes in b256.
+    var it4 = size - length
+    while (it4 !== size && b256[it4] === 0) {
+      it4++
+    }
+    var vch = new Uint8Array(zeroes + (size - it4))
+    var j = zeroes
+    while (it4 !== size) {
+      vch[j++] = b256[it4++]
+    }
+    return vch
+  }
+  function decode (string) {
+    var buffer = decodeUnsafe(string)
+    if (buffer) { return buffer }
+    throw new Error('Non-base' + BASE + ' character')
+  }
+  return {
+    encode: encode,
+    decodeUnsafe: decodeUnsafe,
+    decode: decode
+  }
+}
+module.exports = base
+
+
+/***/ }),
+
+/***/ "./node_modules/@solana-mobile/mobile-wallet-adapter-protocol-web3js/node_modules/bs58/index.js":
+/*!******************************************************************************************************!*\
+  !*** ./node_modules/@solana-mobile/mobile-wallet-adapter-protocol-web3js/node_modules/bs58/index.js ***!
+  \******************************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const basex = __webpack_require__(/*! base-x */ "./node_modules/@solana-mobile/mobile-wallet-adapter-protocol-web3js/node_modules/base-x/src/index.js")
+const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+module.exports = basex(ALPHABET)
 
 
 /***/ }),
@@ -14919,7 +15069,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _wallet_standard_features__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @wallet-standard/features */ "./node_modules/@wallet-standard/features/lib/esm/disconnect.js");
 /* harmony import */ var _wallet_standard_features__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @wallet-standard/features */ "./node_modules/@wallet-standard/features/lib/esm/connect.js");
 /* harmony import */ var _wallet_standard_wallet__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @wallet-standard/wallet */ "./node_modules/@wallet-standard/wallet/lib/esm/util.js");
-/* harmony import */ var bs58__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! bs58 */ "./node_modules/@solana/wallet-standard-wallet-adapter-react/node_modules/bs58/src/esm/index.js");
+/* harmony import */ var bs58__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! bs58 */ "./node_modules/bs58/src/esm/index.js");
 var __classPrivateFieldGet = (undefined && undefined.__classPrivateFieldGet) || function (receiver, state, kind, f) {
     if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
@@ -15340,160 +15490,6 @@ __webpack_require__.r(__webpack_exports__);
  */
 const isWalletAdapterCompatibleWallet = _solana_wallet_adapter_base__WEBPACK_IMPORTED_MODULE_0__.isWalletAdapterCompatibleStandardWallet;
 //# sourceMappingURL=types.js.map
-
-/***/ }),
-
-/***/ "./node_modules/@solana/wallet-standard-wallet-adapter-react/node_modules/base-x/src/esm/index.js":
-/*!********************************************************************************************************!*\
-  !*** ./node_modules/@solana/wallet-standard-wallet-adapter-react/node_modules/base-x/src/esm/index.js ***!
-  \********************************************************************************************************/
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
-/* harmony export */ });
-// base-x encoding / decoding
-// Copyright (c) 2018 base-x contributors
-// Copyright (c) 2014-2018 The Bitcoin Core developers (base58.cpp)
-// Distributed under the MIT software license, see the accompanying
-// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
-function base (ALPHABET) {
-  if (ALPHABET.length >= 255) { throw new TypeError('Alphabet too long') }
-  const BASE_MAP = new Uint8Array(256)
-  for (let j = 0; j < BASE_MAP.length; j++) {
-    BASE_MAP[j] = 255
-  }
-  for (let i = 0; i < ALPHABET.length; i++) {
-    const x = ALPHABET.charAt(i)
-    const xc = x.charCodeAt(0)
-    if (BASE_MAP[xc] !== 255) { throw new TypeError(x + ' is ambiguous') }
-    BASE_MAP[xc] = i
-  }
-  const BASE = ALPHABET.length
-  const LEADER = ALPHABET.charAt(0)
-  const FACTOR = Math.log(BASE) / Math.log(256) // log(BASE) / log(256), rounded up
-  const iFACTOR = Math.log(256) / Math.log(BASE) // log(256) / log(BASE), rounded up
-  function encode (source) {
-    // eslint-disable-next-line no-empty
-    if (source instanceof Uint8Array) { } else if (ArrayBuffer.isView(source)) {
-      source = new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
-    } else if (Array.isArray(source)) {
-      source = Uint8Array.from(source)
-    }
-    if (!(source instanceof Uint8Array)) { throw new TypeError('Expected Uint8Array') }
-    if (source.length === 0) { return '' }
-    // Skip & count leading zeroes.
-    let zeroes = 0
-    let length = 0
-    let pbegin = 0
-    const pend = source.length
-    while (pbegin !== pend && source[pbegin] === 0) {
-      pbegin++
-      zeroes++
-    }
-    // Allocate enough space in big-endian base58 representation.
-    const size = ((pend - pbegin) * iFACTOR + 1) >>> 0
-    const b58 = new Uint8Array(size)
-    // Process the bytes.
-    while (pbegin !== pend) {
-      let carry = source[pbegin]
-      // Apply "b58 = b58 * 256 + ch".
-      let i = 0
-      for (let it1 = size - 1; (carry !== 0 || i < length) && (it1 !== -1); it1--, i++) {
-        carry += (256 * b58[it1]) >>> 0
-        b58[it1] = (carry % BASE) >>> 0
-        carry = (carry / BASE) >>> 0
-      }
-      if (carry !== 0) { throw new Error('Non-zero carry') }
-      length = i
-      pbegin++
-    }
-    // Skip leading zeroes in base58 result.
-    let it2 = size - length
-    while (it2 !== size && b58[it2] === 0) {
-      it2++
-    }
-    // Translate the result into a string.
-    let str = LEADER.repeat(zeroes)
-    for (; it2 < size; ++it2) { str += ALPHABET.charAt(b58[it2]) }
-    return str
-  }
-  function decodeUnsafe (source) {
-    if (typeof source !== 'string') { throw new TypeError('Expected String') }
-    if (source.length === 0) { return new Uint8Array() }
-    let psz = 0
-    // Skip and count leading '1's.
-    let zeroes = 0
-    let length = 0
-    while (source[psz] === LEADER) {
-      zeroes++
-      psz++
-    }
-    // Allocate enough space in big-endian base256 representation.
-    const size = (((source.length - psz) * FACTOR) + 1) >>> 0 // log(58) / log(256), rounded up.
-    const b256 = new Uint8Array(size)
-    // Process the characters.
-    while (source[psz]) {
-      // Decode character
-      let carry = BASE_MAP[source.charCodeAt(psz)]
-      // Invalid character
-      if (carry === 255) { return }
-      let i = 0
-      for (let it3 = size - 1; (carry !== 0 || i < length) && (it3 !== -1); it3--, i++) {
-        carry += (BASE * b256[it3]) >>> 0
-        b256[it3] = (carry % 256) >>> 0
-        carry = (carry / 256) >>> 0
-      }
-      if (carry !== 0) { throw new Error('Non-zero carry') }
-      length = i
-      psz++
-    }
-    // Skip leading zeroes in b256.
-    let it4 = size - length
-    while (it4 !== size && b256[it4] === 0) {
-      it4++
-    }
-    const vch = new Uint8Array(zeroes + (size - it4))
-    let j = zeroes
-    while (it4 !== size) {
-      vch[j++] = b256[it4++]
-    }
-    return vch
-  }
-  function decode (string) {
-    const buffer = decodeUnsafe(string)
-    if (buffer) { return buffer }
-    throw new Error('Non-base' + BASE + ' character')
-  }
-  return {
-    encode,
-    decodeUnsafe,
-    decode
-  }
-}
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (base);
-
-
-/***/ }),
-
-/***/ "./node_modules/@solana/wallet-standard-wallet-adapter-react/node_modules/bs58/src/esm/index.js":
-/*!******************************************************************************************************!*\
-  !*** ./node_modules/@solana/wallet-standard-wallet-adapter-react/node_modules/bs58/src/esm/index.js ***!
-  \******************************************************************************************************/
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
-/* harmony export */ });
-/* harmony import */ var base_x__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! base-x */ "./node_modules/@solana/wallet-standard-wallet-adapter-react/node_modules/base-x/src/esm/index.js");
-
-var ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ((0,base_x__WEBPACK_IMPORTED_MODULE_0__["default"])(ALPHABET));
-
 
 /***/ }),
 
@@ -26752,14 +26748,17 @@ function guard(callback) {
 
 /***/ }),
 
-/***/ "./node_modules/base-x/src/index.js":
-/*!******************************************!*\
-  !*** ./node_modules/base-x/src/index.js ***!
-  \******************************************/
-/***/ ((module) => {
+/***/ "./node_modules/base-x/src/esm/index.js":
+/*!**********************************************!*\
+  !*** ./node_modules/base-x/src/esm/index.js ***!
+  \**********************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
-
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
 // base-x encoding / decoding
 // Copyright (c) 2018 base-x contributors
 // Copyright (c) 2014-2018 The Bitcoin Core developers (base58.cpp)
@@ -26767,47 +26766,47 @@ function guard(callback) {
 // file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 function base (ALPHABET) {
   if (ALPHABET.length >= 255) { throw new TypeError('Alphabet too long') }
-  var BASE_MAP = new Uint8Array(256)
-  for (var j = 0; j < BASE_MAP.length; j++) {
+  const BASE_MAP = new Uint8Array(256)
+  for (let j = 0; j < BASE_MAP.length; j++) {
     BASE_MAP[j] = 255
   }
-  for (var i = 0; i < ALPHABET.length; i++) {
-    var x = ALPHABET.charAt(i)
-    var xc = x.charCodeAt(0)
+  for (let i = 0; i < ALPHABET.length; i++) {
+    const x = ALPHABET.charAt(i)
+    const xc = x.charCodeAt(0)
     if (BASE_MAP[xc] !== 255) { throw new TypeError(x + ' is ambiguous') }
     BASE_MAP[xc] = i
   }
-  var BASE = ALPHABET.length
-  var LEADER = ALPHABET.charAt(0)
-  var FACTOR = Math.log(BASE) / Math.log(256) // log(BASE) / log(256), rounded up
-  var iFACTOR = Math.log(256) / Math.log(BASE) // log(256) / log(BASE), rounded up
+  const BASE = ALPHABET.length
+  const LEADER = ALPHABET.charAt(0)
+  const FACTOR = Math.log(BASE) / Math.log(256) // log(BASE) / log(256), rounded up
+  const iFACTOR = Math.log(256) / Math.log(BASE) // log(256) / log(BASE), rounded up
   function encode (source) {
-    if (source instanceof Uint8Array) {
-    } else if (ArrayBuffer.isView(source)) {
+    // eslint-disable-next-line no-empty
+    if (source instanceof Uint8Array) { } else if (ArrayBuffer.isView(source)) {
       source = new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
     } else if (Array.isArray(source)) {
       source = Uint8Array.from(source)
     }
     if (!(source instanceof Uint8Array)) { throw new TypeError('Expected Uint8Array') }
     if (source.length === 0) { return '' }
-        // Skip & count leading zeroes.
-    var zeroes = 0
-    var length = 0
-    var pbegin = 0
-    var pend = source.length
+    // Skip & count leading zeroes.
+    let zeroes = 0
+    let length = 0
+    let pbegin = 0
+    const pend = source.length
     while (pbegin !== pend && source[pbegin] === 0) {
       pbegin++
       zeroes++
     }
-        // Allocate enough space in big-endian base58 representation.
-    var size = ((pend - pbegin) * iFACTOR + 1) >>> 0
-    var b58 = new Uint8Array(size)
-        // Process the bytes.
+    // Allocate enough space in big-endian base58 representation.
+    const size = ((pend - pbegin) * iFACTOR + 1) >>> 0
+    const b58 = new Uint8Array(size)
+    // Process the bytes.
     while (pbegin !== pend) {
-      var carry = source[pbegin]
-            // Apply "b58 = b58 * 256 + ch".
-      var i = 0
-      for (var it1 = size - 1; (carry !== 0 || i < length) && (it1 !== -1); it1--, i++) {
+      let carry = source[pbegin]
+      // Apply "b58 = b58 * 256 + ch".
+      let i = 0
+      for (let it1 = size - 1; (carry !== 0 || i < length) && (it1 !== -1); it1--, i++) {
         carry += (256 * b58[it1]) >>> 0
         b58[it1] = (carry % BASE) >>> 0
         carry = (carry / BASE) >>> 0
@@ -26816,38 +26815,42 @@ function base (ALPHABET) {
       length = i
       pbegin++
     }
-        // Skip leading zeroes in base58 result.
-    var it2 = size - length
+    // Skip leading zeroes in base58 result.
+    let it2 = size - length
     while (it2 !== size && b58[it2] === 0) {
       it2++
     }
-        // Translate the result into a string.
-    var str = LEADER.repeat(zeroes)
+    // Translate the result into a string.
+    let str = LEADER.repeat(zeroes)
     for (; it2 < size; ++it2) { str += ALPHABET.charAt(b58[it2]) }
     return str
   }
   function decodeUnsafe (source) {
     if (typeof source !== 'string') { throw new TypeError('Expected String') }
     if (source.length === 0) { return new Uint8Array() }
-    var psz = 0
-        // Skip and count leading '1's.
-    var zeroes = 0
-    var length = 0
+    let psz = 0
+    // Skip and count leading '1's.
+    let zeroes = 0
+    let length = 0
     while (source[psz] === LEADER) {
       zeroes++
       psz++
     }
-        // Allocate enough space in big-endian base256 representation.
-    var size = (((source.length - psz) * FACTOR) + 1) >>> 0 // log(58) / log(256), rounded up.
-    var b256 = new Uint8Array(size)
-        // Process the characters.
-    while (source[psz]) {
-            // Decode character
-      var carry = BASE_MAP[source.charCodeAt(psz)]
-            // Invalid character
+    // Allocate enough space in big-endian base256 representation.
+    const size = (((source.length - psz) * FACTOR) + 1) >>> 0 // log(58) / log(256), rounded up.
+    const b256 = new Uint8Array(size)
+    // Process the characters.
+    while (psz < source.length) {
+      // Find code of next character
+      const charCode = source.charCodeAt(psz)
+      // Base map can not be indexed using char code
+      if (charCode > 255) { return }
+      // Decode character
+      let carry = BASE_MAP[charCode]
+      // Invalid character
       if (carry === 255) { return }
-      var i = 0
-      for (var it3 = size - 1; (carry !== 0 || i < length) && (it3 !== -1); it3--, i++) {
+      let i = 0
+      for (let it3 = size - 1; (carry !== 0 || i < length) && (it3 !== -1); it3--, i++) {
         carry += (BASE * b256[it3]) >>> 0
         b256[it3] = (carry % 256) >>> 0
         carry = (carry / 256) >>> 0
@@ -26856,30 +26859,30 @@ function base (ALPHABET) {
       length = i
       psz++
     }
-        // Skip leading zeroes in b256.
-    var it4 = size - length
+    // Skip leading zeroes in b256.
+    let it4 = size - length
     while (it4 !== size && b256[it4] === 0) {
       it4++
     }
-    var vch = new Uint8Array(zeroes + (size - it4))
-    var j = zeroes
+    const vch = new Uint8Array(zeroes + (size - it4))
+    let j = zeroes
     while (it4 !== size) {
       vch[j++] = b256[it4++]
     }
     return vch
   }
   function decode (string) {
-    var buffer = decodeUnsafe(string)
+    const buffer = decodeUnsafe(string)
     if (buffer) { return buffer }
     throw new Error('Non-base' + BASE + ' character')
   }
   return {
-    encode: encode,
-    decodeUnsafe: decodeUnsafe,
-    decode: decode
+    encode,
+    decodeUnsafe,
+    decode
   }
 }
-module.exports = base
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (base);
 
 
 /***/ }),
@@ -31280,16 +31283,21 @@ module.exports = basex(ALPHABET)
 
 /***/ }),
 
-/***/ "./node_modules/bs58/index.js":
-/*!************************************!*\
-  !*** ./node_modules/bs58/index.js ***!
-  \************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+/***/ "./node_modules/bs58/src/esm/index.js":
+/*!********************************************!*\
+  !*** ./node_modules/bs58/src/esm/index.js ***!
+  \********************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
-const basex = __webpack_require__(/*! base-x */ "./node_modules/base-x/src/index.js")
-const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var base_x__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! base-x */ "./node_modules/base-x/src/esm/index.js");
 
-module.exports = basex(ALPHABET)
+var ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ((0,base_x__WEBPACK_IMPORTED_MODULE_0__["default"])(ALPHABET));
 
 
 /***/ }),

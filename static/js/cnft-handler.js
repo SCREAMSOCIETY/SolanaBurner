@@ -798,7 +798,7 @@ export class CNFTHandler {
                 },
                 body: JSON.stringify({
                     assetId,
-                    ownerPublicKey: walletPublicKey,
+                    ownerAddress: walletPublicKey, // Changed to match our updated server endpoint
                     signedMessage
                 })
             });
@@ -828,9 +828,13 @@ export class CNFTHandler {
             // Show appropriate notification based on server response
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                 if (result.isSimulated) {
+                    const assetName = result.assetDetails?.name || "cNFT";
+                    const collectionInfo = result.assetDetails?.collection ? 
+                        ` from ${result.assetDetails.collection}` : "";
+                    
                     window.BurnAnimations.showNotification(
-                        "cNFT Burn Request Processed", 
-                        "Your request was simulated successfully. In a production environment, the cNFT would be burned on-chain."
+                        "Simulation Mode", 
+                        `${assetName}${collectionInfo} burn request processed successfully.\n\nNote: This is a simulation. In real applications, only the collection's tree authority can burn cNFTs, not regular users.`
                     );
                 } else if (result.signature) {
                     const shortSig = result.signature.substring(0, 8) + "...";

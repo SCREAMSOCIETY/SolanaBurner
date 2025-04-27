@@ -4,6 +4,11 @@
  * This server component requires a tree authority keypair to function properly.
  * In a production environment, this keypair would need to be securely stored
  * and managed using proper secret management practices.
+ * 
+ * IMPORTANT: Without a tree authority keypair, this server operates in simulation mode,
+ * which means transactions will appear to succeed but no actual on-chain burning occurs.
+ * This is by design, as regular cNFT owners don't have permissions to burn their own cNFTs
+ * without the tree authority's involvement.
  */
 
 const { 
@@ -65,13 +70,24 @@ if (process.env.TREE_AUTHORITY_SECRET_KEY) {
 async function processBurnRequest(ownerAddress, assetId, signedMessage, proofData, assetData) {
   // If we don't have a real tree authority, return simulated success
   if (!hasTreeAuthority || !treeAuthorityKeypair) {
+    console.log(`[SIMULATION MODE] Processing simulated burn for cNFT: ${assetId}`);
+    
+    // Generate a unique simulation ID that looks like a transaction signature
+    const simulationId = `simulation-${Date.now()}-${assetId.slice(0,4)}`;
+    
     return {
       success: true,
       isSimulated: true,
       status: "completed",
-      signature: `simulation-${Date.now()}-${assetId.slice(0,4)}`,
-      message: "This is a simulated burn since no tree authority keypair is available",
-      explorerUrl: `https://solscan.io/tx/simulation-${Date.now()}-${assetId.slice(0,4)}`
+      signature: simulationId,
+      message: "This is a simulated burn operation. In a production environment, only the tree authority (usually the collection creator) can burn cNFTs. As a regular user, you would need to request the burn from the collection authority.",
+      explorerUrl: `https://solscan.io/token/${assetId}`,
+      simulationId: simulationId,
+      assetDetails: {
+        id: assetId,
+        name: assetData.content?.metadata?.name || "Compressed NFT",
+        collection: assetData.content?.metadata?.collection?.name || "Unknown Collection"
+      }
     };
   }
   
