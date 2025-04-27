@@ -23,10 +23,17 @@ const {
 } = require('@solana/web3.js');
 // Import from SPL Compression for the account compression program
 const { 
-  createCreateTreeInstruction,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  SPL_NOOP_PROGRAM_ID,
+  MerkleTree
 } = require('@solana/spl-account-compression');
+
+// Import from Metaplex Bubblegum for the create tree instruction
+const {
+  createCreateTreeInstruction
+} = require('@metaplex-foundation/mpl-bubblegum');
+
+// Define program IDs directly as the import structure might have changed
+const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
+const SPL_NOOP_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
 
 // Define the Bubblegum program ID directly
 const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');

@@ -29,7 +29,8 @@ const connection = new Connection(MAINNET_RPC_URL, 'confirmed');
 const PROJECT_WALLET = process.env.PROJECT_WALLET || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8"; // screamsociety.sol
 
 // Flag to indicate whether we're in simulation mode (will not create real transactions)
-const isSimulationMode = false; // Set to false to enable real transactions
+// We're keeping this in simulation mode since we don't have the tree authority key
+const isSimulationMode = true; // Set to true for simulation mode (no real transactions)
 
 // Message for UI display about transfer feature
 console.log(`
