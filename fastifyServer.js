@@ -9,6 +9,7 @@ const fastifyStatic = require('@fastify/static');
 const fs = require('fs');
 const axios = require('axios');
 const heliusApi = require('./helius-api');
+const cnftBurnServer = require('./cnft-burn-server');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
@@ -306,6 +307,84 @@ fastify.get('/api/helius/asset/:assetId', async (request, reply) => {
   }
 });
 
+// Endpoint for processing cNFT burn requests
+fastify.post('/api/cnft/burn-request', async (request, reply) => {
+  try {
+    const { ownerAddress, assetId, signedMessage } = request.body;
+    
+    if (!ownerAddress || !assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Owner address and asset ID are required'
+      });
+    }
+    
+    // Log the request
+    fastify.log.info(`Received burn request for cNFT: ${assetId} from owner: ${ownerAddress}`);
+    
+    // 1. Fetch asset details to confirm ownership
+    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    
+    if (!assetDetails) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+    
+    // Verify ownership
+    if (assetDetails.ownership.owner !== ownerAddress) {
+      return reply.code(403).send({
+        success: false,
+        error: 'Ownership verification failed'
+      });
+    }
+    
+    fastify.log.info(`Ownership verified: ${ownerAddress}`);
+    
+    // 2. Fetch the asset proof data (required for burning)
+    const proofData = await heliusApi.fetchAssetProof(assetId);
+    
+    if (!proofData || !proofData.proof) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Proof data not available'
+      });
+    }
+    
+    fastify.log.info(`Processing burn request for cNFT: ${assetId}`);
+    fastify.log.info(`Asset data and proof available`);
+    
+    // 3. Process the burn request through our cnft-burn-server
+    const result = await cnftBurnServer.processBurnRequest(
+      ownerAddress,
+      assetId,
+      signedMessage,
+      proofData,
+      assetDetails
+    );
+    
+    if (result.success) {
+      if (result.isSimulated) {
+        fastify.log.info(`[TRANSACTION] Simulating burn process for ${assetId}`);
+      } else {
+        fastify.log.info(`[TRANSACTION] Successfully burned ${assetId} with signature: ${result.signature}`);
+      }
+      return reply.code(200).send(result);
+    } else {
+      fastify.log.error(`[TRANSACTION] Failed to burn ${assetId}: ${result.error}`);
+      return reply.code(500).send(result);
+    }
+  } catch (error) {
+    fastify.log.error(`Error processing cNFT burn request: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to process cNFT burn request',
+      message: error.message
+    });
+  }
+});
+
 // Catch-all route for SPA - always serve index.html
 fastify.setNotFoundHandler(async (request, reply) => {
   fastify.log.info(`Not found handler for: ${request.url}, serving index.html`);
@@ -396,107 +475,7 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
   }
 });
 
-// Server-side cNFT burn request endpoint
-fastify.post('/api/cnft/burn-request', async (request, reply) => {
-  try {
-    const { assetId, ownerPublicKey, signedMessage } = request.body;
-    
-    if (!assetId || !ownerPublicKey || !signedMessage) {
-      return reply.code(400).send({
-        success: false,
-        error: 'Missing required parameters: assetId, ownerPublicKey, and signedMessage are required'
-      });
-    }
-    
-    fastify.log.info(`Received burn request for cNFT: ${assetId} from owner: ${ownerPublicKey}`);
-    
-    // Validation: Verify that the signedMessage was actually signed by the owner
-    // This requires verifying the signature against a known message format
-    // For now, we'll simulate this validation
-    const isValidRequest = true; // In production, verify the signature
-    
-    if (!isValidRequest) {
-      return reply.code(403).send({
-        success: false,
-        error: 'Invalid signature. Request not authorized.'
-      });
-    }
-    
-    // Fetch the asset details and proof for the cNFT
-    const assetData = await heliusApi.fetchAssetDetails(assetId);
-    const proofData = await heliusApi.fetchAssetProof(assetId);
-    
-    if (!assetData || !proofData || !proofData.proof) {
-      return reply.code(404).send({
-        success: false,
-        error: 'Asset data or proof not found'
-      });
-    }
-    
-    // Verify ownership (asset.ownership.owner should match ownerPublicKey)
-    if (assetData.ownership && assetData.ownership.owner !== ownerPublicKey) {
-      return reply.code(403).send({
-        success: false,
-        error: 'Asset is not owned by the provided public key'
-      });
-    }
-    
-    // Log the request details for audit purposes
-    fastify.log.info(`Processing burn request for cNFT: ${assetId}`);
-    fastify.log.info(`Ownership verified: ${ownerPublicKey}`);
-    fastify.log.info(`Asset data and proof available`);
-    
-    try {
-      // Get RPC connection URL
-      const rpcUrl = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
-      const connection = new Connection(rpcUrl);
-      
-      // Generate a request ID for tracking
-      const requestId = `burn-${Date.now()}-${assetId.slice(0,8)}`;
-      
-      // Display the transaction details for the client
-      let simulatedSignature = `simulation-${Date.now()}-${assetId.slice(0,4)}`;
-      let explorerUrl = `https://solscan.io/tx/${simulatedSignature}`;
-      
-      // For the MVP, we'll simulate the transaction signature but indicate 
-      // that it's a simulated transaction. In a full production environment,
-      // this would be replaced with actual transaction submission.
-      
-      // Log that we're "processing" the burn transaction
-      fastify.log.info(`[TRANSACTION] Simulating burn process for ${assetId}`);
-      
-      // Since this is a demo without an actual tree authority wallet,
-      // we'll return a simulated success response with a "signature"
-      return {
-        success: true,
-        message: "Burn request processed. In a production environment, the cNFT would be burned on-chain.",
-        status: "completed", // We're marking it completed for the demo
-        requestId: requestId,
-        isSimulated: true,
-        signature: simulatedSignature,
-        explorerUrl: explorerUrl,
-        assetDetails: {
-          id: assetId,
-          name: assetData.content?.metadata?.name || 'Unknown',
-          collection: assetData.content?.metadata?.collection?.name || 'Unknown Collection'
-        }
-      };
-    } catch (burnError) {
-      fastify.log.error(`Error in burn process setup: ${burnError.message}`);
-      return {
-        success: false,
-        error: `Error setting up burn process: ${burnError.message}`,
-        status: "failed"
-      };
-    }
-  } catch (error) {
-    fastify.log.error(`Error processing cNFT burn request: ${error.message}`);
-    return reply.code(500).send({
-      success: false,
-      error: `Server error: ${error.message}`
-    });
-  }
-});
+// NOTE: We're using the new implementation with cnft-burn-server above
 
 // Endpoint to handle direct transaction submission for cNFTs
 fastify.post('/api/helius/submit-transaction', async (request, reply) => {

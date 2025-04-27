@@ -1,0 +1,92 @@
+const express = require('express');
+const { Connection, Keypair, PublicKey, sendAndConfirmTransaction } = require('@solana/web3.js');
+const { createBurnInstruction } = require('@metaplex-foundation/mpl-bubblegum');
+const nacl = require('tweetnacl');
+const axios = require('axios');
+const bs58 = require('bs58');
+
+const app = express();
+app.use(express.json());
+
+// Setup
+const RPC_URL = 'https://api.mainnet-beta.solana.com'; // or your preferred RPC
+const connection = new Connection(RPC_URL);
+
+// Load tree authority (secure this properly!)
+const treeAuthorityKeypair = Keypair.fromSecretKey(
+  Uint8Array.from(JSON.parse(process.env.TREE_AUTHORITY_SECRET_KEY))
+);
+
+const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGumV...'); // Replace with actual mpl-bubblegum ID
+
+// POST /burn-request
+app.post('/burn-request', async (req, res) => {
+  try {
+    const { wallet, asset_id, signature } = req.body;
+
+    if (!wallet || !asset_id || !signature) {
+      return res.status(400).send('Missing parameters');
+    }
+
+    const walletPubkey = new PublicKey(wallet);
+    const assetId = asset_id;
+
+    // 1. Verify Signature
+    const message = `I, ${wallet}, request the burn of cNFT ${asset_id}`;
+    const isValid = nacl.sign.detached.verify(
+      Buffer.from(message),
+      bs58.decode(signature),
+      walletPubkey.toBytes()
+    );
+
+    if (!isValid) {
+      return res.status(401).send('Invalid signature');
+    }
+
+    // 2. Fetch Merkle Proof and NFT Metadata
+    const proofUrl = `https://api.helius.xyz/v0/assets/${assetId}/proof?api-key=YOUR_API_KEY`;
+    const proofResponse = await axios.get(proofUrl);
+    const proofData = proofResponse.data;
+
+    if (!proofData || !proofData.proof) {
+      return res.status(404).send('Proof not found');
+    }
+
+    const { root, dataHash, creatorHash, nonce, index, proof } = proofData;
+
+    // 3. Build Burn Instruction
+    const burnIx = createBurnInstruction({
+      treeAuthority: treeAuthorityKeypair.publicKey,
+      leafOwner: walletPubkey,
+      merkleTree: new PublicKey(proofData.treeId),
+      leafDelegate: walletPubkey,
+      root: Buffer.from(root, 'base64'),
+      dataHash: Buffer.from(dataHash, 'base64'),
+      creatorHash: Buffer.from(creatorHash, 'base64'),
+      nonce,
+      index,
+      proof: proof.map(p => Buffer.from(p, 'base64')),
+    }, {
+      bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+    });
+
+    // 4. Build Transaction
+    const transaction = new (await import('@solana/web3.js')).Transaction().add(burnIx);
+
+    // 5. Sign and Send Transaction
+    const signatureTx = await sendAndConfirmTransaction(connection, transaction, [treeAuthorityKeypair], {
+      skipPreflight: false,
+      commitment: 'confirmed',
+    });
+
+    return res.send({ status: 'Burn Successful', tx: signatureTx });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Error processing burn request');
+  }
+});
+
+// Server start
+app.listen(3000, () => {
+  console.log('Burn server running on port 3000');
+});
