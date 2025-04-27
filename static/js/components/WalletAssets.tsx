@@ -995,11 +995,11 @@ const WalletAssets: React.FC = () => {
       // Extract the proof from the cNFT data if available
       const proof = cnft.compression?.proof || cnft.proof || null;
       
-      // Try using the direct burn method first
-      console.log("Attempting direct burn of cNFT:", cnft.mint);
+      // Try using the server-side burn request method
+      console.log("Submitting server-side burn request for cNFT:", cnft.mint);
       
-      // Execute the burn transaction
-      const result = await handler.directBurnCNFT(cnft.mint, proof);
+      // Execute the burn request
+      const result = await handler.serverBurnCNFT(cnft.mint);
       
       // Check if the operation was successful
       if (result && result.success) {
@@ -1258,9 +1258,9 @@ const WalletAssets: React.FC = () => {
               // Extract the proof from the cNFT data if available
               const proof = cnft.compression?.proof || cnft.proof || null;
               
-              // Attempt to burn the cNFT
-              console.log(`Attempting to burn cNFT: ${cnft.mint}`);
-              const result = await handler.directBurnCNFT(cnft.mint, proof);
+              // Attempt to send a server-side burn request for the cNFT
+              console.log(`Submitting server-side burn request for cNFT: ${cnft.mint}`);
+              const result = await handler.serverBurnCNFT(cnft.mint);
               
               if (result && result.success) {
                 console.log(`Successfully burned cNFT: ${cnft.mint}`);
@@ -1517,7 +1517,7 @@ const WalletAssets: React.FC = () => {
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: Compressed NFTs (cNFTs) cannot be directly burned by users - only the collection creator (tree authority) can burn them. The system will visualize them as "processed" for your convenience, but they remain in your wallet.
+              Note: When you "burn" a cNFT, we send a burn request to our server. The server holds the tree authority needed to burn cNFTs and will process your request. This approach allows you to clean up your wallet without requiring you to own the tree authority.
             </div>
             
             <div className="cnfts-grid">
@@ -1549,9 +1549,9 @@ const WalletAssets: React.FC = () => {
                         e.stopPropagation();
                         handleBurnCNFT(cnft);
                       }}
-                      title="For visualization only - cNFTs can't be directly burned"
+                      title="Sends a burn request to the server"
                     >
-                      Process
+                      Burn Request
                     </button>
                   )}
                   {bulkBurnMode && (
