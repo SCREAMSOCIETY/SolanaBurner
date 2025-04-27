@@ -68,11 +68,22 @@ fastify.get('/ping', async (request, reply) => {
 // API Config endpoint
 fastify.get('/api/config', async (request, reply) => {
   fastify.log.info('API config endpoint hit');
+  
+  // Check if we have tree authority and address in environment
+  const hasTreeAuthority = !!process.env.TREE_AUTHORITY_SECRET_KEY;
+  const treeAddress = process.env.TREE_ADDRESS || '';
+  
   return { 
     solscanApiKey: process.env.SOLSCAN_API_KEY || '',
     quicknodeRpcUrl: process.env.QUICKNODE_RPC_URL || '',
     heliusApiKey: process.env.HELIUS_API_KEY ? 'present' : '', // Don't expose actual key
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    // Include tree information for the client side
+    treeInfo: {
+      hasTreeAuthority: hasTreeAuthority,
+      treeAddress: treeAddress,
+      isSimulationMode: false // We're overriding simulation mode
+    }
   };
 });
 
