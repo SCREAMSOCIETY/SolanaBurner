@@ -20,6 +20,29 @@ declare global {
       lastCnftSignature: string;
       lastCnftAssumedSuccess: boolean;
       walletInfo: any;
+      cnftBurnAttempted?: boolean;
+      bulkBurnAttempted?: boolean;
+      proofFetchFailed?: boolean;
+      proofFetchErrors?: string[];
+      fatalProofError?: string;
+      signTransactionCalled?: boolean;
+      lastTransaction?: any;
+      assetData?: any; 
+      proofData?: any;
+      burnMethod?: string;
+    };
+    cnftHandler?: {
+      CNFTHandler: any;
+    };
+    BurnAnimations?: {
+      createConfetti: () => void;
+      toggleDarkMode: () => void;
+      applyBurnAnimation: (element: HTMLElement) => void;
+      showAchievement: (title: string, description: string) => void;
+      updateProgress: (currentVal: number, maxVal: number, level: number) => void;
+      checkAchievements: (type: string, value: number) => void;
+      initUIEnhancements: () => void;
+      showNotification: (title: string, message: string) => void;
     };
   }
 }
@@ -919,9 +942,9 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Function to handle trading compressed NFTs (cNFTs) to burn wallet
+  // Function to handle burning compressed NFTs (cNFTs)
   const handleBurnCNFT = async (cnft: CNFTData) => {
-    if (!publicKey) {
+    if (!publicKey || !connection) {
       setError('Wallet connection required');
       return;
     }
@@ -931,18 +954,13 @@ const WalletAssets: React.FC = () => {
       window.BurnAnimations.checkAchievements('cnft_attempts', 1);
     }
     
-    // Show notification explaining the situation
+    // Show notification explaining the burn operation is processing
     if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
       window.BurnAnimations.showNotification(
-        "cNFT Information", 
-        "Compressed NFTs cannot be directly burned unless you are the tree authority owner"
+        "Processing cNFT Burn", 
+        "Creating burn transaction - this might take a moment..."
       );
     }
-    
-    // Show a more detailed explanation dialog by using the existing error message system
-    setError(
-      `About Compressed NFTs (cNFTs): Unlike regular NFTs, compressed NFTs cannot be burned by users. Only the creator of the cNFT collection (the tree authority) can burn them. This is a limitation of the Solana compressed NFT standard.`
-    );
     
     // Track this attempt for analytics
     if (typeof window !== 'undefined' && window.debugInfo) {
@@ -950,25 +968,96 @@ const WalletAssets: React.FC = () => {
       window.debugInfo.lastCnftData = cnft;
     }
     
-    // Show the burn animation anyway for visual consistency
-    const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
-    if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
-      window.BurnAnimations.applyBurnAnimation(cnftCard);
-    }
-    
-    // Simulate a successful operation to update the UI consistently
-    setTimeout(() => {
-      // Remove the cNFT from the list for user experience continuity
-      setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+    try {
+      // Create a CNFTHandler instance with the current connection and wallet
+      // We're using the @ts-ignore comment to bypass TypeScript's complaint about the CNFTHandler class
+      // which is imported dynamically at runtime via the script tag
+      // @ts-ignore
+      const handler = new window.cnftHandler.CNFTHandler(connection, {
+        publicKey,
+        signTransaction,
+        signAllTransactions: signAllTransactions,
+        connected: connected
+      });
       
-      // Show confetti
-      if (window.BurnAnimations?.createConfetti) {
-        window.BurnAnimations.createConfetti();
+      // Extract the proof from the cNFT data if available
+      const proof = cnft.compression?.proof || cnft.proof || null;
+      
+      // Try using the direct burn method first
+      console.log("Attempting direct burn of cNFT:", cnft.mint);
+      
+      // Execute the burn transaction
+      const result = await handler.directBurnCNFT(cnft.mint, proof);
+      
+      // Check if the operation was successful
+      if (result && result.success) {
+        console.log("cNFT burn successful:", result);
+        
+        // Show the burn animation
+        const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
+        if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
+          window.BurnAnimations.applyBurnAnimation(cnftCard);
+        }
+        
+        // Show successful UI feedback
+        if (window.BurnAnimations?.createConfetti) {
+          window.BurnAnimations.createConfetti();
+        }
+        
+        // Remove the cNFT from the UI
+        setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+        
+        // Track achievement
+        if (window.BurnAnimations?.checkAchievements) {
+          window.BurnAnimations.checkAchievements('cnfts', 1);
+        }
+        
+        // Show success message
+        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
+        setTimeout(() => setError(null), 5000);
+      } else {
+        // Handle the case where burn appears to have failed
+        console.warn("cNFT burn returned unsuccessful result:", result);
+        
+        // If there's a specific error message, display it
+        if (result && result.error) {
+          setError(`cNFT burn operation failed: ${result.error}`);
+        } else {
+          // Fall back to more general messaging
+          setError("cNFT burn operation failed. This could be because you're not the tree authority owner, or due to a network issue.");
+        }
+        
+        // Show a more detailed explanation
+        if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+          window.BurnAnimations.showNotification(
+            "cNFT Burn Failed", 
+            "Only the tree authority owner can burn cNFTs. Check console for details."
+          );
+        }
+        
+        setTimeout(() => setError(null), 8000);
+      }
+    } catch (error) {
+      console.error("Error during cNFT burn:", error);
+      
+      // Show error to user
+      setError(`Error burning cNFT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Show notification with more details
+      if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+        window.BurnAnimations.showNotification(
+          "cNFT Burn Error", 
+          "There was a problem with the burn transaction. See details below."
+        );
       }
       
-      // Clear the error message after a delay
+      // Log for debugging
+      if (typeof window !== 'undefined' && window.debugInfo) {
+        window.debugInfo.lastCnftError = error;
+      }
+      
       setTimeout(() => setError(null), 8000);
-    }, 3000);
+    }
   };
   
   // Helper function to handle successful cNFT trades to burn wallet
@@ -1109,80 +1198,124 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk processing of cNFTs
+  // Handle bulk burning of cNFTs with actual burn transactions
   const handleBulkBurnCNFTs = async () => {
     if (selectedCNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Processing compressed NFTs...");
+    setError("Processing compressed NFTs burns...");
     
     try {
-      // Show explanation about cNFT limitations
+      // Create a CNFTHandler instance with the current connection and wallet
+      // @ts-ignore - Using window object for dynamic script access
+      const handler = new window.cnftHandler.CNFTHandler(connection, {
+        publicKey,
+        signTransaction,
+        signAllTransactions: signAllTransactions,
+        connected: connected
+      });
+      
+      // Show notification about the burn process
       if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
-          "cNFT Information", 
-          "Compressed NFTs cannot be directly burned unless you are the tree authority owner"
+          "Burning cNFTs", 
+          "Attempting to burn selected compressed NFTs - watch for wallet prompts"
         );
       }
       
-      // Show a more detailed explanation dialog
-      setError(
-        `About Compressed NFTs (cNFTs): Unlike regular NFTs, compressed NFTs cannot be burned by users. Only the creator of the cNFT collection (the tree authority) can burn them. This is a limitation of the Solana compressed NFT standard.`
-      );
+      // Process all selected cNFTs with actual burn attempts
+      let successCount = 0;
+      let failedCount = 0;
       
-      // Wait a moment for the user to read the message
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Process all selected cNFTs visually
-      let processedCount = 0;
+      // Array to store promises for concurrent processing
+      const burnPromises = [];
       
       for (const mint of selectedCNFTs) {
         const cnft = cnfts.find(c => c.mint === mint);
         
         if (cnft) {
-          // Show the burn animation for visual consistency
-          const cnftCard = document.querySelector(`[data-mint="${mint}"]`) as HTMLElement;
-          if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
-            window.BurnAnimations.applyBurnAnimation(cnftCard);
-          }
-          
-          // Track achievements
-          if (window.BurnAnimations?.checkAchievements) {
-            window.BurnAnimations.checkAchievements('cnft_attempts', 1);
-          }
-          
           // Track this attempt for analytics
           if (typeof window !== 'undefined' && window.debugInfo) {
             window.debugInfo.cnftBurnAttempted = true;
-            window.debugInfo.lastCnftData = cnft;
+            window.debugInfo.bulkBurnAttempted = true;
           }
           
-          processedCount++;
+          // Add this burn operation to our promises array
+          const burnPromise = (async () => {
+            try {
+              // Extract the proof from the cNFT data if available
+              const proof = cnft.compression?.proof || cnft.proof || null;
+              
+              // Attempt to burn the cNFT
+              console.log(`Attempting to burn cNFT: ${cnft.mint}`);
+              const result = await handler.directBurnCNFT(cnft.mint, proof);
+              
+              if (result && result.success) {
+                console.log(`Successfully burned cNFT: ${cnft.mint}`);
+                successCount++;
+                
+                // Show the burn animation
+                const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
+                if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
+                  window.BurnAnimations.applyBurnAnimation(cnftCard);
+                }
+                
+                // Update UI to remove this cNFT
+                setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+                
+                // Track achievement
+                if (window.BurnAnimations?.checkAchievements) {
+                  window.BurnAnimations.checkAchievements('cnfts', 1);
+                }
+                
+                return { mint: cnft.mint, success: true };
+              } else {
+                console.warn(`Failed to burn cNFT: ${cnft.mint}`, result);
+                failedCount++;
+                return { mint: cnft.mint, success: false, error: result?.error };
+              }
+            } catch (error) {
+              console.error(`Error burning cNFT: ${cnft.mint}`, error);
+              failedCount++;
+              return { mint: cnft.mint, success: false, error };
+            }
+          })();
           
-          // Small delay between animations
-          await new Promise(resolve => setTimeout(resolve, 300));
+          burnPromises.push(burnPromise);
         }
       }
       
-      // Remove all processed cNFTs from the UI after a delay
-      setTimeout(() => {
-        // Remove the cNFTs from the list for user experience continuity
-        setCnfts(prev => prev.filter(c => !selectedCNFTs.includes(c.mint)));
+      // Wait for all burn operations to complete
+      const results = await Promise.all(burnPromises);
+      console.log("All cNFT burn operations completed:", results);
+      
+      // Show confetti if any were successful
+      if (successCount > 0 && window.BurnAnimations?.createConfetti) {
+        window.BurnAnimations.createConfetti();
+      }
+      
+      // Update message based on results
+      if (successCount > 0 && failedCount > 0) {
+        setError(`Successfully burned ${successCount} of ${selectedCNFTs.length} compressed NFTs. ${failedCount} failed (likely not tree authority owner).`);
+      } else if (successCount > 0) {
+        setError(`Successfully burned all ${successCount} compressed NFTs!`);
+      } else {
+        setError(`Failed to burn any compressed NFTs. This is usually because you are not the tree authority owner for these cNFTs.`);
         
-        // Show confetti
-        if (window.BurnAnimations?.createConfetti) {
-          window.BurnAnimations.createConfetti();
+        // Show additional explanation
+        if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+          window.BurnAnimations.showNotification(
+            "cNFT Burn Limitation", 
+            "Only the tree authority owner can burn compressed NFTs"
+          );
         }
-        
-        // Update message
-        setError(`Processed ${processedCount} compressed NFTs. Note: cNFTs remain in your wallet as they can't be directly burned.`);
-        
-        // Clear selections
-        setSelectedCNFTs([]);
-        
-        // Clear the error message after a delay
-        setTimeout(() => setError(null), 8000);
-      }, 2000);
+      }
+      
+      // Clear selections after burning attempts
+      setSelectedCNFTs([]);
+      
+      // Clear the error message after a delay
+      setTimeout(() => setError(null), 8000);
     } catch (error: any) {
       console.error('Error processing cNFTs:', error);
       setError(`Error processing cNFTs: ${error.message}`);
