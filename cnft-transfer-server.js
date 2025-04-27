@@ -70,14 +70,16 @@ async function processTransferRequest(ownerAddress, assetId, signedMessage, proo
     
     // In simulation mode, we return a success response without actual on-chain operations
     if (isSimulationMode) {
+      // Return a clear simulation response
       return {
         success: true,
-        message: `Successfully processed transfer request for ${assetDetails.name}`,
+        message: `Simulated transfer of ${assetDetails.name} to ${PROJECT_WALLET}. No actual blockchain transaction occurred.`,
         isSimulated: true,
         assetDetails,
         signature: "SIMULATED_TRANSFER_" + Math.random().toString(36).substring(2, 15),
         explorerUrl: `https://explorer.solana.com/tx/SIMULATED_TRANSFER?cluster=devnet`,
-        destinationAddress: destinationAddress || PROJECT_WALLET
+        destinationAddress: destinationAddress || PROJECT_WALLET,
+        note: "To enable real transfers, a tree authority keypair must be set up using the create-merkle-tree.js script."
       };
     }
     

@@ -1175,7 +1175,7 @@ export class CNFTHandler {
                     
                     window.BurnAnimations.showNotification(
                         "Simulation Mode", 
-                        `${assetName}${collectionInfo} transfer request processed successfully.\n\nNote: This is a simulation. In real applications, the transfer would be processed by the server.`
+                        `${assetName}${collectionInfo} transfer request simulated successfully.\n\nNote: This is a simulation. The cNFT remains in your wallet since no real blockchain transaction was performed. To enable real transfers, a tree authority keypair is needed.`
                     );
                 } else if (result.signature) {
                     const shortSig = result.signature.substring(0, 8) + "...";
