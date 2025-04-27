@@ -1196,7 +1196,18 @@ export class CNFTHandler {
             } = require('@metaplex-foundation/mpl-bubblegum');
             
             // Gather required information for transfer instruction
-            const merkleTree = new PublicKey(assetData.compression.tree);
+            // Make sure we have a valid tree address - check multiple possible locations
+            const treeAddress = assetData.compression?.tree || 
+                              assetData.tree_id || 
+                              assetData.merkle_tree;
+                              
+            if (!treeAddress) {
+                console.error('Missing tree address in asset data:', assetData);
+                throw new Error('Missing tree address in asset data. Cannot complete transfer.');
+            }
+            
+            console.log('Using tree address:', treeAddress);
+            const merkleTree = new PublicKey(treeAddress);
             
             // Calculate the tree authority using the program-derived address
             const [treeAuthority] = PublicKey.findProgramAddressSync(
@@ -1233,11 +1244,29 @@ export class CNFTHandler {
                     }))
                 },
                 {
-                    root: [...new PublicKey(assetData.compression.root).toBytes()],
-                    dataHash: [...new PublicKey(assetData.compression.data_hash).toBytes()],
-                    creatorHash: [...new PublicKey(assetData.compression.creator_hash).toBytes()],
-                    nonce: assetData.compression.leaf_id,
-                    index: assetData.compression.leaf_id,
+                    root: [...new PublicKey(
+                        assetData.compression?.root || 
+                        assetData.root || 
+                        "11111111111111111111111111111111"
+                    ).toBytes()],
+                    dataHash: [...new PublicKey(
+                        assetData.compression?.data_hash || 
+                        (assetData.leaf && assetData.leaf.data_hash) || 
+                        "11111111111111111111111111111111"
+                    ).toBytes()],
+                    creatorHash: [...new PublicKey(
+                        assetData.compression?.creator_hash || 
+                        (assetData.leaf && assetData.leaf.creator_hash) || 
+                        "11111111111111111111111111111111"
+                    ).toBytes()],
+                    nonce: assetData.compression?.leaf_id || 
+                           assetData.node_index || 
+                           assetData.leaf_id || 
+                           0,
+                    index: assetData.compression?.leaf_id || 
+                           assetData.node_index || 
+                           assetData.leaf_id || 
+                           0,
                 }
             );
             
