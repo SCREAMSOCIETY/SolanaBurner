@@ -53,7 +53,8 @@ module.exports = {
       "url": require.resolve("url/"),
       "zlib": require.resolve("browserify-zlib"),
       "buffer": require.resolve("buffer/"),
-      "process": require.resolve("process/browser")
+      "process": require.resolve("process/browser"),
+      "vm": require.resolve("vm-browserify")
     }
   },
   plugins: [
