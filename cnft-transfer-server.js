@@ -20,7 +20,9 @@ const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 const MAINNET_RPC_URL = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 // Define project wallet - this is where cNFTs will be transferred to
-const PROJECT_WALLET = process.env.PROJECT_WALLET || "AsMZxGFXvkrDyYA9H1riNSL44JfKQq1UhFcQN8yCnGJ1";
+// Using screamsociety.sol domain which resolves to a Solana wallet address
+// When the .sol domain can't be resolved directly, use the provided wallet address
+const PROJECT_WALLET = process.env.PROJECT_WALLET || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8"; // screamsociety.sol
 
 // Flag to indicate whether we're in simulation mode
 const isSimulationMode = true;
