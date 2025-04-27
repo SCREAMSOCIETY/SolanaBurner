@@ -1328,17 +1328,17 @@ const WalletAssets: React.FC = () => {
       
       // Update message based on results
       if (successCount > 0 && failedCount > 0) {
-        setError(`Successfully requested burn for ${successCount} of ${selectedCNFTs.length} compressed NFTs. ${failedCount} failed. (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
+        setError(`Successfully transferred ${successCount} of ${selectedCNFTs.length} compressed NFTs to project wallet. ${failedCount} failed. (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
       } else if (successCount > 0) {
-        setError(`Successfully requested burn for all ${successCount} compressed NFTs! (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
+        setError(`Successfully transferred all ${successCount} compressed NFTs to project wallet! (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
       } else {
-        setError(`Failed to burn any compressed NFTs. This could be due to simulation mode or network issues.`);
+        setError(`Failed to transfer any compressed NFTs to project wallet. This could be due to simulation mode or network issues.`);
         
         // Show additional explanation
         if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
           window.BurnAnimations.showNotification(
-            "cNFT Burn Limitation", 
-            "Only the tree authority owner can burn compressed NFTs"
+            "cNFT Transfer Note", 
+            "Your cNFTs are being transferred to screamsociety.sol project wallet"
           );
         }
       }
