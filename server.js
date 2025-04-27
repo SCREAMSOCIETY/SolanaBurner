@@ -28,6 +28,15 @@ try {
   // Serve static files
   console.log('[SERVER INIT] Setting up static file serving...');
   app.use('/static', express.static('static'));
+  
+  // Serve Markdown files (for documentation)
+  app.get('/docs/cnft-simulation', (req, res) => {
+    res.sendFile('CNFT_SIMULATION_NOTICE.md', { root: './' });
+  });
+  
+  app.get('/docs/tree-creation', (req, res) => {
+    res.sendFile('TREE_CREATION_GUIDE.md', { root: './' });
+  });
 
   // Serve index.html for all routes to support SPA
   app.get('*', (req, res) => {
