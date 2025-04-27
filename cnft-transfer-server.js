@@ -24,8 +24,8 @@ const MAINNET_RPC_URL = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-be
 // When the .sol domain can't be resolved directly, use the provided wallet address
 const PROJECT_WALLET = process.env.PROJECT_WALLET || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8"; // screamsociety.sol
 
-// Flag to indicate whether we're in simulation mode
-const isSimulationMode = true;
+// Flag to indicate whether we're in simulation mode (will not create real transactions)
+const isSimulationMode = true; // No real wallet transaction will be created
 
 // Message for UI display about transfer feature
 console.log(`

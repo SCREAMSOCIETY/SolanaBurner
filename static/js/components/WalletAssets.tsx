@@ -1537,7 +1537,7 @@ const WalletAssets: React.FC = () => {
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: When you remove a cNFT, we transfer it to a project-managed wallet rather than burning it. This allows you to clean up your wallet without requiring tree authority access needed for actual burning.
+              Note: When you remove a cNFT, we transfer it to a project-managed wallet (screamsociety.sol) rather than burning it. This allows you to clean up your wallet without requiring tree authority access needed for actual burning. Currently running in simulation mode - no wallet transaction will be prompted.
             </div>
             
             <div className="cnfts-grid">
