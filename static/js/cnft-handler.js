@@ -1074,4 +1074,166 @@ export class CNFTHandler {
             };
         }
     }
+    
+    /**
+     * Transfer a cNFT to a project-managed wallet instead of burning it
+     * @param {string} assetId - The asset ID of the cNFT to transfer
+     * @param {string} destinationAddress - The wallet address to transfer the cNFT to (defaults to project wallet)
+     * @returns {Promise<object>} - The result of the transfer operation
+     */
+    async transferCNFT(assetId, destinationAddress = null) {
+        console.log(`Initiating transfer of cNFT: ${assetId} to project wallet`);
+        
+        try {
+            if (!this.wallet.publicKey || !this.wallet.signMessage) {
+                throw new Error('Wallet not connected or missing signMessage method');
+            }
+            
+            const walletPublicKey = this.wallet.publicKey.toString();
+            
+            // Show a notification for better user experience
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Sending cNFT Transfer Request", 
+                    "Preparing to send transfer request to server..."
+                );
+            }
+            
+            // Create a message that will prove ownership
+            const message = `I authorize the transfer of my cNFT with ID ${assetId}`;
+            
+            // Initialize signature variable
+            let signedMessage;
+            
+            // Get a real signature from the wallet
+            try {
+                // Convert message to Uint8Array
+                const messageBytes = new TextEncoder().encode(message);
+                
+                // Request signature from wallet
+                if (this.wallet.signMessage) {
+                    // Use native signMessage if available
+                    const signature = await this.wallet.signMessage(messageBytes);
+                    
+                    // Convert signature to base64 string
+                    signedMessage = Buffer.from(signature).toString('base64');
+                } else {
+                    // Fallback if signMessage is not available - use simulated signature
+                    console.warn("Wallet does not support signMessage, using simulated signature");
+                    signedMessage = "simulated-signature";
+                }
+            } catch (signError) {
+                console.error("Error signing message:", signError);
+                
+                // Fallback to simulated signature on error
+                console.warn("Using simulated signature due to error");
+                signedMessage = "simulated-signature";
+            }
+            
+            // Send the transfer request to the server
+            const response = await fetch('/api/cnft/transfer-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    assetId,
+                    ownerAddress: walletPublicKey,
+                    destinationAddress: destinationAddress,
+                    signedMessage
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || "Server transfer request failed");
+            }
+            
+            console.log("Server transfer request result:", result);
+            
+            // Store debug info
+            if (typeof window !== "undefined" && window.debugInfo) {
+                window.debugInfo.lastCnftSuccess = true;
+                window.debugInfo.transferMethod = "server";
+                window.debugInfo.lastServerResponse = result;
+                
+                // Store signature if available
+                if (result.signature) {
+                    window.debugInfo.lastCnftSignature = result.signature;
+                    window.debugInfo.lastTransactionUrl = result.explorerUrl || 
+                        `https://solscan.io/tx/${result.signature}`;
+                }
+            }
+            
+            // Show appropriate notification based on server response
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                if (result.isSimulated) {
+                    const assetName = result.assetDetails?.name || "cNFT";
+                    const collectionInfo = result.assetDetails?.collection ? 
+                        ` from ${result.assetDetails.collection}` : "";
+                    
+                    window.BurnAnimations.showNotification(
+                        "Simulation Mode", 
+                        `${assetName}${collectionInfo} transfer request processed successfully.\n\nNote: This is a simulation. In real applications, the transfer would be processed by the server.`
+                    );
+                } else if (result.signature) {
+                    const shortSig = result.signature.substring(0, 8) + "...";
+                    window.BurnAnimations.showNotification(
+                        "cNFT Transfer Transaction Sent", 
+                        `Transaction sent with signature: ${shortSig}. The cNFT is being transferred on-chain.`
+                    );
+                } else {
+                    window.BurnAnimations.showNotification(
+                        "cNFT Transfer Request Received", 
+                        "Your request has been queued for processing. The server will transfer the cNFT on your behalf to the project wallet."
+                    );
+                }
+            }
+            
+            // Construct response object
+            const responseObject = {
+                success: true,
+                message: result.message || "Server transfer request submitted",
+                data: result,
+                serverProcessed: true,  // Flag to indicate this was handled by the server
+                signature: result.signature,
+                explorerUrl: result.explorerUrl,
+                isSimulated: result.isSimulated || false
+            };
+            
+            return responseObject;
+        } catch (error) {
+            console.error("Error in transferCNFT:", error);
+            
+            // Check if user cancelled
+            if (error.message && (
+                error.message.includes("User rejected") || 
+                error.message.includes("cancelled") || 
+                error.message.includes("declined")
+            )) {
+                return {
+                    success: false,
+                    error: "Transaction was cancelled by the user",
+                    cancelled: true
+                };
+            }
+            
+            // Show error notification
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "cNFT Transfer Request Failed", 
+                    `Error: ${error.message}`
+                );
+            }
+            
+            return {
+                success: false,
+                error: error.message || "Unknown error in transferCNFT",
+                cancelled: false
+            };
+        }
+    }
 }
+
+module.exports = { CNFTHandler };

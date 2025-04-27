@@ -1410,14 +1410,14 @@ const WalletAssets: React.FC = () => {
                       disabled={isBurning}
                       onClick={handleBulkBurnCNFTs}
                     >
-                      Send Burn Requests
+                      Transfer Selected
                     </button>
                   </div>
                 )}
                 
                 {(selectedTokens.length + selectedNFTs.length + selectedCNFTs.length === 0) && (
                   <div className="no-selection-message">
-                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to send burn requests for.
+                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to transfer to the project wallet.
                   </div>
                 )}
               </div>
@@ -1535,7 +1535,7 @@ const WalletAssets: React.FC = () => {
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: When you "burn" a cNFT, we send a burn request to our server. The server holds the tree authority needed to burn cNFTs and will process your request. This approach allows you to clean up your wallet without requiring you to own the tree authority.
+              Note: When you remove a cNFT, we transfer it to a project-managed wallet rather than burning it. This allows you to clean up your wallet without requiring tree authority access needed for actual burning.
             </div>
             
             <div className="cnfts-grid">
@@ -1567,9 +1567,9 @@ const WalletAssets: React.FC = () => {
                         e.stopPropagation();
                         handleBurnCNFT(cnft);
                       }}
-                      title="Sends a burn request to the server"
+                      title="Transfers this cNFT to a project-managed wallet"
                     >
-                      Burn Request
+                      Transfer
                     </button>
                   )}
                   {bulkBurnMode && (
