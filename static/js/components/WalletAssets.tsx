@@ -1013,9 +1013,37 @@ const WalletAssets: React.FC = () => {
           window.BurnAnimations.checkAchievements('cnfts', 1);
         }
         
-        // Show success message
-        setError(`Successfully burned compressed NFT "${cnft.name || 'cNFT'}"! Compressed NFTs don't return rent as they are already efficiently stored on-chain.`);
-        setTimeout(() => setError(null), 5000);
+        // Show success message with transaction details if available
+        let successMessage = `Successfully requested burn for compressed NFT "${cnft.name || 'cNFT'}"!`;
+        
+        // Add transaction signature information if available
+        if (result.signature) {
+          const shortSig = result.signature.substring(0, 8) + '...';
+          const txUrl = result.explorerUrl || `https://solscan.io/tx/${result.signature}`;
+          
+          if (result.isSimulated) {
+            successMessage += ` (Simulated transaction: ${shortSig})`;
+          } else {
+            successMessage += ` Transaction: ${shortSig}`;
+          }
+          
+          // Add link to transaction
+          const txElem = document.createElement('div');
+          txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+          
+          // Add to DOM after a small delay
+          setTimeout(() => {
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+        }
+        
+        // Add note about rent
+        successMessage += " Compressed NFTs don't return rent as they are already efficiently stored on-chain.";
+        
+        setError(successMessage);
+        setTimeout(() => setError(null), 8000); // Give more time to see the message
       } else {
         // Handle the case where burn appears to have failed
         console.warn("cNFT burn returned unsuccessful result:", result);
@@ -1297,11 +1325,11 @@ const WalletAssets: React.FC = () => {
       
       // Update message based on results
       if (successCount > 0 && failedCount > 0) {
-        setError(`Successfully burned ${successCount} of ${selectedCNFTs.length} compressed NFTs. ${failedCount} failed (likely not tree authority owner).`);
+        setError(`Successfully requested burn for ${successCount} of ${selectedCNFTs.length} compressed NFTs. ${failedCount} failed. (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
       } else if (successCount > 0) {
-        setError(`Successfully burned all ${successCount} compressed NFTs!`);
+        setError(`Successfully requested burn for all ${successCount} compressed NFTs! (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
       } else {
-        setError(`Failed to burn any compressed NFTs. This is usually because you are not the tree authority owner for these cNFTs.`);
+        setError(`Failed to burn any compressed NFTs. This could be due to simulation mode or network issues.`);
         
         // Show additional explanation
         if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {

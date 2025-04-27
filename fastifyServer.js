@@ -454,21 +454,27 @@ fastify.post('/api/cnft/burn-request', async (request, reply) => {
       // Generate a request ID for tracking
       const requestId = `burn-${Date.now()}-${assetId.slice(0,8)}`;
       
-      // In a production environment, we would:
-      // 1. Store the burn request in a database with status "queued"
-      // 2. Add the request to a processing queue
-      // 3. Process the queue with a worker that has the tree authority wallet
+      // Display the transaction details for the client
+      let simulatedSignature = `simulation-${Date.now()}-${assetId.slice(0,4)}`;
+      let explorerUrl = `https://solscan.io/tx/${simulatedSignature}`;
       
-      // Log a marker that we would initiate the actual burn process here
-      fastify.log.info(`[BURN-SIMULATION] Would initiate burn process for ${assetId}, requestId: ${requestId}`);
+      // For the MVP, we'll simulate the transaction signature but indicate 
+      // that it's a simulated transaction. In a full production environment,
+      // this would be replaced with actual transaction submission.
       
-      // For the demo version, we'll acknowledge the request and simulate success
-      // In the future, we'd need to implement the actual burn transaction
+      // Log that we're "processing" the burn transaction
+      fastify.log.info(`[TRANSACTION] Simulating burn process for ${assetId}`);
+      
+      // Since this is a demo without an actual tree authority wallet,
+      // we'll return a simulated success response with a "signature"
       return {
         success: true,
-        message: "Burn request received, validated, and queued for processing.",
-        status: "queued", // Could be: queued, processing, completed, failed
+        message: "Burn request processed. In a production environment, the cNFT would be burned on-chain.",
+        status: "completed", // We're marking it completed for the demo
         requestId: requestId,
+        isSimulated: true,
+        signature: simulatedSignature,
+        explorerUrl: explorerUrl,
         assetDetails: {
           id: assetId,
           name: assetData.content?.metadata?.name || 'Unknown',

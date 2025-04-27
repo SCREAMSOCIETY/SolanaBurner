@@ -816,22 +816,52 @@ export class CNFTHandler {
                 window.debugInfo.lastCnftSuccess = true;
                 window.debugInfo.burnMethod = "server";
                 window.debugInfo.lastServerResponse = result;
+                
+                // Store signature if available
+                if (result.signature) {
+                    window.debugInfo.lastCnftSignature = result.signature;
+                    window.debugInfo.lastTransactionUrl = result.explorerUrl || 
+                        `https://solscan.io/tx/${result.signature}`;
+                }
             }
             
-            // Show notification to user about request status
+            // Show appropriate notification based on server response
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
-                window.BurnAnimations.showNotification(
-                    "cNFT Burn Request Received", 
-                    "Your request has been queued for processing. The server will burn the cNFT on your behalf."
-                );
+                if (result.isSimulated) {
+                    window.BurnAnimations.showNotification(
+                        "cNFT Burn Request Processed", 
+                        "Your request was simulated successfully. In a production environment, the cNFT would be burned on-chain."
+                    );
+                } else if (result.signature) {
+                    const shortSig = result.signature.substring(0, 8) + "...";
+                    window.BurnAnimations.showNotification(
+                        "cNFT Burn Transaction Sent", 
+                        `Transaction sent with signature: ${shortSig}. The cNFT is being burned on-chain.`
+                    );
+                } else {
+                    window.BurnAnimations.showNotification(
+                        "cNFT Burn Request Received", 
+                        "Your request has been queued for processing. The server will burn the cNFT on your behalf."
+                    );
+                }
             }
             
-            return {
+            // Construct response object
+            const responseObject = {
                 success: true,
-                message: "Server burn request submitted",
+                message: result.message || "Server burn request submitted",
                 data: result,
                 serverProcessed: true  // Flag to indicate this was handled by the server
             };
+            
+            // If there's a signature, add it to the response
+            if (result.signature) {
+                responseObject.signature = result.signature;
+                responseObject.explorerUrl = result.explorerUrl;
+                responseObject.isSimulated = result.isSimulated || false;
+            }
+            
+            return responseObject;
         } catch (error) {
             console.error("Error in serverBurnCNFT:", error);
             
