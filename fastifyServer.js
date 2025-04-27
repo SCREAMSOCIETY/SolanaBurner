@@ -10,6 +10,7 @@ const fs = require('fs');
 const axios = require('axios');
 const heliusApi = require('./helius-api');
 const cnftBurnServer = require('./cnft-burn-server');
+const cnftTransferServer = require('./cnft-transfer-server');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
