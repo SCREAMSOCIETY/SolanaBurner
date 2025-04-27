@@ -492,6 +492,86 @@ fastify.post('/api/cnft/burn-request', async (request, reply) => {
   }
 });
 
+// Endpoint for transferring a cNFT to the project wallet
+fastify.post('/api/cnft/transfer-request', async (request, reply) => {
+  try {
+    const { ownerAddress, assetId, signedMessage, destinationAddress } = request.body;
+    
+    if (!ownerAddress || !assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Owner address and asset ID are required'
+      });
+    }
+    
+    // Log the request
+    fastify.log.info(`Received transfer request for cNFT: ${assetId} from owner: ${ownerAddress}`);
+    fastify.log.info(`Destination address: ${destinationAddress || 'Using default project wallet'}`);
+    
+    // 1. Fetch asset details to confirm ownership
+    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    
+    if (!assetDetails) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+    
+    // Verify ownership
+    if (assetDetails.ownership.owner !== ownerAddress) {
+      return reply.code(403).send({
+        success: false,
+        error: 'Ownership verification failed'
+      });
+    }
+    
+    fastify.log.info(`Ownership verified: ${ownerAddress}`);
+    
+    // 2. Fetch the asset proof data (required for transferring)
+    const proofData = await heliusApi.fetchAssetProof(assetId);
+    
+    if (!proofData || !proofData.proof) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Proof data not available'
+      });
+    }
+    
+    fastify.log.info(`Processing transfer request for cNFT: ${assetId}`);
+    fastify.log.info(`Asset data and proof available`);
+    
+    // 3. Process the transfer request through our cnft-transfer-server
+    const result = await cnftTransferServer.processTransferRequest(
+      ownerAddress,
+      assetId,
+      signedMessage,
+      proofData,
+      assetDetails,
+      destinationAddress
+    );
+    
+    if (result.success) {
+      if (result.isSimulated) {
+        fastify.log.info(`[TRANSACTION] Simulating transfer process for ${assetId}`);
+      } else {
+        fastify.log.info(`[TRANSACTION] Successfully transferred ${assetId} with signature: ${result.signature}`);
+      }
+      return reply.code(200).send(result);
+    } else {
+      fastify.log.error(`[TRANSACTION] Failed to transfer ${assetId}: ${result.error}`);
+      return reply.code(500).send(result);
+    }
+  } catch (error) {
+    fastify.log.error(`Error processing cNFT transfer request: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to process cNFT transfer request',
+      message: error.message
+    });
+  }
+});
+
 // Catch-all route for SPA - always serve index.html
 fastify.setNotFoundHandler(async (request, reply) => {
   fastify.log.info(`Not found handler for: ${request.url}, serving index.html`);

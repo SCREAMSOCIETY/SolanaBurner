@@ -956,17 +956,17 @@ const WalletAssets: React.FC = () => {
       window.BurnAnimations.checkAchievements('cnft_attempts', 1);
     }
     
-    // Show notification explaining the burn operation is processing
+    // Show notification explaining the transfer operation is processing
     if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
       window.BurnAnimations.showNotification(
-        "Processing cNFT Burn", 
-        "Creating burn transaction - this might take a moment..."
+        "Processing cNFT Transfer", 
+        "Creating transfer transaction to project wallet - this might take a moment..."
       );
     }
     
     // Track this attempt for analytics
     if (typeof window !== 'undefined' && window.debugInfo) {
-      window.debugInfo.cnftBurnAttempted = true;
+      window.debugInfo.cnftTransferAttempted = true;
       window.debugInfo.lastCnftData = cnft;
     }
     
@@ -984,38 +984,16 @@ const WalletAssets: React.FC = () => {
       // Extract the proof from the cNFT data if available
       const proof = cnft.compression?.proof || cnft.proof || null;
       
-      // First delegate burning authority to the server, then burn
-      console.log("Starting two-step process: 1) Delegate authority, 2) Burn cNFT:", cnft.mint);
+      console.log("Sending transfer request for cNFT:", cnft.mint);
       
-      // Step 1: Delegate cNFT burning authority to the server
-      console.log("Step 1: Delegating cNFT authority to server");
-      const delegationResult = await handler.delegateCNFT(cnft.mint, cnft);
-      
-      if (!delegationResult || !delegationResult.success) {
-        throw new Error(`Delegation failed: ${delegationResult?.error || 'Unknown error'}`);
-      }
-      
-      console.log("Delegation successful:", delegationResult);
-      
-      // Show intermediate message about delegation
-      if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
-        window.BurnAnimations.showNotification(
-          "Delegation Complete", 
-          "Now submitting burn request to server..."
-        );
-      }
-      
-      // Step 2: Submit server-side burn request
-      console.log("Step 2: Submitting server-side burn request for cNFT:", cnft.mint);
-      
-      // Execute the burn request
-      const result = await handler.serverBurnCNFT(cnft.mint);
+      // Execute the transfer request - use the new transferCNFT method instead of serverBurnCNFT
+      const result = await handler.transferCNFT(cnft.mint);
       
       // Check if the operation was successful
       if (result && result.success) {
-        console.log("cNFT burn successful:", result);
+        console.log("cNFT transfer successful:", result);
         
-        // Show the burn animation
+        // Show the transfer animation (still using the burn animation for visual effect)
         const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
         if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
           window.BurnAnimations.applyBurnAnimation(cnftCard);
@@ -1035,7 +1013,7 @@ const WalletAssets: React.FC = () => {
         }
         
         // Show success message with transaction details if available
-        let successMessage = `Successfully requested burn for compressed NFT "${cnft.name || 'cNFT'}"!`;
+        let successMessage = `Successfully transferred compressed NFT "${cnft.name || 'cNFT'}" to project wallet!`;
         
         // Add transaction signature information if available
         if (result.signature) {
@@ -1060,21 +1038,21 @@ const WalletAssets: React.FC = () => {
           }, 100);
         }
         
-        // Add note about rent
-        successMessage += " Compressed NFTs don't return rent as they are already efficiently stored on-chain.";
+        // Add note about what happened to the cNFT
+        successMessage += " Your cNFT has been transferred to a project-managed wallet rather than burned.";
         
         setError(successMessage);
         setTimeout(() => setError(null), 8000); // Give more time to see the message
       } else {
-        // Handle the case where burn appears to have failed
-        console.warn("cNFT burn returned unsuccessful result:", result);
+        // Handle the case where transfer appears to have failed
+        console.warn("cNFT transfer returned unsuccessful result:", result);
         
         // If there's a specific error message, display it
         if (result && result.error) {
-          setError(`cNFT burn operation failed: ${result.error}`);
+          setError(`cNFT transfer operation failed: ${result.error}`);
         } else {
           // Fall back to more general messaging
-          setError("cNFT burn operation failed. This could be because you're not the tree authority owner, or due to a network issue.");
+          setError("cNFT transfer operation failed. This could be due to a network issue or permission problem.");
         }
         
         // Show a more detailed explanation
@@ -1248,16 +1226,16 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk burning of cNFTs with actual burn transactions
+  // Handle bulk transfer of cNFTs to project wallet
   const handleBulkBurnCNFTs = async () => {
     if (selectedCNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Processing compressed NFTs burns...");
+    setError("Processing compressed NFT transfers to project wallet...");
     
     try {
       // Create a CNFTHandler instance with the current connection and wallet
-      console.log("Creating CNFTHandler instance for bulk burning");
+      console.log("Creating CNFTHandler instance for bulk transfers");
       
       // Use the directly imported CNFTHandler class
       const handler = new CNFTHandler(connection, {
@@ -1265,11 +1243,11 @@ const WalletAssets: React.FC = () => {
         signTransaction
       });
       
-      // Show notification about the burn process
+      // Show notification about the transfer process
       if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
-          "Burning cNFTs", 
-          "Attempting to burn selected compressed NFTs - watch for wallet prompts"
+          "Transferring cNFTs", 
+          "Sending selected compressed NFTs to project wallet - watch for wallet prompts"
         );
       }
       
@@ -1296,28 +1274,17 @@ const WalletAssets: React.FC = () => {
               // Extract the proof from the cNFT data if available
               const proof = cnft.compression?.proof || cnft.proof || null;
               
-              // First delegate burning authority to the server, then burn
-              console.log(`Starting two-step process for ${cnft.mint}: 1) Delegate, 2) Burn`);
+              // Use the new transfer method directly - skip delegation step
+              console.log(`Sending transfer request for ${cnft.mint}`);
               
-              // Step 1: Delegate cNFT burning authority to the server
-              console.log(`Step 1: Delegating authority for ${cnft.mint}`);
-              const delegationResult = await handler.delegateCNFT(cnft.mint, cnft);
-              
-              if (!delegationResult || !delegationResult.success) {
-                throw new Error(`Delegation failed: ${delegationResult?.error || 'Unknown error'}`);
-              }
-              
-              console.log(`Delegation successful for ${cnft.mint}:`, delegationResult);
-              
-              // Step 2: Submit server-side burn request
-              console.log(`Step 2: Submitting burn request for ${cnft.mint}`);
-              const result = await handler.serverBurnCNFT(cnft.mint);
+              // Submit server-side transfer request
+              const result = await handler.transferCNFT(cnft.mint);
               
               if (result && result.success) {
-                console.log(`Successfully burned cNFT: ${cnft.mint}`);
+                console.log(`Successfully transferred cNFT: ${cnft.mint}`);
                 successCount++;
                 
-                // Show the burn animation
+                // Show the transfer animation (still use the burn animation for effect)
                 const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
                 if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
                   window.BurnAnimations.applyBurnAnimation(cnftCard);
