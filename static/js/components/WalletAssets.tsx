@@ -970,14 +970,26 @@ const WalletAssets: React.FC = () => {
     
     try {
       // Create a CNFTHandler instance with the current connection and wallet
-      // We're using the @ts-ignore comment to bypass TypeScript's complaint about the CNFTHandler class
-      // which is imported dynamically at runtime via the script tag
-      // @ts-ignore
-      const handler = new window.cnftHandler.CNFTHandler(connection, {
+      // The CNFTHandler class is available from the global window object
+      // via the script tag that loads cnft-handler.js
+      console.log("Creating CNFTHandler instance from window object");
+      
+      // Check if the window.cnftHandler object exists and log details
+      if (typeof window !== 'undefined') {
+        console.log("Window object available. cnftHandler exists:", !!window.cnftHandler);
+        if (window.cnftHandler) {
+          console.log("CNFTHandler exists:", !!window.cnftHandler.CNFTHandler);
+        }
+      }
+      
+      // Use the globally available handler constructor
+      // @ts-ignore - Using window object access which TypeScript doesn't know about statically
+      const handler = new CNFTHandler(connection, {
         publicKey,
         signTransaction,
-        signAllTransactions: signAllTransactions,
-        connected: connected
+        // No need for these unused parameters that cause TS errors
+        // signAllTransactions: undefined,
+        // connected: !!publicKey
       });
       
       // Extract the proof from the cNFT data if available
@@ -1207,12 +1219,12 @@ const WalletAssets: React.FC = () => {
     
     try {
       // Create a CNFTHandler instance with the current connection and wallet
-      // @ts-ignore - Using window object for dynamic script access
-      const handler = new window.cnftHandler.CNFTHandler(connection, {
+      console.log("Creating CNFTHandler instance for bulk burning");
+      
+      // @ts-ignore - Using CNFTHandler directly as it's imported at the top of the file
+      const handler = new CNFTHandler(connection, {
         publicKey,
-        signTransaction,
-        signAllTransactions: signAllTransactions,
-        connected: connected
+        signTransaction
       });
       
       // Show notification about the burn process
