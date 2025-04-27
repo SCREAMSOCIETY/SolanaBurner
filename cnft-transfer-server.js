@@ -10,7 +10,8 @@ const {
   Connection, 
   PublicKey, 
   Keypair,
-  Transaction
+  Transaction,
+  sendAndConfirmTransaction
 } = require('@solana/web3.js');
 const bs58 = require('bs58');
 require('dotenv').config();
@@ -19,13 +20,16 @@ require('dotenv').config();
 const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 const MAINNET_RPC_URL = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
+// Initialize connection to Solana network
+const connection = new Connection(MAINNET_RPC_URL, 'confirmed');
+
 // Define project wallet - this is where cNFTs will be transferred to
 // Using screamsociety.sol domain which resolves to a Solana wallet address
 // When the .sol domain can't be resolved directly, use the provided wallet address
 const PROJECT_WALLET = process.env.PROJECT_WALLET || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8"; // screamsociety.sol
 
 // Flag to indicate whether we're in simulation mode (will not create real transactions)
-const isSimulationMode = true; // No real wallet transaction will be created
+const isSimulationMode = false; // Set to false to enable real transactions
 
 // Message for UI display about transfer feature
 console.log(`
@@ -76,20 +80,62 @@ async function processTransferRequest(ownerAddress, assetId, signedMessage, proo
       };
     }
     
-    // For real transfers (not yet implemented):
-    // 1. Create a transaction to transfer the cNFT to the project wallet
-    // 2. Sign and send the transaction
-    // 3. Return the real transaction signature
-    
-    // Return a placeholder for now
-    return {
-      success: true,
-      message: "cNFT transfer request processed successfully",
-      isSimulated: true,
-      assetDetails,
-      signature: "SIMULATED_TRANSFER_" + Math.random().toString(36).substring(2, 15),
-      explorerUrl: "https://explorer.solana.com/tx/SIMULATED_TRANSFER"
-    };
+    // For real transfers, implement the actual transaction
+    try {
+      // This requires a tree authority keypair to be set up
+      if (!process.env.TREE_AUTHORITY_SECRET_KEY) {
+        console.warn("No tree authority secret key found in environment. The transfer will be simulated.");
+        return {
+          success: true,
+          message: `Transfer request processed, but no tree authority key available. Simulating success for ${assetDetails.name}`,
+          isSimulated: true,
+          assetDetails,
+          signature: "SIMULATED_TRANSFER_" + Math.random().toString(36).substring(2, 15),
+          explorerUrl: "https://explorer.solana.com/tx/SIMULATED_TRANSFER"
+        };
+      }
+      
+      // Uncomment this code once you've set up the tree authority keypair
+      // const secretKey = bs58.decode(process.env.TREE_AUTHORITY_SECRET_KEY);
+      // const keypair = Keypair.fromSecretKey(secretKey);
+      // const destination = new PublicKey(destinationAddress || PROJECT_WALLET);
+      
+      // Create and send the transfer transaction here
+      // const tx = await createTransferTransaction(
+      //   assetId, 
+      //   proofData, 
+      //   new PublicKey(ownerAddress), 
+      //   destination,
+      //   keypair
+      // );
+      
+      // const signature = await sendAndConfirmTransaction(
+      //   connection,
+      //   tx,
+      //   [keypair]
+      // );
+      
+      // Need to add additional imports to make this work:
+      // import { Keypair, PublicKey, sendAndConfirmTransaction } from '@solana/web3.js';
+      // import bs58 from 'bs58';
+      
+      return {
+        success: true,
+        message: `Transfer request for ${assetDetails.name} was processed. Ready for implementation with an actual tree authority keypair.`,
+        isSimulated: true, // This will be false when properly implemented
+        assetDetails,
+        signature: "IMPLEMENTATION_REQUIRED_" + Math.random().toString(36).substring(2, 15),
+        explorerUrl: "https://explorer.solana.com/tx/IMPLEMENTATION_REQUIRED"
+      };
+    } catch (transferError) {
+      console.error("Error in transfer transaction:", transferError);
+      return {
+        success: false,
+        error: `Transfer transaction error: ${transferError.message}`,
+        isSimulated: false,
+        assetDetails
+      };
+    }
   } catch (error) {
     console.error('Error processing transfer request:', error);
     return {
