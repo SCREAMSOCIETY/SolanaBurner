@@ -1292,8 +1292,14 @@ const WalletAssets: React.FC = () => {
                   window.BurnAnimations.applyBurnAnimation(cnftCard);
                 }
                 
-                // Update UI to remove this cNFT
-                setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+                // If this is a real transfer (not simulated), update UI to remove this cNFT
+                // In simulation mode, keep the cNFT in the list
+                if (!result.isSimulated) {
+                  setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+                } else {
+                  // In simulation mode, just log that we're keeping the cNFT
+                  console.log(`Simulation mode: ${cnft.mint} remains in wallet`);
+                }
                 
                 // Track achievement
                 if (window.BurnAnimations?.checkAchievements) {
@@ -1328,17 +1334,17 @@ const WalletAssets: React.FC = () => {
       
       // Update message based on results
       if (successCount > 0 && failedCount > 0) {
-        setError(`Successfully transferred ${successCount} of ${selectedCNFTs.length} compressed NFTs to project wallet. ${failedCount} failed. (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
+        setError(`Simulation completed for ${successCount} of ${selectedCNFTs.length} compressed NFTs. ${failedCount} failed. No real transfers happened - add a tree authority key to enable real transfers.`);
       } else if (successCount > 0) {
-        setError(`Successfully transferred all ${successCount} compressed NFTs to project wallet! (Note: Due to simulation mode, the NFTs will reappear on refresh)`);
+        setError(`Simulation completed for all ${successCount} compressed NFTs! No real transfers happened - add a tree authority key to enable real transfers.`);
       } else {
-        setError(`Failed to transfer any compressed NFTs to project wallet. This could be due to simulation mode or network issues.`);
+        setError(`Simulation completed: No actual transfers occurred because we're running in simulation mode. A tree authority keypair is needed for real transfers.`);
         
         // Show additional explanation
         if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
           window.BurnAnimations.showNotification(
-            "cNFT Transfer Note", 
-            "Your cNFTs are being transferred to screamsociety.sol project wallet"
+            "cNFT Transfer Simulation", 
+            "This is a simulation. To transfer cNFTs in production, a tree authority key is required. Your cNFTs remain in your wallet."
           );
         }
       }
