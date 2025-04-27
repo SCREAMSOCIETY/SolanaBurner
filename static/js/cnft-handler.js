@@ -49,14 +49,34 @@ export class CNFTHandler {
         const errors = [];
         
         try {
+            if (typeof window !== "undefined" && window.debugInfo) {
+                window.debugInfo.proofFetchFailed = false;
+                window.debugInfo.proofFetchErrors = [];
+            }
+            
             // Method 1: Using bubblegum SDK getAssetWithProof
             console.log("Method 1: Using bubblegum SDK getAssetWithProof...");
             try {
                 const { getAssetWithProof } = require("@metaplex-foundation/mpl-bubblegum");
                 const asset = await getAssetWithProof(this.connection, assetId);
                 
-                if (asset && asset.proof && Array.isArray(asset.proof)) {
+                console.log("SDK Response:", asset);
+                
+                if (asset && asset.proof && Array.isArray(asset.proof) && asset.proof.length > 0) {
                     console.log("Successfully fetched proof via bubblegum SDK");
+                    
+                    // Ensure asset has the correct structure
+                    if (!asset.compression) {
+                        asset.compression = {
+                            compressed: true,
+                            tree: asset.tree_id || asset.merkle_tree || "11111111111111111111111111111111",
+                            root: asset.root || "11111111111111111111111111111111",
+                            leaf_id: asset.leaf_id || asset.node_index || 0,
+                            data_hash: "11111111111111111111111111111111", 
+                            creator_hash: "11111111111111111111111111111111"
+                        };
+                    }
+                    
                     return asset;
                 } else {
                     throw new Error("Invalid proof data from bubblegum SDK");
@@ -73,11 +93,32 @@ export class CNFTHandler {
                 const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
                 const proofData = await proofResponse.json();
                 
-                if (proofData.success && proofData.data && proofData.data.proof && Array.isArray(proofData.data.proof)) {
-                    console.log("Successfully fetched proof data via Helius API");
-                    return proofData.data;
+                console.log("Backend API Response:", proofData);
+                
+                if (proofData.success && proofData.data) {
+                    if (proofData.data.proof && Array.isArray(proofData.data.proof) && proofData.data.proof.length > 0) {
+                        console.log("Successfully fetched proof data via Helius backend API");
+                        
+                        // Make sure we have all the required compression fields
+                        if (!proofData.data.compression) {
+                            proofData.data.compression = {
+                                compressed: true,
+                                tree: proofData.data.tree_id || "11111111111111111111111111111111",
+                                root: proofData.data.root || "11111111111111111111111111111111",
+                                leaf_id: proofData.data.node_index || 0,
+                                data_hash: "11111111111111111111111111111111", 
+                                creator_hash: "11111111111111111111111111111111"
+                            };
+                        }
+                        
+                        return proofData.data;
+                    } else {
+                        console.warn("Proof array is missing or empty in backend API response");
+                        throw new Error("Invalid proof data from Helius backend API");
+                    }
                 } else {
-                    throw new Error("Invalid proof data from Helius backend API");
+                    console.warn("Invalid response structure from backend API:", proofData);
+                    throw new Error("Invalid response structure from Helius backend API");
                 }
             } catch (apiError) {
                 console.log("Method 2 error:", apiError);
@@ -93,13 +134,30 @@ export class CNFTHandler {
                     const directResponse = await fetch(`https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${apiKey}`);
                     const directData = await directResponse.json();
                     
-                    if (directData && directData.proof && Array.isArray(directData.proof)) {
+                    console.log("Direct API Response:", directData);
+                    
+                    if (directData && directData.proof && Array.isArray(directData.proof) && directData.proof.length > 0) {
                         console.log("Successfully fetched proof via direct Helius API");
+                        
+                        // Create a properly structured response
                         return {
-                            ...directData,
-                            assetId: assetId
+                            assetId: assetId,
+                            proof: directData.proof,
+                            root: directData.root,
+                            tree_id: directData.tree_id,
+                            node_index: directData.node_index,
+                            leaf: directData.leaf,
+                            compression: {
+                                compressed: true,
+                                tree: directData.tree_id || "11111111111111111111111111111111",
+                                root: directData.root || "11111111111111111111111111111111",
+                                leaf_id: directData.node_index || 0,
+                                data_hash: directData.leaf && directData.leaf.data_hash ? directData.leaf.data_hash : "11111111111111111111111111111111",
+                                creator_hash: directData.leaf && directData.leaf.creator_hash ? directData.leaf.creator_hash : "11111111111111111111111111111111"
+                            }
                         };
                     } else {
+                        console.warn("Proof array is missing or empty in direct API response");
                         throw new Error("Invalid proof data from direct Helius API");
                     }
                 } catch (directError) {
@@ -113,17 +171,16 @@ export class CNFTHandler {
                 errors.push("No API key available");
             }
             
-            // Method 4: If all else fails, create a minimal asset object with an empty proof
-            // This is a last resort and may not work, but better than crashing
-            console.warn("All proof fetching methods failed, constructing placeholder asset data");
+            // If all methods failed, update debugging info and show warnings
+            console.warn("All proof fetching methods failed for asset:", assetId);
             console.warn("Attempts:", attempts.join(", "));
             console.warn("Errors:", errors.join(", "));
             
             // Show notification warning to user
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                 window.BurnAnimations.showNotification(
-                    "Warning: Limited Proof Data", 
-                    "Could not retrieve complete proof data. Transaction may fail."
+                    "Error Fetching Proof Data", 
+                    "We couldn't retrieve the proof data needed for this cNFT. The transfer will not work without this data."
                 );
             }
             
@@ -133,17 +190,9 @@ export class CNFTHandler {
                 window.debugInfo.proofFetchErrors = errors;
             }
             
-            // Return minimal data structure
-            return {
-                assetId: assetId,
-                proof: [],  // Empty proof array
-                compression: {
-                    compressed: true,
-                    tree: "EDR6ywjZy9pQqz7UCCx3jzCeMQcoks231URFDizJAUNq",
-                    root: "11111111111111111111111111111111",
-                    proofFailed: true
-                }
-            };
+            // Rather than returning placeholder data that would cause transaction errors,
+            // throw an error to handle it properly in the UI
+            throw new Error("Failed to fetch required proof data after multiple attempts");
         } catch (error) {
             console.error("Fatal error in fetchAssetWithProof:", error);
             
