@@ -48,11 +48,28 @@ let treeAuthorityKeypair = null;
 // Try to load the tree authority keypair if available
 if (process.env.TREE_AUTHORITY_SECRET_KEY) {
   try {
-    treeAuthorityKeypair = Keypair.fromSecretKey(
-      Uint8Array.from(JSON.parse(process.env.TREE_AUTHORITY_SECRET_KEY))
-    );
+    // Handle both base58 encoded format and JSON array format
+    if (process.env.TREE_AUTHORITY_SECRET_KEY.startsWith('[')) {
+      // Legacy JSON array format
+      treeAuthorityKeypair = Keypair.fromSecretKey(
+        Uint8Array.from(JSON.parse(process.env.TREE_AUTHORITY_SECRET_KEY))
+      );
+    } else {
+      // Base58 encoded format (the format we output from create-merkle-tree.js)
+      const secretKey = bs58.decode(process.env.TREE_AUTHORITY_SECRET_KEY);
+      treeAuthorityKeypair = Keypair.fromSecretKey(secretKey);
+    }
+    
     hasTreeAuthority = true;
     console.log('Tree authority keypair loaded successfully');
+    console.log(`Tree authority public key: ${treeAuthorityKeypair.publicKey.toString()}`);
+    
+    // Check if a specific tree address is specified
+    if (process.env.TREE_ADDRESS) {
+      console.log(`Using tree address: ${process.env.TREE_ADDRESS}`);
+    } else {
+      console.log('No specific tree address provided. Will derive from asset proof data.');
+    }
   } catch (error) {
     console.error('Error loading tree authority keypair:', error);
   }
