@@ -612,7 +612,18 @@ export class CNFTHandler {
             }
             
             // Gather required information for burn instruction
-            const merkleTree = new PublicKey(assetData.compression.tree);
+            // Make sure we have a valid tree address - check multiple possible locations
+            const treeAddress = assetData.compression?.tree || 
+                              assetData.tree_id || 
+                              assetData.merkle_tree;
+                              
+            if (!treeAddress) {
+                console.error('Missing tree address in asset data:', assetData);
+                throw new Error('Missing tree address in asset data. Cannot complete burn operation.');
+            }
+            
+            console.log('Using tree address for burn:', treeAddress);
+            const merkleTree = new PublicKey(treeAddress);
             
             // Calculate the tree authority using the program-derived address
             const [treeAuthority] = PublicKey.findProgramAddressSync(
@@ -625,25 +636,41 @@ export class CNFTHandler {
             console.log("Merkle tree:", merkleTree.toString());
             console.log("Leaf owner (wallet):", this.wallet.publicKey.toString());
             
-            // Extract required compression data fields
+            // Extract required compression data fields - with robust fallbacks
             const dataHash = new PublicKey(
-                assetData.compression.data_hash || 
-                assetData.compression.dataHash || 
+                assetData.compression?.data_hash || 
+                assetData.compression?.dataHash || 
+                (assetData.leaf && assetData.leaf.data_hash) ||
+                (assetData.leaf && assetData.leaf.dataHash) ||
+                assetData.data_hash ||
+                assetData.dataHash ||
                 "11111111111111111111111111111111"
             );
             
             const creatorHash = new PublicKey(
-                assetData.compression.creator_hash || 
-                assetData.compression.creatorHash || 
+                assetData.compression?.creator_hash || 
+                assetData.compression?.creatorHash || 
+                (assetData.leaf && assetData.leaf.creator_hash) ||
+                (assetData.leaf && assetData.leaf.creatorHash) ||
+                assetData.creator_hash ||
+                assetData.creatorHash ||
                 "11111111111111111111111111111111"
             );
             
-            // Get the root hash from the proof (first element)
-            const rootHash = new PublicKey(proof[0]);
+            // Get the root hash from the proof (first element) or from asset data
+            const rootHash = new PublicKey(
+                proof[0] || 
+                assetData.compression?.root ||
+                assetData.root ||
+                "11111111111111111111111111111111"
+            );
             
             // Get the leaf index/nonce for the asset
-            const leafIndex = assetData.compression.leaf_id || 
-                             assetData.compression.leafId || 
+            const leafIndex = assetData.compression?.leaf_id || 
+                             assetData.compression?.leafId || 
+                             assetData.leaf_id ||
+                             assetData.leafId ||
+                             assetData.node_index ||
                              0;
             
             // Convert the proof into an array of PublicKeys
