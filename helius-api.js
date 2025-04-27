@@ -213,6 +213,44 @@ function formatHeliusV0NFTData(nft) {
 }
 
 /**
+ * Fetches proof data for a compressed NFT (cNFT)
+ * @param {string} assetId - The NFT/asset ID
+ * @returns {Promise<Object>} - Asset proof data for the cNFT
+ */
+async function fetchAssetProof(assetId) {
+  try {
+    console.log(`[Helius API] Fetching proof data for asset: ${assetId}`);
+    
+    const response = await axios.post(
+      HELIUS_RPC_URL,
+      {
+        jsonrpc: '2.0',
+        id: 'helius-proof',
+        method: 'getAssetProof',
+        params: {
+          id: assetId
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    if (response.data && response.data.result) {
+      return response.data.result;
+    } else {
+      console.warn('[Helius API] No proof data found:', response.data);
+      return null;
+    }
+  } catch (error) {
+    console.error('[Helius API] Error fetching asset proof:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Converts Helius NFT data from RPC API to our application's NFT format
  * @param {Object} heliusNFT - NFT data from Helius RPC API
  * @returns {Object} - Formatted NFT data for our application
@@ -281,6 +319,7 @@ module.exports = {
   fetchAllNFTsByOwner,
   fetchAssetDetails,
   fetchCompressedNFTsByOwner,
+  fetchAssetProof,
   formatHeliusNFTData,
   formatHeliusV0NFTData
 };
