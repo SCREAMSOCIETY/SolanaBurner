@@ -1006,12 +1006,10 @@ const WalletAssets: React.FC = () => {
           window.BurnAnimations.createConfetti();
         }
         
-        // Only remove the cNFT from the UI if it's a real transfer, not a simulation
-        if (!result.isSimulated) {
-          setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
-        } else {
-          console.log(`Simulation mode: ${cnft.mint} remains in wallet since no real transfer occurred`);
-        }
+        // When using direct wallet transfer, the transfer should always be real (not simulated)
+        // Remove the NFT from the UI list since it has been transferred
+        setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+        console.log(`Transfer complete: ${cnft.mint} has been transferred to the project wallet`);
         
         // Track achievement
         if (window.BurnAnimations?.checkAchievements) {
@@ -1308,14 +1306,10 @@ const WalletAssets: React.FC = () => {
                   window.BurnAnimations.applyBurnAnimation(cnftCard);
                 }
                 
-                // If this is a real transfer (not simulated), update UI to remove this cNFT
-                // In simulation mode, keep the cNFT in the list
-                if (!result.isSimulated) {
-                  setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
-                } else {
-                  // In simulation mode, just log that we're keeping the cNFT
-                  console.log(`Simulation mode: ${cnft.mint} remains in wallet`);
-                }
+                // When using direct wallet transfer, the transfer should always be real (not simulated)
+                // Remove the NFT from the UI list since it has been transferred
+                setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
+                console.log(`Transfer complete: ${cnft.mint} has been transferred to the project wallet`);
                 
                 // Track achievement
                 if (window.BurnAnimations?.checkAchievements) {
@@ -1350,17 +1344,17 @@ const WalletAssets: React.FC = () => {
       
       // Update message based on results
       if (successCount > 0 && failedCount > 0) {
-        setError(`Simulation completed for ${successCount} of ${selectedCNFTs.length} compressed NFTs. ${failedCount} failed. No real transfers happened - add a tree authority key to enable real transfers.`);
+        setError(`Transferred ${successCount} of ${selectedCNFTs.length} compressed NFTs to the project wallet. ${failedCount} failed.`);
       } else if (successCount > 0) {
-        setError(`Simulation completed for all ${successCount} compressed NFTs! No real transfers happened - add a tree authority key to enable real transfers.`);
+        setError(`Successfully transferred all ${successCount} compressed NFTs to the project wallet!`);
       } else {
-        setError(`Simulation completed: No actual transfers occurred because we're running in simulation mode. A tree authority keypair is needed for real transfers.`);
+        setError(`No transfers were completed. Please try again or check your wallet connection.`);
         
         // Show additional explanation
         if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
           window.BurnAnimations.showNotification(
-            "cNFT Transfer Simulation", 
-            "This is a simulation. To transfer cNFTs in production, a tree authority key is required. Your cNFTs remain in your wallet."
+            "cNFT Transfer Failed", 
+            "We couldn't transfer any of your selected cNFTs. Please make sure your wallet is connected and try again."
           );
         }
       }
@@ -1561,8 +1555,8 @@ const WalletAssets: React.FC = () => {
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
               Note: When you remove a cNFT, we transfer it to a project-managed wallet (screamsociety.sol) rather than burning it. This allows you to clean up your wallet without requiring tree authority access needed for actual burning.
             </div>
-            <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#663399', background: '#f0e6ff', padding: '8px', borderRadius: '4px', border: '1px solid #d8c8ff' }}>
-              <strong>Simulation Mode:</strong> This application is currently running in simulation mode. No real blockchain transactions will be performed when transferring cNFTs. To enable real transfers, a tree authority keypair must be configured.
+            <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#006633', background: '#e6fff0', padding: '8px', borderRadius: '4px', border: '1px solid #c8ffd8' }}>
+              <strong>Direct Transfer Mode:</strong> This application now supports direct wallet-to-wallet transfers for cNFTs. When you transfer a cNFT, it will be sent directly from your wallet to the project wallet (screamsociety.sol) as a real blockchain transaction.
             </div>
             
             <div className="cnfts-grid">
