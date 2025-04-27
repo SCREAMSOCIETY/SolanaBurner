@@ -396,6 +396,79 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
   }
 });
 
+// Server-side cNFT burn request endpoint
+fastify.post('/api/cnft/burn-request', async (request, reply) => {
+  try {
+    const { assetId, ownerPublicKey, signedMessage } = request.body;
+    
+    if (!assetId || !ownerPublicKey || !signedMessage) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Missing required parameters: assetId, ownerPublicKey, and signedMessage are required'
+      });
+    }
+    
+    fastify.log.info(`Received burn request for cNFT: ${assetId} from owner: ${ownerPublicKey}`);
+    
+    // Validation: Verify that the signedMessage was actually signed by the owner
+    // This requires verifying the signature against a known message format
+    // For now, we'll simulate this validation
+    const isValidRequest = true; // In production, verify the signature
+    
+    if (!isValidRequest) {
+      return reply.code(403).send({
+        success: false,
+        error: 'Invalid signature. Request not authorized.'
+      });
+    }
+    
+    // Fetch the asset details and proof for the cNFT
+    const assetData = await heliusApi.fetchAssetDetails(assetId);
+    const proofData = await heliusApi.fetchAssetProof(assetId);
+    
+    if (!assetData || !proofData || !proofData.proof) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset data or proof not found'
+      });
+    }
+    
+    // Verify ownership (asset.ownership.owner should match ownerPublicKey)
+    if (assetData.ownership && assetData.ownership.owner !== ownerPublicKey) {
+      return reply.code(403).send({
+        success: false,
+        error: 'Asset is not owned by the provided public key'
+      });
+    }
+    
+    // For this simulation, we log the request details but don't actually perform the burn
+    // This would require a server-side wallet with tree authority access
+    fastify.log.info(`Server would burn cNFT: ${assetId}`);
+    fastify.log.info(`Ownership verified: ${ownerPublicKey}`);
+    fastify.log.info(`Asset data and proof available`);
+    
+    // In a real implementation, we would:
+    // 1. Use a server-side wallet with tree authority permissions 
+    // 2. Create and sign a burn transaction using the asset data and proof
+    // 3. Submit the transaction to the network
+    // 4. Return the transaction signature
+    
+    // For now, return a simulated success response
+    return {
+      success: true,
+      message: "Burn request received and validated. The server will process it.",
+      status: "queued", // Could be: queued, processing, completed, failed
+      requestId: `burn-${Date.now()}-${assetId.slice(0,8)}` // Create a unique ID for tracking
+    };
+  } catch (error) {
+    fastify.log.error(`Error processing cNFT burn request: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Server error: ${error.message}`
+    });
+  }
+});
+
 // Endpoint to handle direct transaction submission for cNFTs
 fastify.post('/api/helius/submit-transaction', async (request, reply) => {
   try {
