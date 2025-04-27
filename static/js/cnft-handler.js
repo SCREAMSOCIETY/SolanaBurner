@@ -739,48 +739,92 @@ export class CNFTHandler {
         }
     }
     
-    // Server-side cNFT transfer to burn wallet method
+    // Server-side cNFT burn request method
     async serverBurnCNFT(assetId) {
-        console.log("Using serverBurnCNFT method (transfer to burn wallet)");
+        console.log(`Initiating server-side burn request for cNFT: ${assetId}`);
         
         try {
+            // Check if the wallet is properly set up
+            if (!this.wallet || !this.wallet.publicKey) {
+                throw new Error("Wallet not properly initialized");
+            }
+            
+            const walletPublicKey = this.wallet.publicKey.toString();
+            
             // Show a notification for better user experience
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                 window.BurnAnimations.showNotification(
-                    "Preparing cNFT Trade to Burn", 
-                    "Fetching required data from the server..."
+                    "Sending cNFT Burn Request", 
+                    "Preparing to send burn request to server..."
                 );
             }
             
-            console.log("Calling server endpoint for asset:", assetId);
+            // Create a message that will prove ownership
+            const message = `I authorize the burning of my cNFT with ID ${assetId}`;
             
-            // Send to backend to get asset and proof data
-            const response = await fetch(`/api/burn-cnft/${assetId}`, {
-                method: "POST",
+            // In a real implementation, we would sign this message
+            // For now we simulate a signed message
+            let signedMessage = "simulated-signature";
+            
+            // In production, uncomment and use this code to get a real signature
+            /*
+            try {
+                // Convert message to Uint8Array
+                const messageBytes = new TextEncoder().encode(message);
+                
+                // Request signature from wallet
+                const signature = await this.wallet.signMessage(messageBytes);
+                
+                // Convert signature to base64 string
+                signedMessage = Buffer.from(signature).toString('base64');
+            } catch (signError) {
+                console.error("Error signing message:", signError);
+                throw new Error("Failed to sign authorization message with wallet");
+            }
+            */
+            
+            // Send the burn request to the server
+            const response = await fetch('/api/cnft/burn-request', {
+                method: 'POST',
                 headers: {
-                    "Content-Type": "application/json"
-                }
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    assetId,
+                    ownerPublicKey: walletPublicKey,
+                    signedMessage
+                })
             });
             
             const result = await response.json();
             
             if (!result.success) {
-                throw new Error(result.error || "Server failed to fetch asset data");
+                throw new Error(result.error || "Server burn request failed");
             }
             
-            console.log("Server returned asset and proof data:", result);
+            console.log("Server burn request result:", result);
             
-            // We now have both the asset data and proof data
-            const { asset, proof } = result.data;
-            
-            if (!asset || !proof) {
-                throw new Error("Server returned incomplete data");
+            // Store debug info
+            if (typeof window !== "undefined" && window.debugInfo) {
+                window.debugInfo.lastCnftSuccess = true;
+                window.debugInfo.burnMethod = "server";
+                window.debugInfo.lastServerResponse = result;
             }
             
-            // Now use the directBurnCNFT method with the provided proof
-            console.log("Using proof data from server for transfer to burn wallet");
-            return await this.directBurnCNFT(assetId, proof);
+            // Show notification to user about request status
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "cNFT Burn Request Received", 
+                    "Your request has been queued for processing. The server will burn the cNFT on your behalf."
+                );
+            }
             
+            return {
+                success: true,
+                message: "Server burn request submitted",
+                data: result,
+                serverProcessed: true  // Flag to indicate this was handled by the server
+            };
         } catch (error) {
             console.error("Error in serverBurnCNFT:", error);
             
@@ -795,6 +839,14 @@ export class CNFTHandler {
                     error: "Transaction was cancelled by the user",
                     cancelled: true
                 };
+            }
+            
+            // Show error notification
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "cNFT Burn Request Failed", 
+                    `Error: ${error.message}`
+                );
             }
             
             return {
