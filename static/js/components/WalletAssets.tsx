@@ -24,6 +24,7 @@ declare global {
       lastCnftAssumedSuccess: boolean;
       walletInfo: any;
       cnftBurnAttempted?: boolean;
+      cnftTransferAttempted?: boolean;
       bulkBurnAttempted?: boolean;
       proofFetchFailed?: boolean;
       proofFetchErrors?: string[];
@@ -33,6 +34,7 @@ declare global {
       assetData?: any; 
       proofData?: any;
       burnMethod?: string;
+      transferMethod?: string;
     };
     cnftHandler?: {
       CNFTHandler: any;
@@ -987,7 +989,7 @@ const WalletAssets: React.FC = () => {
       console.log("Sending transfer request for cNFT:", cnft.mint);
       
       // Execute the transfer request - use the new transferCNFT method instead of serverBurnCNFT
-      const result = await handler.transferCNFT(cnft.mint);
+      const result = await handler.transferCNFT(cnft.mint) as any;
       
       // Check if the operation was successful
       if (result && result.success) {
@@ -1278,7 +1280,7 @@ const WalletAssets: React.FC = () => {
               console.log(`Sending transfer request for ${cnft.mint}`);
               
               // Submit server-side transfer request
-              const result = await handler.transferCNFT(cnft.mint);
+              const result = await handler.transferCNFT(cnft.mint) as any;
               
               if (result && result.success) {
                 console.log(`Successfully transferred cNFT: ${cnft.mint}`);

@@ -1236,4 +1236,4 @@ export class CNFTHandler {
     }
 }
 
-module.exports = { CNFTHandler };
+// CNFTHandler is already exported at the top of the file
