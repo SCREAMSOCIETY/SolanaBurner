@@ -6,7 +6,7 @@ import {
     PROGRAM_ID as BUBBLEGUM_PROGRAM_ID
 } from "@metaplex-foundation/mpl-bubblegum";
 import axios from "axios";
-import { BN } from "@project-serum/anchor";
+import BN from "bn.js";
 
 // Define burn wallet address - standard all zeros address
 const BURN_WALLET_ADDRESS = "11111111111111111111111111111111";
