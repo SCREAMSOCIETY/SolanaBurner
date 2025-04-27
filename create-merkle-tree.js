@@ -21,14 +21,20 @@ const {
   Transaction,
   sendAndConfirmTransaction
 } = require('@solana/web3.js');
+// Import from SPL Compression for the account compression program
 const { 
   createCreateTreeInstruction,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  SPL_NOOP_PROGRAM_ID
+  SPL_NOOP_PROGRAM_ID,
 } = require('@solana/spl-account-compression');
-const { 
-  PROGRAM_ID: BUBBLEGUM_PROGRAM_ID,
-} = require('@metaplex-foundation/mpl-bubblegum');
+
+// Define the Bubblegum program ID directly
+const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+
+// Log the program IDs to verify they're loaded correctly
+console.log(`Using Bubblegum Program ID: ${BUBBLEGUM_PROGRAM_ID.toString()}`);
+console.log(`Using Compression Program ID: ${SPL_ACCOUNT_COMPRESSION_PROGRAM_ID.toString()}`);
+console.log(`Using NoOp Program ID: ${SPL_NOOP_PROGRAM_ID.toString()}`);
 const bs58 = require('bs58');
 require('dotenv').config();
 
@@ -81,7 +87,7 @@ async function createMerkleTree() {
     );
     console.log(`Tree authority: ${treeAuthority.toString()}`);
     
-    // Create the instruction to create a new tree
+    // Create the instruction to create a new tree (with v0.2.0 API)
     const createTreeIx = createCreateTreeInstruction(
       {
         payer: payer.publicKey,
@@ -95,11 +101,10 @@ async function createMerkleTree() {
         maxDepth: MAX_DEPTH,
         maxBufferSize: MAX_BUFFER_SIZE,
         public: true,
-      },
-      BUBBLEGUM_PROGRAM_ID
+      }
     );
     
-    // Create and send the transaction
+    // Create a transaction with the instruction
     const tx = new Transaction().add(createTreeIx);
     const txSignature = await sendAndConfirmTransaction(
       connection,

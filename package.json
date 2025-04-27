@@ -17,7 +17,7 @@
     "@metaplex-foundation/js": "^0.20.1",
     "@metaplex-foundation/mpl-bubblegum": "^4.3.1",
     "@project-serum/anchor": "^0.26.0",
-    "@solana/spl-account-compression": "^0.4.1",
+    "@solana/spl-account-compression": "^0.2.0",
     "@solana/spl-token": "^0.4.13",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
