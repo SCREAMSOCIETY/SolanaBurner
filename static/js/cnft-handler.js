@@ -673,7 +673,12 @@ export class CNFTHandler {
                              assetData.node_index ||
                              0;
             
-            // Convert the proof into an array of PublicKeys
+            // Make sure proof is valid and convert it to an array of PublicKeys
+            if (!proof || !Array.isArray(proof) || proof.length === 0) {
+                console.error('Missing or invalid proof data:', proof);
+                throw new Error('Missing or invalid proof data for cNFT burn operation.');
+            }
+            console.log('Using proof data:', proof);
             const proofPublicKeys = proof.map(node => new PublicKey(node));
             
             // Create the burn instruction
@@ -1202,8 +1207,36 @@ export class CNFTHandler {
                 }
             }
             
+            // Make sure we have valid proof data
+            if (!assetData.proof || !Array.isArray(assetData.proof) || assetData.proof.length === 0) {
+                console.warn('Missing or empty proof array in asset data:', assetData);
+                console.log('Attempting to fetch proof data specifically...');
+                
+                try {
+                    // Try direct asset proof endpoint
+                    const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
+                    const proofData = await proofResponse.json();
+                    
+                    if (proofData && proofData.data && Array.isArray(proofData.data.proof) && proofData.data.proof.length > 0) {
+                        console.log('Successfully fetched proof data:', proofData.data.proof);
+                        assetData.proof = proofData.data.proof;
+                    } else {
+                        console.error('Failed to get valid proof data from API:', proofData);
+                        throw new Error('Could not obtain valid proof data required for transfer.');
+                    }
+                } catch (proofError) {
+                    console.error('Error fetching proof data:', proofError);
+                    throw new Error('Failed to fetch proof data required for transfer.');
+                }
+            }
+            
             const proof = assetData.proof || [];
             console.log("Using proof:", proof);
+            
+            // Validate proof data
+            if (!proof || !Array.isArray(proof) || proof.length === 0) {
+                throw new Error('Missing proof data required for cNFT transfer.')
+            }
             
             // If no destination address specified, use screamsociety.sol by default
             // In a real scenario, we'd need to look this up via the SNS RPC call
@@ -1264,11 +1297,11 @@ export class CNFTHandler {
                         new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV')
                     )[0],
                     compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-                    anchorRemainingAccounts: proof.map((node) => ({
+                    anchorRemainingAccounts: proof && Array.isArray(proof) ? proof.map((node) => ({
                         pubkey: new PublicKey(node),
                         isSigner: false,
                         isWritable: false
-                    }))
+                    })) : []
                 },
                 {
                     root: [...new PublicKey(
