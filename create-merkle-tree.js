@@ -28,7 +28,9 @@ const {
 
 // Import from Metaplex Bubblegum for the create tree instruction
 const {
-  createCreateTreeInstruction
+  createAllocTreeIx,
+  createCreateTreeInstruction,
+  PROGRAM_ID: BUBBLEGUM_PROGRAM_ID_IMPORT
 } = require('@metaplex-foundation/mpl-bubblegum');
 
 // Define program IDs directly as the import structure might have changed
@@ -36,7 +38,8 @@ const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey('cmtDvXumGCrqC1Age74AVP
 const SPL_NOOP_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
 
 // Define the Bubblegum program ID directly
-const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+// Use the imported one if available, otherwise use a hardcoded value
+const BUBBLEGUM_PROGRAM_ID = BUBBLEGUM_PROGRAM_ID_IMPORT || new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
 
 // Log the program IDs to verify they're loaded correctly
 console.log(`Using Bubblegum Program ID: ${BUBBLEGUM_PROGRAM_ID.toString()}`);
@@ -94,22 +97,46 @@ async function createMerkleTree() {
     );
     console.log(`Tree authority: ${treeAuthority.toString()}`);
     
-    // Create the instruction to create a new tree (with v0.2.0 API)
-    const createTreeIx = createCreateTreeInstruction(
-      {
-        payer: payer.publicKey,
-        treeCreator: payer.publicKey,
-        treeAuthority,
-        merkleTree: treeKeypair.publicKey,
-        compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-        logWrapper: SPL_NOOP_PROGRAM_ID,
-      },
-      {
-        maxDepth: MAX_DEPTH,
-        maxBufferSize: MAX_BUFFER_SIZE,
-        public: true,
-      }
-    );
+    // Check for the correct API version by examining available functions
+    console.log("Checking available Bubblegum API methods...");
+    
+    // Try newer API first - using createAllocTreeIx if available
+    let createTreeIx;
+    if (typeof createAllocTreeIx === 'function') {
+      console.log("Using newer Bubblegum API with createAllocTreeIx");
+      createTreeIx = createAllocTreeIx(
+        {
+          merkleTree: treeKeypair.publicKey,
+          payer: payer.publicKey,
+          treeCreator: payer.publicKey,
+          treeAuthority,
+          maxDepth: MAX_DEPTH,
+          maxBufferSize: MAX_BUFFER_SIZE,
+        },
+        BUBBLEGUM_PROGRAM_ID,
+        SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
+      );
+    } else if (typeof createCreateTreeInstruction === 'function') {
+      // Fallback to the older API if available
+      console.log("Using older Bubblegum API with createCreateTreeInstruction");
+      createTreeIx = createCreateTreeInstruction(
+        {
+          payer: payer.publicKey,
+          treeCreator: payer.publicKey,
+          treeAuthority,
+          merkleTree: treeKeypair.publicKey,
+          compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          logWrapper: SPL_NOOP_PROGRAM_ID,
+        },
+        {
+          maxDepth: MAX_DEPTH,
+          maxBufferSize: MAX_BUFFER_SIZE,
+          public: true,
+        }
+      );
+    } else {
+      throw new Error("Could not find compatible tree creation method in Bubblegum API");
+    }
     
     // Create a transaction with the instruction
     const tx = new Transaction().add(createTreeIx);
