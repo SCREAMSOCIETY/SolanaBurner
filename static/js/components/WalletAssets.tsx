@@ -9,6 +9,9 @@ import {
 } from '@solana/spl-token';
 import axios from 'axios';
 
+// Import the CNFTHandler class
+import { CNFTHandler } from '../cnft-handler';
+
 // Add global variable to global window object to access in console for debugging
 declare global {
   interface Window {
@@ -59,7 +62,6 @@ if (typeof window !== 'undefined') {
     walletInfo: null
   };
 }
-import { CNFTHandler } from '../cnft-handler';
 
 // Define asset type interfaces
 interface TokenData {
@@ -970,26 +972,13 @@ const WalletAssets: React.FC = () => {
     
     try {
       // Create a CNFTHandler instance with the current connection and wallet
-      // The CNFTHandler class is available from the global window object
-      // via the script tag that loads cnft-handler.js
-      console.log("Creating CNFTHandler instance from window object");
+      // Use the directly imported CNFTHandler class
+      console.log("Creating CNFTHandler instance from direct import");
       
-      // Check if the window.cnftHandler object exists and log details
-      if (typeof window !== 'undefined') {
-        console.log("Window object available. cnftHandler exists:", !!window.cnftHandler);
-        if (window.cnftHandler) {
-          console.log("CNFTHandler exists:", !!window.cnftHandler.CNFTHandler);
-        }
-      }
-      
-      // Use the globally available handler constructor
-      // @ts-ignore - Using window object access which TypeScript doesn't know about statically
+      // Create a new handler instance
       const handler = new CNFTHandler(connection, {
         publicKey,
-        signTransaction,
-        // No need for these unused parameters that cause TS errors
-        // signAllTransactions: undefined,
-        // connected: !!publicKey
+        signTransaction
       });
       
       // Extract the proof from the cNFT data if available
@@ -1221,7 +1210,7 @@ const WalletAssets: React.FC = () => {
       // Create a CNFTHandler instance with the current connection and wallet
       console.log("Creating CNFTHandler instance for bulk burning");
       
-      // @ts-ignore - Using CNFTHandler directly as it's imported at the top of the file
+      // Use the directly imported CNFTHandler class
       const handler = new CNFTHandler(connection, {
         publicKey,
         signTransaction
@@ -1392,14 +1381,14 @@ const WalletAssets: React.FC = () => {
                       disabled={isBurning}
                       onClick={handleBulkBurnCNFTs}
                     >
-                      Process Selected cNFTs
+                      Send Burn Requests
                     </button>
                   </div>
                 )}
                 
                 {(selectedTokens.length + selectedNFTs.length + selectedCNFTs.length === 0) && (
                   <div className="no-selection-message">
-                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to process.
+                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to send burn requests for.
                   </div>
                 )}
               </div>
