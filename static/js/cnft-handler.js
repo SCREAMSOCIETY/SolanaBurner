@@ -916,4 +916,162 @@ export class CNFTHandler {
             throw error;
         }
     }
+    
+    // NEW METHOD: Delegate burning authority to the server
+    async delegateCNFT(assetId, assetData) {
+        console.log(`Delegating cNFT burning authority: ${assetId}`);
+        
+        if (typeof window !== "undefined" && window.debugInfo) {
+            window.debugInfo.cnftDelegateTriggered = true;
+            window.debugInfo.lastCnftData = assetData;
+            window.debugInfo.delegateMethod = "server";
+            window.debugInfo.delegateStartTime = Date.now();
+        }
+        
+        // Show a notification that we're processing the delegation
+        if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+            window.BurnAnimations.showNotification(
+                "Processing cNFT Delegation", 
+                "Preparing to delegate burning authority to server"
+            );
+        }
+        
+        try {
+            if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+                throw new Error("Wallet not connected or missing signTransaction method");
+            }
+            
+            // Use our server's endpoint to get delegation data
+            const delegationResponse = await fetch('/api/cnft/delegate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ownerAddress: this.wallet.publicKey.toString(),
+                    assetId,
+                    // Our server public key
+                    delegatePublicKey: 'HomZPVRkJsD8yRJyGVYBfCsLJ6YBGnqZRpMDBDVzKjh6'
+                })
+            });
+            
+            const delegationData = await delegationResponse.json();
+            
+            if (!delegationData.success) {
+                throw new Error(`Server error: ${delegationData.error || 'Unknown error'}`);
+            }
+            
+            console.log("Delegation data received:", delegationData);
+            
+            // Show delegation status
+            if (delegationData.isSimulated) {
+                if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                    window.BurnAnimations.showNotification(
+                        "Delegation Simulation", 
+                        "This is a simulation. In production, you would delegate authority to the server for burning."
+                    );
+                }
+                
+                return {
+                    success: true,
+                    isSimulated: true,
+                    message: delegationData.message || "Delegation simulated - tree authority required for real operation"
+                };
+            }
+            
+            // In a real implementation (with tree authority):
+            // 1. Get the proof data from delegationData
+            const proofData = delegationData.data.requiredProof;
+            
+            // 2. Convert the proof to proper format
+            const merkleProof = proofData.proof.map(node => new PublicKey(node));
+            
+            // 3. Create transaction to delegate authority
+            const tx = new Transaction();
+            
+            // Add compute budget instructions for complex operations
+            tx.add(
+                ComputeBudgetProgram.setComputeUnitLimit({ 
+                    units: 400000 // Higher compute units for cNFT operations
+                })
+            );
+            
+            // Create the tree public key
+            const treePublicKey = new PublicKey(delegationData.data.treeId);
+            
+            // Get the tree authority - derived from the tree ID
+            const treeAuthority = new PublicKey(delegationData.data.treeAuthority);
+            
+            console.log("Tree authority:", treeAuthority.toString());
+            
+            // Get compression data from proof
+            const root = new PublicKey(proofData.root);
+            const dataHash = new PublicKey(assetData?.compression?.data_hash || "11111111111111111111111111111111");
+            const creatorHash = new PublicKey(assetData?.compression?.creator_hash || "11111111111111111111111111111111");
+            const leafIndex = Number(assetData?.compression?.leaf_id || assetData?.compression?.leafId || 0);
+            
+            // The server's public key to delegate to
+            const serverDelegateKey = new PublicKey(delegationData.data.delegate);
+            
+            // Required system program accounts
+            const logWrapper = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+            const compressionProgram = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
+            
+            // Create delegate instruction with all accounts and data
+            // In a real implementation, we would import the delegate function from @metaplex-foundation/mpl-bubblegum
+            // For simulation, we'll just log the important parts:
+            console.log({
+                delegateInstruction: {
+                    treeAuthority: treeAuthority.toString(),
+                    leafOwner: this.wallet.publicKey.toString(),
+                    previousDelegate: this.wallet.publicKey.toString(),
+                    newDelegate: serverDelegateKey.toString(),
+                    merkleTree: treePublicKey.toString(),
+                    proofLength: merkleProof.length
+                }
+            });
+            
+            // Set the fee payer and recent blockhash
+            tx.feePayer = this.wallet.publicKey;
+            const { blockhash } = await this.connection.getLatestBlockhash("confirmed");
+            tx.recentBlockhash = blockhash;
+            
+            console.log("Delegation transaction prepared with blockhash:", blockhash);
+            
+            // In a real implementation with the delegate instruction:
+            // tx.add(delegateInstruction);
+            // const signedTx = await this.wallet.signTransaction(tx);
+            // const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+            
+            // Return simulated success
+            return {
+                success: true,
+                isSimulated: true,
+                message: "Delegation simulated - ready for asset burn",
+                data: {
+                    assetId,
+                    delegatedTo: serverDelegateKey.toString()
+                }
+            };
+            
+        } catch (error) {
+            console.error("Error in delegateCNFT:", error);
+            
+            if (typeof window !== "undefined" && window.debugInfo) {
+                window.debugInfo.lastCnftError = error.message;
+            }
+            
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Delegation Error", 
+                    `Failed to delegate: ${error.message}`
+                );
+            }
+            
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
 }

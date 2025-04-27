@@ -307,6 +307,112 @@ fastify.get('/api/helius/asset/:assetId', async (request, reply) => {
   }
 });
 
+// Endpoint for delegating authority for a cNFT to our server
+fastify.post('/api/cnft/delegate', async (request, reply) => {
+  try {
+    const { ownerAddress, assetId, signedMessage, delegatePublicKey } = request.body;
+    
+    if (!ownerAddress || !assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Owner address and asset ID are required'
+      });
+    }
+    
+    // Log the request
+    fastify.log.info(`Received delegation request for cNFT: ${assetId} from owner: ${ownerAddress}`);
+    
+    // 1. Fetch asset details to confirm ownership
+    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    
+    if (!assetDetails) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+    
+    // Verify ownership
+    if (assetDetails.ownership.owner !== ownerAddress) {
+      return reply.code(403).send({
+        success: false,
+        error: 'Ownership verification failed'
+      });
+    }
+    
+    fastify.log.info(`Ownership verified: ${ownerAddress}`);
+    
+    // 2. Fetch the asset proof data (required for delegation)
+    const proofData = await heliusApi.fetchAssetProof(assetId);
+    
+    if (!proofData || !proofData.proof) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Proof data not available'
+      });
+    }
+    
+    fastify.log.info(`Processing delegation request for cNFT: ${assetId}`);
+    
+    // Import required libraries
+    const { 
+      Connection, 
+      PublicKey, 
+      Transaction,
+      ComputeBudgetProgram
+    } = require('@solana/web3.js');
+    
+    // Get Bubblegum Program ID
+    const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+    
+    // 3. Create a transaction for the client to sign
+    try {
+      // Extract tree ID from proof data
+      const treeId = proofData.tree_id;
+      const treeAddress = new PublicKey(treeId);
+      
+      // Derive the tree authority PDA
+      const [treeAuthority] = PublicKey.findProgramAddressSync(
+        [treeAddress.toBuffer()],
+        BUBBLEGUM_PROGRAM_ID
+      );
+      
+      // Get our server's public key to use as delegate
+      // In a real scenario, this would be a dedicated keypair
+      const serverDelegateKey = new PublicKey(delegatePublicKey || 'HomZPVRkJsD8yRJyGVYBfCsLJ6YBGnqZRpMDBDVzKjh6');
+      
+      // We'll return instructions for the client to create a delegate transaction
+      return {
+        success: true,
+        message: "Delegation request processed. You need to sign a transaction to delegate authority.",
+        data: {
+          assetId,
+          owner: ownerAddress,
+          delegate: serverDelegateKey.toString(),
+          treeId,
+          treeAuthority: treeAuthority.toString(),
+          requiredProof: proofData
+        },
+        // This is a simulation since we're not completing the actual delegation
+        isSimulated: true
+      };
+    } catch (error) {
+      fastify.log.error(`Error creating delegation transaction: ${error.message}`);
+      return reply.code(500).send({
+        success: false,
+        error: `Error creating delegation transaction: ${error.message}`
+      });
+    }
+  } catch (error) {
+    fastify.log.error(`Error processing delegation request: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to process delegation request',
+      message: error.message
+    });
+  }
+});
+
 // Endpoint for processing cNFT burn requests
 fastify.post('/api/cnft/burn-request', async (request, reply) => {
   try {

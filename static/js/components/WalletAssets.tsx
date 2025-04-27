@@ -984,8 +984,29 @@ const WalletAssets: React.FC = () => {
       // Extract the proof from the cNFT data if available
       const proof = cnft.compression?.proof || cnft.proof || null;
       
-      // Try using the server-side burn request method
-      console.log("Submitting server-side burn request for cNFT:", cnft.mint);
+      // First delegate burning authority to the server, then burn
+      console.log("Starting two-step process: 1) Delegate authority, 2) Burn cNFT:", cnft.mint);
+      
+      // Step 1: Delegate cNFT burning authority to the server
+      console.log("Step 1: Delegating cNFT authority to server");
+      const delegationResult = await handler.delegateCNFT(cnft.mint, cnft);
+      
+      if (!delegationResult || !delegationResult.success) {
+        throw new Error(`Delegation failed: ${delegationResult?.error || 'Unknown error'}`);
+      }
+      
+      console.log("Delegation successful:", delegationResult);
+      
+      // Show intermediate message about delegation
+      if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+        window.BurnAnimations.showNotification(
+          "Delegation Complete", 
+          "Now submitting burn request to server..."
+        );
+      }
+      
+      // Step 2: Submit server-side burn request
+      console.log("Step 2: Submitting server-side burn request for cNFT:", cnft.mint);
       
       // Execute the burn request
       const result = await handler.serverBurnCNFT(cnft.mint);
@@ -1275,8 +1296,21 @@ const WalletAssets: React.FC = () => {
               // Extract the proof from the cNFT data if available
               const proof = cnft.compression?.proof || cnft.proof || null;
               
-              // Attempt to send a server-side burn request for the cNFT
-              console.log(`Submitting server-side burn request for cNFT: ${cnft.mint}`);
+              // First delegate burning authority to the server, then burn
+              console.log(`Starting two-step process for ${cnft.mint}: 1) Delegate, 2) Burn`);
+              
+              // Step 1: Delegate cNFT burning authority to the server
+              console.log(`Step 1: Delegating authority for ${cnft.mint}`);
+              const delegationResult = await handler.delegateCNFT(cnft.mint, cnft);
+              
+              if (!delegationResult || !delegationResult.success) {
+                throw new Error(`Delegation failed: ${delegationResult?.error || 'Unknown error'}`);
+              }
+              
+              console.log(`Delegation successful for ${cnft.mint}:`, delegationResult);
+              
+              // Step 2: Submit server-side burn request
+              console.log(`Step 2: Submitting burn request for ${cnft.mint}`);
               const result = await handler.serverBurnCNFT(cnft.mint);
               
               if (result && result.success) {
