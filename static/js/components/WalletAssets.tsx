@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
@@ -128,6 +128,7 @@ const WalletAssets: React.FC = () => {
   // State variables for assets
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [nfts, setNfts] = useState<NFTData[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [cnfts, setCnfts] = useState<CNFTData[]>([]);
   
   // State variables for loading and errors
@@ -324,21 +325,27 @@ const WalletAssets: React.FC = () => {
     fetchTokens();
   }, [publicKey, connection, solscanApiKey]);
 
-  // Fetch all NFTs (regular + compressed) when wallet connects using Helius v0 API
-  useEffect(() => {
-    const fetchAllNFTs = async () => {
-      if (!publicKey) return;
-      
+  // Function to fetch all NFTs with an optional refresh parameter
+  const fetchAllNFTs = useCallback(async (forceRefresh = false) => {
+    if (!publicKey) return;
+    
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
       setNftsLoading(true);
       setCnftsLoading(true);
-      setError(null);
+    }
+    setError(null);
+    
+    try {
+      console.log('[WalletAssets] Fetching all NFTs (regular + compressed) using Helius v0 API...');
+      const walletAddress = publicKey.toBase58();
       
-      try {
-        console.log('[WalletAssets] Fetching all NFTs (regular + compressed) using Helius v0 API...');
-        const walletAddress = publicKey.toBase58();
-        
-        // Use our combined Helius v0 API endpoint to fetch all NFTs at once
-        const response = await axios.get(`/api/helius/wallet/nfts/${walletAddress}`);
+      // Add cache-busting timestamp to force fresh data from the API
+      const timestamp = forceRefresh ? `?t=${Date.now()}` : '';
+      
+      // Use our combined Helius v0 API endpoint to fetch all NFTs at once
+      const response = await axios.get(`/api/helius/wallet/nfts/${walletAddress}${timestamp}`);
         
         if (!response.data || !response.data.success) {
           console.error('[WalletAssets] Invalid response from Helius v0 API:', response.data);
@@ -567,11 +574,17 @@ const WalletAssets: React.FC = () => {
       } catch (error) {
         console.error('[WalletAssets] Error in CNFTHandler method:', error);
         throw error;
+      } finally {
+        if (forceRefresh) {
+          setIsRefreshing(false);
+        }
       }
-    };
-    
-    fetchAllNFTs();
   }, [publicKey, connection, signTransaction]);
+    
+  // Trigger the fetch on initial load  
+  useEffect(() => {
+    fetchAllNFTs();
+  }, [fetchAllNFTs]);
 
   // Function to format token amount for display
   const formatTokenAmount = (balance: number, decimals: number): string => {
@@ -1853,7 +1866,49 @@ const WalletAssets: React.FC = () => {
 
       {publicKey && (
         <div className="assets-section">
-          <h2>Your Wallet Assets</h2>
+          <div className="wallet-header">
+            <h2>Your Wallet Assets</h2>
+            <button 
+              className="refresh-button" 
+              onClick={() => {
+                console.log("Manual refresh triggered");
+                // Create a timestamp to force cache-busting
+                const timestamp = Date.now();
+                if (publicKey) {
+                  // Add loading indicator
+                  setIsRefreshing(true);
+                  // Call the wallet-related APIs with the timestamp to bust cache
+                  axios.get(`/api/helius/wallet/nfts/${publicKey.toBase58()}?t=${timestamp}`)
+                    .then(response => {
+                      if (response.data && response.data.success) {
+                        const { regularNfts, compressedNfts } = response.data.data;
+                        setNfts(regularNfts);
+                        
+                        // Filter out hidden compressed NFTs if the HiddenAssets functionality is available
+                        let visibleCompressedNfts = compressedNfts;
+                        if (typeof window !== "undefined" && window.HiddenAssets) {
+                          visibleCompressedNfts = compressedNfts.filter((cnft) => 
+                            !window.HiddenAssets?.isAssetHidden(cnft.mint));
+                        }
+                        
+                        setCnfts(visibleCompressedNfts);
+                        console.log(`Refreshed: Found ${regularNfts.length} NFTs and ${visibleCompressedNfts.length} cNFTs`);
+                      }
+                    })
+                    .catch(error => {
+                      console.error("Error refreshing NFTs:", error);
+                      setError("Failed to refresh NFTs. Please try again.");
+                    })
+                    .finally(() => {
+                      setIsRefreshing(false);
+                    });
+                }
+              }}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? "Refreshing..." : "Refresh Assets"}
+            </button>
+          </div>
           
           {/* Bulk Burn Selection Panel - Always Visible */}
           {publicKey && (
