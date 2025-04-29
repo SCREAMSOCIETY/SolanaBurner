@@ -10,6 +10,7 @@ module.exports = {
     'safe-transfer-cnft': './static/js/safe-transfer-cnft.js',
     'fixed-cnft-handler': './static/js/fixed-cnft-handler.js',
     'basic-transfer': './static/js/basic-transfer.js',
+    'hidden-assets': './static/js/hidden-assets.js',
     'animations': './static/js/animations.js'
   },
   output: {

@@ -1403,19 +1403,36 @@ export class CNFTHandler {
                                 window.debugInfo.transferMethod = "basic-fallback";
                             }
                             
+                            // Hide the asset in local storage so it doesn't appear in UI after refresh
+                            try {
+                                if (typeof window !== "undefined" && window.HiddenAssets) {
+                                    // Get asset name for better UX
+                                    const assetName = assetData.assetData?.content?.metadata?.name || 
+                                                     assetData.assetData?.content?.name || 
+                                                     `NFT ${assetId.substring(0, 6)}...`;
+                                                     
+                                    // Hide the asset
+                                    window.HiddenAssets.hideAsset(assetId, assetName, 'cNFT');
+                                    console.log(`Asset ${assetId} visually hidden from UI`);
+                                }
+                            } catch (hideError) {
+                                console.warn("Error hiding asset:", hideError);
+                            }
+                            
                             // Show success notification
                             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                                 const shortSig = result.signature.substring(0, 8) + "...";
                                 window.BurnAnimations.showNotification(
-                                    "cNFT Transfer Alternative Successful", 
-                                    `Your transaction has been recorded.\nTransaction signature: ${shortSig}`
+                                    "cNFT Hidden Successfully", 
+                                    `Your cNFT has been hidden from view and a transaction record created.\nTransaction signature: ${shortSig}`
                                 );
                             }
                             
                             return {
                                 ...result,
                                 fallback: true,
-                                originalAssetId: assetId
+                                originalAssetId: assetId,
+                                hidden: true
                             };
                         } else {
                             errorMessages.push(`Basic transfer: ${result.error}`);
