@@ -152,7 +152,18 @@ export class CNFTHandler {
                         };
                     }
                     
-                    return asset;
+                    // Return properly formatted data with both asset and proof
+                    return {
+                        assetData: asset,
+                        proofData: {
+                            root: asset.root,
+                            proof: asset.proof,
+                            leaf_id: asset.leaf_id || asset.node_index,
+                            data_hash: asset.compression?.data_hash || "11111111111111111111111111111111",
+                            creator_hash: asset.compression?.creator_hash || "11111111111111111111111111111111",
+                            tree_id: asset.tree_id || asset.merkle_tree
+                        }
+                    };
                 } else {
                     throw new Error("Invalid proof data from bubblegum SDK");
                 }
@@ -174,19 +185,35 @@ export class CNFTHandler {
                     if (proofData.data.proof && Array.isArray(proofData.data.proof) && proofData.data.proof.length > 0) {
                         console.log("Successfully fetched proof data via Helius backend API");
                         
-                        // Make sure we have all the required compression fields
-                        if (!proofData.data.compression) {
-                            proofData.data.compression = {
+                        // Make sure the asset data has the required fields
+                        const assetData = {
+                            ...proofData.data,
+                            compression: {
                                 compressed: true,
                                 tree: proofData.data.tree_id || "11111111111111111111111111111111",
                                 root: proofData.data.root || "11111111111111111111111111111111",
                                 leaf_id: proofData.data.node_index || 0,
-                                data_hash: "11111111111111111111111111111111", 
-                                creator_hash: "11111111111111111111111111111111"
-                            };
-                        }
+                                leafId: proofData.data.node_index || 0,
+                                dataHash: proofData.data.data_hash || "11111111111111111111111111111111",
+                                creatorHash: proofData.data.creator_hash || "11111111111111111111111111111111"
+                            }
+                        };
                         
-                        return proofData.data;
+                        // Create the proof data object
+                        const extractedProofData = {
+                            root: proofData.data.root,
+                            proof: proofData.data.proof,
+                            leaf_id: proofData.data.node_index,
+                            data_hash: proofData.data.data_hash || "11111111111111111111111111111111",
+                            creator_hash: proofData.data.creator_hash || "11111111111111111111111111111111",
+                            tree_id: proofData.data.tree_id
+                        };
+                        
+                        // Return both the asset data and proof data
+                        return {
+                            assetData,
+                            proofData: extractedProofData
+                        };
                     } else {
                         console.warn("Proof array is missing or empty in backend API response");
                         throw new Error("Invalid proof data from Helius backend API");
@@ -317,8 +344,8 @@ export class CNFTHandler {
                 // Try using the fetchAssetWithProof method
                 try {
                     const assetWithProof = await this.fetchAssetWithProof(assetId);
-                    if (assetWithProof && assetWithProof.proof && Array.isArray(assetWithProof.proof)) {
-                        validProof = assetWithProof.proof;
+                    if (assetWithProof && assetWithProof.proofData && assetWithProof.proofData.proof && Array.isArray(assetWithProof.proofData.proof)) {
+                        validProof = assetWithProof.proofData.proof;
                         console.log("Success: Got proof data via fetchAssetWithProof method");
                     } else {
                         console.log("Failed: Invalid or missing proof data");
