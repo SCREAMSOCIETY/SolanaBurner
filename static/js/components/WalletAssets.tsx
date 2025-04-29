@@ -1194,70 +1194,441 @@ const WalletAssets: React.FC = () => {
     );
   };
 
-  // Handle bulk burn of tokens
+  // Handle bulk burn of tokens - with batching in a single transaction
   const handleBulkBurnTokens = async () => {
     if (selectedTokens.length === 0) return;
     
     setIsBurning(true);
-    setError("Starting bulk burn operation for tokens...");
+    setError("Starting bulk burn operation for tokens in a single transaction...");
     
     try {
-      let successCount = 0;
+      // Import necessary web3 modules
+      const { ComputeBudgetProgram } = require('@solana/web3.js');
       
-      for (const mint of selectedTokens) {
+      // Create a single transaction for all token burns
+      const transaction = new Transaction();
+      
+      // Add compute budget instructions to avoid insufficient SOL errors
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 400000 // Higher compute units for multiple operations
+      });
+      
+      // Add a compute budget instruction to set a very low prioritization fee 
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimum possible fee
+      });
+      
+      // Add compute budget instructions to transaction
+      transaction.add(modifyComputeUnits, addPriorityFee);
+      
+      // Define fee recipient for donation
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      // Keep track of which tokens were successfully added to the transaction
+      const processedTokens = [];
+      const failedTokens = [];
+      
+      // Maximum number of tokens to process in a single transaction (to avoid size limits)
+      const MAX_TOKENS_PER_BATCH = 8;
+      const tokensToProcess = selectedTokens.slice(0, MAX_TOKENS_PER_BATCH);
+      
+      if (tokensToProcess.length < selectedTokens.length) {
+        setError(`Processing first ${MAX_TOKENS_PER_BATCH} tokens in this batch. Remaining tokens will need a separate transaction.`);
+      }
+      
+      // Add burn and close instructions for each token
+      for (const mint of tokensToProcess) {
         const token = tokens.find(t => t.mint === mint);
-        if (token) {
+        if (token && token.account) {
           try {
-            // Burn the token and await result
-            await handleBurnToken(token);
-            successCount++;
+            // Add burn instruction for this token
+            transaction.add(
+              createBurnCheckedInstruction(
+                new PublicKey(token.account), // token account
+                new PublicKey(token.mint), // mint
+                publicKey, // owner
+                token.balance, // amount to burn
+                token.decimals // decimals
+              )
+            );
+            
+            // Add close account instruction to recover rent
+            transaction.add(
+              createCloseAccountInstruction(
+                new PublicKey(token.account), // token account to close
+                publicKey, // destination for recovered SOL
+                publicKey, // authority
+                [] // multisig signers (empty in our case)
+              )
+            );
+            
+            processedTokens.push(token);
           } catch (error) {
-            console.error(`Error burning token ${mint}:`, error);
-            // Continue with next token
+            console.error(`Error adding token ${mint} to transaction:`, error);
+            failedTokens.push(token);
           }
+        } else {
+          failedTokens.push({mint});
         }
       }
       
-      setError(`Successfully burned ${successCount} of ${selectedTokens.length} tokens!`);
+      // If no tokens were successfully added, exit
+      if (processedTokens.length === 0) {
+        setError("Could not add any tokens to the transaction. Please try again or burn individually.");
+        setIsBurning(false);
+        return;
+      }
       
-      // Clear selections after burning
-      setSelectedTokens([]);
+      // Add a single donation instruction (instead of one per token)
+      // Scale the fee based on number of tokens, but with a reasonable cap
+      const feePerToken = 40000; // 0.00004 SOL in lamports
+      const maxFee = 100000; // Cap at 0.0001 SOL
+      const feeAmount = Math.min(feePerToken * processedTokens.length, maxFee);
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
+      
+      // Get recent blockhash with lower fee priority
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed' // Lower commitment level to reduce fees
+      });
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Create a timeoutPromise that rejects after 2 minutes
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<Transaction>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Transaction signing timed out or was cancelled'));
+        }, 120000); // 2 minute timeout
+      });
+      
+      // Update UI to show we're waiting for signature
+      setError(`Please approve the transaction in your wallet to burn ${processedTokens.length} tokens at once...`);
+      
+      try {
+        // Race between the signTransaction and the timeout
+        const signedTx = await Promise.race([
+          signTransaction(transaction),
+          timeoutPromise
+        ]);
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+        
+        // Update UI to show transaction is being processed
+        setError(`Sending transaction to burn ${processedTokens.length} tokens at once...`);
+        
+        // Send the transaction with skipPreflight to avoid client-side checks
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: true, // Skip preflight checks
+          maxRetries: 3, // Retry a few times if needed
+          preflightCommitment: 'processed' // Lower commitment level
+        });
+        
+        console.log('Bulk token burn transaction sent with signature:', signature);
+        
+        // Wait for confirmation with a custom strategy to avoid timeouts
+        const confirmation = await connection.confirmTransaction({
+          signature: signature,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight
+        }, 'processed'); // Use processed commitment level
+        
+        console.log('Bulk burn confirmation result:', confirmation);
+        
+        if (confirmation.value.err) {
+          console.error('Error confirming bulk burn transaction:', confirmation.value.err);
+          setError(`Error burning tokens: ${confirmation.value.err}`);
+        } else {
+          console.log('Bulk token burn successful with signature:', signature);
+          
+          // Update the tokens list by removing all burned tokens
+          const updatedTokens = tokens.filter(t => !processedTokens.some(p => p.mint === t.mint));
+          setTokens(updatedTokens);
+          
+          // Remove processed tokens from selected tokens
+          const remainingSelected = selectedTokens.filter(
+            mint => !processedTokens.some(p => p.mint === mint)
+          );
+          setSelectedTokens(remainingSelected);
+          
+          // Show animations and achievements
+          if (window.BurnAnimations) {
+            // Show confetti animation
+            if (window.BurnAnimations.createConfetti) {
+              window.BurnAnimations.createConfetti();
+            }
+            
+            // Track achievements - count multiple burns
+            if (window.BurnAnimations.checkAchievements) {
+              window.BurnAnimations.checkAchievements('tokens', processedTokens.length);
+            }
+          }
+          
+          // Show success message with transaction link
+          const txUrl = `https://solscan.io/tx/${signature}`;
+          const shortSig = signature.substring(0, 8) + '...';
+          
+          setError(`Successfully burned ${processedTokens.length} tokens in a single transaction! Signature: ${shortSig}`);
+          
+          // Add link to transaction
+          setTimeout(() => {
+            const txElem = document.createElement('div');
+            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+            
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+          
+          // If there are remaining tokens, show a message
+          if (remainingSelected.length > 0) {
+            setTimeout(() => {
+              setError(`${remainingSelected.length} tokens remain selected. Click "Burn Selected" again to process them.`);
+            }, 5000);
+          } else {
+            setTimeout(() => setError(null), 8000);
+          }
+        }
+      } catch (signingError: any) {
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Check if the error is related to user cancellation
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
+          console.log('Transaction was cancelled by the user or timed out');
+          setError('Transaction was cancelled. No tokens were burned.');
+        } else {
+          // For other signing errors
+          setError(`Error in transaction signing: ${signingError.message}`);
+        }
+      }
     } catch (error: any) {
+      console.error('Error in bulk burn operation:', error);
       setError(`Error in bulk burn operation: ${error.message}`);
     } finally {
       setIsBurning(false);
     }
   };
 
-  // Handle bulk burn of NFTs
+  // Handle bulk burn of NFTs - with batching in a single transaction
   const handleBulkBurnNFTs = async () => {
     if (selectedNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Starting bulk burn operation for NFTs...");
+    setError("Starting bulk burn operation for NFTs in a single transaction...");
     
     try {
-      let successCount = 0;
+      // Import necessary web3 modules
+      const { ComputeBudgetProgram } = require('@solana/web3.js');
       
-      for (const mint of selectedNFTs) {
+      // Create a single transaction for all NFT burns
+      const transaction = new Transaction();
+      
+      // Add compute budget instructions to avoid insufficient SOL errors
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 400000 // Higher compute units for multiple operations
+      });
+      
+      // Add a compute budget instruction to set a very low prioritization fee 
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimum possible fee
+      });
+      
+      // Add compute budget instructions to transaction
+      transaction.add(modifyComputeUnits, addPriorityFee);
+      
+      // Define fee recipient for donation
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      // Keep track of which NFTs were successfully added to the transaction
+      const processedNFTs = [];
+      const failedNFTs = [];
+      
+      // Maximum number of NFTs to process in a single transaction (to avoid size limits)
+      const MAX_NFTS_PER_BATCH = 5; // NFTs require more instructions than tokens
+      const nftsToProcess = selectedNFTs.slice(0, MAX_NFTS_PER_BATCH);
+      
+      if (nftsToProcess.length < selectedNFTs.length) {
+        setError(`Processing first ${MAX_NFTS_PER_BATCH} NFTs in this batch. Remaining NFTs will need a separate transaction.`);
+      }
+      
+      // Add burn and close instructions for each NFT
+      for (const mint of nftsToProcess) {
         const nft = nfts.find(n => n.mint === mint);
-        if (nft) {
+        if (nft && nft.tokenAddress) {
           try {
-            // Burn the NFT and await result
-            await handleBurnNFT(nft);
-            successCount++;
+            // Add close token account instruction (effectively burns the NFT)
+            transaction.add(
+              createCloseAccountInstruction(
+                new PublicKey(nft.tokenAddress),  // token account to close
+                publicKey,                        // destination for recovered SOL
+                publicKey,                        // authority
+                []                                // multisig signers (empty in our case)
+              )
+            );
+            
+            processedNFTs.push(nft);
           } catch (error) {
-            console.error(`Error burning NFT ${mint}:`, error);
-            // Continue with next NFT
+            console.error(`Error adding NFT ${mint} to transaction:`, error);
+            failedNFTs.push(nft);
           }
+        } else {
+          failedNFTs.push({mint});
         }
       }
       
-      setError(`Successfully burned ${successCount} of ${selectedNFTs.length} NFTs!`);
+      // If no NFTs were successfully added, exit
+      if (processedNFTs.length === 0) {
+        setError("Could not add any NFTs to the transaction. Please try again or burn individually.");
+        setIsBurning(false);
+        return;
+      }
       
-      // Clear selections after burning
-      setSelectedNFTs([]);
+      // Add a single donation instruction (instead of one per NFT)
+      // Scale the fee based on number of NFTs, but with a reasonable cap
+      const feePerNFT = 40000; // 0.00004 SOL in lamports
+      const maxFee = 100000; // Cap at 0.0001 SOL
+      const feeAmount = Math.min(feePerNFT * processedNFTs.length, maxFee);
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
+      
+      // Get recent blockhash with lower fee priority
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed' // Lower commitment level to reduce fees
+      });
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Create a timeoutPromise that rejects after 2 minutes
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<Transaction>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Transaction signing timed out or was cancelled'));
+        }, 120000); // 2 minute timeout
+      });
+      
+      // Update UI to show we're waiting for signature
+      setError(`Please approve the transaction in your wallet to burn ${processedNFTs.length} NFTs at once...`);
+      
+      try {
+        // Race between the signTransaction and the timeout
+        const signedTx = await Promise.race([
+          signTransaction(transaction),
+          timeoutPromise
+        ]);
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+        
+        // Update UI to show transaction is being processed
+        setError(`Sending transaction to burn ${processedNFTs.length} NFTs at once...`);
+        
+        // Send the transaction with skipPreflight to avoid client-side checks
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: true, // Skip preflight checks
+          maxRetries: 3, // Retry a few times if needed
+          preflightCommitment: 'processed' // Lower commitment level
+        });
+        
+        console.log('Bulk NFT burn transaction sent with signature:', signature);
+        
+        // Wait for confirmation with a custom strategy to avoid timeouts
+        const confirmation = await connection.confirmTransaction({
+          signature: signature,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight
+        }, 'processed'); // Use processed commitment level
+        
+        console.log('Bulk burn confirmation result:', confirmation);
+        
+        if (confirmation.value.err) {
+          console.error('Error confirming bulk burn transaction:', confirmation.value.err);
+          setError(`Error burning NFTs: ${confirmation.value.err}`);
+        } else {
+          console.log('Bulk NFT burn successful with signature:', signature);
+          
+          // Update the NFTs list by removing all burned NFTs
+          const updatedNFTs = nfts.filter(n => !processedNFTs.some(p => p.mint === n.mint));
+          setNfts(updatedNFTs);
+          
+          // Remove processed NFTs from selected NFTs
+          const remainingSelected = selectedNFTs.filter(
+            mint => !processedNFTs.some(p => p.mint === mint)
+          );
+          setSelectedNFTs(remainingSelected);
+          
+          // Show animations and achievements
+          if (window.BurnAnimations) {
+            // Show confetti animation
+            if (window.BurnAnimations.createConfetti) {
+              window.BurnAnimations.createConfetti();
+            }
+            
+            // Track achievements - count multiple burns
+            if (window.BurnAnimations.checkAchievements) {
+              window.BurnAnimations.checkAchievements('nfts', processedNFTs.length);
+            }
+          }
+          
+          // Show success message with transaction link
+          const txUrl = `https://solscan.io/tx/${signature}`;
+          const shortSig = signature.substring(0, 8) + '...';
+          
+          setError(`Successfully burned ${processedNFTs.length} NFTs in a single transaction! Signature: ${shortSig}`);
+          
+          // Add link to transaction
+          setTimeout(() => {
+            const txElem = document.createElement('div');
+            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+            
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+          
+          // If there are remaining NFTs, show a message
+          if (remainingSelected.length > 0) {
+            setTimeout(() => {
+              setError(`${remainingSelected.length} NFTs remain selected. Click "Burn Selected" again to process them.`);
+            }, 5000);
+          } else {
+            setTimeout(() => setError(null), 8000);
+          }
+        }
+      } catch (signingError: any) {
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Check if the error is related to user cancellation
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
+          console.log('Transaction was cancelled by the user or timed out');
+          setError('Transaction was cancelled. No NFTs were burned.');
+        } else {
+          // For other signing errors
+          setError(`Error in transaction signing: ${signingError.message}`);
+        }
+      }
     } catch (error: any) {
+      console.error('Error in bulk burn operation:', error);
       setError(`Error in bulk burn operation: ${error.message}`);
     } finally {
       setIsBurning(false);

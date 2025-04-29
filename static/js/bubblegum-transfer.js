@@ -4,6 +4,10 @@
  * This implementation follows the standard Metaplex Bubblegum protocol for transferring
  * compressed NFTs (cNFTs) on Solana. It properly handles the Merkle proofs and uses
  * the Bubblegum program to create the transfer instruction.
+ * 
+ * NEW FEATURE:
+ * Includes support for batch transfers of multiple cNFTs in a single transaction
+ * which significantly reduces wallet approval friction and blockchain fees.
  */
 
 import {
