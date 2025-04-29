@@ -1837,6 +1837,133 @@ export class CNFTHandler {
             };
         }
     }
+    
+    /**
+     * Transfer a compressed NFT to our project wallet using explicit proof data
+     * This method is optimized for our special case handling of single cNFTs
+     * in the bulk transfer mode.
+     * 
+     * @param {string} assetId - The asset ID (mint address) of the cNFT
+     * @param {object} providedProofData - The proof data for the cNFT
+     * @param {string} destinationAddress - Destination wallet (optional, defaults to project wallet)
+     * @returns {Promise<object>} - Result of the transfer operation
+     */
+    async transferCNFTWithProof(assetId, providedProofData, destinationAddress = null) {
+        console.log("Starting cNFT transfer with explicit proof data");
+        
+        if (!assetId) {
+            return {
+                success: false,
+                error: "Asset ID is required",
+            };
+        }
+        
+        if (!providedProofData) {
+            return {
+                success: false,
+                error: "Proof data is required for transferCNFTWithProof method",
+            };
+        }
+        
+        try {
+            console.log("Using provided proof data:", providedProofData);
+            
+            // Import the bubblegum-transfer module
+            const bubblegumImplementation = await import('./bubblegum-transfer.js').then(module => module.default);
+            
+            if (!bubblegumImplementation) {
+                throw new Error("Could not load bubblegum-transfer module");
+            }
+            
+            // Get asset data - we still need this for metadata
+            let assetData = null;
+            try {
+                // Fetch asset data from API
+                const assetResponse = await fetch(`/api/helius/asset/${assetId}`);
+                const assetResult = await assetResponse.json();
+                
+                if (assetResult.success && assetResult.data) {
+                    assetData = assetResult.data;
+                    console.log("Successfully fetched asset data for cNFT");
+                } else {
+                    throw new Error("Failed to fetch asset data");
+                }
+            } catch (assetError) {
+                console.error("Error fetching asset data:", assetError);
+                throw new Error("Failed to get cNFT asset data. Cannot complete transfer");
+            }
+            
+            // Validate the destination address
+            const finalDestination = destinationAddress || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
+            
+            console.log("Destination wallet:", finalDestination);
+            console.log("Attempting Bubblegum transfer with explicit proof data...");
+            
+            // Execute the transfer using bubblegum protocol
+            const result = await bubblegumImplementation.transferCompressedNFT({
+                connection: this.connection,
+                wallet: this.wallet,
+                assetId,
+                destinationAddress: finalDestination,
+                proofData: providedProofData,
+                assetData
+            });
+            
+            // If successful, return the result
+            if (result.success) {
+                console.log("Explicit proof transfer succeeded!");
+                
+                // Store debug info
+                if (typeof window !== "undefined" && window.debugInfo) {
+                    window.debugInfo.lastCnftSignature = result.signature;
+                    window.debugInfo.lastCnftSuccess = true;
+                    window.debugInfo.transferMethod = "bubblegum-explicit-proof";
+                }
+                
+                // Show success notification
+                if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                    const shortSig = result.signature.substring(0, 8) + "...";
+                    window.BurnAnimations.showNotification(
+                        "cNFT Moved to Trash", 
+                        `Your cNFT has been successfully moved to trash.\nTransaction signature: ${shortSig}`
+                    );
+                }
+                
+                return result;
+            } else {
+                throw new Error(result.error || "Transfer failed with explicit proof data");
+            }
+        } catch (error) {
+            console.error("Error in transferCNFTWithProof:", error);
+            
+            // Check if user cancelled
+            if (error.message && (
+                error.message.includes("User rejected") || 
+                error.message.includes("cancelled") || 
+                error.message.includes("declined")
+            )) {
+                return {
+                    success: false,
+                    error: "Transaction was cancelled by the user",
+                    cancelled: true
+                };
+            }
+            
+            // Show error notification
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "cNFT Trash Request Failed", 
+                    `Error: ${error.message}`
+                );
+            }
+            
+            return {
+                success: false,
+                error: error.message || "Unknown error in transferCNFTWithProof",
+                cancelled: false
+            };
+        }
+    }
 }
 
 // CNFTHandler is already exported at the top of the file
