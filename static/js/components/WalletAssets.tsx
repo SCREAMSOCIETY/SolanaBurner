@@ -1725,15 +1725,53 @@ const WalletAssets: React.FC = () => {
           );
         }
         
-        // Use the single transfer method instead of batch
-        const singleMint = selectedCNFTs[0];
-        const singleResult = await handler.transferCNFT(singleMint);
-        
-        if (singleResult.success) {
-          // Format the result to match batch response structure for consistent handling
-          return handleSingleCnftSuccess(singleResult, singleMint);
-        } else {
-          throw new Error(singleResult.error || "Single cNFT transfer failed");
+        try {
+          // Get the single mint to process
+          const singleMint = selectedCNFTs[0];
+          
+          // Find the cNFT data for this mint
+          const cnftData = cnfts.find(c => c.mint === singleMint);
+          if (!cnftData) {
+            throw new Error(`Could not find cNFT data for ${singleMint}`);
+          }
+          
+          console.log("Found cNFT data:", cnftData);
+          
+          // Explicitly fetch asset proof data - this is crucial for transfer
+          let proofData = null;
+          try {
+            setError(`Fetching proof data for ${cnftData.name || 'cNFT'}...`);
+            // Fetch proof data directly from API
+            const proofResponse = await fetch(`/api/helius/asset-proof/${singleMint}`);
+            const proofResult = await proofResponse.json();
+            
+            if (proofResult.success && proofResult.data) {
+              proofData = proofResult.data;
+              console.log("Successfully fetched proof data for cNFT");
+            } else {
+              throw new Error("Failed to fetch proof data");
+            }
+          } catch (proofError) {
+            console.error("Error fetching proof data:", proofError);
+            throw new Error("Failed to get required proof data for the cNFT. Cannot complete transfer");
+          }
+          
+          setError(`Processing trash operation for ${cnftData.name || 'cNFT'}...`);
+          
+          // Now use the handler with explicit proof data
+          const singleResult = await handler.transferCNFTWithProof(singleMint, proofData);
+          
+          if (singleResult.success) {
+            // Format the result to match batch response structure for consistent handling
+            return handleSingleCnftSuccess(singleResult, singleMint);
+          } else {
+            throw new Error(singleResult.error || "Single cNFT transfer failed");
+          }
+        } catch (error) {
+          console.error("Error in single cNFT transfer special case:", error);
+          setError(`Error: ${error.message || "Failed to process cNFT"}`);
+          setIsBurning(false);
+          throw error;
         }
       }
       
