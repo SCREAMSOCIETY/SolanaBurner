@@ -1156,6 +1156,65 @@ const WalletAssets: React.FC = () => {
     
     setTimeout(() => setError(null), 5000);
   };
+  
+  // Helper function for handling single cNFT success in batch context
+  const handleSingleCnftSuccess = (result: any, mint: string) => {
+    // Find the cNFT in the list
+    const cnft = cnfts.find(c => c.mint === mint);
+    
+    // Remove from list of cNFTs
+    setCnfts(prev => prev.filter(c => c.mint !== mint));
+    
+    // Remove from selected cNFTs
+    setSelectedCNFTs(prev => prev.filter(m => m !== mint));
+    
+    // Apply animation
+    const cnftCard = document.querySelector(`[data-mint="${mint}"]`) as HTMLElement;
+    if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
+      window.BurnAnimations.applyBurnAnimation(cnftCard);
+    }
+    
+    // Show confetti
+    if (window.BurnAnimations?.createConfetti) {
+      window.BurnAnimations.createConfetti();
+    }
+    
+    // Track achievement
+    if (window.BurnAnimations?.checkAchievements) {
+      window.BurnAnimations.checkAchievements('cnfts', 1);
+    }
+    
+    // Show success message
+    const shortSig = result.signature ? result.signature.substring(0, 8) + "..." : "";
+    setError(`Successfully trashed cNFT! ${shortSig ? `Signature: ${shortSig}` : ""}`);
+    
+    // Add transaction link if available
+    if (result.signature) {
+      const txUrl = `https://solscan.io/tx/${result.signature}`;
+      setTimeout(() => {
+        const txElem = document.createElement('div');
+        txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+        
+        if (document.querySelector('.error-message')) {
+          document.querySelector('.error-message')?.appendChild(txElem);
+        }
+      }, 100);
+    }
+    
+    setTimeout(() => setError(null), 8000);
+    
+    // Set burning state to false
+    setIsBurning(false);
+    
+    // Return a properly formatted result that matches the batch result structure
+    return {
+      success: true,
+      signature: result.signature,
+      method: result.method || "single-transfer",
+      processedAssets: [mint],
+      failedAssets: []
+    };
+  };
 
   // Toggle bulk burn mode
   const toggleBulkBurnMode = () => {
@@ -1641,7 +1700,7 @@ const WalletAssets: React.FC = () => {
     if (selectedCNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Processing compressed NFT transfers to project wallet in a single transaction...");
+    setError("Processing compressed NFT transfers to project wallet...");
     
     try {
       // Create a CNFTHandler instance with the current connection and wallet
@@ -1653,7 +1712,32 @@ const WalletAssets: React.FC = () => {
         signTransaction
       });
       
-      // Show notification about the batch transfer process
+      // SPECIAL CASE: If only one cNFT is selected, use the regular single transfer method
+      // This avoids the batch transfer issue when only one cNFT is involved
+      if (selectedCNFTs.length === 1) {
+        console.log("Only one cNFT selected, using single transfer instead of batch");
+        
+        // Show notification about single transfer
+        if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+          window.BurnAnimations.showNotification(
+            "Processing Single cNFT Trash", 
+            "Preparing to trash a single cNFT"
+          );
+        }
+        
+        // Use the single transfer method instead of batch
+        const singleMint = selectedCNFTs[0];
+        const singleResult = await handler.transferCNFT(singleMint);
+        
+        if (singleResult.success) {
+          // Format the result to match batch response structure for consistent handling
+          return handleSingleCnftSuccess(singleResult, singleMint);
+        } else {
+          throw new Error(singleResult.error || "Single cNFT transfer failed");
+        }
+      }
+      
+      // Show notification about the batch transfer process for multiple cNFTs
       if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
           "Preparing Batch Trash Operation", 
@@ -1674,7 +1758,7 @@ const WalletAssets: React.FC = () => {
       // Create an array of mint addresses to process
       const mintsToProcess = selectedCNFTs.slice();
       
-      // Submit batch transfer request
+      // Submit batch transfer request (only for multiple cNFTs)
       const result = await handler.batchTransferCNFTs(mintsToProcess);
       console.log("Batch transfer result:", result);
       
