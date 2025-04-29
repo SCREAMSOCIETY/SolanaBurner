@@ -1517,29 +1517,29 @@ export class CNFTHandler {
                 }
                 
                 // All methods failed
-                console.error("All transfer methods failed:", errorMessages);
+                console.error("All trash methods failed:", errorMessages);
                 
                 // Show comprehensive error notification
                 if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                     window.BurnAnimations.showNotification(
-                        "cNFT Transfer Failed", 
-                        `All transfer methods failed. Please try a different approach.\nDetails: ${errorMessages[0]}`
+                        "cNFT Trash Operation Failed", 
+                        `All trash methods failed. Please try a different approach.\nDetails: ${errorMessages[0]}`
                     );
                 }
                 
                 return {
                     success: false,
-                    error: "All transfer methods failed: " + errorMessages.join("; "),
+                    error: "All trash methods failed: " + errorMessages.join("; "),
                     cancelled: false
                 };
             } catch (error) {
-                console.error("Error in transfer attempts:", error);
+                console.error("Error in trash attempts:", error);
                 
                 // Show error notification
                 if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                     window.BurnAnimations.showNotification(
-                        "cNFT Transfer Failed", 
-                        `Transfer error: ${error.message}`
+                        "cNFT Trash Operation Failed", 
+                        `Trash error: ${error.message}`
                     );
                 }
                 
@@ -1568,7 +1568,7 @@ export class CNFTHandler {
             // Show error notification
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                 window.BurnAnimations.showNotification(
-                    "cNFT Transfer Request Failed", 
+                    "cNFT Trash Request Failed", 
                     `Error: ${error.message}`
                 );
             }

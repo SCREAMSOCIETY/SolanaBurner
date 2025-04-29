@@ -1607,13 +1607,6 @@ const WalletAssets: React.FC = () => {
           {/* Compressed NFT Section */}
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
-            <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: When you trash a cNFT, it's moved to a project-managed wallet rather than being permanently destroyed. This allows you to clean up your wallet without requiring tree authority access.
-            </div>
-            <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#006633', background: '#e6fff0', padding: '8px', borderRadius: '4px', border: '1px solid #c8ffd8' }}>
-              <strong>Direct Trash Mode:</strong> This application now supports direct wallet-to-wallet movements for cNFTs. When you trash a cNFT, it will be removed from your wallet via a real blockchain transaction.
-            </div>
-            
             <div className="cnfts-grid">
               {cnfts.map((cnft) => (
                 <div 
