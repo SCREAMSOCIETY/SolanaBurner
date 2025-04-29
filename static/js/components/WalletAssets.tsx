@@ -325,27 +325,21 @@ const WalletAssets: React.FC = () => {
     fetchTokens();
   }, [publicKey, connection, solscanApiKey]);
 
-  // Function to fetch all NFTs with an optional refresh parameter
-  const fetchAllNFTs = useCallback(async (forceRefresh = false) => {
-    if (!publicKey) return;
-    
-    if (forceRefresh) {
-      setIsRefreshing(true);
-    } else {
+  // Fetch all NFTs (regular + compressed) when wallet connects using Helius v0 API
+  useEffect(() => {
+    const fetchAllNFTs = async () => {
+      if (!publicKey) return;
+      
       setNftsLoading(true);
       setCnftsLoading(true);
-    }
-    setError(null);
-    
-    try {
-      console.log('[WalletAssets] Fetching all NFTs (regular + compressed) using Helius v0 API...');
-      const walletAddress = publicKey.toBase58();
+      setError(null);
       
-      // Add cache-busting timestamp to force fresh data from the API
-      const timestamp = forceRefresh ? `?t=${Date.now()}` : '';
-      
-      // Use our combined Helius v0 API endpoint to fetch all NFTs at once
-      const response = await axios.get(`/api/helius/wallet/nfts/${walletAddress}${timestamp}`);
+      try {
+        console.log('[WalletAssets] Fetching all NFTs (regular + compressed) using Helius v0 API...');
+        const walletAddress = publicKey.toBase58();
+        
+        // Use our combined Helius v0 API endpoint to fetch all NFTs at once
+        const response = await axios.get(`/api/helius/wallet/nfts/${walletAddress}`);
         
         if (!response.data || !response.data.success) {
           console.error('[WalletAssets] Invalid response from Helius v0 API:', response.data);
@@ -574,17 +568,11 @@ const WalletAssets: React.FC = () => {
       } catch (error) {
         console.error('[WalletAssets] Error in CNFTHandler method:', error);
         throw error;
-      } finally {
-        if (forceRefresh) {
-          setIsRefreshing(false);
-        }
       }
-  }, [publicKey, connection, signTransaction]);
+    };
     
-  // Trigger the fetch on initial load  
-  useEffect(() => {
     fetchAllNFTs();
-  }, [fetchAllNFTs]);
+  }, [publicKey, connection, signTransaction]);
 
   // Function to format token amount for display
   const formatTokenAmount = (balance: number, decimals: number): string => {

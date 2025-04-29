@@ -1,0 +1,26 @@
+.wallet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.refresh-button {
+  background-color: #3a86ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 15px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s;
+}
+
+.refresh-button:hover {
+  background-color: #2667cc;
+}
+
+.refresh-button:disabled {
+  background-color: #a0bfff;
+  cursor: not-allowed;
+}
