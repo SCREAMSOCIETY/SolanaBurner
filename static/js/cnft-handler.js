@@ -7,6 +7,45 @@ import {
 } from "@metaplex-foundation/mpl-bubblegum";
 import axios from "axios";
 import BN from "bn.js";
+import bs58 from "bs58";
+
+/**
+ * Safely converts a PublicKey to a Buffer
+ * This utility function handles the error-prone toBuffer operation
+ * and provides a reliable fallback mechanism
+ * 
+ * @param {PublicKey|string} publicKeyOrString - The PublicKey or string to convert
+ * @returns {Buffer} - A buffer containing the public key bytes
+ */
+function safePublicKeyToBuffer(publicKeyOrString) {
+    try {
+        // If input is a string, convert to PublicKey first
+        const publicKey = typeof publicKeyOrString === 'string' 
+            ? new PublicKey(publicKeyOrString) 
+            : publicKeyOrString;
+            
+        // Try the standard toBuffer method first
+        return publicKey.toBuffer();
+    } catch (error) {
+        console.warn('Error in toBuffer(), using fallback method:', error.message);
+        
+        // Get the string representation
+        const addressStr = typeof publicKeyOrString === 'string' 
+            ? publicKeyOrString
+            : publicKeyOrString.toString();
+        
+        // Decode base58 string to get the bytes
+        try {
+            return Buffer.from(bs58.decode(addressStr));
+        } catch (fallbackError) {
+            console.error('Fallback method also failed:', fallbackError);
+            
+            // Last resort: Return a buffer with zeros (32 bytes, standard Solana public key length)
+            console.error('Using zeroed buffer as last resort - this will likely cause transaction failure');
+            return Buffer.alloc(32);
+        }
+    }
+}
 
 // Define burn wallet address - standard all zeros address
 const BURN_WALLET_ADDRESS = "11111111111111111111111111111111";
@@ -298,7 +337,7 @@ export class CNFTHandler {
             
             // Get the tree authority - derived from the tree ID
             const [treeAuthority] = await PublicKey.findProgramAddress(
-                [treePublicKey.toBuffer()],
+                [safePublicKeyToBuffer(treePublicKey)],
                 BUBBLEGUM_PROGRAM_ID
             );
             
