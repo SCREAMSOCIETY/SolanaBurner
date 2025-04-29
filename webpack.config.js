@@ -7,6 +7,8 @@ module.exports = {
     'app': './static/js/App.tsx',
     'WalletProvider': './static/js/WalletProvider.tsx',
     'cnft-handler': './static/js/cnft-handler.js',
+    'safe-transfer-cnft': './static/js/safe-transfer-cnft.js',
+    'fixed-cnft-handler': './static/js/fixed-cnft-handler.js',
     'animations': './static/js/animations.js'
   },
   output: {

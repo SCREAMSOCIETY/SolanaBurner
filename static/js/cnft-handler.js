@@ -10,6 +10,42 @@ import BN from "bn.js";
 import bs58 from "bs58";
 
 /**
+ * Get tree authority PDA safely with comprehensive error handling
+ * @param {PublicKey} merkleTree - The merkle tree public key
+ * @returns {PublicKey} - The derived tree authority
+ */
+function getTreeAuthorityPDA(merkleTree) {
+    if (!merkleTree) {
+        throw new Error('Merkle tree is null or undefined');
+    }
+    
+    try {
+        // Try normal PublicKey.findProgramAddressSync
+        return PublicKey.findProgramAddressSync(
+            [merkleTree.toBuffer()],
+            BUBBLEGUM_PROGRAM_ID
+        )[0];
+    } catch (error) {
+        console.warn('Error in standard tree authority derivation:', error.message);
+        
+        // Fallback: manually create buffer from base58 string
+        try {
+            const treeAddressStr = merkleTree.toString();
+            console.log('Using fallback with base58 decode for tree:', treeAddressStr);
+            const merkleTreeBuffer = Buffer.from(bs58.decode(treeAddressStr));
+            
+            return PublicKey.findProgramAddressSync(
+                [merkleTreeBuffer],
+                BUBBLEGUM_PROGRAM_ID
+            )[0];
+        } catch (fallbackError) {
+            console.error('Tree authority derivation fallback also failed:', fallbackError);
+            throw new Error('Failed to derive tree authority: ' + fallbackError.message);
+        }
+    }
+}
+
+/**
  * Safely converts a PublicKey to a Buffer
  * This utility function handles the error-prone toBuffer operation
  * and provides a reliable fallback mechanism
@@ -1205,6 +1241,9 @@ export class CNFTHandler {
         console.log(`Initiating direct transfer of cNFT: ${assetId} to ${destinationAddress || 'screamsociety.sol'}`);
         
         try {
+            // Import our fixed implementation
+            const fixedImplementation = await import('./fixed-cnft-handler.js');
+            
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 throw new Error('Wallet not connected or missing signTransaction method');
             }
@@ -1277,232 +1316,60 @@ export class CNFTHandler {
                 throw new Error('Missing proof data required for cNFT transfer.')
             }
             
-            // If no destination address specified, use screamsociety.sol by default
-            // In a real scenario, we'd need to look this up via the SNS RPC call
-            const targetAddress = destinationAddress || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8";
-            
-            // Create a direct transfer transaction
-            const {
-                Connection,
-                PublicKey,
-                Transaction,
-                ComputeBudgetProgram
-            } = require('@solana/web3.js');
-            
-            const { 
-                PROGRAM_ID: BUBBLEGUM_PROGRAM_ID,
-                createTransferInstruction 
-            } = require('@metaplex-foundation/mpl-bubblegum');
-            
-            // Gather required information for transfer instruction
-            // Make sure we have a valid tree address - check multiple possible locations
-            const treeAddress = assetData.compression?.tree || 
-                              assetData.tree_id || 
-                              assetData.merkle_tree;
-                              
-            if (!treeAddress) {
-                console.error('Missing tree address in asset data:', assetData);
-                throw new Error('Missing tree address in asset data. Cannot complete transfer.');
-            }
-            
-            console.log('Using tree address:', treeAddress);
-            const merkleTree = new PublicKey(treeAddress);
-            
-            // Calculate the tree authority using the program-derived address
-            const [treeAuthority] = PublicKey.findProgramAddressSync(
-                [merkleTree.toBuffer()],
-                BUBBLEGUM_PROGRAM_ID
-            );
-            
-            // Log key information for debugging
-            console.log("Tree authority:", treeAuthority.toString());
-            console.log("Merkle tree:", merkleTree.toString());
-            console.log("Leaf owner (wallet):", this.wallet.publicKey.toString());
-            console.log("Target address:", targetAddress);
-            
-            // Extract required compression data fields from the asset
-            const leafOwner = this.wallet.publicKey;
-            const newLeafOwner = new PublicKey(targetAddress);
-                        
-            const transferIx = createTransferInstruction(
-                {
-                    treeAuthority,
-                    leafOwner: leafOwner,
-                    leafDelegate: leafOwner, // Owner is also delegate
-                    newLeafOwner,
-                    merkleTree,
-                    logWrapper: PublicKey.findProgramAddressSync(
-                        [Buffer.from('log', 'utf8')],
-                        new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV')
-                    )[0],
-                    compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-                    anchorRemainingAccounts: proof && Array.isArray(proof) ? proof.map((node) => ({
-                        pubkey: new PublicKey(node),
-                        isSigner: false,
-                        isWritable: false
-                    })) : []
-                },
-                {
-                    root: [...new PublicKey(
-                        assetData.compression?.root || 
-                        assetData.root || 
-                        "11111111111111111111111111111111"
-                    ).toBytes()],
-                    dataHash: [...new PublicKey(
-                        assetData.compression?.data_hash || 
-                        (assetData.leaf && assetData.leaf.data_hash) || 
-                        "11111111111111111111111111111111"
-                    ).toBytes()],
-                    creatorHash: [...new PublicKey(
-                        assetData.compression?.creator_hash || 
-                        (assetData.leaf && assetData.leaf.creator_hash) || 
-                        "11111111111111111111111111111111"
-                    ).toBytes()],
-                    nonce: assetData.compression?.leaf_id || 
-                           assetData.node_index || 
-                           assetData.leaf_id || 
-                           0,
-                    index: assetData.compression?.leaf_id || 
-                           assetData.node_index || 
-                           assetData.leaf_id || 
-                           0,
-                }
-            );
-            
-            // Add compute budget instruction to increase compute units for compression
-            const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-                units: 1000000 
-            });
-            
-            // Add priority fee to help the transaction get processed faster
-            const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({ 
-                microLamports: 10000
-            });
-            
-            // Get recent blockhash
-            const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
-            
-            // Create and populate the transaction
-            const tx = new Transaction();
-            tx.feePayer = this.wallet.publicKey;
-            tx.recentBlockhash = blockhash;
-            
-            // Add all instructions
-            tx.add(modifyComputeUnits);
-            tx.add(addPriorityFee);
-            tx.add(transferIx);
-            
             // Store debug info
             if (typeof window !== "undefined" && window.debugInfo) {
                 window.debugInfo.cnftTransferTriggered = true;
                 window.debugInfo.lastTransferAssetId = assetId;
-                window.debugInfo.lastTransferDestination = targetAddress;
+                window.debugInfo.lastTransferDestination = destinationAddress || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8";
+                window.debugInfo.transferMethod = "fixed-implementation";
             }
             
+            // Use our fixed implementation that handles toBuffer errors
             try {
-                console.log("Signing transfer transaction...");
+                const result = await fixedImplementation.safeTransferCNFT({
+                    connection: this.connection,
+                    wallet: this.wallet,
+                    assetId,
+                    assetData,
+                    proof,
+                    destinationAddress
+                });
                 
-                // Sign the transaction
-                if (!this.wallet.signTransaction) {
-                    throw new Error("Wallet doesn't support signTransaction");
-                }
-                
-                const signed = await this.wallet.signTransaction(tx);
-                console.log("Transaction signed successfully");
-                
-                // Send the signed transaction
-                console.log("Sending signed transaction...");
-                const signature = await this.connection.sendRawTransaction(
-                    signed.serialize()
-                );
-                
-                console.log("Transaction sent. Signature:", signature);
-                
-                // Store debug info
-                if (typeof window !== "undefined" && window.debugInfo) {
-                    window.debugInfo.lastCnftSignature = signature;
+                // Store debug info for success case
+                if (result.success && typeof window !== "undefined" && window.debugInfo) {
+                    window.debugInfo.lastCnftSignature = result.signature;
                     window.debugInfo.lastCnftSuccess = true;
-                    window.debugInfo.transferMethod = "direct";
                 }
                 
-                // Wait for confirmation
-                try {
-                    const confirmation = await this.connection.confirmTransaction({
-                        signature,
-                        blockhash,
-                        lastValidBlockHeight
-                    }, "confirmed");
-                    
-                    console.log("cNFT transfer transaction confirmed:", confirmation);
-                    
-                    // Show success notification
-                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
-                        const shortSig = signature.substring(0, 8) + "...";
-                        window.BurnAnimations.showNotification(
-                            "cNFT Transfer Successful", 
-                            `Your cNFT has been successfully transferred to the provided address.\nTransaction signature: ${shortSig}`
-                        );
-                    }
-                    
-                    return {
-                        success: true,
-                        signature,
-                        message: "Compressed NFT successfully transferred!",
-                        explorerUrl: `https://solscan.io/tx/${signature}`
-                    };
-                } catch (confirmError) {
-                    // Confirmation might time out but transaction could still succeed
-                    console.warn("Confirmation error but transaction may have succeeded:", confirmError);
-                    
-                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
-                        const shortSig = signature.substring(0, 8) + "...";
-                        window.BurnAnimations.showNotification(
-                            "cNFT Transfer Submitted", 
-                            `Your transfer transaction has been submitted to the network.\nTransaction signature: ${shortSig}`
-                        );
-                    }
-                    
-                    return {
-                        success: true,
-                        signature,
-                        assumed: true,
-                        message: "Transaction submitted but confirmation timed out. The transfer is likely to succeed.",
-                        explorerUrl: `https://solscan.io/tx/${signature}`
-                    };
+                // Handle success notification
+                if (result.success && typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                    const shortSig = result.signature.substring(0, 8) + "...";
+                    window.BurnAnimations.showNotification(
+                        result.assumed ? "cNFT Transfer Submitted" : "cNFT Transfer Successful", 
+                        `Your cNFT has been ${result.assumed ? "submitted for transfer" : "successfully transferred"} to the provided address.\nTransaction signature: ${shortSig}`
+                    );
+                } 
+                // Handle error notification
+                else if (!result.success && typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                    window.BurnAnimations.showNotification(
+                        "cNFT Transfer Failed", 
+                        `Error: ${result.error}`
+                    );
                 }
+                
+                return result;
             } catch (error) {
-                console.error("Error signing or sending transaction:", error);
-                
-                // Check if user cancelled
-                if (error.message && (
-                    error.message.includes("User rejected") || 
-                    error.message.includes("cancelled") || 
-                    error.message.includes("declined")
-                )) {
-                    // Show cancellation notification
-                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
-                        window.BurnAnimations.showNotification(
-                            "Transaction Cancelled", 
-                            "You cancelled the cNFT transfer transaction"
-                        );
-                    }
-                    
-                    return {
-                        success: false,
-                        error: "Transaction was cancelled by the user",
-                        cancelled: true
-                    };
-                }
+                console.error("Error in fixed implementation:", error);
                 
                 // Show error notification
                 if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                     window.BurnAnimations.showNotification(
                         "cNFT Transfer Failed", 
-                        `Error: ${error.message}`
+                        `Implementation error: ${error.message}`
                     );
                 }
                 
-                throw new Error(`Transfer transaction failed: ${error.message}`);
+                throw error;
             }
         } catch (error) {
             console.error("Error in transferCNFT:", error);
