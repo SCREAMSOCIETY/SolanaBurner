@@ -1253,11 +1253,11 @@ export class CNFTHandler {
             
             const walletPublicKey = this.wallet.publicKey.toString();
             
-            // Show notification to user about the transfer process
+            // Show notification to user about the trash process
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                 window.BurnAnimations.showNotification(
-                    "Processing cNFT Transfer", 
-                    "Creating transfer transaction - watch for wallet approval prompt"
+                    "Moving cNFT to Trash", 
+                    "Creating trash transaction - watch for wallet approval prompt"
                 );
             }
             
@@ -1378,8 +1378,8 @@ export class CNFTHandler {
                             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                                 const shortSig = result.signature.substring(0, 8) + "...";
                                 window.BurnAnimations.showNotification(
-                                    "cNFT Transfer Successful", 
-                                    `Your cNFT has been successfully transferred to the provided address.\nTransaction signature: ${shortSig}`
+                                    "cNFT Moved to Trash", 
+                                    `Your cNFT has been successfully moved to trash.\nTransaction signature: ${shortSig}`
                                 );
                             }
                             
@@ -1424,8 +1424,8 @@ export class CNFTHandler {
                         if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                             const shortSig = result.signature.substring(0, 8) + "...";
                             window.BurnAnimations.showNotification(
-                                result.assumed ? "cNFT Transfer Submitted" : "cNFT Transfer Successful", 
-                                `Your cNFT has been ${result.assumed ? "submitted for transfer" : "successfully transferred"} to the provided address.\nTransaction signature: ${shortSig}`
+                                result.assumed ? "cNFT Trash Job Submitted" : "cNFT Moved to Trash", 
+                                `Your cNFT has been ${result.assumed ? "submitted for trash" : "successfully moved to trash"}.\nTransaction signature: ${shortSig}`
                             );
                         }
                         
@@ -1449,8 +1449,8 @@ export class CNFTHandler {
                         // Show notification about fallback
                         if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                             window.BurnAnimations.showNotification(
-                                "Using Transfer Alternative", 
-                                "Creating a transaction record for this cNFT..."
+                                "Using Trash Alternative", 
+                                "Creating a record for this cNFT trash operation..."
                             );
                         }
                         

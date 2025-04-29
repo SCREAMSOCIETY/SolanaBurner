@@ -1483,14 +1483,14 @@ const WalletAssets: React.FC = () => {
                       disabled={isBurning}
                       onClick={handleBulkBurnCNFTs}
                     >
-                      Transfer Selected
+                      Trash Selected
                     </button>
                   </div>
                 )}
                 
                 {(selectedTokens.length + selectedNFTs.length + selectedCNFTs.length === 0) && (
                   <div className="no-selection-message">
-                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to transfer to the project wallet.
+                    Click on any asset to select it. You can select multiple tokens/NFTs to burn or cNFTs to trash.
                   </div>
                 )}
               </div>
@@ -1608,10 +1608,10 @@ const WalletAssets: React.FC = () => {
           <div className="asset-section">
             <h3>Compressed NFTs {cnftsLoading && <span className="loading-indicator">Loading...</span>}</h3>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#555', background: '#f8f8f8', padding: '8px', borderRadius: '4px' }}>
-              Note: When you remove a cNFT, we transfer it to a project-managed wallet (screamsociety.sol) rather than burning it. This allows you to clean up your wallet without requiring tree authority access needed for actual burning.
+              Note: When you trash a cNFT, it's moved to a project-managed wallet rather than being permanently destroyed. This allows you to clean up your wallet without requiring tree authority access.
             </div>
             <div className="info-message" style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#006633', background: '#e6fff0', padding: '8px', borderRadius: '4px', border: '1px solid #c8ffd8' }}>
-              <strong>Direct Transfer Mode:</strong> This application now supports direct wallet-to-wallet transfers for cNFTs. When you transfer a cNFT, it will be sent directly from your wallet to the project wallet (screamsociety.sol) as a real blockchain transaction.
+              <strong>Direct Trash Mode:</strong> This application now supports direct wallet-to-wallet movements for cNFTs. When you trash a cNFT, it will be removed from your wallet via a real blockchain transaction.
             </div>
             
             <div className="cnfts-grid">
@@ -1643,9 +1643,9 @@ const WalletAssets: React.FC = () => {
                         e.stopPropagation();
                         handleBurnCNFT(cnft);
                       }}
-                      title="Transfers this cNFT to a project-managed wallet"
+                      title="Moves this cNFT to trash"
                     >
-                      Transfer
+                      Trash
                     </button>
                   )}
                   {bulkBurnMode && (
