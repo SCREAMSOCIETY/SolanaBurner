@@ -1073,6 +1073,206 @@ export class CNFTHandler {
         }
     }
     
+    /**
+     * Batch transfer multiple cNFTs to a project wallet in a single transaction
+     * Uses Bubblegum protocol to transfer multiple assets with one signature
+     * 
+     * @param {string[]} assetIds - Array of asset IDs to transfer
+     * @param {string} destinationAddress - Destination wallet address (defaults to project wallet)
+     * @returns {Promise<object>} - Result of the batch transfer operation
+     */
+    async batchTransferCNFTs(assetIds, destinationAddress = null) {
+        try {
+            console.log("Starting batch cNFT trash operation to project wallet");
+            console.log("Number of assets to transfer:", assetIds.length);
+            
+            if (!Array.isArray(assetIds) || assetIds.length === 0) {
+                throw new Error("No asset IDs provided for batch transfer");
+            }
+            
+            // Use the project wallet address if none specified
+            const finalDestination = destinationAddress || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
+            console.log("Destination address:", finalDestination);
+            
+            // Fetch all assets with proofs
+            const assetsWithProofs = [];
+            const failedFetches = [];
+            
+            // Show loading notification
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Preparing Batch Trash", 
+                    `Fetching proof data for ${assetIds.length} cNFTs - please wait...`
+                );
+            }
+            
+            // Fetch proof data for each asset (up to a reasonable limit)
+            const MAX_BATCH_SIZE = 5;
+            const assetsToProcess = assetIds.slice(0, MAX_BATCH_SIZE);
+            
+            if (assetsToProcess.length < assetIds.length) {
+                console.log(`Only processing first ${MAX_BATCH_SIZE} assets in this batch`);
+            }
+            
+            for (const assetId of assetsToProcess) {
+                try {
+                    const assetWithProof = await this.fetchAssetWithProof(assetId);
+                    
+                    if (!assetWithProof || !assetWithProof.assetData) {
+                        throw new Error("Could not fetch asset data with proof");
+                    }
+                    
+                    const { assetData, proofData } = assetWithProof;
+                    
+                    // Prepare proof data in the right format for batch transfer
+                    assetsWithProofs.push({
+                        assetId,
+                        assetData,
+                        proofData: {
+                            proof: assetData.proof,
+                            root: assetData.root || assetData.rootHash,
+                            data_hash: assetData.dataHash,
+                            creator_hash: assetData.creatorHash,
+                            leaf_id: assetData.compression?.leaf_id || assetData.compression?.leafId
+                        }
+                    });
+                    
+                    console.log("Got asset with proof:", assetId);
+                } catch (fetchError) {
+                    console.error(`Failed to fetch asset with proof for ${assetId}:`, fetchError);
+                    failedFetches.push({ assetId, error: fetchError.message });
+                }
+            }
+            
+            // If we couldn't fetch any assets with proofs, fail early
+            if (assetsWithProofs.length === 0) {
+                throw new Error(`Could not fetch proof data for any assets. First error: ${failedFetches[0]?.error || "Unknown error"}`);
+            }
+            
+            try {
+                // Import the bubblegum-transfer module
+                const bubblegumImplementation = await import('./bubblegum-transfer.js');
+                
+                console.log("Using Bubblegum batch transfer implementation");
+                console.log("Assets ready for batch transfer:", assetsWithProofs.length);
+                
+                // Call the batch transfer function
+                const result = await bubblegumImplementation.batchTransferCompressedNFTs({
+                    connection: this.connection,
+                    wallet: this.wallet,
+                    assets: assetsWithProofs,
+                    destinationAddress: finalDestination
+                });
+                
+                // Handle the result
+                if (result.success) {
+                    console.log("Batch transfer succeeded!", result);
+                    
+                    // Store debug info
+                    if (typeof window !== "undefined" && window.debugInfo) {
+                        window.debugInfo.lastCnftSignature = result.signature;
+                        window.debugInfo.lastCnftSuccess = true;
+                        window.debugInfo.transferMethod = "bubblegum-batch";
+                        window.debugInfo.batchSize = result.processedAssets.length;
+                    }
+                    
+                    // Show success notification
+                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                        const shortSig = result.signature.substring(0, 8) + "...";
+                        window.BurnAnimations.showNotification(
+                            "cNFTs Moved to Trash", 
+                            `${result.processedAssets.length} cNFTs have been successfully moved to trash in a single transaction.\nSignature: ${shortSig}`
+                        );
+                    }
+                    
+                    // Return success with details
+                    return {
+                        success: true,
+                        signature: result.signature,
+                        explorerUrl: result.explorerUrl,
+                        method: "bubblegum-batch",
+                        processedAssets: result.processedAssets,
+                        failedAssets: [...result.failedAssets, ...failedFetches.map(f => f.assetId)]
+                    };
+                } else {
+                    console.error("Batch transfer failed:", result.error);
+                    
+                    // Show error notification
+                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                        window.BurnAnimations.showNotification(
+                            "Batch Trash Failed", 
+                            `Could not trash cNFTs in batch: ${result.error}`
+                        );
+                    }
+                    
+                    throw new Error(`Batch transfer failed: ${result.error}`);
+                }
+            } catch (batchError) {
+                console.error("Error in batch transfer operation:", batchError);
+                
+                // Fall back to individual transfers if the batch fails
+                console.log("Falling back to individual transfers...");
+                
+                // Show fallback notification
+                if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                    window.BurnAnimations.showNotification(
+                        "Falling Back to Individual Transfers", 
+                        "Batch operation failed. Trying individual trash operations instead."
+                    );
+                }
+                
+                // Process assets individually as a fallback
+                const results = [];
+                let successCount = 0;
+                
+                for (const { assetId } of assetsWithProofs) {
+                    try {
+                        const result = await this.transferCNFT(assetId, finalDestination);
+                        if (result.success) {
+                            successCount++;
+                        }
+                        results.push({ assetId, ...result });
+                    } catch (individualError) {
+                        console.error(`Error transferring ${assetId}:`, individualError);
+                        results.push({ 
+                            assetId, 
+                            success: false, 
+                            error: individualError.message 
+                        });
+                    }
+                }
+                
+                return {
+                    success: successCount > 0,
+                    method: "individual-fallback",
+                    results,
+                    successCount,
+                    totalCount: assetsWithProofs.length
+                };
+            }
+        } catch (error) {
+            console.error("Error in batch transfer operation:", error);
+            
+            // Show error notification
+            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                window.BurnAnimations.showNotification(
+                    "Batch Trash Failed", 
+                    `Error: ${error.message}`
+                );
+            }
+            
+            return {
+                success: false,
+                error: error.message || "Unknown error in batch transfer",
+                cancelled: error.message && (
+                    error.message.includes("User rejected") ||
+                    error.message.includes("cancelled") ||
+                    error.message.includes("declined")
+                )
+            };
+        }
+    }
+    
     // NEW METHOD: Delegate burning authority to the server
     async delegateCNFT(assetId, assetData) {
         console.log(`Delegating cNFT burning authority: ${assetId}`);

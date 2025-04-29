@@ -1640,7 +1640,7 @@ const WalletAssets: React.FC = () => {
     if (selectedCNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Processing compressed NFT transfers to project wallet...");
+    setError("Processing compressed NFT transfers to project wallet in a single transaction...");
     
     try {
       // Create a CNFTHandler instance with the current connection and wallet
@@ -1652,141 +1652,169 @@ const WalletAssets: React.FC = () => {
         signTransaction
       });
       
-      // Show notification about the transfer process
+      // Show notification about the batch transfer process
       if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
-          "Transferring cNFTs", 
-          "Sending selected compressed NFTs to project wallet - watch for wallet prompts"
+          "Preparing Batch Trash Operation", 
+          `Preparing to trash ${selectedCNFTs.length} cNFTs in a single transaction`
         );
       }
       
-      // Process all selected cNFTs with transfer attempts
-      let successCount = 0;
-      let failedCount = 0;
+      // Track this batch attempt for analytics
+      if (typeof window !== 'undefined' && window.debugInfo) {
+        window.debugInfo.cnftTransferAttempted = true;
+        window.debugInfo.bulkBurnAttempted = true;
+        window.debugInfo.batchTransferAttempted = true;
+      }
       
-      // Array to store promises for concurrent processing
-      const transferPromises = [];
+      // Use our new batch transfer method
+      setError(`Preparing batch transaction for ${selectedCNFTs.length} cNFTs...`);
       
-      for (const mint of selectedCNFTs) {
-        const cnft = cnfts.find(c => c.mint === mint);
+      // Create an array of mint addresses to process
+      const mintsToProcess = selectedCNFTs.slice();
+      
+      // Submit batch transfer request
+      const result = await handler.batchTransferCNFTs(mintsToProcess);
+      console.log("Batch transfer result:", result);
+      
+      if (result.success) {
+        // Success! Transaction succeeded and processed at least some assets
+        const processedCount = result.processedAssets?.length || 0;
+        const failedCount = result.failedAssets?.length || 0;
         
-        if (cnft) {
-          // Track this attempt for analytics
-          if (typeof window !== 'undefined' && window.debugInfo) {
-            window.debugInfo.cnftTransferAttempted = true;
-            window.debugInfo.bulkBurnAttempted = true;
-          }
-          
-          // Add this transfer operation to our promises array
-          const transferPromise = (async () => {
-            try {
-              // Use the direct transfer method
-              console.log(`Sending transfer request for ${cnft.mint}`);
-              
-              // Submit client-side transfer request
-              const result = await handler.transferCNFT(cnft.mint) as any;
-              
-              if (result && result.success) {
-                console.log(`Successfully transferred cNFT: ${cnft.mint}`);
-                successCount++;
-                
-                // Show the transfer animation (using burn animation for visual effect)
-                const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
-                if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
-                  window.BurnAnimations.applyBurnAnimation(cnftCard);
-                }
-                
-                // Remove the NFT from the UI list
-                setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
-                console.log(`Transfer complete: ${cnft.mint} has been transferred to the project wallet`);
-                
-                // Track achievement
-                if (window.BurnAnimations?.checkAchievements) {
-                  window.BurnAnimations.checkAchievements('cnfts', 1);
-                }
-                
-                return { mint: cnft.mint, success: true, signature: result.signature };
-              } else {
-                console.warn(`Failed to transfer cNFT: ${cnft.mint}`, result);
-                failedCount++;
-                return { 
-                  mint: cnft.mint, 
-                  success: false, 
-                  error: result?.error || result?.userMessage || "Transfer failed"
-                };
+        // Apply animations to processed assets
+        if (processedCount > 0) {
+          // Update the UI by removing the processed cNFTs
+          if (result.processedAssets && Array.isArray(result.processedAssets)) {
+            // Remove successfully processed assets from the UI
+            setCnfts(prev => prev.filter(c => !result.processedAssets.includes(c.mint)));
+            
+            // Apply animations to each processed cNFT
+            result.processedAssets.forEach(mint => {
+              const cnftCard = document.querySelector(`[data-mint="${mint}"]`) as HTMLElement;
+              if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
+                window.BurnAnimations.applyBurnAnimation(cnftCard);
               }
-            } catch (error) {
-              console.error(`Error transferring cNFT: ${cnft.mint}`, error);
-              failedCount++;
-              return { 
-                mint: cnft.mint, 
-                success: false, 
-                error: error instanceof Error ? error.message : "Unknown error" 
-              };
-            }
-          })();
+            });
+            
+            // Remove processed assets from the selected assets list
+            setSelectedCNFTs(prev => prev.filter(mint => !result.processedAssets.includes(mint)));
+          }
           
-          transferPromises.push(transferPromise);
-        }
-      }
-      
-      // Wait for all transfer operations to complete (one by one to avoid wallet confusion)
-      const results = [];
-      for (const promise of transferPromises) {
-        try {
-          const result = await promise;
-          results.push(result);
-        } catch (error) {
-          console.error("Transfer promise rejected:", error);
-          results.push({ success: false, error: "Promise rejected" });
-        }
-      }
-      
-      console.log("All cNFT transfer operations completed:", results);
-      
-      // Show confetti if any were successful
-      if (successCount > 0 && window.BurnAnimations?.createConfetti) {
-        window.BurnAnimations.createConfetti();
-      }
-      
-      // Update message based on results
-      if (successCount > 0 && failedCount > 0) {
-        setError(`Transferred ${successCount} of ${selectedCNFTs.length} compressed NFTs to the project wallet. ${failedCount} failed.`);
-      } else if (successCount > 0) {
-        setError(`Successfully transferred all ${successCount} compressed NFTs to the project wallet!`);
-      } else {
-        // Detailed error message based on what went wrong
-        let errorDetails = "Please try again or check your wallet connection.";
-        
-        // Try to extract more specific error information
-        if (window.debugInfo?.proofFetchFailed) {
-          errorDetails = "Failed to fetch the required proof data for the cNFT. Proof data is needed for transfers.";
-        } else if (results.length > 0 && results[0].error) {
-          const firstError = results[0].error.toString();
-          if (firstError.includes("proof")) {
-            errorDetails = "Could not get valid proof data for the cNFT.";
-          } else if (firstError.includes("rejected")) {
-            errorDetails = "The transaction was rejected in your wallet.";
-          } else if (firstError.includes("funds")) {
-            errorDetails = "Not enough SOL in your wallet to pay for the transaction.";
+          // Show confetti for successful batch
+          if (window.BurnAnimations?.createConfetti) {
+            window.BurnAnimations.createConfetti();
+          }
+          
+          // Track multiple achievements at once
+          if (window.BurnAnimations?.checkAchievements) {
+            window.BurnAnimations.checkAchievements('cnfts', processedCount);
+          }
+          
+          // Show success message with transaction link
+          if (result.signature && result.explorerUrl) {
+            const shortSig = result.signature.substring(0, 8) + "...";
+            const txUrl = result.explorerUrl;
+            
+            setError(`Successfully trashed ${processedCount} cNFTs in a single transaction! Signature: ${shortSig}`);
+            
+            // Add link to transaction
+            setTimeout(() => {
+              const txElem = document.createElement('div');
+              txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+              
+              if (document.querySelector('.error-message')) {
+                document.querySelector('.error-message')?.appendChild(txElem);
+              }
+            }, 100);
+            
+            // Show message about any failed assets if applicable
+            if (failedCount > 0) {
+              setTimeout(() => {
+                setError(`${failedCount} cNFTs could not be included in the batch. Try again with those assets separately.`);
+              }, 7000);
+            }
           } else {
-            errorDetails = `Error: ${firstError.substring(0, 100)}`;
+            setError(`Successfully trashed ${processedCount} cNFTs in a single transaction!`);
+          }
+        } else {
+          // No assets were processed in the batch
+          setError("No cNFTs were included in the batch transaction. Check console for details.");
+        }
+      } else {
+        // Transaction failed
+        console.error("Batch transfer failed:", result.error);
+        
+        // Check if it was cancelled by the user
+        if (result.cancelled) {
+          setError("Transaction was cancelled by the user. No cNFTs were trashed.");
+        } else if (result.method === "individual-fallback") {
+          // Fallback process handled some assets
+          const successCount = result.successCount || 0;
+          const totalCount = result.totalCount || 0;
+          
+          if (successCount > 0) {
+            setError(`Batch transaction failed but completed ${successCount} of ${totalCount} individual transfers as fallback.`);
+            
+            // Show confetti for partial success
+            if (window.BurnAnimations?.createConfetti) {
+              window.BurnAnimations.createConfetti();
+            }
+            
+            // Track achievements for individual successes
+            if (window.BurnAnimations?.checkAchievements) {
+              window.BurnAnimations.checkAchievements('cnfts', successCount);
+            }
+            
+            // Remove processed assets from the UI
+            if (result.results && Array.isArray(result.results)) {
+              result.results.forEach(itemResult => {
+                if (itemResult.success && itemResult.assetId) {
+                  // Remove from UI
+                  setCnfts(prev => prev.filter(c => c.mint !== itemResult.assetId));
+                  
+                  // Apply animation
+                  const cnftCard = document.querySelector(`[data-mint="${itemResult.assetId}"]`) as HTMLElement;
+                  if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
+                    window.BurnAnimations.applyBurnAnimation(cnftCard);
+                  }
+                  
+                  // Remove from selected list
+                  setSelectedCNFTs(prev => prev.filter(mint => mint !== itemResult.assetId));
+                }
+              });
+            }
+          } else {
+            setError(`Batch transaction failed and no individual transfers succeeded. Please try again.`);
+          }
+        } else {
+          // Regular error
+          setError(`Error trashing cNFTs: ${result.error || "Unknown error"}`);
+          
+          // Try to extract more specific error information
+          let errorDetails = "Please try again or check your wallet connection.";
+          if (result.error) {
+            const errorMsg = result.error.toString();
+            if (errorMsg.includes("proof")) {
+              errorDetails = "Could not get valid proof data for the cNFTs.";
+            } else if (errorMsg.includes("rejected") || errorMsg.includes("cancelled")) {
+              errorDetails = "The transaction was rejected in your wallet.";
+            } else if (errorMsg.includes("funds")) {
+              errorDetails = "Not enough SOL in your wallet to pay for the transaction.";
+            } else {
+              errorDetails = errorMsg.substring(0, 100);
+            }
+          }
+          
+          // Show additional explanation
+          if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
+            window.BurnAnimations.showNotification(
+              "cNFT Batch Trash Failed", 
+              errorDetails
+            );
           }
         }
-          
-        setError(`No transfers were completed. ${errorDetails}`);
-        
-        // Show additional explanation
-        if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
-          window.BurnAnimations.showNotification(
-            "cNFT Transfer Failed", 
-            errorDetails
-          );
-        }
       }
-      
-      // Clear selections after transfer attempts
-      setSelectedCNFTs([]);
       
       // Clear the error message after a delay
       setTimeout(() => setError(null), 8000);
