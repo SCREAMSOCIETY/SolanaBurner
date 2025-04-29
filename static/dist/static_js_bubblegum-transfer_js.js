@@ -9,513 +9,238 @@
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   batchTransferCompressedNFTs: () => (/* binding */ batchTransferCompressedNFTs),
-/* harmony export */   canUseCompressedTransfer: () => (/* binding */ canUseCompressedTransfer),
-/* harmony export */   transferCompressedNFT: () => (/* binding */ transferCompressedNFT)
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
 /* harmony import */ var _metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @metaplex-foundation/mpl-bubblegum */ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/index.js");
 /* harmony import */ var _metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @solana/web3.js */ "./node_modules/@solana/web3.js/lib/index.browser.esm.js");
 /* provided dependency */ var Buffer = __webpack_require__(/*! buffer */ "./node_modules/buffer/index.js")["Buffer"];
 /**
- * Bubblegum Transfer Implementation for Compressed NFTs
+ * Bubblegum Transfer Implementation
  * 
- * This implementation follows the standard Metaplex Bubblegum protocol for transferring
- * compressed NFTs (cNFTs) on Solana. It properly handles the Merkle proofs and uses
- * the Bubblegum program to create the transfer instruction.
- * 
- * NEW FEATURE:
- * Includes support for batch transfers of multiple cNFTs in a single transaction
- * which significantly reduces wallet approval friction and blockchain fees.
+ * This module provides functionality for transferring compressed NFTs using the
+ * Bubblegum protocol. It handles the creation of transfer instructions and 
+ * transaction sending.
  */
 
 
 
 
 /**
- * Transfer a compressed NFT to a new owner using the Bubblegum protocol
- * 
- * @param {Object} params Transfer parameters
- * @param {Connection} params.connection - Solana connection
- * @param {Object} params.wallet - User's wallet with signTransaction method
- * @param {string} params.assetId - The asset ID (mint) of the cNFT
- * @param {string} params.destinationAddress - The address to transfer the cNFT to
- * @param {Object} params.proofData - The Merkle proof data for the cNFT
- * @param {Object} params.assetData - Asset data with compression information
- * @returns {Promise<Object>} Transfer result with transaction signature
+ * Get tree authority PDA
+ * @param {PublicKey} merkleTree - The merkle tree public key
+ * @returns {PublicKey} - The derived tree authority
+ */
+function getTreeAuthorityPDA(merkleTree) {
+    const [treeAuthority] = _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey.findProgramAddressSync(
+        [merkleTree.toBuffer()],
+        new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY")
+    );
+    return treeAuthority;
+}
+
+/**
+ * Safely converts a PublicKey to a Buffer
+ * @param {PublicKey|string} publicKeyOrString - The PublicKey or string to convert
+ * @returns {Buffer} - A buffer containing the public key bytes
+ */
+function safePublicKeyToBuffer(publicKeyOrString) {
+    try {
+        if (typeof publicKeyOrString === 'string') {
+            return new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(publicKeyOrString).toBuffer();
+        } else if (publicKeyOrString instanceof _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey) {
+            return publicKeyOrString.toBuffer();
+        }
+    } catch (e) {
+        console.error("Error converting public key to buffer:", e);
+    }
+    
+    // Return an empty buffer as fallback
+    return Buffer.alloc(32);
+}
+
+/**
+ * Transfer a compressed NFT to a specified destination
+ * @param {object} params - The transfer parameters
+ * @param {Connection} params.connection - Solana connection object
+ * @param {WalletAdapter} params.wallet - Wallet adapter with signTransaction method
+ * @param {string} params.assetId - Asset ID (mint address) of the cNFT
+ * @param {string} params.destinationAddress - Destination wallet address
+ * @param {object} params.proofData - The asset proof data
+ * @param {object} params.assetData - Additional asset data (optional)
+ * @returns {Promise<object>} - The result of the transfer operation
  */
 async function transferCompressedNFT(params) {
-  const {
-    connection,
-    wallet,
-    assetId,
-    destinationAddress,
-    proofData,
-    assetData,
-  } = params;
-
-  try {
-    console.log('[bubblegum-transfer] Starting cNFT transfer using Bubblegum protocol');
-    console.log('[bubblegum-transfer] Asset ID:', assetId);
-    console.log('[bubblegum-transfer] Destination:', destinationAddress);
-
-    if (!wallet || !wallet.publicKey || !wallet.signTransaction) {
-      throw new Error('Wallet with signTransaction capability required');
-    }
-
-    if (!proofData || !proofData.proof || !proofData.root) {
-      throw new Error('Valid proof data required for Bubblegum transfer');
-    }
-
-    if (!assetData || !assetData.compression || !assetData.compression.tree) {
-      throw new Error('Asset compression data required for Bubblegum transfer');
-    }
-
-    // Extract proof data
-    const {
-      root,
-      proof,
-      leaf_id,
-      leaf,
-      data_hash,
-      creator_hash,
-    } = proofData;
-
-    // Get necessary addresses and data
-    const ownerAddress = wallet.publicKey;
-    const merkleTreeAddress = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(assetData.compression.tree);
-    const destinationPublicKey = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(destinationAddress);
-    const leafOwner = ownerAddress;
-    const leafDelegate = ownerAddress; // Assuming owner is also delegate
-    const nonce = assetData.compression.leaf_id || leaf_id;
-    const index = assetData.compression.leaf_id || leaf_id;
-
-    console.log('[bubblegum-transfer] Creating Bubblegum transfer instruction');
-    console.log('[bubblegum-transfer] Merkle tree:', merkleTreeAddress.toString());
-    console.log('[bubblegum-transfer] Owner:', ownerAddress.toString());
-    console.log('[bubblegum-transfer] Destination:', destinationPublicKey.toString());
-
-    // Convert proof to right format if needed
-    const bubblegumProof = proof.map(node => {
-      if (typeof node === 'string') {
-        return Buffer.from(node.replace('0x', ''), 'hex');
-      }
-      return node;
-    });
-
-    // Set up root and hashes in the right format
-    const rootArray = typeof root === 'string' 
-      ? Buffer.from(root.replace('0x', ''), 'hex') 
-      : root;
-      
-    const dataHashArray = typeof data_hash === 'string'
-      ? Buffer.from(data_hash.replace('0x', ''), 'hex')
-      : data_hash;
-      
-    const creatorHashArray = typeof creator_hash === 'string'
-      ? Buffer.from(creator_hash.replace('0x', ''), 'hex')
-      : creator_hash;
-
-    // Create the transfer instruction (simplified to only require what's necessary)
-    const [treeAuthority] = _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey.findProgramAddressSync(
-      [merkleTreeAddress.toBuffer()],
-      _metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.PROGRAM_ID
-    );
+    const { connection, wallet, assetId, destinationAddress, proofData, assetData } = params;
     
-    const transferInstruction = (0,_metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.createTransferInstruction)(
-      {
-        merkleTree: merkleTreeAddress,
-        treeAuthority: treeAuthority, // Required parameter but no signature needed
-        leafOwner: leafOwner,
-        leafDelegate: leafDelegate,
-        newLeafOwner: destinationPublicKey,
-        logWrapper: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey('nooooooooooooooooooooooooooooooooooooooo'),
-        compressionProgram: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-        anchorRemainingAccounts: [], // No additional accounts needed
-      },
-      {
-        root: rootArray,
-        dataHash: dataHashArray,
-        creatorHash: creatorHashArray,
-        nonce: BigInt(nonce),
-        index: Number(index),
-        proof: bubblegumProof,
-      },
-      _metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.PROGRAM_ID
-    );
-
-    // Create and sign the transaction
-    console.log('[bubblegum-transfer] Creating transaction');
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    
-    const transaction = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Transaction({
-      feePayer: ownerAddress,
-      blockhash,
-      lastValidBlockHeight,
-    });
-
-    transaction.add(transferInstruction);
-
-    console.log('[bubblegum-transfer] Signing transaction');
-    const signedTransaction = await wallet.signTransaction(transaction);
-
-    console.log('[bubblegum-transfer] Sending transaction');
-    const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
-
-    console.log('[bubblegum-transfer] Waiting for confirmation');
-    const confirmation = await connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    });
-
-    console.log('[bubblegum-transfer] Transaction confirmed!', signature);
-    
-    // If we got this far, transfer was successful
-    return {
-      success: true,
-      signature,
-      method: 'bubblegum',
-      assetId,
-      destination: destinationAddress,
-    };
-  } catch (error) {
-    console.error('[bubblegum-transfer] Error transferring cNFT:', error);
-    throw error;
-  }
-}
-
-/**
- * Batch transfer multiple compressed NFTs in a single transaction
- * This reduces wallet approval friction and saves on transaction fees
- * 
- * @param {Object} params - Batch transfer parameters
- * @param {Connection} params.connection - Solana connection
- * @param {Object} params.wallet - User's wallet with signTransaction method
- * @param {Array} params.assets - Array of assets to transfer, each containing:
- *   - assetId: The asset ID (mint) of the cNFT
- *   - assetData: The asset data with compression info
- *   - proofData: The merkle proof data
- * @param {string} params.destinationAddress - The destination wallet address
- * @returns {Promise<Object>} - Result with transaction signature and success status
- */
-async function batchTransferCompressedNFTs(params) {
-  const {
-    connection,
-    wallet,
-    assets,
-    destinationAddress
-  } = params;
-
-  try {
-    console.log('[bubblegum-transfer] Starting batch cNFT transfer using Bubblegum protocol');
-    console.log('[bubblegum-transfer] Number of assets:', assets.length);
-    console.log('[bubblegum-transfer] Destination:', destinationAddress);
-
-    if (!wallet || !wallet.publicKey || !wallet.signTransaction) {
-      throw new Error('Wallet with signTransaction capability required');
-    }
-
-    if (!assets || !Array.isArray(assets) || assets.length === 0) {
-      throw new Error('At least one valid asset is required for batch transfer');
-    }
-
-    // Validate maximum batch size (too many will exceed transaction size limits)
-    const MAX_BATCH_SIZE = 5;
-    if (assets.length > MAX_BATCH_SIZE) {
-      console.warn(`[bubblegum-transfer] Batch size exceeds maximum (${MAX_BATCH_SIZE}). Only processing first ${MAX_BATCH_SIZE} assets.`);
-    }
-
-    const assetsToProcess = assets.slice(0, MAX_BATCH_SIZE);
-    
-    // Create a new transaction
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    
-    const transaction = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Transaction({
-      feePayer: wallet.publicKey,
-      blockhash,
-      lastValidBlockHeight,
-    });
-
-    // Prepare each cNFT transfer instruction
-    const processedAssets = [];
-    const failedAssets = [];
-
-    // Common destination address
-    const destinationPublicKey = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(destinationAddress);
-    
-    // Create transfer instruction for each asset
-    for (const asset of assetsToProcess) {
-      try {
-        const { assetId, assetData, proofData } = asset;
-        
-        // Validate required data
-        if (!canUseCompressedTransfer(assetData, proofData)) {
-          console.warn(`[bubblegum-transfer] Asset ${assetId} missing required data for Bubblegum transfer`);
-          failedAssets.push({ assetId, error: 'Missing required data' });
-          continue;
-        }
-        
-        // Get merkle tree address
-        const merkleTreeAddress = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(assetData.compression.tree);
-        
-        // Extract proof data
-        const {
-          root,
-          proof,
-          data_hash,
-          creator_hash,
-        } = proofData;
-        
-        const leafId = assetData.compression.leaf_id || proofData.leaf_id;
-        
-        // Owner and delegate are the same (current wallet)
-        const ownerAddress = wallet.publicKey;
-        const leafOwner = ownerAddress;
-        const leafDelegate = ownerAddress;
-        
-        // Convert proof to correct format
-        const bubblegumProof = proof.map(node => {
-          // Convert string proofs to Buffer
-          if (typeof node === 'string') {
-            try {
-              // Remove '0x' prefix if present
-              const cleanNode = node.replace('0x', '');
-              // Create Buffer from hex string
-              return Buffer.from(cleanNode, 'hex');
-            } catch (err) {
-              console.error(`[bubblegum-transfer] Error converting proof node to Buffer:`, err);
-              // Return a safe default if conversion fails
-              return Buffer.from([]);
-            }
-          } else if (Buffer.isBuffer(node)) {
-            // If already a Buffer, return as is
-            return node;
-          } else if (Array.isArray(node)) {
-            // If it's an array (like Uint8Array), convert to Buffer
-            return Buffer.from(node);
-          } else if (node && typeof node === 'object' && node.type === 'Buffer' && Array.isArray(node.data)) {
-            // Handle special case of serialized Buffer objects
-            return Buffer.from(node.data);
-          } else {
-            console.warn(`[bubblegum-transfer] Unknown proof node type:`, typeof node);
-            // Return an empty buffer as fallback
-            return Buffer.from([]);
-          }
+    try {
+        console.log("Starting Bubblegum transfer with params:", {
+            assetId,
+            destinationAddress,
+            walletPublicKey: wallet.publicKey.toString(),
+            proofDataAvailable: !!proofData
         });
         
-        // Safely convert root and hashes to Buffer format
-        let rootArray, dataHashArray, creatorHashArray;
-        
-        try {
-          // Handle root conversion
-          if (typeof root === 'string') {
-            rootArray = Buffer.from(root.replace('0x', ''), 'hex');
-          } else if (Buffer.isBuffer(root)) {
-            rootArray = root;
-          } else if (Array.isArray(root)) {
-            rootArray = Buffer.from(root);
-          } else if (root && typeof root === 'object' && root.type === 'Buffer' && Array.isArray(root.data)) {
-            rootArray = Buffer.from(root.data);
-          } else {
-            console.warn(`[bubblegum-transfer] Unexpected root type: ${typeof root}`);
-            rootArray = Buffer.from([]);
-          }
-          
-          // Handle data_hash conversion
-          if (typeof data_hash === 'string') {
-            dataHashArray = Buffer.from(data_hash.replace('0x', ''), 'hex');
-          } else if (Buffer.isBuffer(data_hash)) {
-            dataHashArray = data_hash;
-          } else if (Array.isArray(data_hash)) {
-            dataHashArray = Buffer.from(data_hash);
-          } else if (data_hash && typeof data_hash === 'object' && data_hash.type === 'Buffer' && Array.isArray(data_hash.data)) {
-            dataHashArray = Buffer.from(data_hash.data);
-          } else {
-            console.warn(`[bubblegum-transfer] Unexpected data_hash type: ${typeof data_hash}`);
-            dataHashArray = Buffer.from([]);
-          }
-          
-          // Handle creator_hash conversion
-          if (typeof creator_hash === 'string') {
-            creatorHashArray = Buffer.from(creator_hash.replace('0x', ''), 'hex');
-          } else if (Buffer.isBuffer(creator_hash)) {
-            creatorHashArray = creator_hash;
-          } else if (Array.isArray(creator_hash)) {
-            creatorHashArray = Buffer.from(creator_hash);
-          } else if (creator_hash && typeof creator_hash === 'object' && creator_hash.type === 'Buffer' && Array.isArray(creator_hash.data)) {
-            creatorHashArray = Buffer.from(creator_hash.data);
-          } else {
-            console.warn(`[bubblegum-transfer] Unexpected creator_hash type: ${typeof creator_hash}`);
-            creatorHashArray = Buffer.from([]);
-          }
-        } catch (error) {
-          console.error(`[bubblegum-transfer] Error converting hash data:`, error);
-          throw new Error(`Failed to convert hash data: ${error.message}`);
+        if (!proofData) {
+            return {
+                success: false,
+                error: "No proof data provided for cNFT transfer"
+            };
         }
         
-        // Derive tree authority
-        const [treeAuthority] = _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey.findProgramAddressSync(
-          [merkleTreeAddress.toBuffer()],
-          _metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.PROGRAM_ID
-        );
+        // Validate required proof data
+        if (!proofData.proof || !proofData.root || !proofData.tree) {
+            console.error("Invalid proof data:", proofData);
+            return {
+                success: false,
+                error: "Invalid proof data structure"
+            };
+        }
         
-        // Create transfer instruction
-        const transferInstruction = (0,_metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.createTransferInstruction)(
-          {
-            merkleTree: merkleTreeAddress,
-            treeAuthority: treeAuthority,
-            leafOwner: leafOwner,
-            leafDelegate: leafDelegate,
-            newLeafOwner: destinationPublicKey,
-            logWrapper: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey('nooooooooooooooooooooooooooooooooooooooo'),
-            compressionProgram: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-            anchorRemainingAccounts: [],
-          },
-          {
-            root: rootArray,
-            dataHash: dataHashArray,
-            creatorHash: creatorHashArray,
-            nonce: BigInt(leafId),
-            index: Number(leafId),
-            proof: bubblegumProof,
-          },
-          _metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.PROGRAM_ID
-        );
+        // Get the latest blockhash
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
         
-        // Add the instruction to the transaction
-        transaction.add(transferInstruction);
+        // Create a new transaction
+        const transaction = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.Transaction({
+            feePayer: wallet.publicKey,
+            blockhash,
+            lastValidBlockHeight,
+        });
         
-        // Track this asset as processed
-        processedAssets.push({ assetId, assetData });
+        // Convert tree ID to PublicKey
+        const merkleTree = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(proofData.tree);
+        const newLeafOwner = new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(destinationAddress);
         
-        console.log(`[bubblegum-transfer] Added transfer instruction for asset ${assetId}`);
-      } catch (error) {
-        console.error(`[bubblegum-transfer] Error adding asset ${asset.assetId} to batch:`, error);
-        failedAssets.push({ assetId: asset.assetId, error: error.message });
-      }
+        console.log("Creating transfer instruction with params:", {
+            merkleTree: merkleTree.toString(),
+            treeAuthority: getTreeAuthorityPDA(merkleTree).toString(),
+            leafOwner: wallet.publicKey.toString(),
+            newLeafOwner: newLeafOwner.toString(),
+            proofLength: proofData.proof.length
+        });
+        
+        // Create the transfer instruction
+        try {
+            const transferIx = (0,_metaplex_foundation_mpl_bubblegum__WEBPACK_IMPORTED_MODULE_0__.createTransferInstruction)(
+                {
+                    merkleTree,
+                    treeAuthority: getTreeAuthorityPDA(merkleTree),
+                    leafOwner: wallet.publicKey,
+                    leafDelegate: wallet.publicKey,
+                    newLeafOwner,
+                    logWrapper: _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey.findProgramAddressSync(
+                        [Buffer.from("log_wrapper", "utf8")],
+                        new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV")
+                    )[0],
+                    compressionProgram: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                    anchorRemainingAccounts: [
+                        {
+                            pubkey: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(proofData.root),
+                            isSigner: false,
+                            isWritable: false,
+                        },
+                        ...proofData.proof.map((node) => ({
+                            pubkey: new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(node),
+                            isSigner: false,
+                            isWritable: false,
+                        })),
+                    ],
+                },
+                {
+                    root: [...new _solana_web3_js__WEBPACK_IMPORTED_MODULE_1__.PublicKey(proofData.root).toBytes()],
+                    dataHash: [...Buffer.from(proofData.data_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                    creatorHash: [...Buffer.from(proofData.creator_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                    nonce: proofData.leaf_id || 0,
+                    index: proofData.leaf_id || 0,
+                }
+            );
+            
+            console.log("Transfer instruction created successfully");
+            transaction.add(transferIx);
+        } catch (err) {
+            console.error("Error creating transfer instruction:", err);
+            return {
+                success: false,
+                error: `Error creating transfer instruction: ${err.message}`
+            };
+        }
+        
+        // Sign and send the transaction
+        try {
+            console.log("Signing transaction...");
+            const signedTx = await wallet.signTransaction(transaction);
+            
+            console.log("Sending transaction...");
+            const signature = await connection.sendRawTransaction(
+                signedTx.serialize(),
+                { skipPreflight: true }
+            );
+            
+            console.log("Transaction sent, signature:", signature);
+            
+            // Confirm the transaction
+            const confirmation = await connection.confirmTransaction({
+                signature,
+                blockhash,
+                lastValidBlockHeight,
+            });
+            
+            if (confirmation.value.err) {
+                console.error("Transaction confirmed but has errors:", confirmation.value.err);
+                return {
+                    success: false,
+                    error: `Transaction confirmed but has errors: ${JSON.stringify(confirmation.value.err)}`,
+                    signature,
+                    explorerUrl: `https://solscan.io/tx/${signature}`
+                };
+            }
+            
+            console.log("Transaction confirmed successfully");
+            return {
+                success: true,
+                signature,
+                message: "Successfully transferred cNFT",
+                explorerUrl: `https://solscan.io/tx/${signature}`
+            };
+        } catch (err) {
+            // Check if this is a user rejection
+            if (err.message && (
+                err.message.includes("User rejected") || 
+                err.message.includes("cancelled") || 
+                err.message.includes("declined")
+            )) {
+                console.log("User rejected transaction");
+                return {
+                    success: false,
+                    error: "Transaction was cancelled by the user",
+                    cancelled: true
+                };
+            }
+            
+            console.error("Error in transaction signing/sending:", err);
+            return {
+                success: false,
+                error: `Transaction error: ${err.message}`,
+                cancelled: false
+            };
+        }
+    } catch (error) {
+        console.error("Unexpected error in transferCompressedNFT:", error);
+        return {
+            success: false,
+            error: error.message || "Unknown error in transferCompressedNFT",
+            cancelled: false
+        };
     }
-    
-    // If no assets were successfully added to the transaction, return failure
-    if (processedAssets.length === 0) {
-      return {
-        success: false,
-        error: 'Could not add any assets to the batch transaction',
-        failedAssets
-      };
-    }
-    
-    // Sign and send the transaction
-    console.log(`[bubblegum-transfer] Signing batch transaction with ${processedAssets.length} assets`);
-    const signedTransaction = await wallet.signTransaction(transaction);
-    
-    console.log('[bubblegum-transfer] Sending batch transaction');
-    const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
-    
-    console.log('[bubblegum-transfer] Waiting for batch transaction confirmation');
-    const confirmation = await connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    });
-    
-    if (confirmation.value.err) {
-      console.error('[bubblegum-transfer] Batch transaction error:', confirmation.value.err);
-      return {
-        success: false,
-        error: `Transaction failed: ${confirmation.value.err}`,
-        signature,
-        processedAssets,
-        failedAssets
-      };
-    }
-    
-    console.log('[bubblegum-transfer] Batch transaction confirmed!', signature);
-    
-    // Return success with details
-    return {
-      success: true,
-      signature,
-      method: 'bubblegum-batch',
-      processedAssets: processedAssets.map(a => a.assetId),
-      failedAssets: failedAssets.map(a => a.assetId),
-      explorerUrl: `https://solscan.io/tx/${signature}`,
-      destination: destinationAddress
-    };
-  } catch (error) {
-    console.error('[bubblegum-transfer] Error in batch transfer:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error in batch transfer',
-      cancelled: error.message && (
-        error.message.includes('User rejected') ||
-        error.message.includes('cancelled') ||
-        error.message.includes('declined')
-      )
-    };
-  }
 }
 
-// Export a helper function to determine if this transfer method can be used
-function canUseCompressedTransfer(assetData, proofData) {
-  // Detailed validation with specific error logging to help troubleshoot
-  
-  // First validate asset data is properly structured
-  if (!assetData) {
-    console.warn('[bubblegum-transfer] Missing asset data for compressed transfer');
-    return false;
-  }
-  
-  if (!assetData.compression) {
-    console.warn('[bubblegum-transfer] Asset is not compressed (missing compression field)');
-    return false;
-  }
-  
-  if (!assetData.compression.tree) {
-    console.warn('[bubblegum-transfer] Asset missing merkle tree address');
-    return false;
-  }
-  
-  if (assetData.compression.leaf_id === undefined || assetData.compression.leaf_id === null) {
-    console.warn('[bubblegum-transfer] Asset missing leaf ID in compression data');
-    // Not returning false here because we can sometimes get leaf ID from proof data
-  }
-  
-  // Then validate proof data structure
-  if (!proofData) {
-    console.warn('[bubblegum-transfer] Missing proof data for compressed transfer');
-    return false;
-  }
-  
-  if (!proofData.proof || !Array.isArray(proofData.proof)) {
-    console.warn('[bubblegum-transfer] Missing or invalid proof array in proof data');
-    return false;
-  }
-  
-  if (!proofData.root) {
-    console.warn('[bubblegum-transfer] Missing root in proof data');
-    return false;
-  }
-  
-  if (!proofData.data_hash) {
-    console.warn('[bubblegum-transfer] Missing data_hash in proof data');
-    return false;
-  }
-  
-  if (!proofData.creator_hash) {
-    console.warn('[bubblegum-transfer] Missing creator_hash in proof data');
-    return false;
-  }
-  
-  // All validation passed
-  return true;
+// Make sure bubblegumTransfer is accessible globally for direct access
+if (typeof window !== 'undefined') {
+    window.bubblegumTransfer = { transferCompressedNFT };
 }
+
+// Export the transfer function for module imports
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({ transferCompressedNFT });
 
 /***/ })
 

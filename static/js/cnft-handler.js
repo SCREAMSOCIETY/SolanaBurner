@@ -1257,10 +1257,147 @@ export class CNFTHandler {
             }
             
             try {
-                // Import the bubblegum-transfer module
-                const bubblegumImplementation = await import('./bubblegum-transfer.js');
+                // Create an internal batch transfer implementation
+                const bubblegumImplementation = {
+                    batchTransferCompressedNFTs: async ({ connection, wallet, assets, destinationAddress }) => {
+                        try {
+                            console.log("Using internal batch transfer implementation");
+                            console.log("Assets to transfer:", assets.length);
+                            
+                            // Import dependencies directly
+                            const mplBubblegum = await import('@metaplex-foundation/mpl-bubblegum');
+                            const { createTransferInstruction } = mplBubblegum;
+                            const web3 = await import('@solana/web3.js');
+                            const { Transaction, PublicKey, ComputeBudgetProgram } = web3;
+                            
+                            // Helper function to get tree authority PDA
+                            const getTreeAuthorityPDA = (merkleTree) => {
+                                const [treeAuthority] = PublicKey.findProgramAddressSync(
+                                    [merkleTree.toBuffer()],
+                                    new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY")
+                                );
+                                return treeAuthority;
+                            };
+                            
+                            // Get the latest blockhash for the transaction
+                            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                            
+                            // Create a new transaction
+                            const transaction = new Transaction({
+                                feePayer: wallet.publicKey,
+                                blockhash,
+                                lastValidBlockHeight,
+                            });
+                            
+                            // Add compute budget instruction for complex operations
+                            transaction.add(
+                                ComputeBudgetProgram.setComputeUnitLimit({ 
+                                    units: 1000000 // Higher compute units for batch operations
+                                })
+                            );
+                            
+                            // Process each asset and add transfer instructions
+                            const processedAssets = [];
+                            const failedAssets = [];
+                            
+                            for (const asset of assets) {
+                                try {
+                                    const { assetId, proofData } = asset;
+                                    
+                                    // Create the transfer instruction
+                                    const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
+                                    const newLeafOwner = new PublicKey(destinationAddress);
+                                    
+                                    // Create the transfer instruction
+                                    const transferIx = createTransferInstruction(
+                                        {
+                                            merkleTree,
+                                            treeAuthority: getTreeAuthorityPDA(merkleTree),
+                                            leafOwner: wallet.publicKey,
+                                            leafDelegate: wallet.publicKey,
+                                            newLeafOwner,
+                                            logWrapper: PublicKey.findProgramAddressSync(
+                                                [Buffer.from("log_wrapper", "utf8")],
+                                                new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV")
+                                            )[0],
+                                            compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                                            anchorRemainingAccounts: [
+                                                {
+                                                    pubkey: new PublicKey(proofData.root),
+                                                    isSigner: false,
+                                                    isWritable: false,
+                                                },
+                                                ...proofData.proof.map((node) => ({
+                                                    pubkey: new PublicKey(node),
+                                                    isSigner: false,
+                                                    isWritable: false,
+                                                })),
+                                            ],
+                                        },
+                                        {
+                                            root: [...new PublicKey(proofData.root).toBytes()],
+                                            dataHash: [...Buffer.from(proofData.data_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                                            creatorHash: [...Buffer.from(proofData.creator_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                                            nonce: proofData.leaf_id || 0,
+                                            index: proofData.leaf_id || 0,
+                                        }
+                                    );
+                                    
+                                    // Add the transfer instruction to the transaction
+                                    transaction.add(transferIx);
+                                    processedAssets.push(assetId);
+                                } catch (assetError) {
+                                    console.error(`Error adding asset ${asset.assetId} to batch:`, assetError);
+                                    failedAssets.push(asset.assetId);
+                                }
+                            }
+                            
+                            // If we couldn't add any assets to the transaction, fail early
+                            if (processedAssets.length === 0) {
+                                throw new Error("Could not add any assets to the batch transaction");
+                            }
+                            
+                            // Sign and send the transaction
+                            console.log(`Sending batch transaction with ${processedAssets.length} cNFTs`);
+                            const signedTx = await wallet.signTransaction(transaction);
+                            const signature = await connection.sendRawTransaction(
+                                signedTx.serialize(),
+                                { skipPreflight: true }
+                            );
+                            
+                            // Confirm the transaction
+                            console.log("Transaction sent, confirming...");
+                            const confirmation = await connection.confirmTransaction({
+                                signature,
+                                blockhash,
+                                lastValidBlockHeight,
+                            });
+                            
+                            console.log("Batch transaction confirmed:", confirmation);
+                            
+                            return {
+                                success: true,
+                                signature,
+                                explorerUrl: `https://solscan.io/tx/${signature}`,
+                                processedAssets,
+                                failedAssets
+                            };
+                        } catch (error) {
+                            console.error("Error in batch transfer implementation:", error);
+                            return {
+                                success: false,
+                                error: error.message || "Unknown error in batch transfer",
+                                cancelled: error.message && (
+                                    error.message.includes("User rejected") ||
+                                    error.message.includes("cancelled") ||
+                                    error.message.includes("declined")
+                                )
+                            };
+                        }
+                    }
+                };
                 
-                console.log("Using Bubblegum batch transfer implementation");
+                console.log("Using internal Bubblegum batch transfer implementation");
                 console.log("Assets ready for batch transfer:", assetsWithProofs.length);
                 
                 // Call the batch transfer function
@@ -1918,126 +2055,140 @@ export class CNFTHandler {
         try {
             console.log("Using provided proof data:", providedProofData);
             
-            // Use the globally available bubblegum transfer handler
-            // This avoids import issues with webpack bundling
-            let bubblegumImplementation = null;
+            // Use the globally available bubblegum transfer handler from window
+            console.log("Attempting to get bubblegum-transfer from window global");
             
-            // First attempt to get it from the window object if available
-            if (typeof window !== 'undefined' && window.bubblegumTransfer) {
-                bubblegumImplementation = window.bubblegumTransfer;
-                console.log("Using bubblegum transfer from window object");
-            }
-            // Otherwise try to use a required version if we're in Node.js
-            else if (typeof require !== 'undefined') {
-                try {
-                    bubblegumImplementation = require('./bubblegum-transfer.js');
-                    console.log("Using bubblegum transfer from require");
-                } catch (err) {
-                    console.error("Error requiring bubblegum transfer:", err);
-                }
-            }
-            
-            // As a last resort, directly use the existing BubblegumHandler method
-            if (!bubblegumImplementation) {
-                console.log("Could not load external bubblegum module, using direct implementation");
-                
-                // Create a simplified version that matches the interface we need
-                bubblegumImplementation = {
-                    transferCompressedNFT: async (params) => {
-                        try {
-                            console.log("Using direct BubblegumHandler implementation");
-                            
-                            const { connection, wallet, assetId, destinationAddress, proofData } = params;
-                            
-                            // Create a BubblegumHandler instance with the same parameters
-                            const { createTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
-                            const { Transaction, PublicKey } = require('@solana/web3.js');
-                            
-                            // Get the latest blockhash for the transaction
-                            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-                            
-                            // Create a new transaction
-                            const transaction = new Transaction({
-                                feePayer: wallet.publicKey,
-                                blockhash,
-                                lastValidBlockHeight,
-                            });
-                            
-                            // Create the transfer instruction
-                            const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
-                            const leafOwner = wallet.publicKey;
-                            const newLeafOwner = new PublicKey(destinationAddress);
-                            
-                            // Create the transfer instruction
-                            const transferIx = createTransferInstruction(
-                                {
-                                    merkleTree,
-                                    treeAuthority: getTreeAuthorityPDA(merkleTree),
-                                    leafOwner: wallet.publicKey,
-                                    leafDelegate: wallet.publicKey,
-                                    newLeafOwner,
-                                    logWrapper: PublicKey.findProgramAddressSync(
-                                        [Buffer.from("log_wrapper", "utf8")],
-                                        new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV")
-                                    )[0],
-                                    compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
-                                    anchorRemainingAccounts: [
-                                        {
-                                            pubkey: new PublicKey(proofData.root),
-                                            isSigner: false,
-                                            isWritable: false,
-                                        },
-                                        ...proofData.proof.map((node) => ({
-                                            pubkey: new PublicKey(node),
-                                            isSigner: false,
-                                            isWritable: false,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    root: [...new PublicKey(proofData.root).toBytes()],
-                                    dataHash: [...Buffer.from(proofData.data_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
-                                    creatorHash: [...Buffer.from(proofData.creator_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
-                                    nonce: proofData.leaf_id || 0,
-                                    index: proofData.leaf_id || 0,
-                                }
+            // Create a simplified internal implementation that doesn't depend on external imports
+            const internalBubblegumImplementation = {
+                transferCompressedNFT: async (params) => {
+                    try {
+                        console.log("Using direct internal transfer implementation");
+                        
+                        const { connection, wallet, assetId, destinationAddress, proofData } = params;
+                        
+                        // Import needed dependencies directly
+                        const mplBubblegum = await import('@metaplex-foundation/mpl-bubblegum');
+                        const { createTransferInstruction } = mplBubblegum;
+                        const web3 = await import('@solana/web3.js');
+                        const { Transaction, PublicKey, ComputeBudgetProgram } = web3;
+                        
+                        // Get the latest blockhash for the transaction
+                        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                        
+                        // Helper function to get tree authority PDA
+                        const getTreeAuthorityPDA = (merkleTree) => {
+                            const [treeAuthority] = PublicKey.findProgramAddressSync(
+                                [merkleTree.toBuffer()],
+                                new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY")
                             );
-                            
-                            // Add the transfer instruction to the transaction
-                            transaction.add(transferIx);
-                            
-                            // Sign and send the transaction
+                            return treeAuthority;
+                        };
+                        
+                        // Create a new transaction
+                        const transaction = new Transaction({
+                            feePayer: wallet.publicKey,
+                            blockhash,
+                            lastValidBlockHeight,
+                        });
+                        
+                        // Add compute budget instruction for complex operations
+                        transaction.add(
+                            ComputeBudgetProgram.setComputeUnitLimit({ 
+                                units: 400000 // Higher compute units for cNFT operations
+                            })
+                        );
+                        
+                        // Create the transfer instruction
+                        const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
+                        const newLeafOwner = new PublicKey(destinationAddress);
+                        
+                        console.log("Creating transfer instruction with tree:", merkleTree.toString());
+                        console.log("Destination address:", newLeafOwner.toString());
+                        
+                        // Create the transfer instruction
+                        const transferIx = createTransferInstruction(
+                            {
+                                merkleTree,
+                                treeAuthority: getTreeAuthorityPDA(merkleTree),
+                                leafOwner: wallet.publicKey,
+                                leafDelegate: wallet.publicKey,
+                                newLeafOwner,
+                                logWrapper: PublicKey.findProgramAddressSync(
+                                    [Buffer.from("log_wrapper", "utf8")],
+                                    new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV")
+                                )[0],
+                                compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                                anchorRemainingAccounts: [
+                                    {
+                                        pubkey: new PublicKey(proofData.root),
+                                        isSigner: false,
+                                        isWritable: false,
+                                    },
+                                    ...proofData.proof.map((node) => ({
+                                        pubkey: new PublicKey(node),
+                                        isSigner: false,
+                                        isWritable: false,
+                                    })),
+                                ],
+                            },
+                            {
+                                root: [...new PublicKey(proofData.root).toBytes()],
+                                dataHash: [...Buffer.from(proofData.data_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                                creatorHash: [...Buffer.from(proofData.creator_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                                nonce: proofData.leaf_id || 0,
+                                index: proofData.leaf_id || 0,
+                            }
+                        );
+                        
+                        // Add the transfer instruction to the transaction
+                        transaction.add(transferIx);
+                        
+                        // Sign and send the transaction
+                        let signature;
+                        
+                        try {
+                            console.log("Requesting wallet signature...");
                             const signedTx = await wallet.signTransaction(transaction);
-                            const signature = await connection.sendRawTransaction(
+                            
+                            console.log("Sending transaction...");
+                            signature = await connection.sendRawTransaction(
                                 signedTx.serialize(),
                                 { skipPreflight: true }
                             );
                             
-                            // Confirm the transaction
+                            console.log("Transaction sent, confirming...");
                             const confirmation = await connection.confirmTransaction({
                                 signature,
                                 blockhash,
                                 lastValidBlockHeight,
                             });
                             
-                            console.log("cNFT transfer successful via direct implementation");
-                            
-                            return {
-                                success: true,
-                                signature,
-                                message: "Successfully transferred cNFT",
-                                explorerUrl: `https://solscan.io/tx/${signature}`
-                            };
-                        } catch (error) {
-                            console.error("Error in direct implementation:", error);
-                            return {
-                                success: false,
-                                error: error.message || "Unknown error in direct BubblegumHandler implementation"
-                            };
+                            console.log("Transaction confirmed:", confirmation);
+                        } catch (txError) {
+                            console.error("Transaction error:", txError);
+                            throw txError;
                         }
+                        
+                        console.log("cNFT transfer successful via direct implementation");
+                        
+                        return {
+                            success: true,
+                            signature,
+                            message: "Successfully transferred cNFT",
+                            explorerUrl: `https://solscan.io/tx/${signature}`
+                        };
+                    } catch (error) {
+                        console.error("Error in direct implementation:", error);
+                        return {
+                            success: false,
+                            error: error.message || "Unknown error in direct implementation"
+                        };
                     }
-                };
-            }
+                }
+            };
+            
+            // Use the internal implementation we just created - no external dependencies
+            const bubblegumImplementation = internalBubblegumImplementation;
             
             // Get asset data - we still need this for metadata
             let assetData = null;
