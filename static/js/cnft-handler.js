@@ -1121,7 +1121,37 @@ export class CNFTHandler {
             const finalDestination = destinationAddress || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
             console.log("Destination address:", finalDestination);
             
-            // Fetch all assets with proofs
+            // SPECIAL CASE: If only one cNFT, use the single-asset transfer method
+            if (assetIds.length === 1) {
+                console.log("Only one cNFT to transfer, using single transfer method instead of batch");
+                
+                // Show notification about single transfer
+                if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                    window.BurnAnimations.showNotification(
+                        "Trashing Single cNFT", 
+                        "Preparing to trash a single cNFT"
+                    );
+                }
+                
+                // Use the transferCNFT method instead
+                const result = await this.transferCNFT(assetIds[0], finalDestination);
+                
+                // If successful, format the result to match the batch response structure
+                if (result.success) {
+                    return {
+                        success: true,
+                        signature: result.signature,
+                        explorerUrl: `https://solscan.io/tx/${result.signature}`,
+                        method: result.method || "single-transfer",
+                        processedAssets: [assetIds[0]],
+                        failedAssets: []
+                    };
+                } else {
+                    throw new Error(result.error || "Single transfer failed");
+                }
+            }
+            
+            // Fetch all assets with proofs for batch operation
             const assetsWithProofs = [];
             const failedFetches = [];
             
