@@ -1265,10 +1265,81 @@ export class CNFTHandler {
                             console.log("Assets to transfer:", assets.length);
                             
                             // Import dependencies directly
-                            const mplBubblegum = await import('@metaplex-foundation/mpl-bubblegum');
-                            const { createTransferInstruction } = mplBubblegum;
                             const web3 = await import('@solana/web3.js');
                             const { Transaction, PublicKey, ComputeBudgetProgram } = web3;
+                            
+                            // We need to handle the mpl-bubblegum import differently
+                            let createTransferInstruction;
+                            try {
+                                // Try to access it directly from the window 
+                                if (typeof window !== 'undefined' && window.mplBubblegum && window.mplBubblegum.createTransferInstruction) {
+                                    createTransferInstruction = window.mplBubblegum.createTransferInstruction;
+                                    console.log("Using createTransferInstruction from window.mplBubblegum for batch");
+                                } else {
+                                    // Create our own implementation directly using the parameters we need
+                                    console.log("Creating a custom transfer instruction implementation for batch");
+                                    
+                                    // Import the constants we need for the program ID
+                                    const BUBBLEGUM_PROGRAM_ID = new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
+                                    const SPL_NOOP_PROGRAM_ID = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+                                    const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
+                                    
+                                    // This is our custom implementation of a transfer instruction
+                                    createTransferInstruction = (accounts, args) => {
+                                        // Prepare the keys array
+                                        const keys = [
+                                            { pubkey: accounts.treeAuthority, isSigner: false, isWritable: false },
+                                            { pubkey: accounts.leafOwner, isSigner: true, isWritable: false },
+                                            { pubkey: accounts.leafDelegate, isSigner: true, isWritable: false },
+                                            { pubkey: accounts.newLeafOwner, isSigner: false, isWritable: false },
+                                            { pubkey: accounts.merkleTree, isSigner: false, isWritable: true },
+                                            { pubkey: BUBBLEGUM_PROGRAM_ID, isSigner: false, isWritable: false },
+                                            { pubkey: accounts.compressionProgram, isSigner: false, isWritable: false },
+                                            { pubkey: accounts.logWrapper, isSigner: false, isWritable: false },
+                                        ];
+                                        
+                                        // Add the remaining accounts for the proof path
+                                        accounts.anchorRemainingAccounts.forEach(account => {
+                                            keys.push(account);
+                                        });
+                                        
+                                        // Create the buffers for data
+                                        const dataHash = Buffer.from(args.dataHash);
+                                        const creatorHash = Buffer.from(args.creatorHash);
+                                        const nonce = args.nonce || 0;
+                                        const index = args.index || 0;
+                                        
+                                        // Data layout (simplified version)
+                                        // The actual data format is:
+                                        // [ BPF_INSTRUCTION_PACK(Transfer), root(32), dataHash(32), creatorHash(32), nonce(8), index(8) ]
+                                        const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
+                                        data.writeUInt8(3, 0); // 3 is the instruction code for Transfer
+                                        
+                                        // Copy root, dataHash, creatorHash
+                                        Buffer.from(args.root).copy(data, 1);
+                                        dataHash.copy(data, 1 + 32);
+                                        creatorHash.copy(data, 1 + 32 + 32);
+                                        
+                                        // Write nonce and index (as u64 LE)
+                                        const nonceBuffer = Buffer.alloc(8);
+                                        const indexBuffer = Buffer.alloc(8);
+                                        nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
+                                        indexBuffer.writeBigUInt64LE(BigInt(index), 0);
+                                        nonceBuffer.copy(data, 1 + 32 + 32 + 32);
+                                        indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
+                                        
+                                        // Return the constructed instruction
+                                        return new web3.TransactionInstruction({
+                                            keys,
+                                            programId: BUBBLEGUM_PROGRAM_ID,
+                                            data
+                                        });
+                                    };
+                                }
+                            } catch (importError) {
+                                console.error("Error setting up createTransferInstruction:", importError);
+                                throw new Error("Failed to set up Bubblegum transfer implementation for batch");
+                            }
                             
                             // Helper function to get tree authority PDA
                             const getTreeAuthorityPDA = (merkleTree) => {
@@ -2067,10 +2138,82 @@ export class CNFTHandler {
                         const { connection, wallet, assetId, destinationAddress, proofData } = params;
                         
                         // Import needed dependencies directly
-                        const mplBubblegum = await import('@metaplex-foundation/mpl-bubblegum');
-                        const { createTransferInstruction } = mplBubblegum;
+                        // Get the Bubblegum library and specifically access the createTransferInstruction from it
                         const web3 = await import('@solana/web3.js');
                         const { Transaction, PublicKey, ComputeBudgetProgram } = web3;
+                        
+                        // We need to handle the mpl-bubblegum import differently
+                        let createTransferInstruction;
+                        try {
+                            // Try to access it directly from the window 
+                            if (typeof window !== 'undefined' && window.mplBubblegum && window.mplBubblegum.createTransferInstruction) {
+                                createTransferInstruction = window.mplBubblegum.createTransferInstruction;
+                                console.log("Using createTransferInstruction from window.mplBubblegum");
+                            } else {
+                                // Create our own implementation directly using the parameters we need
+                                console.log("Creating a custom transfer instruction implementation");
+                                
+                                // Import the constants we need for the program ID
+                                const BUBBLEGUM_PROGRAM_ID = new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
+                                const SPL_NOOP_PROGRAM_ID = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+                                const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
+                                
+                                // This is our custom implementation of a transfer instruction
+                                createTransferInstruction = (accounts, args) => {
+                                    // Prepare the keys array
+                                    const keys = [
+                                        { pubkey: accounts.treeAuthority, isSigner: false, isWritable: false },
+                                        { pubkey: accounts.leafOwner, isSigner: true, isWritable: false },
+                                        { pubkey: accounts.leafDelegate, isSigner: true, isWritable: false },
+                                        { pubkey: accounts.newLeafOwner, isSigner: false, isWritable: false },
+                                        { pubkey: accounts.merkleTree, isSigner: false, isWritable: true },
+                                        { pubkey: BUBBLEGUM_PROGRAM_ID, isSigner: false, isWritable: false },
+                                        { pubkey: accounts.compressionProgram, isSigner: false, isWritable: false },
+                                        { pubkey: accounts.logWrapper, isSigner: false, isWritable: false },
+                                    ];
+                                    
+                                    // Add the remaining accounts for the proof path
+                                    accounts.anchorRemainingAccounts.forEach(account => {
+                                        keys.push(account);
+                                    });
+                                    
+                                    // Create the buffers for data
+                                    const dataHash = Buffer.from(args.dataHash);
+                                    const creatorHash = Buffer.from(args.creatorHash);
+                                    const nonce = args.nonce || 0;
+                                    const index = args.index || 0;
+                                    
+                                    // Data layout (simplified version)
+                                    // The actual data format is:
+                                    // [ BPF_INSTRUCTION_PACK(Transfer), root(32), dataHash(32), creatorHash(32), nonce(8), index(8) ]
+                                    const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
+                                    data.writeUInt8(3, 0); // 3 is the instruction code for Transfer
+                                    
+                                    // Copy root, dataHash, creatorHash
+                                    Buffer.from(args.root).copy(data, 1);
+                                    dataHash.copy(data, 1 + 32);
+                                    creatorHash.copy(data, 1 + 32 + 32);
+                                    
+                                    // Write nonce and index (as u64 LE)
+                                    const nonceBuffer = Buffer.alloc(8);
+                                    const indexBuffer = Buffer.alloc(8);
+                                    nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
+                                    indexBuffer.writeBigUInt64LE(BigInt(index), 0);
+                                    nonceBuffer.copy(data, 1 + 32 + 32 + 32);
+                                    indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
+                                    
+                                    // Return the constructed instruction
+                                    return new web3.TransactionInstruction({
+                                        keys,
+                                        programId: BUBBLEGUM_PROGRAM_ID,
+                                        data
+                                    });
+                                };
+                            }
+                        } catch (importError) {
+                            console.error("Error setting up createTransferInstruction:", importError);
+                            throw new Error("Failed to set up Bubblegum transfer implementation");
+                        }
                         
                         // Get the latest blockhash for the transaction
                         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
