@@ -1310,25 +1310,29 @@ export class CNFTHandler {
                                         const nonce = args.nonce || 0;
                                         const index = args.index || 0;
                                         
-                                        // Data layout for Bubblegum instruction
-                                        // We're constructing an anchor-compatible instruction payload
-                                        // The first 8 bytes are a discriminator for the instruction
-                                        // For transfer, it's sha256("global:transfer")[0..8]
-                                        const transferDiscriminator = Buffer.from([122, 83, 222, 129, 159, 48, 225, 168]);
+                                        // This time we're trying with the raw native instruction format instead of Anchor
+                                        // Bubblegum transfer instruction code is 3 according to on-chain program
+                                        const instructionCode = 3; // Transfer instruction
                                         
                                         // Create space for the instruction data
-                                        // Format: discriminator(8) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
-                                        const data = Buffer.alloc(8 + 32 + 32 + 32 + 8 + 8);
+                                        // Format without discriminator: instructionCode(1) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
+                                        const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
                                         
-                                        // Copy discriminator and fields
-                                        transferDiscriminator.copy(data, 0);
-                                        Buffer.from(args.root).copy(data, 8);
-                                        dataHash.copy(data, 8 + 32);
-                                        creatorHash.copy(data, 8 + 32 + 32);
+                                        // Set the instruction code
+                                        data[0] = instructionCode;
                                         
-                                        // Write the nonce and index as u64
-                                        data.writeBigUInt64LE(BigInt(nonce), 8 + 32 + 32 + 32);
-                                        data.writeBigUInt64LE(BigInt(index), 8 + 32 + 32 + 32 + 8);
+                                        // Copy root, dataHash, creatorHash
+                                        Buffer.from(args.root).copy(data, 1);
+                                        dataHash.copy(data, 1 + 32);
+                                        creatorHash.copy(data, 1 + 32 + 32);
+                                        
+                                        // Write the nonce and index
+                                        const nonceBuffer = Buffer.alloc(8);
+                                        const indexBuffer = Buffer.alloc(8);
+                                        nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
+                                        indexBuffer.writeBigUInt64LE(BigInt(index), 0);
+                                        nonceBuffer.copy(data, 1 + 32 + 32 + 32);
+                                        indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
                                         
                                         // Debug the instruction data and accounts
                                         console.log("Batch instruction data (hex):", Buffer.from(data).toString('hex'));
@@ -2190,25 +2194,29 @@ export class CNFTHandler {
                                     const nonce = args.nonce || 0;
                                     const index = args.index || 0;
                                     
-                                    // Data layout for Bubblegum instruction
-                                    // We're constructing an anchor-compatible instruction payload
-                                    // The first 8 bytes are a discriminator for the instruction
-                                    // For transfer, it's sha256("global:transfer")[0..8]
-                                    const transferDiscriminator = Buffer.from([122, 83, 222, 129, 159, 48, 225, 168]);
+                                    // This time we're trying with the raw native instruction format instead of Anchor
+                                    // Bubblegum transfer instruction code is 3 according to on-chain program
+                                    const instructionCode = 3; // Transfer instruction
                                     
                                     // Create space for the instruction data
-                                    // Format: discriminator(8) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
-                                    const data = Buffer.alloc(8 + 32 + 32 + 32 + 8 + 8);
+                                    // Format without discriminator: instructionCode(1) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
+                                    const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
                                     
-                                    // Copy discriminator and fields
-                                    transferDiscriminator.copy(data, 0);
-                                    Buffer.from(args.root).copy(data, 8);
-                                    dataHash.copy(data, 8 + 32);
-                                    creatorHash.copy(data, 8 + 32 + 32);
+                                    // Set the instruction code
+                                    data[0] = instructionCode;
                                     
-                                    // Write the nonce and index as u64
-                                    data.writeBigUInt64LE(BigInt(nonce), 8 + 32 + 32 + 32);
-                                    data.writeBigUInt64LE(BigInt(index), 8 + 32 + 32 + 32 + 8);
+                                    // Copy root, dataHash, creatorHash
+                                    Buffer.from(args.root).copy(data, 1);
+                                    dataHash.copy(data, 1 + 32);
+                                    creatorHash.copy(data, 1 + 32 + 32);
+                                    
+                                    // Write the nonce and index
+                                    const nonceBuffer = Buffer.alloc(8);
+                                    const indexBuffer = Buffer.alloc(8);
+                                    nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
+                                    indexBuffer.writeBigUInt64LE(BigInt(index), 0);
+                                    nonceBuffer.copy(data, 1 + 32 + 32 + 32);
+                                    indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
                                     
                                     // Debug the instruction data and accounts
                                     console.log("Instruction data (hex):", Buffer.from(data).toString('hex'));
