@@ -263,24 +263,83 @@ export async function batchTransferCompressedNFTs(params) {
         
         // Convert proof to correct format
         const bubblegumProof = proof.map(node => {
+          // Convert string proofs to Buffer
           if (typeof node === 'string') {
-            return Buffer.from(node.replace('0x', ''), 'hex');
+            try {
+              // Remove '0x' prefix if present
+              const cleanNode = node.replace('0x', '');
+              // Create Buffer from hex string
+              return Buffer.from(cleanNode, 'hex');
+            } catch (err) {
+              console.error(`[bubblegum-transfer] Error converting proof node to Buffer:`, err);
+              // Return a safe default if conversion fails
+              return Buffer.from([]);
+            }
+          } else if (Buffer.isBuffer(node)) {
+            // If already a Buffer, return as is
+            return node;
+          } else if (Array.isArray(node)) {
+            // If it's an array (like Uint8Array), convert to Buffer
+            return Buffer.from(node);
+          } else if (node && typeof node === 'object' && node.type === 'Buffer' && Array.isArray(node.data)) {
+            // Handle special case of serialized Buffer objects
+            return Buffer.from(node.data);
+          } else {
+            console.warn(`[bubblegum-transfer] Unknown proof node type:`, typeof node);
+            // Return an empty buffer as fallback
+            return Buffer.from([]);
           }
-          return node;
         });
         
-        // Set up root and hashes in the right format
-        const rootArray = typeof root === 'string' 
-          ? Buffer.from(root.replace('0x', ''), 'hex') 
-          : root;
+        // Safely convert root and hashes to Buffer format
+        let rootArray, dataHashArray, creatorHashArray;
+        
+        try {
+          // Handle root conversion
+          if (typeof root === 'string') {
+            rootArray = Buffer.from(root.replace('0x', ''), 'hex');
+          } else if (Buffer.isBuffer(root)) {
+            rootArray = root;
+          } else if (Array.isArray(root)) {
+            rootArray = Buffer.from(root);
+          } else if (root && typeof root === 'object' && root.type === 'Buffer' && Array.isArray(root.data)) {
+            rootArray = Buffer.from(root.data);
+          } else {
+            console.warn(`[bubblegum-transfer] Unexpected root type: ${typeof root}`);
+            rootArray = Buffer.from([]);
+          }
           
-        const dataHashArray = typeof data_hash === 'string'
-          ? Buffer.from(data_hash.replace('0x', ''), 'hex')
-          : data_hash;
+          // Handle data_hash conversion
+          if (typeof data_hash === 'string') {
+            dataHashArray = Buffer.from(data_hash.replace('0x', ''), 'hex');
+          } else if (Buffer.isBuffer(data_hash)) {
+            dataHashArray = data_hash;
+          } else if (Array.isArray(data_hash)) {
+            dataHashArray = Buffer.from(data_hash);
+          } else if (data_hash && typeof data_hash === 'object' && data_hash.type === 'Buffer' && Array.isArray(data_hash.data)) {
+            dataHashArray = Buffer.from(data_hash.data);
+          } else {
+            console.warn(`[bubblegum-transfer] Unexpected data_hash type: ${typeof data_hash}`);
+            dataHashArray = Buffer.from([]);
+          }
           
-        const creatorHashArray = typeof creator_hash === 'string'
-          ? Buffer.from(creator_hash.replace('0x', ''), 'hex')
-          : creator_hash;
+          // Handle creator_hash conversion
+          if (typeof creator_hash === 'string') {
+            creatorHashArray = Buffer.from(creator_hash.replace('0x', ''), 'hex');
+          } else if (Buffer.isBuffer(creator_hash)) {
+            creatorHashArray = creator_hash;
+          } else if (Array.isArray(creator_hash)) {
+            creatorHashArray = Buffer.from(creator_hash);
+          } else if (creator_hash && typeof creator_hash === 'object' && creator_hash.type === 'Buffer' && Array.isArray(creator_hash.data)) {
+            creatorHashArray = Buffer.from(creator_hash.data);
+          } else {
+            console.warn(`[bubblegum-transfer] Unexpected creator_hash type: ${typeof creator_hash}`);
+            creatorHashArray = Buffer.from([]);
+          }
+        } catch (error) {
+          console.error(`[bubblegum-transfer] Error converting hash data:`, error);
+          throw new Error(`Failed to convert hash data: ${error.message}`);
+        }
         
         // Derive tree authority
         const [treeAuthority] = PublicKey.findProgramAddressSync(
@@ -389,13 +448,55 @@ export async function batchTransferCompressedNFTs(params) {
 
 // Export a helper function to determine if this transfer method can be used
 export function canUseCompressedTransfer(assetData, proofData) {
-  if (!assetData || !assetData.compression || !assetData.compression.tree) {
+  // Detailed validation with specific error logging to help troubleshoot
+  
+  // First validate asset data is properly structured
+  if (!assetData) {
+    console.warn('[bubblegum-transfer] Missing asset data for compressed transfer');
     return false;
   }
   
-  if (!proofData || !proofData.proof || !proofData.root) {
+  if (!assetData.compression) {
+    console.warn('[bubblegum-transfer] Asset is not compressed (missing compression field)');
     return false;
   }
   
+  if (!assetData.compression.tree) {
+    console.warn('[bubblegum-transfer] Asset missing merkle tree address');
+    return false;
+  }
+  
+  if (assetData.compression.leaf_id === undefined || assetData.compression.leaf_id === null) {
+    console.warn('[bubblegum-transfer] Asset missing leaf ID in compression data');
+    // Not returning false here because we can sometimes get leaf ID from proof data
+  }
+  
+  // Then validate proof data structure
+  if (!proofData) {
+    console.warn('[bubblegum-transfer] Missing proof data for compressed transfer');
+    return false;
+  }
+  
+  if (!proofData.proof || !Array.isArray(proofData.proof)) {
+    console.warn('[bubblegum-transfer] Missing or invalid proof array in proof data');
+    return false;
+  }
+  
+  if (!proofData.root) {
+    console.warn('[bubblegum-transfer] Missing root in proof data');
+    return false;
+  }
+  
+  if (!proofData.data_hash) {
+    console.warn('[bubblegum-transfer] Missing data_hash in proof data');
+    return false;
+  }
+  
+  if (!proofData.creator_hash) {
+    console.warn('[bubblegum-transfer] Missing creator_hash in proof data');
+    return false;
+  }
+  
+  // All validation passed
   return true;
 }
