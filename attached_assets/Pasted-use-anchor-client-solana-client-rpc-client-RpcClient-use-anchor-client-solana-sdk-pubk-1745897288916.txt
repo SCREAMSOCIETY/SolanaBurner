@@ -1,0 +1,79 @@
+use anchor_client::solana_client::rpc_client::RpcClient;
+use anchor_client::solana_sdk::{
+    pubkey::Pubkey,
+    signature::{Keypair, Signer, read_keypair_file},
+    transaction::Transaction,
+};
+use mpl_bubblegum::{
+    instructions::TransferArgs,
+    ID as BUBBLEGUM_PROGRAM_ID,
+};
+use solana_program::instruction::Instruction;
+use std::str::FromStr;
+
+fn main() -> anyhow::Result<()> {
+    // Set up the Solana client
+    let rpc_url = "https://api.mainnet-beta.solana.com"; // or your RPC endpoint
+    let client = RpcClient::new(rpc_url.to_string());
+
+    // Load the sender's keypair
+    let sender = read_keypair_file("~/.config/solana/id.json")?;
+
+    // Addresses (replace these with actual addresses)
+    let merkle_tree = Pubkey::from_str("MERKLE_TREE_ADDRESS_HERE")?;
+    let leaf_owner = sender.pubkey(); // current owner
+    let new_owner = Pubkey::from_str("NEW_OWNER_ADDRESS_HERE")?;
+    let leaf_delegate = sender.pubkey(); // assuming no separate delegate
+
+    // The asset_id / leaf_hash of the cNFT you are transferring
+    let asset_id = Pubkey::from_str("ASSET_ID_HERE")?;
+
+    // Fetch proof from your API or your indexer (not shown here)
+    let proof = fetch_proof(asset_id)?; // You'll need to implement this or use Helius API
+
+    // Create the transfer instruction
+    let transfer_ix = mpl_bubblegum::instruction::transfer(
+        BUBBLEGUM_PROGRAM_ID,
+        leaf_owner,
+        leaf_delegate,
+        new_owner,
+        merkle_tree,
+        proof.root,
+        proof.data_hash,
+        proof.creator_hash,
+        proof.nonce,
+        proof.index,
+        proof.proof,
+        TransferArgs::V1 { amount: 1 }, // transferring 1 unit
+    );
+
+    // Create and send the transaction
+    let recent_blockhash = client.get_latest_blockhash()?;
+    let tx = Transaction::new_signed_with_payer(
+        &[transfer_ix],
+        Some(&sender.pubkey()),
+        &[&sender],
+        recent_blockhash,
+    );
+
+    let signature = client.send_and_confirm_transaction(&tx)?;
+    println!("✅ Transaction successful! Signature: {}", signature);
+
+    Ok(())
+}
+
+// Mock function - you need to implement real proof fetching
+fn fetch_proof(_asset_id: Pubkey) -> anyhow::Result<ProofData> {
+    // Usually from Helius API, SimpleHash API, or your own Merkle tree indexer.
+    unimplemented!("Proof fetching must be implemented!");
+}
+
+// Struct for proof data
+struct ProofData {
+    root: [u8; 32],
+    data_hash: [u8; 32],
+    creator_hash: [u8; 32],
+    nonce: u64,
+    index: u32,
+    proof: Vec<[u8; 32]>,
+}

@@ -49,6 +49,17 @@ declare global {
       initUIEnhancements: () => void;
       showNotification: (title: string, message: string) => void;
     };
+    HiddenAssets?: {
+      hideAsset: (assetId: string, assetName: string, assetType: string) => boolean;
+      unhideAsset: (assetId: string) => boolean;
+      isAssetHidden: (assetId: string) => boolean;
+      getHiddenAssets: () => Record<string, {id: string, name: string, type: string, dateHidden: string}>;
+      getHiddenAssetsCount: () => number;
+      clearHiddenAssets: () => boolean;
+    };
+    BasicTransfer?: {
+      transfer: (connection: any, wallet: any, destinationAddress: string, amount: number) => Promise<any>;
+    };
   }
 }
 
@@ -345,7 +356,7 @@ const WalletAssets: React.FC = () => {
         let visibleCompressedNfts = compressedNfts;
         if (typeof window !== "undefined" && window.HiddenAssets) {
           console.log('[WalletAssets] Filtering out hidden cNFTs from Helius API results');
-          visibleCompressedNfts = compressedNfts.filter(cnft => !window.HiddenAssets.isAssetHidden(cnft.mint));
+          visibleCompressedNfts = compressedNfts.filter((cnft: CNFTData) => !window.HiddenAssets?.isAssetHidden(cnft.mint));
           
           // Log how many were filtered out
           const hiddenCount = compressedNfts.length - visibleCompressedNfts.length;
@@ -542,7 +553,7 @@ const WalletAssets: React.FC = () => {
         let filteredCnftList = cnftList;
         if (typeof window !== "undefined" && window.HiddenAssets) {
           console.log('[WalletAssets] Filtering out hidden assets from display');
-          filteredCnftList = cnftList.filter(cnft => !window.HiddenAssets.isAssetHidden(cnft.mint));
+          filteredCnftList = cnftList.filter((cnft: CNFTData) => !window.HiddenAssets?.isAssetHidden(cnft.mint));
           
           // Log how many were filtered out
           const hiddenCount = cnftList.length - filteredCnftList.length;

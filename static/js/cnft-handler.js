@@ -1233,6 +1233,9 @@ export class CNFTHandler {
     
     /**
      * Transfer a cNFT to a project-managed wallet instead of burning it
+     * Using a multi-method approach that tries Bubblegum protocol first,
+     * then falls back to other methods if needed
+     * 
      * @param {string} assetId - The asset ID of the cNFT to transfer
      * @param {string} destinationAddress - The wallet address to transfer the cNFT to (defaults to project wallet)
      * @returns {Promise<object>} - The result of the transfer operation
@@ -1328,9 +1331,75 @@ export class CNFTHandler {
             let errorMessages = [];
             
             try {
-                // METHOD 1: Try our fixed implementation first
+                // METHOD 1: Try Bubblegum protocol (the standard method) first
                 try {
-                    console.log("METHOD 1: Using fixed implementation with tree authority handling");
+                    console.log("METHOD 1: Using standard Bubblegum protocol transfer");
+                    
+                    // Import our Bubblegum implementation
+                    const bubblegumImplementation = await import('./bubblegum-transfer.js');
+                    
+                    // Check if we can use Bubblegum transfer
+                    if (bubblegumImplementation.canUseCompressedTransfer(assetData, {
+                        proof: assetData.proof,
+                        root: assetData.root || assetData.rootHash,
+                        data_hash: assetData.dataHash,
+                        creator_hash: assetData.creatorHash,
+                        leaf_id: assetData.compression?.leaf_id || assetData.compression?.leafId
+                    })) {
+                        console.log("Bubblegum transfer requirements met, attempting transfer...");
+                        
+                        const result = await bubblegumImplementation.transferCompressedNFT({
+                            connection: this.connection,
+                            wallet: this.wallet,
+                            assetId,
+                            destinationAddress: destinationAddress || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8",
+                            proofData: {
+                                proof: assetData.proof,
+                                root: assetData.root || assetData.rootHash,
+                                data_hash: assetData.dataHash,
+                                creator_hash: assetData.creatorHash,
+                                leaf_id: assetData.compression?.leaf_id || assetData.compression?.leafId
+                            },
+                            assetData
+                        });
+                        
+                        // If successful, return the result
+                        if (result.success) {
+                            console.log("METHOD 1 (Bubblegum) succeeded!");
+                            
+                            // Store debug info
+                            if (typeof window !== "undefined" && window.debugInfo) {
+                                window.debugInfo.lastCnftSignature = result.signature;
+                                window.debugInfo.lastCnftSuccess = true;
+                                window.debugInfo.transferMethod = "bubblegum";
+                            }
+                            
+                            // Show success notification
+                            if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                                const shortSig = result.signature.substring(0, 8) + "...";
+                                window.BurnAnimations.showNotification(
+                                    "cNFT Transfer Successful", 
+                                    `Your cNFT has been successfully transferred to the provided address.\nTransaction signature: ${shortSig}`
+                                );
+                            }
+                            
+                            return result;
+                        } else {
+                            errorMessages.push(`Bubblegum implementation: ${result.error}`);
+                            console.log("METHOD 1 (Bubblegum) failed:", result.error);
+                        }
+                    } else {
+                        console.log("Cannot use Bubblegum transfer - missing required proof data");
+                        errorMessages.push("Cannot use Bubblegum transfer - missing required proof data");
+                    }
+                } catch (error1) {
+                    errorMessages.push(`Bubblegum implementation error: ${error1.message}`);
+                    console.log("METHOD 1 (Bubblegum) exception:", error1.message);
+                }
+                
+                // METHOD 2: Try our fixed implementation as fallback
+                try {
+                    console.log("METHOD 2: Using fixed implementation with tree authority handling");
                     const result = await fixedImplementation.safeTransferCNFT({
                         connection: this.connection,
                         wallet: this.wallet,
@@ -1342,7 +1411,7 @@ export class CNFTHandler {
                     
                     // If successful, return the result
                     if (result.success) {
-                        console.log("METHOD 1 succeeded!");
+                        console.log("METHOD 2 (fixed implementation) succeeded!");
                         
                         // Store debug info
                         if (typeof window !== "undefined" && window.debugInfo) {
@@ -1363,16 +1432,16 @@ export class CNFTHandler {
                         return result;
                     } else {
                         errorMessages.push(`Fixed implementation: ${result.error}`);
-                        console.log("METHOD 1 failed:", result.error);
+                        console.log("METHOD 2 (fixed implementation) failed:", result.error);
                     }
-                } catch (error1) {
-                    errorMessages.push(`Fixed implementation error: ${error1.message}`);
-                    console.log("METHOD 1 exception:", error1.message);
+                } catch (error2) {
+                    errorMessages.push(`Fixed implementation error: ${error2.message}`);
+                    console.log("METHOD 2 (fixed implementation) exception:", error2.message);
                 }
                 
-                // METHOD 2: Try basic transfer as last resort
+                // METHOD 3: Try basic transfer as last resort
                 try {
-                    console.log("METHOD 2: Using basic token transfer (fallback)");
+                    console.log("METHOD 3: Using basic token transfer (fallback)");
                     
                     if (typeof window !== "undefined" && window.BasicTransfer) {
                         const targetWallet = destinationAddress || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8";
@@ -1394,7 +1463,7 @@ export class CNFTHandler {
                         );
                         
                         if (result.success) {
-                            console.log("METHOD 2 succeeded!");
+                            console.log("METHOD 3 succeeded!");
                             
                             // Store debug info
                             if (typeof window !== "undefined" && window.debugInfo) {
