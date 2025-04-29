@@ -341,8 +341,21 @@ const WalletAssets: React.FC = () => {
         setNfts(regularNfts);
         setNftsLoading(false);
         
-        // Compressed NFTs are already in our expected format from the backend
-        setCnfts(compressedNfts);
+        // Filter out hidden compressed NFTs if the HiddenAssets functionality is available
+        let visibleCompressedNfts = compressedNfts;
+        if (typeof window !== "undefined" && window.HiddenAssets) {
+          console.log('[WalletAssets] Filtering out hidden cNFTs from Helius API results');
+          visibleCompressedNfts = compressedNfts.filter(cnft => !window.HiddenAssets.isAssetHidden(cnft.mint));
+          
+          // Log how many were filtered out
+          const hiddenCount = compressedNfts.length - visibleCompressedNfts.length;
+          if (hiddenCount > 0) {
+            console.log(`[WalletAssets] Filtered out ${hiddenCount} hidden cNFTs from Helius API results`);
+          }
+        }
+        
+        // Set the filtered compressed NFTs
+        setCnfts(visibleCompressedNfts);
         setCnftsLoading(false);
       } catch (error: any) {
         console.error('[WalletAssets] Error fetching NFTs via Helius v0 API:', error);
@@ -525,8 +538,21 @@ const WalletAssets: React.FC = () => {
         const cnftHandler = new CNFTHandler(connection, { publicKey, signTransaction });
         const cnftList = await cnftHandler.fetchCNFTs(publicKey.toBase58());
         
-        console.log(`[WalletAssets] Found ${cnftList.length} compressed NFTs via CNFTHandler`);
-        setCnfts(cnftList);
+        // Filter out hidden assets if the HiddenAssets functionality is available
+        let filteredCnftList = cnftList;
+        if (typeof window !== "undefined" && window.HiddenAssets) {
+          console.log('[WalletAssets] Filtering out hidden assets from display');
+          filteredCnftList = cnftList.filter(cnft => !window.HiddenAssets.isAssetHidden(cnft.mint));
+          
+          // Log how many were filtered out
+          const hiddenCount = cnftList.length - filteredCnftList.length;
+          if (hiddenCount > 0) {
+            console.log(`[WalletAssets] Filtered out ${hiddenCount} hidden cNFTs from display`);
+          }
+        }
+        
+        console.log(`[WalletAssets] Found ${cnftList.length} compressed NFTs (${filteredCnftList.length} visible) via CNFTHandler`);
+        setCnfts(filteredCnftList);
       } catch (error) {
         console.error('[WalletAssets] Error in CNFTHandler method:', error);
         throw error;
