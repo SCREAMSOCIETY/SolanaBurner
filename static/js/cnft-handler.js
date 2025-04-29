@@ -1121,33 +1121,83 @@ export class CNFTHandler {
             const finalDestination = destinationAddress || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
             console.log("Destination address:", finalDestination);
             
-            // SPECIAL CASE: If only one cNFT, use the single-asset transfer method
+            // SPECIAL CASE: If only one cNFT, use the enhanced single-asset transfer method
             if (assetIds.length === 1) {
-                console.log("Only one cNFT to transfer, using single transfer method instead of batch");
+                console.log("Only one cNFT to transfer, using enhanced single transfer method with explicit proof data");
                 
                 // Show notification about single transfer
                 if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                     window.BurnAnimations.showNotification(
                         "Trashing Single cNFT", 
-                        "Preparing to trash a single cNFT"
+                        "Preparing to trash a single cNFT with enhanced proof handling"
                     );
                 }
                 
-                // Use the transferCNFT method instead
-                const result = await this.transferCNFT(assetIds[0], finalDestination);
-                
-                // If successful, format the result to match the batch response structure
-                if (result.success) {
-                    return {
-                        success: true,
-                        signature: result.signature,
-                        explorerUrl: `https://solscan.io/tx/${result.signature}`,
-                        method: result.method || "single-transfer",
-                        processedAssets: [assetIds[0]],
-                        failedAssets: []
-                    };
-                } else {
-                    throw new Error(result.error || "Single transfer failed");
+                try {
+                    // Fetch asset proof data directly - crucial for reliable transfer
+                    console.log("Fetching proof data for single cNFT:", assetIds[0]);
+                    const proofResponse = await fetch(`/api/helius/asset-proof/${assetIds[0]}`);
+                    const proofResult = await proofResponse.json();
+                    
+                    if (proofResult.success && proofResult.data) {
+                        console.log("Successfully fetched proof data for single cNFT transfer");
+                        
+                        // Use our new specialized method with explicit proof data
+                        const result = await this.transferCNFTWithProof(
+                            assetIds[0],
+                            proofResult.data,
+                            finalDestination
+                        );
+                        
+                        // If successful, format the result to match the batch response structure
+                        if (result.success) {
+                            return {
+                                success: true,
+                                signature: result.signature,
+                                explorerUrl: `https://solscan.io/tx/${result.signature}`,
+                                method: "enhanced-single-transfer",
+                                processedAssets: [assetIds[0]],
+                                failedAssets: []
+                            };
+                        } else {
+                            // If enhanced method fails, fall back to regular transfer
+                            console.warn("Enhanced single transfer failed, trying regular method as fallback");
+                            const fallbackResult = await this.transferCNFT(assetIds[0], finalDestination);
+                            
+                            if (fallbackResult.success) {
+                                return {
+                                    success: true,
+                                    signature: fallbackResult.signature,
+                                    explorerUrl: `https://solscan.io/tx/${fallbackResult.signature}`,
+                                    method: "fallback-single-transfer",
+                                    processedAssets: [assetIds[0]],
+                                    failedAssets: []
+                                };
+                            } else {
+                                throw new Error(fallbackResult.error || "All single transfer methods failed");
+                            }
+                        }
+                    } else {
+                        console.warn("Failed to get proof data, falling back to regular transfer method");
+                        // Fall back to regular transfer if proof fetch fails
+                        const fallbackResult = await this.transferCNFT(assetIds[0], finalDestination);
+                        
+                        if (fallbackResult.success) {
+                            return {
+                                success: true,
+                                signature: fallbackResult.signature,
+                                explorerUrl: `https://solscan.io/tx/${fallbackResult.signature}`,
+                                method: "fallback-single-transfer",
+                                processedAssets: [assetIds[0]],
+                                failedAssets: []
+                            };
+                        } else {
+                            throw new Error(fallbackResult.error || "Single transfer failed");
+                        }
+                    }
+                } catch (singleTransferError) {
+                    console.error("Error in single cNFT transfer with proof:", singleTransferError);
+                    throw new Error(`Single transfer failed: ${singleTransferError.message}`);
                 }
             }
             
@@ -1868,11 +1918,125 @@ export class CNFTHandler {
         try {
             console.log("Using provided proof data:", providedProofData);
             
-            // Import the bubblegum-transfer module
-            const bubblegumImplementation = await import('./bubblegum-transfer.js').then(module => module.default);
+            // Use the globally available bubblegum transfer handler
+            // This avoids import issues with webpack bundling
+            let bubblegumImplementation = null;
             
+            // First attempt to get it from the window object if available
+            if (typeof window !== 'undefined' && window.bubblegumTransfer) {
+                bubblegumImplementation = window.bubblegumTransfer;
+                console.log("Using bubblegum transfer from window object");
+            }
+            // Otherwise try to use a required version if we're in Node.js
+            else if (typeof require !== 'undefined') {
+                try {
+                    bubblegumImplementation = require('./bubblegum-transfer.js');
+                    console.log("Using bubblegum transfer from require");
+                } catch (err) {
+                    console.error("Error requiring bubblegum transfer:", err);
+                }
+            }
+            
+            // As a last resort, directly use the existing BubblegumHandler method
             if (!bubblegumImplementation) {
-                throw new Error("Could not load bubblegum-transfer module");
+                console.log("Could not load external bubblegum module, using direct implementation");
+                
+                // Create a simplified version that matches the interface we need
+                bubblegumImplementation = {
+                    transferCompressedNFT: async (params) => {
+                        try {
+                            console.log("Using direct BubblegumHandler implementation");
+                            
+                            const { connection, wallet, assetId, destinationAddress, proofData } = params;
+                            
+                            // Create a BubblegumHandler instance with the same parameters
+                            const { createTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
+                            const { Transaction, PublicKey } = require('@solana/web3.js');
+                            
+                            // Get the latest blockhash for the transaction
+                            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                            
+                            // Create a new transaction
+                            const transaction = new Transaction({
+                                feePayer: wallet.publicKey,
+                                blockhash,
+                                lastValidBlockHeight,
+                            });
+                            
+                            // Create the transfer instruction
+                            const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
+                            const leafOwner = wallet.publicKey;
+                            const newLeafOwner = new PublicKey(destinationAddress);
+                            
+                            // Create the transfer instruction
+                            const transferIx = createTransferInstruction(
+                                {
+                                    merkleTree,
+                                    treeAuthority: getTreeAuthorityPDA(merkleTree),
+                                    leafOwner: wallet.publicKey,
+                                    leafDelegate: wallet.publicKey,
+                                    newLeafOwner,
+                                    logWrapper: PublicKey.findProgramAddressSync(
+                                        [Buffer.from("log_wrapper", "utf8")],
+                                        new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV")
+                                    )[0],
+                                    compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
+                                    anchorRemainingAccounts: [
+                                        {
+                                            pubkey: new PublicKey(proofData.root),
+                                            isSigner: false,
+                                            isWritable: false,
+                                        },
+                                        ...proofData.proof.map((node) => ({
+                                            pubkey: new PublicKey(node),
+                                            isSigner: false,
+                                            isWritable: false,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    root: [...new PublicKey(proofData.root).toBytes()],
+                                    dataHash: [...Buffer.from(proofData.data_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                                    creatorHash: [...Buffer.from(proofData.creator_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
+                                    nonce: proofData.leaf_id || 0,
+                                    index: proofData.leaf_id || 0,
+                                }
+                            );
+                            
+                            // Add the transfer instruction to the transaction
+                            transaction.add(transferIx);
+                            
+                            // Sign and send the transaction
+                            const signedTx = await wallet.signTransaction(transaction);
+                            const signature = await connection.sendRawTransaction(
+                                signedTx.serialize(),
+                                { skipPreflight: true }
+                            );
+                            
+                            // Confirm the transaction
+                            const confirmation = await connection.confirmTransaction({
+                                signature,
+                                blockhash,
+                                lastValidBlockHeight,
+                            });
+                            
+                            console.log("cNFT transfer successful via direct implementation");
+                            
+                            return {
+                                success: true,
+                                signature,
+                                message: "Successfully transferred cNFT",
+                                explorerUrl: `https://solscan.io/tx/${signature}`
+                            };
+                        } catch (error) {
+                            console.error("Error in direct implementation:", error);
+                            return {
+                                success: false,
+                                error: error.message || "Unknown error in direct BubblegumHandler implementation"
+                            };
+                        }
+                    }
+                };
             }
             
             // Get asset data - we still need this for metadata
