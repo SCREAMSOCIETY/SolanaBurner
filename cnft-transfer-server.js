@@ -26,7 +26,7 @@ const connection = new Connection(MAINNET_RPC_URL, 'confirmed');
 // Define project wallet - this is where cNFTs will be transferred to
 // Using screamsociety.sol domain which resolves to a Solana wallet address
 // When the .sol domain can't be resolved directly, use the provided wallet address
-const PROJECT_WALLET = process.env.PROJECT_WALLET || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8"; // screamsociety.sol
+const PROJECT_WALLET = process.env.PROJECT_WALLET || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
 
 // Check for tree authority secret key in environment variables
 const TREE_AUTHORITY_SECRET_KEY = process.env.TREE_AUTHORITY_SECRET_KEY;

