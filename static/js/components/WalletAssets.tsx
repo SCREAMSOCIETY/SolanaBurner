@@ -1788,16 +1788,31 @@ const WalletAssets: React.FC = () => {
             setError(`Batch transaction failed and no individual transfers succeeded. Please try again.`);
           }
         } else {
-          // Regular error
-          setError(`Error trashing cNFTs: ${result.error || "Unknown error"}`);
-          
-          // Try to extract more specific error information
+          // Regular error with enhanced user feedback
+          // Try to extract more specific error information for a better user experience
+          let errorMessage = "Error trashing cNFTs";
           let errorDetails = "Please try again or check your wallet connection.";
+          
           if (result.error) {
-            const errorMsg = result.error.toString();
-            if (errorMsg.includes("proof")) {
-              errorDetails = "Could not get valid proof data for the cNFTs.";
-            } else if (errorMsg.includes("rejected") || errorMsg.includes("cancelled")) {
+            const errorMsg = result.error.toString().toLowerCase();
+            
+            // Proof data issues
+            if (errorMsg.includes("proof") || errorMsg.includes("hash") || errorMsg.includes("buffer")) {
+              errorMessage = "Could not process the cNFT transaction";
+              errorDetails = "The proof data couldn't be properly validated. This can happen when blockchain data is inconsistent or not fully synced. Please try again in a few minutes.";
+            } 
+            // Invalid format issues
+            else if (errorMsg.includes("format") || errorMsg.includes("invalid") || errorMsg.includes("expected")) {
+              errorMessage = "Validation error in transaction data";
+              errorDetails = "There was a formatting issue with the transaction data. Please try selecting just one cNFT to trash instead of a batch.";
+            }
+            // RPC issues 
+            else if (errorMsg.includes("rpc") || errorMsg.includes("connection") || errorMsg.includes("network")) {
+              errorMessage = "Network connection issue";
+              errorDetails = "Could not connect to the Solana network properly. Please check your internet connection and try again.";
+            }
+            // Rejected by user
+            else if (errorMsg.includes("rejected") || errorMsg.includes("cancelled") || errorMsg.includes("declined")) {
               errorDetails = "The transaction was rejected in your wallet.";
             } else if (errorMsg.includes("funds")) {
               errorDetails = "Not enough SOL in your wallet to pay for the transaction.";
@@ -1806,7 +1821,10 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Show additional explanation
+          // Set the error message with the enhanced details
+          setError(`${errorMessage}: ${errorDetails}`);
+          
+          // Show additional explanation in a notification
           if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
             window.BurnAnimations.showNotification(
               "cNFT Batch Trash Failed", 
