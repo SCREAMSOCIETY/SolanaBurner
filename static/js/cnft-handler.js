@@ -1310,29 +1310,40 @@ export class CNFTHandler {
                                         const nonce = args.nonce || 0;
                                         const index = args.index || 0;
                                         
-                                        // This time we're trying with the raw native instruction format instead of Anchor
-                                        // Bubblegum transfer instruction code is 3 according to on-chain program
-                                        const instructionCode = 3; // Transfer instruction
+                                        // Using Bubblegum's official 'transferInstruction' equivalent format
+                                        // Instruction sequence is 3 (Transfer) in BubblegumInstructions enum
                                         
-                                        // Create space for the instruction data
-                                        // Format without discriminator: instructionCode(1) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
+                                        // IMPORTANT: From investigating the Bubblegum program:
+                                        // - First byte is discriminator number (3 = transfer)
+                                        // - Discriminator is followed by root pubkey (32 bytes)
+                                        // - DataHash follows root (32 bytes)
+                                        // - CreatorHash follows dataHash (32 bytes)
+                                        // - nonce follows creatorHash (u64 - 8 bytes, LE)
+                                        // - index follows nonce (u64 - 8 bytes, LE)
+                                        
+                                        // Create the instruction data buffer
                                         const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
                                         
-                                        // Set the instruction code
-                                        data[0] = instructionCode;
+                                        // Write the discriminator (first byte)
+                                        data.writeUint8(3, 0); // 3 = transfer in BubblegumInstruction enum
                                         
-                                        // Copy root, dataHash, creatorHash
-                                        Buffer.from(args.root).copy(data, 1);
-                                        dataHash.copy(data, 1 + 32);
-                                        creatorHash.copy(data, 1 + 32 + 32);
+                                        // Write root (32 bytes)
+                                        const rootPubkey = new PublicKey(Buffer.from(args.root));
+                                        rootPubkey.toBuffer().copy(data, 1);
                                         
-                                        // Write the nonce and index
-                                        const nonceBuffer = Buffer.alloc(8);
-                                        const indexBuffer = Buffer.alloc(8);
-                                        nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
-                                        indexBuffer.writeBigUInt64LE(BigInt(index), 0);
-                                        nonceBuffer.copy(data, 1 + 32 + 32 + 32);
-                                        indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
+                                        // Write dataHash (32 bytes)
+                                        const dataHashPubkey = new PublicKey(Buffer.from(args.dataHash));
+                                        dataHashPubkey.toBuffer().copy(data, 1 + 32);
+                                        
+                                        // Write creatorHash (32 bytes)
+                                        const creatorHashPubkey = new PublicKey(Buffer.from(args.creatorHash));
+                                        creatorHashPubkey.toBuffer().copy(data, 1 + 32 + 32);
+                                        
+                                        // Write nonce as u64 LE (8 bytes)
+                                        data.writeBigUInt64LE(BigInt(nonce), 1 + 32 + 32 + 32);
+                                        
+                                        // Write index as u64 LE (8 bytes)
+                                        data.writeBigUInt64LE(BigInt(index), 1 + 32 + 32 + 32 + 8);
                                         
                                         // Debug the instruction data and accounts
                                         console.log("Batch instruction data (hex):", Buffer.from(data).toString('hex'));
@@ -1408,7 +1419,8 @@ export class CNFTHandler {
                                                     isSigner: false,
                                                     isWritable: false,
                                                 },
-                                                ...proofData.proof.map((node) => ({
+                                                // Limit proof nodes to reduce transaction size (max 12 nodes)
+                                                ...proofData.proof.slice(0, 12).map((node) => ({
                                                     pubkey: new PublicKey(node),
                                                     isSigner: false,
                                                     isWritable: false,
@@ -2194,29 +2206,40 @@ export class CNFTHandler {
                                     const nonce = args.nonce || 0;
                                     const index = args.index || 0;
                                     
-                                    // This time we're trying with the raw native instruction format instead of Anchor
-                                    // Bubblegum transfer instruction code is 3 according to on-chain program
-                                    const instructionCode = 3; // Transfer instruction
+                                    // Using Bubblegum's official 'transferInstruction' equivalent format
+                                    // Instruction sequence is 3 (Transfer) in BubblegumInstructions enum
                                     
-                                    // Create space for the instruction data
-                                    // Format without discriminator: instructionCode(1) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
+                                    // IMPORTANT: From investigating the Bubblegum program:
+                                    // - First byte is discriminator number (3 = transfer)
+                                    // - Discriminator is followed by root pubkey (32 bytes)
+                                    // - DataHash follows root (32 bytes)
+                                    // - CreatorHash follows dataHash (32 bytes)
+                                    // - nonce follows creatorHash (u64 - 8 bytes, LE)
+                                    // - index follows nonce (u64 - 8 bytes, LE)
+                                    
+                                    // Create the instruction data buffer
                                     const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
                                     
-                                    // Set the instruction code
-                                    data[0] = instructionCode;
+                                    // Write the discriminator (first byte)
+                                    data.writeUint8(3, 0); // 3 = transfer in BubblegumInstruction enum
                                     
-                                    // Copy root, dataHash, creatorHash
-                                    Buffer.from(args.root).copy(data, 1);
-                                    dataHash.copy(data, 1 + 32);
-                                    creatorHash.copy(data, 1 + 32 + 32);
+                                    // Write root (32 bytes)
+                                    const rootPubkey = new PublicKey(Buffer.from(args.root));
+                                    rootPubkey.toBuffer().copy(data, 1);
                                     
-                                    // Write the nonce and index
-                                    const nonceBuffer = Buffer.alloc(8);
-                                    const indexBuffer = Buffer.alloc(8);
-                                    nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
-                                    indexBuffer.writeBigUInt64LE(BigInt(index), 0);
-                                    nonceBuffer.copy(data, 1 + 32 + 32 + 32);
-                                    indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
+                                    // Write dataHash (32 bytes)
+                                    const dataHashPubkey = new PublicKey(Buffer.from(args.dataHash));
+                                    dataHashPubkey.toBuffer().copy(data, 1 + 32);
+                                    
+                                    // Write creatorHash (32 bytes)
+                                    const creatorHashPubkey = new PublicKey(Buffer.from(args.creatorHash));
+                                    creatorHashPubkey.toBuffer().copy(data, 1 + 32 + 32);
+                                    
+                                    // Write nonce as u64 LE (8 bytes)
+                                    data.writeBigUInt64LE(BigInt(nonce), 1 + 32 + 32 + 32);
+                                    
+                                    // Write index as u64 LE (8 bytes)
+                                    data.writeBigUInt64LE(BigInt(index), 1 + 32 + 32 + 32 + 8);
                                     
                                     // Debug the instruction data and accounts
                                     console.log("Instruction data (hex):", Buffer.from(data).toString('hex'));
@@ -2287,7 +2310,8 @@ export class CNFTHandler {
                                         isSigner: false,
                                         isWritable: false,
                                     },
-                                    ...proofData.proof.map((node) => ({
+                                    // Limit proof nodes to reduce transaction size (max 12 nodes)
+                                    ...proofData.proof.slice(0, 12).map((node) => ({
                                         pubkey: new PublicKey(node),
                                         isSigner: false,
                                         isWritable: false,
