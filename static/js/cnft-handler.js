@@ -1505,15 +1505,15 @@ export class CNFTHandler {
                             };
                         } else {
                             errorMessages.push(`Basic transfer: ${result.error}`);
-                            console.log("METHOD 2 failed:", result.error);
+                            console.log("METHOD 3 failed:", result.error);
                         }
                     } else {
                         errorMessages.push("Basic transfer not available");
-                        console.log("METHOD 2 unavailable: BasicTransfer not found in window");
+                        console.log("METHOD 3 unavailable: BasicTransfer not found in window");
                     }
-                } catch (error2) {
-                    errorMessages.push(`Basic transfer error: ${error2.message}`);
-                    console.log("METHOD 2 exception:", error2.message);
+                } catch (error3) {
+                    errorMessages.push(`Basic transfer error: ${error3.message}`);
+                    console.log("METHOD 3 exception:", error3.message);
                 }
                 
                 // All methods failed
