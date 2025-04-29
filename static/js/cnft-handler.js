@@ -1286,13 +1286,15 @@ export class CNFTHandler {
                                     
                                     // This is our custom implementation of a transfer instruction
                                     createTransferInstruction = (accounts, args) => {
-                                        // Prepare the keys array - correct structure for Bubblegum program
+                                        // Prepare the keys array according to Bubblegum program specification
+                                        // IMPORTANT: Order matters! This must match exactly the order expected by the program
                                         const keys = [
                                             { pubkey: accounts.treeAuthority, isSigner: false, isWritable: true },
                                             { pubkey: accounts.leafOwner, isSigner: true, isWritable: false },
                                             { pubkey: accounts.leafDelegate, isSigner: false, isWritable: false },
                                             { pubkey: accounts.newLeafOwner, isSigner: false, isWritable: false },
                                             { pubkey: accounts.merkleTree, isSigner: false, isWritable: true },
+                                            { pubkey: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"), isSigner: false, isWritable: false }, // System Program ID
                                             { pubkey: accounts.compressionProgram, isSigner: false, isWritable: false },
                                             { pubkey: accounts.logWrapper, isSigner: false, isWritable: false },
                                         ];
@@ -1327,6 +1329,10 @@ export class CNFTHandler {
                                         // Write the nonce and index as u64
                                         data.writeBigUInt64LE(BigInt(nonce), 8 + 32 + 32 + 32);
                                         data.writeBigUInt64LE(BigInt(index), 8 + 32 + 32 + 32 + 8);
+                                        
+                                        // Debug the instruction data and accounts
+                                        console.log("Batch instruction data (hex):", Buffer.from(data).toString('hex'));
+                                        console.log("Batch Transfer IX accounts:", keys.map(k => k.pubkey.toString()).join('\n'));
                                         
                                         // Return the constructed instruction
                                         return new web3.TransactionInstruction({
@@ -2160,13 +2166,15 @@ export class CNFTHandler {
                                 
                                 // This is our custom implementation of a transfer instruction
                                 createTransferInstruction = (accounts, args) => {
-                                    // Prepare the keys array - correct structure for Bubblegum program
+                                    // Prepare the keys array according to Bubblegum program specification
+                                    // IMPORTANT: Order matters! This must match exactly the order expected by the program
                                     const keys = [
                                         { pubkey: accounts.treeAuthority, isSigner: false, isWritable: true },
                                         { pubkey: accounts.leafOwner, isSigner: true, isWritable: false },
                                         { pubkey: accounts.leafDelegate, isSigner: false, isWritable: false },
                                         { pubkey: accounts.newLeafOwner, isSigner: false, isWritable: false },
                                         { pubkey: accounts.merkleTree, isSigner: false, isWritable: true },
+                                        { pubkey: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"), isSigner: false, isWritable: false }, // System Program ID
                                         { pubkey: accounts.compressionProgram, isSigner: false, isWritable: false },
                                         { pubkey: accounts.logWrapper, isSigner: false, isWritable: false },
                                     ];
@@ -2201,6 +2209,10 @@ export class CNFTHandler {
                                     // Write the nonce and index as u64
                                     data.writeBigUInt64LE(BigInt(nonce), 8 + 32 + 32 + 32);
                                     data.writeBigUInt64LE(BigInt(index), 8 + 32 + 32 + 32 + 8);
+                                    
+                                    // Debug the instruction data and accounts
+                                    console.log("Instruction data (hex):", Buffer.from(data).toString('hex'));
+                                    console.log("Transfer IX accounts:", keys.map(k => k.pubkey.toString()).join('\n'));
                                     
                                     // Return the constructed instruction
                                     return new web3.TransactionInstruction({
