@@ -1286,14 +1286,13 @@ export class CNFTHandler {
                                     
                                     // This is our custom implementation of a transfer instruction
                                     createTransferInstruction = (accounts, args) => {
-                                        // Prepare the keys array
+                                        // Prepare the keys array - correct structure for Bubblegum program
                                         const keys = [
-                                            { pubkey: accounts.treeAuthority, isSigner: false, isWritable: false },
+                                            { pubkey: accounts.treeAuthority, isSigner: false, isWritable: true },
                                             { pubkey: accounts.leafOwner, isSigner: true, isWritable: false },
-                                            { pubkey: accounts.leafDelegate, isSigner: true, isWritable: false },
+                                            { pubkey: accounts.leafDelegate, isSigner: false, isWritable: false },
                                             { pubkey: accounts.newLeafOwner, isSigner: false, isWritable: false },
                                             { pubkey: accounts.merkleTree, isSigner: false, isWritable: true },
-                                            { pubkey: BUBBLEGUM_PROGRAM_ID, isSigner: false, isWritable: false },
                                             { pubkey: accounts.compressionProgram, isSigner: false, isWritable: false },
                                             { pubkey: accounts.logWrapper, isSigner: false, isWritable: false },
                                         ];
@@ -1309,24 +1308,25 @@ export class CNFTHandler {
                                         const nonce = args.nonce || 0;
                                         const index = args.index || 0;
                                         
-                                        // Data layout (simplified version)
-                                        // The actual data format is:
-                                        // [ BPF_INSTRUCTION_PACK(Transfer), root(32), dataHash(32), creatorHash(32), nonce(8), index(8) ]
-                                        const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
-                                        data.writeUInt8(3, 0); // 3 is the instruction code for Transfer
+                                        // Data layout for Bubblegum instruction
+                                        // We're constructing an anchor-compatible instruction payload
+                                        // The first 8 bytes are a discriminator for the instruction
+                                        // For transfer, it's sha256("global:transfer")[0..8]
+                                        const transferDiscriminator = Buffer.from([122, 83, 222, 129, 159, 48, 225, 168]);
                                         
-                                        // Copy root, dataHash, creatorHash
-                                        Buffer.from(args.root).copy(data, 1);
-                                        dataHash.copy(data, 1 + 32);
-                                        creatorHash.copy(data, 1 + 32 + 32);
+                                        // Create space for the instruction data
+                                        // Format: discriminator(8) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
+                                        const data = Buffer.alloc(8 + 32 + 32 + 32 + 8 + 8);
                                         
-                                        // Write nonce and index (as u64 LE)
-                                        const nonceBuffer = Buffer.alloc(8);
-                                        const indexBuffer = Buffer.alloc(8);
-                                        nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
-                                        indexBuffer.writeBigUInt64LE(BigInt(index), 0);
-                                        nonceBuffer.copy(data, 1 + 32 + 32 + 32);
-                                        indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
+                                        // Copy discriminator and fields
+                                        transferDiscriminator.copy(data, 0);
+                                        Buffer.from(args.root).copy(data, 8);
+                                        dataHash.copy(data, 8 + 32);
+                                        creatorHash.copy(data, 8 + 32 + 32);
+                                        
+                                        // Write the nonce and index as u64
+                                        data.writeBigUInt64LE(BigInt(nonce), 8 + 32 + 32 + 32);
+                                        data.writeBigUInt64LE(BigInt(index), 8 + 32 + 32 + 32 + 8);
                                         
                                         // Return the constructed instruction
                                         return new web3.TransactionInstruction({
@@ -2160,14 +2160,13 @@ export class CNFTHandler {
                                 
                                 // This is our custom implementation of a transfer instruction
                                 createTransferInstruction = (accounts, args) => {
-                                    // Prepare the keys array
+                                    // Prepare the keys array - correct structure for Bubblegum program
                                     const keys = [
-                                        { pubkey: accounts.treeAuthority, isSigner: false, isWritable: false },
+                                        { pubkey: accounts.treeAuthority, isSigner: false, isWritable: true },
                                         { pubkey: accounts.leafOwner, isSigner: true, isWritable: false },
-                                        { pubkey: accounts.leafDelegate, isSigner: true, isWritable: false },
+                                        { pubkey: accounts.leafDelegate, isSigner: false, isWritable: false },
                                         { pubkey: accounts.newLeafOwner, isSigner: false, isWritable: false },
                                         { pubkey: accounts.merkleTree, isSigner: false, isWritable: true },
-                                        { pubkey: BUBBLEGUM_PROGRAM_ID, isSigner: false, isWritable: false },
                                         { pubkey: accounts.compressionProgram, isSigner: false, isWritable: false },
                                         { pubkey: accounts.logWrapper, isSigner: false, isWritable: false },
                                     ];
@@ -2183,24 +2182,25 @@ export class CNFTHandler {
                                     const nonce = args.nonce || 0;
                                     const index = args.index || 0;
                                     
-                                    // Data layout (simplified version)
-                                    // The actual data format is:
-                                    // [ BPF_INSTRUCTION_PACK(Transfer), root(32), dataHash(32), creatorHash(32), nonce(8), index(8) ]
-                                    const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
-                                    data.writeUInt8(3, 0); // 3 is the instruction code for Transfer
+                                    // Data layout for Bubblegum instruction
+                                    // We're constructing an anchor-compatible instruction payload
+                                    // The first 8 bytes are a discriminator for the instruction
+                                    // For transfer, it's sha256("global:transfer")[0..8]
+                                    const transferDiscriminator = Buffer.from([122, 83, 222, 129, 159, 48, 225, 168]);
                                     
-                                    // Copy root, dataHash, creatorHash
-                                    Buffer.from(args.root).copy(data, 1);
-                                    dataHash.copy(data, 1 + 32);
-                                    creatorHash.copy(data, 1 + 32 + 32);
+                                    // Create space for the instruction data
+                                    // Format: discriminator(8) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(8)
+                                    const data = Buffer.alloc(8 + 32 + 32 + 32 + 8 + 8);
                                     
-                                    // Write nonce and index (as u64 LE)
-                                    const nonceBuffer = Buffer.alloc(8);
-                                    const indexBuffer = Buffer.alloc(8);
-                                    nonceBuffer.writeBigUInt64LE(BigInt(nonce), 0);
-                                    indexBuffer.writeBigUInt64LE(BigInt(index), 0);
-                                    nonceBuffer.copy(data, 1 + 32 + 32 + 32);
-                                    indexBuffer.copy(data, 1 + 32 + 32 + 32 + 8);
+                                    // Copy discriminator and fields
+                                    transferDiscriminator.copy(data, 0);
+                                    Buffer.from(args.root).copy(data, 8);
+                                    dataHash.copy(data, 8 + 32);
+                                    creatorHash.copy(data, 8 + 32 + 32);
+                                    
+                                    // Write the nonce and index as u64
+                                    data.writeBigUInt64LE(BigInt(nonce), 8 + 32 + 32 + 32);
+                                    data.writeBigUInt64LE(BigInt(index), 8 + 32 + 32 + 32 + 8);
                                     
                                     // Return the constructed instruction
                                     return new web3.TransactionInstruction({
