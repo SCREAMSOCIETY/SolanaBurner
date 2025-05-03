@@ -13,19 +13,21 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[CNFT Handler Patch] Initializing...');
     
     // Check if CNFTHandler and our fixed implementation are available
-    if (window.cnftHandler && window.cnftHandler.CNFTHandler && window.fixedBubblegumTransfer) {
-      console.log('[CNFT Handler Patch] CNFTHandler and fixedBubblegumTransfer found, applying patch');
-      
-      try {
-        // Save a reference to the original prototype
-        const originalPrototype = window.cnftHandler.CNFTHandler.prototype;
+    if (window.cnftHandler?.CNFTHandler || window.CNFTHandler) {
+      // Make sure our transfer implementation is available
+      if (window.fixedBubblegumTransfer) {
+        console.log('[CNFT Handler Patch] CNFTHandler and fixedBubblegumTransfer found, applying patch');
         
-        // Save a reference to the original methods we want to preserve
-        const originalTransferCNFT = originalPrototype.transferCNFT;
-        const originalTransferCNFTWithProof = originalPrototype.transferCNFTWithProof;
-        
-        // Replace the transferCNFTWithProof method with our fixed implementation
-        originalPrototype.transferCNFTWithProof = async function(assetId, providedProofData, destinationAddress = null) {
+        try {
+          // Save a reference to the original prototype
+          const originalPrototype = (window.cnftHandler?.CNFTHandler || window.CNFTHandler).prototype;
+          
+          // Save a reference to the original methods we want to preserve
+          const originalTransferCNFT = originalPrototype.transferCNFT;
+          const originalTransferCNFTWithProof = originalPrototype.transferCNFTWithProof;
+          
+          // Replace the transferCNFTWithProof method with our fixed implementation
+          originalPrototype.transferCNFTWithProof = async function(assetId, providedProofData, destinationAddress = null) {
           console.log('[CNFT Handler Patch] Using patched transferCNFTWithProof method');
           
           if (!assetId) {

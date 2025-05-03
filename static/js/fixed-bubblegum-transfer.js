@@ -6,7 +6,7 @@
  * the proper instruction format.
  */
 
-import { Connection, PublicKey, Transaction, ComputeBudgetProgram } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, TransactionInstruction, ComputeBudgetProgram } from '@solana/web3.js';
 import { createTransferInstruction } from '@metaplex-foundation/mpl-bubblegum';
 import bs58 from 'bs58';
 

@@ -12,7 +12,7 @@ module.exports = {
     'bubblegum-transfer': './static/js/bubblegum-transfer.js',
     'metaplex-cnft-transfer': './static/js/metaplex-cnft-transfer.js',
     'fixed-bubblegum-transfer': './static/js/fixed-bubblegum-transfer.js',
-    'cnft-handler-patch': './static/js/cnft-handler-patch.js',
+    'cnft-direct-patch': './static/js/cnft-direct-patch.js',
     'basic-transfer': './static/js/basic-transfer.js',
     'hidden-assets': './static/js/hidden-assets.js',
     'animations': './static/js/animations.js'
