@@ -1522,6 +1522,13 @@ export class CNFTHandler {
                         );
                     }
                     
+                    // Add successfully transferred CNFTs to hidden assets list
+                    // This helps with Helius API caching issues
+                    if (typeof window !== "undefined" && window.HiddenAssets && result.processedAssets?.length > 0) {
+                        console.log(`Adding ${result.processedAssets.length} successfully transferred cNFTs to hidden assets list`);
+                        window.HiddenAssets.addMultipleToHiddenAssets(result.processedAssets);
+                    }
+                    
                     // Return success with details
                     return {
                         success: true,
