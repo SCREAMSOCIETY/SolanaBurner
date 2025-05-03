@@ -2404,188 +2404,239 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 var __webpack_exports__ = {};
 // This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
 (() => {
-/*!******************************************!*\
-  !*** ./static/js/standalone-transfer.js ***!
-  \******************************************/
+/*!************************************!*\
+  !*** ./static/js/solo-transfer.js ***!
+  \************************************/
 /* provided dependency */ var Buffer = __webpack_require__(/*! buffer */ "./node_modules/buffer/index.js")["Buffer"];
 /**
- * Standalone Transfer for cNFTs
- * 
- * This is a completely self-contained implementation that doesn't
- * depend on any external modules or the CNFTHandler class.
+ * Solo Transfer - Completely standalone cNFT transfer implementation
+ * This file provides a completely self-contained implementation of cNFT transfers
+ * that doesn't depend on the CNFTHandler class or any other external code.
  */
 
-// Define a standalone function to bypass TransactionInstruction issues
-// We'll implement this right away without waiting for DOMContentLoaded
+// Create a standalone namespace to avoid global pollution
 (function() {
-  // Make the function available globally
-  window.standaloneTransferCNFT = async function(assetId) {
-    console.log(`[Standalone] Starting transfer for ${assetId}`);
+  // Expose our function globally
+  window.soloTransferCNFT = async function(assetId) {
+    console.log(`[Solo] Starting transfer for cNFT: ${assetId}`);
+    
+    // Check if we have any errors to report and help with debugging
+    window.soloTransferErrors = window.soloTransferErrors || [];
     
     try {
-      // Make sure wallet is connected
+      // Only proceed if we have a connected wallet
       if (!window.solana || !window.solana.isConnected) {
         throw new Error("Wallet not connected");
       }
       
-      // Simplify the wallet interface to what we need
+      // Simple object with just what we need from the wallet
       const wallet = {
         publicKey: window.solana.publicKey,
-        signTransaction: function(tx) {
-          return window.solana.signTransaction(tx);
-        }
+        signTransaction: (tx) => window.solana.signTransaction(tx)
       };
       
-      // Log wallet information
-      console.log(`[Standalone] Using wallet: ${wallet.publicKey.toString()}`);
+      console.log(`[Solo] Using wallet: ${wallet.publicKey.toString()}`);
       
-      // Get proof data for the asset
-      console.log(`[Standalone] Fetching proof data`);
-      const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
-      if (!proofResponse.ok) {
-        throw new Error("Failed to fetch asset proof");
-      }
-      
-      const proofResult = await proofResponse.json();
-      if (!proofResult.success || !proofResult.data) {
-        throw new Error("Invalid proof data received");
-      }
-      
-      const proofData = proofResult.data;
-      console.log(`[Standalone] Proof data retrieved successfully`);
-      
-      // Show notification to user
-      if (window.BurnAnimations && window.BurnAnimations.showNotification) {
+      // Notify the user we're processing
+      if (window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
-          "Processing Transfer",
-          "Preparing transaction on server..."
+          "Processing cNFT",
+          "Fetching asset data..."
         );
       }
       
-      // Call server to build the transaction
-      console.log(`[Standalone] Requesting transaction from server`);
-      const prepareResponse = await fetch('/api/server-transfer/prepare', {
+      // Fetch both proof data and asset details in parallel
+      console.log(`[Solo] Fetching proof and asset data for ${assetId}`);
+      const [proofResp, assetResp] = await Promise.all([
+        fetch(`/api/helius/asset-proof/${assetId}`),
+        fetch(`/api/helius/asset/${assetId}`)
+      ]);
+      
+      if (!proofResp.ok || !assetResp.ok) {
+        throw new Error("Failed to fetch asset data from server");
+      }
+      
+      const proofData = await proofResp.json();
+      const assetData = await assetResp.json();
+      
+      if (!proofData.success || !assetData.success) {
+        throw new Error("Invalid asset data received from server");
+      }
+      
+      console.log(`[Solo] Asset and proof data retrieved successfully`);
+      
+      // Notify the user we're preparing the transaction
+      if (window.BurnAnimations?.showNotification) {
+        window.BurnAnimations.showNotification(
+          "Processing cNFT",
+          "Preparing transaction..."
+        );
+      }
+      
+      // Call the server to prepare the transaction for us
+      console.log("[Solo] Calling server to prepare transaction");
+      const prepareResp = await fetch('/api/server-transfer/prepare', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ownerPublicKey: wallet.publicKey.toString(),
           assetId,
-          proofData
+          proofData: proofData.data
         })
       });
       
-      // Check for errors
-      if (!prepareResponse.ok) {
-        const errorData = await prepareResponse.json();
-        throw new Error(`Server error: ${errorData.error || prepareResponse.statusText}`);
+      if (!prepareResp.ok) {
+        const errorText = await prepareResp.text();
+        throw new Error(`Server error: ${errorText}`);
       }
       
-      const prepareResult = await prepareResponse.json();
-      if (!prepareResult.success || !prepareResult.transaction) {
-        throw new Error(`Error preparing transaction: ${prepareResult.error || 'Unknown error'}`);
+      const prepared = await prepareResp.json();
+      if (!prepared.success) {
+        throw new Error(`Transaction preparation failed: ${prepared.error}`);
       }
       
-      console.log(`[Standalone] Transaction prepared, signing...`);
+      console.log("[Solo] Transaction prepared successfully");
       
-      // Convert the base64 transaction buffer to a Transaction object
-      const transactionBuffer = Buffer.from(prepareResult.transaction, 'base64');
-      
-      // Create the transaction object, handling different web3.js imports
-      let transaction;
-      try {
-        // Try different approaches to get the Transaction constructor
-        if (window.solana && window.solana.Transaction) {
-          console.log("[Standalone] Using wallet.Transaction");
-          transaction = window.solana.Transaction.from(transactionBuffer);
-        } else if (window.solanaWeb3 && window.solanaWeb3.Transaction) {
-          console.log("[Standalone] Using solanaWeb3.Transaction");
-          transaction = window.solanaWeb3.Transaction.from(transactionBuffer);
-        } else if (window.SolanaWeb3JS && window.SolanaWeb3JS.Transaction) {
-          console.log("[Standalone] Using SolanaWeb3JS.Transaction");
-          transaction = window.SolanaWeb3JS.Transaction.from(transactionBuffer);
-        } else {
-          // Final fallback - try to reconstruct the transaction manually
-          console.log("[Standalone] Using manual transaction reconstruction");
-          
-          // Clone the transaction data using a simple object
-          const txData = JSON.parse(Buffer.from(transactionBuffer).toString());
-          
-          // If we have the wallet's signTransaction method but not Transaction class,
-          // we can create a minimal transaction object that the wallet can sign
-          transaction = {
-            serialize: function() {
-              return transactionBuffer;
-            },
-            signatures: [],
-            recentBlockhash: txData.recentBlockhash || "",
-            feePayer: new solana.PublicKey(ownerPublicKey),
-            instructions: txData.instructions || []
-          };
-        }
-      } catch (txError) {
-        console.error("[Standalone] Error creating transaction:", txError);
-        throw new Error("Transaction creation failed: " + txError.message);
-      }
-      
-      // Sign the transaction
-      console.log(`[Standalone] Signing transaction`);
-      const signedTransaction = await wallet.signTransaction(transaction);
-      
-      // Serialize for sending to server
-      const serializedTransaction = Buffer.from(
-        signedTransaction.serialize()
-      ).toString('base64');
-      
-      // Show notification
-      if (window.BurnAnimations && window.BurnAnimations.showNotification) {
+      // Notify the user we're signing
+      if (window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
-          "Processing Transfer",
-          "Submitting transaction to network..."
+          "Processing cNFT",
+          "Signing transaction..."
         );
       }
       
-      // Submit to server
-      console.log(`[Standalone] Submitting signed transaction`);
-      const submitResponse = await fetch('/api/server-transfer/submit', {
+      // Handle serialized transaction data
+      const txBuffer = Buffer.from(prepared.transaction, 'base64');
+      
+      // We need to determine which Transaction implementation to use
+      let Transaction;
+      let tx;
+      
+      try {
+        // Try different ways to get the Transaction constructor
+        if (window.solanaWeb3?.Transaction) {
+          console.log("[Solo] Using window.solanaWeb3.Transaction");
+          Transaction = window.solanaWeb3.Transaction;
+        } else if (window.solana?.Transaction) {
+          console.log("[Solo] Using window.solana.Transaction");
+          Transaction = window.solana.Transaction;
+        } else if (window.solana?.Web3?.Transaction) {
+          console.log("[Solo] Using window.solana.Web3.Transaction");
+          Transaction = window.solana.Web3.Transaction;
+        } else {
+          // Last resort - check for any global Transaction
+          console.log("[Solo] Using global Transaction object");
+          Transaction = window.Transaction;
+        }
+        
+        // Create the transaction object from the serialized data
+        if (Transaction) {
+          tx = Transaction.from(txBuffer);
+        } else {
+          throw new Error("Cannot find Transaction constructor");
+        }
+      } catch (txError) {
+        // Log the error for debugging
+        console.error("[Solo] Error creating transaction:", txError);
+        window.soloTransferErrors.push({
+          stage: "transaction-creation",
+          error: txError,
+          message: txError.message,
+          stack: txError.stack
+        });
+        
+        // Try a different approach - create a simple object
+        console.log("[Solo] Falling back to manual transaction object");
+        tx = {
+          serialize: function() { return txBuffer; },
+          serializeMessage: function() { return txBuffer; }
+        };
+      }
+      
+      let signedTx;
+      try {
+        // Sign the transaction with the wallet
+        console.log("[Solo] Signing transaction with wallet");
+        signedTx = await wallet.signTransaction(tx);
+      } catch (signError) {
+        console.error("[Solo] Error signing transaction:", signError);
+        window.soloTransferErrors.push({
+          stage: "transaction-signing",
+          error: signError,
+          message: signError.message,
+          stack: signError.stack
+        });
+        throw new Error(`Failed to sign transaction: ${signError.message}`);
+      }
+      
+      console.log("[Solo] Transaction signed successfully");
+      
+      // Notify the user we're submitting
+      if (window.BurnAnimations?.showNotification) {
+        window.BurnAnimations.showNotification(
+          "Processing cNFT",
+          "Submitting to network..."
+        );
+      }
+      
+      // Serialize and submit the signed transaction
+      let serializedTx;
+      try {
+        if (signedTx.serialize) {
+          console.log("[Solo] Using transaction.serialize()");
+          serializedTx = Buffer.from(signedTx.serialize()).toString('base64');
+        } else {
+          console.log("[Solo] Using txBuffer directly");
+          serializedTx = Buffer.from(txBuffer).toString('base64');
+        }
+      } catch (serError) {
+        console.error("[Solo] Error serializing transaction:", serError);
+        window.soloTransferErrors.push({
+          stage: "transaction-serialization", 
+          error: serError,
+          message: serError.message,
+          stack: serError.stack
+        });
+        throw new Error(`Failed to serialize transaction: ${serError.message}`);
+      }
+      
+      // Submit the signed transaction to the server
+      console.log("[Solo] Submitting signed transaction to server");
+      const submitResp = await fetch('/api/server-transfer/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          signedTransaction: serializedTransaction,
+          signedTransaction: serializedTx,
           assetId
         })
       });
       
-      // Check for errors
-      if (!submitResponse.ok) {
-        const errorData = await submitResponse.json();
-        throw new Error(`Server error: ${errorData.error || submitResponse.statusText}`);
+      if (!submitResp.ok) {
+        const errorText = await submitResp.text();
+        throw new Error(`Server submission error: ${errorText}`);
       }
       
-      const submitResult = await submitResponse.json();
-      if (!submitResult.success) {
-        throw new Error(`Error submitting transaction: ${submitResult.error || 'Unknown error'}`);
+      const result = await submitResp.json();
+      if (!result.success) {
+        throw new Error(`Transaction submission failed: ${result.error}`);
       }
       
-      console.log(`[Standalone] Transaction confirmed: ${submitResult.signature}`);
+      console.log(`[Solo] Transaction successful! Signature: ${result.signature}`);
       
       // Add to hidden assets to update UI immediately
       if (window.hiddenAssets) {
         window.hiddenAssets.addHiddenAsset(assetId);
       }
       
-      // Show achievement notification
-      if (window.BurnAnimations && window.BurnAnimations.showAchievement) {
+      // Show success notification
+      if (window.BurnAnimations?.showAchievement) {
         window.BurnAnimations.showAchievement(
           "cNFT Trashed",
-          `Successfully transferred cNFT to project collection`
+          "Successfully transferred cNFT to project collection"
         );
       }
       
-      // Update achievements
+      // Track achievements if available
       if (window.checkAchievements) {
         window.checkAchievements('cnft_trash', 1);
       }
@@ -2593,15 +2644,22 @@ var __webpack_exports__ = {};
       // Return success result
       return {
         success: true,
-        signature: submitResult.signature,
-        message: "Successfully transferred cNFT to project collection",
-        explorerUrl: `https://solscan.io/tx/${submitResult.signature}`
+        signature: result.signature,
+        message: "Successfully trashed cNFT to project collection",
+        explorerUrl: `https://solscan.io/tx/${result.signature}`
       };
     } catch (error) {
-      console.error(`[Standalone] Error:`, error);
+      console.error("[Solo] Error:", error);
+      window.soloTransferErrors.push({
+        stage: "general-execution",
+        error: error,
+        message: error.message,
+        stack: error.stack,
+        time: new Date().toISOString()
+      });
       
       // Show error notification
-      if (window.BurnAnimations && window.BurnAnimations.showNotification) {
+      if (window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
           "cNFT Trash Failed",
           `Error: ${error.message}`
@@ -2616,67 +2674,77 @@ var __webpack_exports__ = {};
     }
   };
   
-  // Add a utility function to patch buttons
-  window.patchCNFTButtons = function() {
-    console.log("[Standalone] Patching cNFT buttons");
+  // Utility to patch buttons with our implementation
+  function patchButtons() {
+    console.log("[Solo] Patching cNFT buttons with solo implementation");
     
     // Find all trash/burn buttons for cNFTs
     const buttons = document.querySelectorAll('.trash-button, .burn-button, [data-action="trash"], [data-action="burn-cnft"]');
-    console.log(`[Standalone] Found ${buttons.length} buttons to patch`);
+    console.log(`[Solo] Found ${buttons.length} buttons to patch`);
     
     buttons.forEach(button => {
-      // Save the original click handler
-      const originalClick = button.onclick;
+      // Store original handler
+      const originalHandler = button.onclick;
       
       // Replace with our handler
       button.onclick = async function(event) {
-        // Get the asset ID from the button
         const assetId = button.getAttribute('data-asset-id');
-        
-        // Check if this is a cNFT button
         if (assetId && button.classList.contains('cnft')) {
-          // Stop the default behavior
+          // This is a cNFT button, handle it
           event.preventDefault();
           event.stopPropagation();
           
-          console.log(`[Standalone] Intercepted click for cNFT ${assetId}`);
+          console.log(`[Solo] Intercepted click for cNFT ${assetId}`);
           
           // Show processing notification
-          if (window.BurnAnimations && window.BurnAnimations.showNotification) {
+          if (window.BurnAnimations?.showNotification) {
             window.BurnAnimations.showNotification(
-              "Processing cNFT Transfer",
-              "Preparing transaction..."
+              "Processing cNFT",
+              "Starting transfer process..."
             );
           }
           
-          // Use our standalone transfer function
-          await window.standaloneTransferCNFT(assetId);
+          // Use our implementation
+          const result = await window.soloTransferCNFT(assetId);
+          
+          // Update UI based on result
+          if (result.success) {
+            console.log(`[Solo] Transfer successful for ${assetId}`);
+            // You might want to refresh the UI here
+          } else {
+            console.error(`[Solo] Transfer failed for ${assetId}:`, result.error);
+          }
+          
           return false;
-        } else if (originalClick) {
-          // Use the original handler for non-cNFT buttons
-          return originalClick.call(this, event);
+        } else if (originalHandler) {
+          // Not a cNFT button, use original handler
+          return originalHandler.call(this, event);
         }
       };
     });
     
-    console.log("[Standalone] Button patching completed");
-  };
+    console.log("[Solo] Button patching completed");
+  }
   
-  // Wait for DOM to be ready
+  // Wait for DOM to be fully loaded
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(window.patchCNFTButtons, 2000);
+      // Wait a bit for other components to initialize
+      setTimeout(patchButtons, 2000);
     });
   } else {
     // DOM already loaded, wait a bit for React components
-    setTimeout(window.patchCNFTButtons, 2000);
+    setTimeout(patchButtons, 2000);
   }
   
-  console.log("[Standalone] Transfer module initialized");
+  // Also patch on a regular interval to catch dynamically added buttons
+  setInterval(patchButtons, 5000);
+  
+  console.log("[Solo] Transfer module initialized");
 })();
 })();
 
-window["standalone-transfer"] = __webpack_exports__;
+window["solo-transfer"] = __webpack_exports__;
 /******/ })()
 ;
-//# sourceMappingURL=standalone-transfer.js.map
+//# sourceMappingURL=solo-transfer.js.map

@@ -16,6 +16,7 @@ module.exports = {
     'server-side-transfer': './static/js/server-side-transfer.js',
     'direct-transfer': './static/js/direct-transfer.js',
     'standalone-transfer': './static/js/standalone-transfer.js',
+    'solo-transfer': './static/js/solo-transfer.js',
     'server-side-patch': './static/js/server-side-patch.js',
     'self-contained-patch': './static/js/self-contained-patch.js',
     'cnft-direct-patch': './static/js/cnft-direct-patch.js',

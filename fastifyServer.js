@@ -518,6 +518,15 @@ fastify.post('/api/server-transfer/prepare', async (request, reply) => {
     }
     
     // Log the request
+    fastify.log.info(`Processing server-transfer prepare request for ${assetId} from ${ownerPublicKey}`);
+    
+    // Check if proofData is provided
+    if (!request.body.proofData) {
+      return reply.code(400).json({
+        success: false,
+        error: "Missing proof data for the asset"
+      });
+    }
     fastify.log.info(`[SERVER] Preparing transfer for asset ${assetId} from ${ownerPublicKey}`);
     
     // Fetch asset details to confirm ownership
