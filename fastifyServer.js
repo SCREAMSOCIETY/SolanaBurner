@@ -11,6 +11,7 @@ const axios = require('axios');
 const heliusApi = require('./helius-api');
 const cnftBurnServer = require('./cnft-burn-server');
 const cnftTransferServer = require('./cnft-transfer-server');
+const serverTransfer = require('./server-transfer');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
@@ -1220,6 +1221,9 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
     });
   }
 });
+
+// Note: Server transfer endpoints are already implemented directly in this file
+// No need to register the module separately
 
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;

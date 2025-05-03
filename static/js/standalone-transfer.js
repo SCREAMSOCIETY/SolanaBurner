@@ -84,13 +84,39 @@
       
       // Create the transaction object, handling different web3.js imports
       let transaction;
-      if (window.solana && window.solana.Transaction) {
-        // Use the wallet's Transaction constructor if available
-        transaction = solana.Transaction.from(transactionBuffer);
-      } else {
-        // If Transaction isn't available in expected places, notify the user
-        console.error("[Standalone] Cannot find Transaction constructor");
-        throw new Error("Cannot access Solana Transaction class. Please try again or refresh the page.");
+      try {
+        // Try different approaches to get the Transaction constructor
+        if (window.solana && window.solana.Transaction) {
+          console.log("[Standalone] Using wallet.Transaction");
+          transaction = window.solana.Transaction.from(transactionBuffer);
+        } else if (window.solanaWeb3 && window.solanaWeb3.Transaction) {
+          console.log("[Standalone] Using solanaWeb3.Transaction");
+          transaction = window.solanaWeb3.Transaction.from(transactionBuffer);
+        } else if (window.SolanaWeb3JS && window.SolanaWeb3JS.Transaction) {
+          console.log("[Standalone] Using SolanaWeb3JS.Transaction");
+          transaction = window.SolanaWeb3JS.Transaction.from(transactionBuffer);
+        } else {
+          // Final fallback - try to reconstruct the transaction manually
+          console.log("[Standalone] Using manual transaction reconstruction");
+          
+          // Clone the transaction data using a simple object
+          const txData = JSON.parse(Buffer.from(transactionBuffer).toString());
+          
+          // If we have the wallet's signTransaction method but not Transaction class,
+          // we can create a minimal transaction object that the wallet can sign
+          transaction = {
+            serialize: function() {
+              return transactionBuffer;
+            },
+            signatures: [],
+            recentBlockhash: txData.recentBlockhash || "",
+            feePayer: new solana.PublicKey(ownerPublicKey),
+            instructions: txData.instructions || []
+          };
+        }
+      } catch (txError) {
+        console.error("[Standalone] Error creating transaction:", txError);
+        throw new Error("Transaction creation failed: " + txError.message);
       }
       
       // Sign the transaction
