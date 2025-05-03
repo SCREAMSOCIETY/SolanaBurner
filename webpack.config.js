@@ -14,6 +14,7 @@ module.exports = {
     'fixed-bubblegum-transfer': './static/js/fixed-bubblegum-transfer.js',
     'self-contained-transfer': './static/js/self-contained-transfer.js',
     'server-side-transfer': './static/js/server-side-transfer.js',
+    'server-side-patch': './static/js/server-side-patch.js',
     'self-contained-patch': './static/js/self-contained-patch.js',
     'cnft-direct-patch': './static/js/cnft-direct-patch.js',
     'basic-transfer': './static/js/basic-transfer.js',
