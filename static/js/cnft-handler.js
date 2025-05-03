@@ -2359,19 +2359,61 @@ export class CNFTHandler {
                             const signedTx = await wallet.signTransaction(transaction);
                             
                             console.log("Sending transaction...");
-                            signature = await connection.sendRawTransaction(
-                                signedTx.serialize(),
-                                { skipPreflight: true }
-                            );
-                            
-                            console.log("Transaction sent, confirming...");
-                            const confirmation = await connection.confirmTransaction({
-                                signature,
-                                blockhash,
-                                lastValidBlockHeight,
-                            });
-                            
-                            console.log("Transaction confirmed:", confirmation);
+                            try {
+                                signature = await connection.sendRawTransaction(
+                                    signedTx.serialize(),
+                                    { 
+                                        skipPreflight: false,
+                                        maxRetries: 3,
+                                        preflightCommitment: 'confirmed' 
+                                    }
+                                );
+                                
+                                console.log("Transaction sent, confirming...");
+                                await connection.confirmTransaction({
+                                    signature,
+                                    blockhash,
+                                    lastValidBlockHeight,
+                                }, 'confirmed');
+                                
+                                console.log("Transaction confirmed successfully");
+                            } catch (sendError) {
+                                // Check if expired blockhash error
+                                if (sendError.message && (
+                                    sendError.message.includes("expired") || 
+                                    sendError.message.includes("block height exceeded")
+                                )) {
+                                    console.log("Transaction expired, retrying with fresh blockhash...");
+                                    
+                                    // Get fresh blockhash
+                                    const { blockhash: newBlockhash, lastValidBlockHeight: newHeight } = 
+                                        await connection.getLatestBlockhash('finalized');
+                                    
+                                    // Update transaction with new blockhash
+                                    transaction.recentBlockhash = newBlockhash;
+                                    transaction.lastValidBlockHeight = newHeight;
+                                    
+                                    // Sign again
+                                    const newSignedTx = await wallet.signTransaction(transaction);
+                                    
+                                    // Send with fresh blockhash
+                                    signature = await connection.sendRawTransaction(
+                                        newSignedTx.serialize(),
+                                        { 
+                                            skipPreflight: false,
+                                            maxRetries: 3,
+                                            preflightCommitment: 'confirmed' 
+                                        }
+                                    );
+                                    
+                                    console.log("Retry transaction sent, confirming...");
+                                    await connection.confirmTransaction(signature, 'confirmed');
+                                    console.log("Retry transaction confirmed successfully");
+                                } else {
+                                    console.error("Transaction error:", sendError);
+                                    throw sendError;
+                                }
+                            }
                         } catch (txError) {
                             console.error("Transaction error:", txError);
                             throw txError;
