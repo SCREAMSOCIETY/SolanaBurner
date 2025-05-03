@@ -3,8 +3,8 @@
  * 
  * This module provides functionality to "hide" assets from the UI
  * without actually transferring or burning them on-chain.
- * It's used as a visual-only solution for cNFTs that can't be easily
- * transferred due to tree authority limitations.
+ * It's also used to hide successfully transferred cNFTs that might
+ * still appear in API results due to caching.
  */
 
 // Initialize hidden assets storage
@@ -38,6 +38,49 @@ window.HiddenAssets = {
             return true;
         } catch (error) {
             console.error('Error hiding asset:', error);
+            return false;
+        }
+    },
+    
+    /**
+     * Add an asset to the hidden assets list (alias for hideAsset)
+     * @param {string} assetId - The asset ID to add
+     */
+    addToHiddenAssets: function(assetId) {
+        return this.hideAsset(assetId, "Transferred Asset", "cNFT");
+    },
+    
+    /**
+     * Add multiple assets to the hidden assets list at once
+     * @param {string[]} assetIds - Array of asset IDs to add to hidden assets
+     */
+    addMultipleToHiddenAssets: function(assetIds) {
+        if (!Array.isArray(assetIds) || assetIds.length === 0) {
+            return false;
+        }
+        
+        try {
+            // Get existing hidden assets
+            const hiddenAssets = this.getHiddenAssets();
+            const now = new Date().toISOString();
+            
+            // Add each asset to the list
+            assetIds.forEach(assetId => {
+                hiddenAssets[assetId] = {
+                    id: assetId,
+                    name: "Transferred Asset",
+                    type: "cNFT",
+                    dateHidden: now
+                };
+            });
+            
+            // Save back to local storage
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(hiddenAssets));
+            
+            console.log(`Added ${assetIds.length} assets to hidden assets list`);
+            return true;
+        } catch (error) {
+            console.error('Error adding multiple assets to hidden list:', error);
             return false;
         }
     },

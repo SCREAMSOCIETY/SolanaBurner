@@ -2422,6 +2422,13 @@ export class CNFTHandler {
                     window.debugInfo.transferMethod = "bubblegum-explicit-proof";
                 }
                 
+                // Add the transferred cNFT to hidden assets list to prevent it from showing in UI
+                // even if the API still returns it in results (due to caching)
+                if (typeof window !== "undefined" && window.HiddenAssets) {
+                    console.log(`Adding ${assetId} to hidden assets list to handle API caching`);
+                    window.HiddenAssets.addToHiddenAssets(assetId);
+                }
+                
                 // Show success notification
                 if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                     const shortSig = result.signature.substring(0, 8) + "...";
