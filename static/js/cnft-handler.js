@@ -2312,41 +2312,78 @@ export class CNFTHandler {
                         console.log("Creating transfer instruction with tree:", merkleTree.toString());
                         console.log("Destination address:", newLeafOwner.toString());
                         
+                        // Create a manual native instruction for Bubblegum - don't use the Anchor-compatible wrapper
+                        // We'll implement a direct lower-level instruction instead
+                        
+                        const bubblegumProgramId = new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
+                        const noopProgramId = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+                        const compressionProgramId = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
+                        const tokenProgramId = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+                        
+                        // Create authority PDA
+                        const treeAuthority = getTreeAuthorityPDA(merkleTree);
+                        
+                        // Create log wrapper PDA
+                        const logWrapper = PublicKey.findProgramAddressSync(
+                            [Buffer.from("log_wrapper", "utf8")],
+                            noopProgramId
+                        )[0];
+                        
+                        // Create SPL token metadata program
+                        const metadataProgramId = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+                        
+                        // Define the accounts for the instruction
+                        const keys = [
+                            { pubkey: treeAuthority, isSigner: false, isWritable: true },
+                            { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+                            { pubkey: wallet.publicKey, isSigner: false, isWritable: false }, // Leaf delegate
+                            { pubkey: newLeafOwner, isSigner: false, isWritable: false },
+                            { pubkey: merkleTree, isSigner: false, isWritable: true },
+                            { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+                            { pubkey: compressionProgramId, isSigner: false, isWritable: false },
+                            { pubkey: logWrapper, isSigner: false, isWritable: false },
+                            { pubkey: metadataProgramId, isSigner: false, isWritable: false },
+                            // Add the root and proof nodes as remaining accounts
+                            { pubkey: new PublicKey(proofData.root), isSigner: false, isWritable: false },
+                            // Limit proof nodes to reduce transaction size (max 12 nodes)
+                            ...proofData.proof.slice(0, 12).map((node) => ({
+                                pubkey: new PublicKey(node),
+                                isSigner: false,
+                                isWritable: false,
+                            })),
+                        ];
+                        
+                        // Create native instruction data with correct byte layout
+                        // First byte is the instruction discriminator (3 = transfer)
+                        const data = Buffer.alloc(1 + 32 + 32 + 32 + 8 + 8);
+                        data.writeUint8(3, 0); // 3 = transfer instruction
+                        
+                        // Root (32 bytes)
+                        const rootBuffer = new PublicKey(proofData.root).toBuffer();
+                        rootBuffer.copy(data, 1);
+                        
+                        // Data hash (32 bytes)
+                        const dataHashBuffer = new PublicKey(proofData.data_hash || "11111111111111111111111111111111").toBuffer();
+                        dataHashBuffer.copy(data, 1 + 32);
+                        
+                        // Creator hash (32 bytes)
+                        const creatorHashBuffer = new PublicKey(proofData.creator_hash || "11111111111111111111111111111111").toBuffer();
+                        creatorHashBuffer.copy(data, 1 + 32 + 32);
+                        
+                        // Nonce (u64 little-endian - 8 bytes)
+                        data.writeBigUInt64LE(BigInt(proofData.leaf_id || 0), 1 + 32 + 32 + 32);
+                        
+                        // Index (u64 little-endian - 8 bytes)
+                        data.writeBigUInt64LE(BigInt(proofData.leaf_id || 0), 1 + 32 + 32 + 32 + 8);
+                        
+                        console.log("Native instruction data (hex):", data.toString('hex'));
+                        
                         // Create the transfer instruction
-                        const transferIx = createTransferInstruction(
-                            {
-                                merkleTree,
-                                treeAuthority: getTreeAuthorityPDA(merkleTree),
-                                leafOwner: wallet.publicKey,
-                                leafDelegate: wallet.publicKey,
-                                newLeafOwner,
-                                logWrapper: PublicKey.findProgramAddressSync(
-                                    [Buffer.from("log_wrapper", "utf8")],
-                                    new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV")
-                                )[0],
-                                compressionProgram: new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"),
-                                anchorRemainingAccounts: [
-                                    {
-                                        pubkey: new PublicKey(proofData.root),
-                                        isSigner: false,
-                                        isWritable: false,
-                                    },
-                                    // Limit proof nodes to reduce transaction size (max 12 nodes)
-                                    ...proofData.proof.slice(0, 12).map((node) => ({
-                                        pubkey: new PublicKey(node),
-                                        isSigner: false,
-                                        isWritable: false,
-                                    })),
-                                ],
-                            },
-                            {
-                                root: [...new PublicKey(proofData.root).toBytes()],
-                                dataHash: [...Buffer.from(proofData.data_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
-                                creatorHash: [...Buffer.from(proofData.creator_hash || "0000000000000000000000000000000000000000000000000000000000000000", "hex")],
-                                nonce: proofData.leaf_id || 0,
-                                index: proofData.leaf_id || 0,
-                            }
-                        );
+                        const transferIx = new TransactionInstruction({
+                            keys,
+                            programId: bubblegumProgramId,
+                            data
+                        });
                         
                         // Add the transfer instruction to the transaction
                         transaction.add(transferIx);
