@@ -1568,12 +1568,19 @@ export class CNFTHandler {
                 // Process assets individually as a fallback
                 const results = [];
                 let successCount = 0;
+                const successfulAssetIds = [];
                 
                 for (const { assetId } of assetsWithProofs) {
                     try {
                         const result = await this.transferCNFT(assetId, finalDestination);
                         if (result.success) {
                             successCount++;
+                            successfulAssetIds.push(assetId);
+                            
+                            // Add to hidden assets for immediate UI update (in case of Helius API caching)
+                            if (typeof window !== "undefined" && window.HiddenAssets) {
+                                window.HiddenAssets.addToHiddenAssets(assetId);
+                            }
                         }
                         results.push({ assetId, ...result });
                     } catch (individualError) {
@@ -1591,7 +1598,8 @@ export class CNFTHandler {
                     method: "individual-fallback",
                     results,
                     successCount,
-                    totalCount: assetsWithProofs.length
+                    totalCount: assetsWithProofs.length,
+                    processedAssets: successfulAssetIds // Add to match batch result format for consistency
                 };
             }
         } catch (error) {
@@ -1918,6 +1926,12 @@ export class CNFTHandler {
                                 window.debugInfo.transferMethod = "bubblegum";
                             }
                             
+                            // Add to hidden assets for immediate UI update (in case of Helius API caching)
+                            if (typeof window !== "undefined" && window.HiddenAssets) {
+                                window.HiddenAssets.addToHiddenAssets(assetId);
+                                console.log(`Asset ${assetId} added to hidden assets for immediate UI update`);
+                            }
+
                             // Show success notification
                             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                                 const shortSig = result.signature.substring(0, 8) + "...";
