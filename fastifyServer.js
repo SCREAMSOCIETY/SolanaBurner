@@ -708,6 +708,12 @@ fastify.get('/ultra', async (request, reply) => {
   return reply.sendFile('ultra-minimal.html');
 });
 
+// Route for working cNFT transfer implementation
+fastify.get('/working', async (request, reply) => {
+  fastify.log.info('Serving working cNFT transfer implementation');
+  return reply.sendFile('working-transfer.html');
+});
+
 // Import server-side cNFT handler
 const serverSideCnftHandler = require('./server-side-cnft-handler');
 

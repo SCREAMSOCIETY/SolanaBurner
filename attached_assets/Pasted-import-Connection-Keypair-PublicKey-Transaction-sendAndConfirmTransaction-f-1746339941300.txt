@@ -1,0 +1,98 @@
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
+import {
+  createTransferInstruction,
+  SPL_NOOP_PROGRAM_ID,
+} from "@metaplex-foundation/mpl-bubblegum";
+import fetch from "node-fetch";
+
+// CONFIG
+const HELIUS_API_KEY = "YOUR_HELIUS_API_KEY";
+const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+
+// Sender wallet
+const SENDER = Keypair.fromSecretKey(new Uint8Array([
+  // Replace with your secret key
+]));
+
+// Target address
+const RECEIVER = new PublicKey("EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK");
+
+async function getCnfts(publicKey: PublicKey) {
+  const url = `https://api.helius.xyz/v0/addresses/${publicKey.toBase58()}/assets?compressed=true&api-key=${HELIUS_API_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.items || [];
+}
+
+async function getProof(assetId: string) {
+  const url = `https://api.helius.xyz/v0/assets/${assetId}/proof?api-key=${HELIUS_API_KEY}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+async function transferCnft(proofData: any) {
+  const {
+    root,
+    proof,
+    node_index: index,
+    tree_id,
+    leaf_owner,
+    data_hash,
+    creator_hash,
+  } = proofData;
+
+  const merkleTree = new PublicKey(tree_id);
+  const bubblegumProgramId = new PublicKey("BGumxB2cUoR4nA4SwbUKyR6gJie6wApnYYqPbGVhHrCq");
+
+  const [treeAuthority] = await PublicKey.findProgramAddressSync(
+    [merkleTree.toBuffer()],
+    bubblegumProgramId
+  );
+
+  const ix = createTransferInstruction(
+    {
+      merkleTree,
+      treeAuthority,
+      leafOwner: new PublicKey(leaf_owner),
+      leafDelegate: new PublicKey(leaf_owner),
+      newLeafOwner: RECEIVER,
+      logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
+      noop: SPL_NOOP_PROGRAM_ID,
+    },
+    {
+      root: Buffer.from(root, "base64"),
+      dataHash: Buffer.from(data_hash, "base64"),
+      creatorHash: Buffer.from(creator_hash, "base64"),
+      index,
+      proof: proof.map((p: string) => Buffer.from(p, "base64")),
+    }
+  );
+
+  const tx = new Transaction().add(ix);
+  tx.feePayer = SENDER.publicKey;
+  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+  tx.sign(SENDER);
+
+  const sig = await sendAndConfirmTransaction(connection, tx, [SENDER]);
+  console.log("✅ cNFT sent! Transaction:", sig);
+}
+
+(async () => {
+  console.log("🔎 Fetching cNFTs...");
+  const cnfts = await getCnfts(SENDER.publicKey);
+  if (!cnfts.length) return console.error("❌ No cNFTs found!");
+
+  const firstCnft = cnfts[0];
+  console.log("📦 Using cNFT:", firstCnft.id);
+
+  const proof = await getProof(firstCnft.id);
+  console.log("🔏 Got Merkle proof, sending...");
+
+  await transferCnft(proof);
+})();
