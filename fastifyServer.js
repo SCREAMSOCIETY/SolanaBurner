@@ -720,6 +720,12 @@ fastify.get('/pure', async (request, reply) => {
   return reply.sendFile('pure-browser-transfer.html');
 });
 
+// Route for direct CLI-based cNFT transfer implementation
+fastify.get('/direct', async (request, reply) => {
+  fastify.log.info('Serving direct CLI-based cNFT transfer page');
+  return reply.sendFile('direct-cnft-transfer.html');
+});
+
 // Import server-side cNFT handler
 const serverSideCnftHandler = require('./server-side-cnft-handler');
 
@@ -745,6 +751,73 @@ fastify.post('/api/cnft/submit-transaction', async (request, reply) => {
     return reply.code(500).send({
       success: false,
       error: `Error submitting transaction: ${error.message}`
+    });
+  }
+});
+
+// New endpoint for direct CLI-based transfer
+fastify.post('/api/cnft/direct-transfer', async (request, reply) => {
+  try {
+    const { encoded_private_key, asset_id, destination_address } = request.body;
+    
+    if (!encoded_private_key || !asset_id) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Missing required parameters: encoded_private_key and asset_id are required'
+      });
+    }
+    
+    fastify.log.info(`Received direct-transfer request for asset ${asset_id}`);
+    
+    // Import required modules
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    
+    // Create command (don't log the private key!)
+    let command = `node cli-transfer-cnft.js "${encoded_private_key}" "${asset_id}"`;
+    
+    // Add destination address if provided
+    if (destination_address) {
+      command += ` "${destination_address}"`;
+    }
+    
+    fastify.log.info(`Executing CLI command for asset ${asset_id}`);
+    
+    // Execute the command
+    const { stdout, stderr } = await execPromise(command);
+    
+    if (stderr) {
+      fastify.log.error(`Command error: ${stderr}`);
+      return reply.code(500).send({
+        success: false,
+        error: stderr
+      });
+    }
+    
+    // Parse the output to find transaction signature
+    let signature = null;
+    const signatureMatch = stdout.match(/Transaction Signature: ([a-zA-Z0-9]+)/);
+    if (signatureMatch && signatureMatch[1]) {
+      signature = signatureMatch[1];
+    }
+    
+    // Check for success message
+    const success = stdout.includes('Successfully transferred cNFT');
+    
+    fastify.log.info(`CLI command completed with success=${success}`);
+    
+    return {
+      success,
+      output: stdout,
+      signature,
+      explorerUrl: signature ? `https://solscan.io/tx/${signature}` : null
+    };
+  } catch (error) {
+    fastify.log.error(`Error in direct-transfer endpoint: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Error with direct transfer: ${error.message}`
     });
   }
 });

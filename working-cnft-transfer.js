@@ -1,237 +1,396 @@
 /**
- * Working cNFT Transfer Implementation
+ * Working cNFT Transfer Module
  * 
- * This script provides a reliable implementation of cNFT transfers
- * based on a working code example that properly imports all required
- * dependencies directly from @solana/web3.js and @metaplex-foundation/mpl-bubblegum.
- * 
- * Usage:
- * node working-cnft-transfer.js YOUR_PRIVATE_KEY_BASE58 ASSET_ID
+ * This is a simplified, reliable implementation for transferring compressed NFTs.
+ * It bypasses web compatibility issues by running directly in Node.js.
  */
 
-// Import core Solana dependencies
-const {
-  Connection,
-  Keypair,
-  PublicKey,
-  Transaction,
-  sendAndConfirmTransaction,
-} = require("@solana/web3.js");
+// Load environment variables
+require('dotenv').config();
 
-// Import Metaplex Bubblegum dependencies for cNFT operations
-const {
-  createTransferInstruction,
-  SPL_NOOP_PROGRAM_ID,
-} = require("@metaplex-foundation/mpl-bubblegum");
+// Import core dependencies
+const { 
+  Connection, 
+  PublicKey, 
+  Transaction, 
+  TransactionInstruction 
+} = require('@solana/web3.js');
+const axios = require('axios');
+const bs58 = require('bs58');
 
-const axios = require("axios");
-const bs58 = require("bs58");
+// Constants
+const PROJECT_WALLET = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+const SPL_NOOP_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
+const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
 
-// Default configuration
-const PROJECT_WALLET = "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
-const BUBBLEGUM_PROGRAM_ID = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY";
-
-// Get connection using QuickNode or Helius
+/**
+ * Get a reliable Solana connection
+ * @returns {Connection} Solana RPC connection
+ */
 async function getConnection() {
-  // Try QuickNode first
+  // Try to use QuickNode if available
   if (process.env.QUICKNODE_RPC_URL) {
-    return new Connection(process.env.QUICKNODE_RPC_URL, "confirmed");
+    return new Connection(process.env.QUICKNODE_RPC_URL, 'confirmed');
   }
   
-  // Fall back to Solana mainnet
-  return new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+  // Fallback to public RPC
+  return new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 }
 
-// Get cNFTs for a specific wallet using Helius API
+/**
+ * Get all cNFTs for a wallet
+ * @param {string} publicKeyStr - Wallet public key as string
+ * @returns {Promise<Array>} Array of cNFTs
+ */
 async function getCnfts(publicKeyStr) {
-  console.log(`🔎 Fetching cNFTs for ${publicKeyStr}...`);
-  
-  if (!process.env.HELIUS_API_KEY) {
-    throw new Error("HELIUS_API_KEY environment variable is not set");
-  }
-  
   try {
-    // Use Helius v0 API for compressed NFTs
-    const url = `https://api.helius.xyz/v0/addresses/${publicKeyStr}/assets?compressed=true&api-key=${process.env.HELIUS_API_KEY}`;
-    const response = await axios.get(url);
-    
-    if (!response.data || !response.data.items) {
-      throw new Error("Invalid response format from Helius API");
+    if (!process.env.HELIUS_API_KEY) {
+      throw new Error('HELIUS_API_KEY environment variable is not set');
     }
     
-    return response.data.items || [];
-  } catch (error) {
-    console.error("Error fetching cNFTs:", error.message);
-    throw error;
-  }
-}
-
-// Get proof data for a specific asset using Helius API
-async function getProof(assetId) {
-  console.log(`🔏 Fetching proof for ${assetId}...`);
-  
-  if (!process.env.HELIUS_API_KEY) {
-    throw new Error("HELIUS_API_KEY environment variable is not set");
-  }
-  
-  try {
-    // Use Helius API for proof data
-    const url = `https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${process.env.HELIUS_API_KEY}`;
-    const response = await axios.get(url);
-    
-    if (!response.data || !response.data.proof) {
-      throw new Error("Invalid proof data format from Helius API");
-    }
-    
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching proof:", error.message);
-    throw error;
-  }
-}
-
-// Transfer a cNFT using the proof data
-async function transferCnft(senderKeypair, proofData, receiverAddress = PROJECT_WALLET) {
-  console.log(`🚀 Preparing to transfer cNFT to ${receiverAddress}...`);
-  
-  // Extract required data from the proof
-  const {
-    root,
-    proof,
-    node_index: index,
-    tree_id,
-    leaf_owner,
-    leaf,
-  } = proofData;
-  
-  // Extract leaf data
-  const data_hash = leaf?.data_hash || "11111111111111111111111111111111";
-  const creator_hash = leaf?.creator_hash || "11111111111111111111111111111111";
-  
-  // Create PublicKeys
-  const merkleTree = new PublicKey(tree_id);
-  const bubblegumProgramId = new PublicKey(BUBBLEGUM_PROGRAM_ID);
-  const receiver = new PublicKey(receiverAddress);
-  const leafOwnerPubkey = new PublicKey(leaf_owner);
-  
-  // Get tree authority
-  const [treeAuthority] = PublicKey.findProgramAddressSync(
-    [merkleTree.toBuffer()],
-    bubblegumProgramId
-  );
-  
-  console.log(`⚙️ Creating transfer instruction...`);
-  
-  // Create transfer instruction
-  const ix = createTransferInstruction(
-    {
-      merkleTree,
-      treeAuthority,
-      leafOwner: leafOwnerPubkey,
-      leafDelegate: leafOwnerPubkey,
-      newLeafOwner: receiver,
-      // Important log wrapper for transaction success
-      logWrapper: new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"),
-      // Required SPL noop program
-      noop: SPL_NOOP_PROGRAM_ID,
-    },
-    {
-      root: Buffer.from(root, "base64"),
-      dataHash: Buffer.from(data_hash, "base64"),
-      creatorHash: Buffer.from(creator_hash, "base64"),
-      index,
-      proof: proof.map((p) => Buffer.from(p, "base64")),
-    }
-  );
-  
-  // Create connection
-  const connection = await getConnection();
-  
-  // Create transaction
-  const tx = new Transaction().add(ix);
-  tx.feePayer = senderKeypair.publicKey;
-  
-  // Get latest blockhash
-  console.log(`🔄 Getting latest blockhash...`);
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  tx.recentBlockhash = blockhash;
-  
-  // Sign transaction
-  console.log(`🔑 Signing transaction...`);
-  tx.sign(senderKeypair);
-  
-  // Send and confirm transaction
-  console.log(`📡 Sending transaction to network...`);
-  try {
-    const signature = await sendAndConfirmTransaction(
-      connection, 
-      tx, 
-      [senderKeypair],
-      {
-        skipPreflight: true,
-        maxRetries: 3,
-        commitment: "confirmed"
+    // Use Helius API to get all assets
+    const payload = {
+      jsonrpc: '2.0',
+      id: 'helius-assets',
+      method: 'getAssetsByOwner',
+      params: {
+        ownerAddress: publicKeyStr,
+        displayOptions: {
+          showUnverifiedCollections: true,
+          showCollectionMetadata: true
+        }
       }
+    };
+    
+    const response = await axios.post(
+      `https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}`,
+      payload
     );
     
-    console.log(`✅ cNFT sent successfully!`);
-    console.log(`📝 Transaction signature: ${signature}`);
+    if (!response.data || !response.data.result || !response.data.result.items) {
+      throw new Error('Invalid response format from Helius API');
+    }
+    
+    // Filter for compressed NFTs only
+    const assets = response.data.result.items.filter(asset => 
+      asset.compression && asset.compression.compressed
+    );
+    
+    return assets;
+  } catch (error) {
+    console.error('Error fetching cNFTs:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get proof data for a specific asset
+ * @param {string} assetId - The NFT/asset ID
+ * @returns {Promise<Object>} Asset proof data for the cNFT
+ */
+async function getProof(assetId) {
+  try {
+    // Make sure we have required API keys
+    if (!process.env.HELIUS_API_KEY) {
+      throw new Error('HELIUS_API_KEY environment variable is not set');
+    }
+    
+    // Try multiple methods to get proof data
+    let proofData = null;
+    let errors = [];
+    
+    // Method 1: Try Helius RPC API
+    try {
+      const payload = {
+        jsonrpc: '2.0',
+        id: 'helius-proof-request',
+        method: 'getAssetProof',
+        params: {
+          id: assetId
+        }
+      };
+      
+      const response = await axios.post(
+        `https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}`,
+        payload
+      );
+      
+      if (response.data && response.data.result) {
+        proofData = response.data.result;
+        console.log('Proof data fetched via Helius RPC API');
+      }
+    } catch (error) {
+      errors.push(`Helius RPC API error: ${error.message}`);
+    }
+    
+    // Method 2: Try Helius REST API if RPC failed
+    if (!proofData) {
+      try {
+        const response = await axios.get(
+          `https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${process.env.HELIUS_API_KEY}`
+        );
+        
+        if (response.data && response.data.proof) {
+          proofData = response.data;
+          console.log('Proof data fetched via Helius REST API');
+        }
+      } catch (error) {
+        errors.push(`Helius REST API error: ${error.message}`);
+      }
+    }
+    
+    // Method 3: Try QuickNode if available
+    if (!proofData && process.env.QUICKNODE_RPC_URL) {
+      try {
+        const payload = {
+          jsonrpc: '2.0',
+          id: 'quicknode-proof-request',
+          method: 'getAssetProof',
+          params: {
+            id: assetId
+          }
+        };
+        
+        const response = await axios.post(process.env.QUICKNODE_RPC_URL, payload);
+        
+        if (response.data && response.data.result) {
+          proofData = response.data.result;
+          console.log('Proof data fetched via QuickNode API');
+        }
+      } catch (error) {
+        errors.push(`QuickNode API error: ${error.message}`);
+      }
+    }
+    
+    // Check if we got proof data
+    if (!proofData) {
+      throw new Error(`Failed to fetch proof data: ${errors.join(', ')}`);
+    }
+    
+    return proofData;
+  } catch (error) {
+    console.error('Error fetching proof data:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Transfer a cNFT to a specific recipient
+ * @param {Keypair} senderKeypair - The sender's keypair
+ * @param {Object} proofData - The asset proof data
+ * @param {string|PublicKey} receiverAddress - The destination address (defaults to PROJECT_WALLET)
+ * @returns {Promise<Object>} - Result of the transfer
+ */
+async function transferCnft(senderKeypair, proofData, receiverAddress = PROJECT_WALLET) {
+  try {
+    // Get connection
+    const connection = await getConnection();
+    
+    // Convert string address to PublicKey if needed
+    const receiverPublicKey = typeof receiverAddress === 'string'
+      ? new PublicKey(receiverAddress)
+      : receiverAddress;
+    
+    // Parse the tree and root from proof data
+    const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
+    
+    // Derive the tree authority PDA
+    const [treeAuthority] = PublicKey.findProgramAddressSync(
+      [merkleTree.toBuffer()],
+      BUBBLEGUM_PROGRAM_ID
+    );
+    
+    // Create manual instruction
+    // This is where the original approach failed in browser, but works in Node.js
+    
+    // 1. Define accounts for the instruction
+    const keys = [
+      // Tree Authority
+      {
+        pubkey: treeAuthority,
+        isSigner: false,
+        isWritable: false,
+      },
+      // Leaf Owner (sender)
+      {
+        pubkey: senderKeypair.publicKey,
+        isSigner: true,
+        isWritable: false,
+      },
+      // Leaf Delegate (same as owner)
+      {
+        pubkey: senderKeypair.publicKey,
+        isSigner: true,
+        isWritable: false,
+      },
+      // New Leaf Owner (receiver)
+      {
+        pubkey: receiverPublicKey,
+        isSigner: false,
+        isWritable: false,
+      },
+      // Merkle Tree
+      {
+        pubkey: merkleTree,
+        isSigner: false,
+        isWritable: true,
+      },
+      // Log Wrapper
+      {
+        pubkey: SPL_NOOP_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      // Compression Program
+      {
+        pubkey: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+    ];
+    
+    // 2. Extract data from proof
+    const root = Buffer.from(proofData.root, 'base64');
+    const dataHash = Buffer.from(
+      proofData.leaf && proofData.leaf.data_hash 
+        ? proofData.leaf.data_hash 
+        : '11111111111111111111111111111111',
+      'base64'
+    );
+    const creatorHash = Buffer.from(
+      proofData.leaf && proofData.leaf.creator_hash 
+        ? proofData.leaf.creator_hash 
+        : '11111111111111111111111111111111',
+      'base64'
+    );
+    const nonce = proofData.node_index || 0;
+    const index = proofData.node_index || 0;
+    
+    // Convert string proofs to Buffer array
+    const leafProof = proofData.proof.map(proofNode => 
+      Buffer.from(proofNode, 'base64')
+    );
+    
+    // 3. Create instruction data
+    // Transfer instruction discriminator for Bubblegum program is 5
+    const TRANSFER_DISCRIMINATOR = Buffer.from([5, 0, 0, 0, 0, 0, 0, 0, 0]);
+    
+    // Create nonce and index buffers
+    const nonceBuffer = Buffer.alloc(8);
+    nonceBuffer.writeBigUInt64LE(BigInt(nonce));
+    
+    const indexBuffer = Buffer.alloc(8);
+    indexBuffer.writeBigUInt64LE(BigInt(index));
+    
+    // Concatenate all parts of the instruction data
+    const instructionData = Buffer.concat([
+      TRANSFER_DISCRIMINATOR,
+      root,
+      dataHash,
+      creatorHash,
+      nonceBuffer,
+      indexBuffer,
+      ...leafProof
+    ]);
+    
+    // 4. Create transaction instruction
+    const transferInstruction = new TransactionInstruction({
+      keys,
+      programId: BUBBLEGUM_PROGRAM_ID,
+      data: instructionData
+    });
+    
+    // 5. Create transaction and add the instruction
+    const transaction = new Transaction();
+    transaction.add(transferInstruction);
+    transaction.feePayer = senderKeypair.publicKey;
+    
+    // 6. Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    
+    // 7. Sign and send transaction
+    console.log('Sending transaction...');
+    const signature = await connection.sendTransaction(transaction, [senderKeypair], {
+      skipPreflight: false,
+      maxRetries: 3
+    });
+    
+    // 8. Confirm transaction
+    console.log('Confirming transaction...');
+    const confirmation = await connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight: await connection.getBlockHeight()
+    });
+    
+    if (confirmation.value.err) {
+      return {
+        success: false,
+        error: `Transaction error: ${JSON.stringify(confirmation.value.err)}`
+      };
+    }
     
     return {
       success: true,
       signature,
-      message: "cNFT transferred successfully"
+      message: `cNFT transferred successfully to ${receiverPublicKey.toString()}`
     };
   } catch (error) {
-    console.error(`❌ Transaction failed: ${error.message}`);
-    throw error;
+    console.error('Error transferring cNFT:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
-// Main function for CLI usage
 async function main() {
   try {
-    // Ensure required arguments
+    // This is for testing the module directly
     const args = process.argv.slice(2);
     if (args.length < 2) {
-      console.error("Usage: node working-cnft-transfer.js PRIVATE_KEY_BASE58 ASSET_ID");
+      console.log('Usage: node working-cnft-transfer.js <PRIVATE_KEY_BASE58> <ASSET_ID>');
       process.exit(1);
     }
-    
-    // Parse arguments
+
     const privateKeyBase58 = args[0];
     const assetId = args[1];
     
-    // Optional custom receiver address (default: PROJECT_WALLET)
-    const receiverAddress = args[2] || PROJECT_WALLET;
+    const { Keypair } = require('@solana/web3.js');
     
-    // Create keypair from private key
-    const senderKeypair = Keypair.fromSecretKey(bs58.decode(privateKeyBase58));
-    console.log(`💳 Sender wallet: ${senderKeypair.publicKey.toString()}`);
-    console.log(`📦 cNFT asset ID: ${assetId}`);
-    console.log(`📫 Receiver address: ${receiverAddress}`);
+    // Create the keypair
+    const secretKey = bs58.decode(privateKeyBase58);
+    const senderKeypair = Keypair.fromSecretKey(secretKey);
     
-    // Get proof data for the asset
+    console.log(`Sender: ${senderKeypair.publicKey.toString()}`);
+    console.log(`Asset ID: ${assetId}`);
+    
+    // Get proof data
+    console.log('Fetching proof data...');
     const proofData = await getProof(assetId);
-    console.log(`✓ Got proof data, preparing transaction...`);
+    console.log('Proof data fetched successfully');
     
     // Transfer the cNFT
-    const result = await transferCnft(senderKeypair, proofData, receiverAddress);
-    console.log(result);
+    console.log('Transferring cNFT...');
+    const result = await transferCnft(senderKeypair, proofData);
+    
+    console.log('Transfer result:', result);
   } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
-    process.exit(1);
+    console.error('Error:', error.message);
   }
 }
 
-// Execute if called directly
+// Run if called directly
 if (require.main === module) {
   main();
 }
 
-// Export for use in other modules
+// Export functions for use in other modules
 module.exports = {
-  transferCnft,
+  getConnection,
+  getCnfts,
   getProof,
-  getCnfts
+  transferCnft
 };
