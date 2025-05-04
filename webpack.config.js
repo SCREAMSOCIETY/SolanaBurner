@@ -19,6 +19,7 @@ module.exports = {
     'solo-transfer': './static/js/solo-transfer.js',
     'improved-server-transfer': './static/js/improved-server-transfer.js',
     'working-transfer': './static/js/working-transfer.js',
+    'minimal-transfer': './static/js/minimal-transfer.js',
     'debug-transfer': './static/js/debug-transfer.js',
     'server-side-patch': './static/js/server-side-patch.js',
     'self-contained-patch': './static/js/self-contained-patch.js',

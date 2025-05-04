@@ -261,6 +261,9 @@ const createTree = async (context, input) => {
     const space = input.merkleTreeSize ??
         (0, hooked_1.getMerkleTreeSize)(input.maxDepth, input.maxBufferSize, input.canopyDepth);
     const lamports = await context.rpc.getRent(space);
+    const programId = input.compressionProgram
+        ? (0, umi_1.publicKey)(input.compressionProgram)
+        : context.programs.getPublicKey('splAccountCompression', generated_1.SPL_ACCOUNT_COMPRESSION_PROGRAM_ID);
     return ((0, umi_1.transactionBuilder)()
         // Create the empty Merkle tree account.
         .add((0, mpl_toolbox_1.createAccount)(context, {
@@ -268,7 +271,7 @@ const createTree = async (context, input) => {
         newAccount: input.merkleTree,
         lamports,
         space,
-        programId: context.programs.getPublicKey('splAccountCompression', generated_1.SPL_ACCOUNT_COMPRESSION_PROGRAM_ID),
+        programId,
     }))
         // Create the tree config.
         .add((0, generated_1.createTreeConfig)(context, {
@@ -4707,6 +4710,48 @@ exports.getAssetWithProof = getAssetWithProof;
 
 /***/ }),
 
+/***/ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/getCompressionPrograms.js":
+/*!********************************************************************************************!*\
+  !*** ./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/getCompressionPrograms.js ***!
+  \********************************************************************************************/
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getCompressionPrograms = exports.MPL_NOOP_PROGRAM_ID = exports.MPL_ACCOUNT_COMPRESSION_PROGRAM_ID = void 0;
+const generated_1 = __webpack_require__(/*! ./generated */ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/generated/index.js");
+exports.MPL_ACCOUNT_COMPRESSION_PROGRAM_ID = 'mcmt6YrQEMKw8Mw43FmpRLmf7BqRnFMKmAcbxE3xkAW';
+exports.MPL_NOOP_PROGRAM_ID = 'mnoopTCrg4p8ry25e4bcWA9XZjbNjMTfgYVGGEdRsf3';
+// Constants for known genesis blockhashes on Solana.
+const SOLANA_MAINNET_GENESIS_HASH = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
+const SOLANA_DEVNET_GENESIS_HASH = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
+const SOLANA_TESTNET_GENESIS_HASH = '4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY';
+async function getCompressionPrograms(context) {
+    const genesisHash = await context.rpc.call('getGenesisHash');
+    // Determine if the genesis hash matches known clusters.
+    const isSolanaCluster = [
+        SOLANA_MAINNET_GENESIS_HASH,
+        SOLANA_DEVNET_GENESIS_HASH,
+        SOLANA_TESTNET_GENESIS_HASH,
+    ].includes(genesisHash);
+    // Return appropriate program IDs based on the cluster.
+    if (isSolanaCluster) {
+        return {
+            logWrapper: generated_1.SPL_NOOP_PROGRAM_ID,
+            compressionProgram: generated_1.SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        };
+    }
+    return {
+        logWrapper: exports.MPL_NOOP_PROGRAM_ID,
+        compressionProgram: exports.MPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+    };
+}
+exports.getCompressionPrograms = getCompressionPrograms;
+//# sourceMappingURL=getCompressionPrograms.js.map
+
+/***/ }),
+
 /***/ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/hash.js":
 /*!**************************************************************************!*\
   !*** ./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/hash.js ***!
@@ -5012,6 +5057,7 @@ __exportStar(__webpack_require__(/*! ./hooked */ "./node_modules/@metaplex-found
 __exportStar(__webpack_require__(/*! ./leafAssetId */ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/leafAssetId.js"), exports);
 __exportStar(__webpack_require__(/*! ./merkle */ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/merkle.js"), exports);
 __exportStar(__webpack_require__(/*! ./plugin */ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/plugin.js"), exports);
+__exportStar(__webpack_require__(/*! ./getCompressionPrograms */ "./node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/getCompressionPrograms.js"), exports);
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -48055,20 +48101,20 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   sendAndConfirmTransaction: () => (/* binding */ sendAndConfirmTransaction)
 /* harmony export */ });
 /* harmony import */ var buffer__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! buffer */ "./node_modules/buffer/index.js");
-/* harmony import */ var _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @noble/curves/ed25519 */ "./node_modules/@noble/curves/esm/ed25519.js");
+/* harmony import */ var _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @noble/curves/ed25519 */ "./node_modules/@noble/curves/esm/ed25519.js");
 /* harmony import */ var bn_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! bn.js */ "./node_modules/bn.js/lib/bn.js");
 /* harmony import */ var bn_js__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(bn_js__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony import */ var bs58__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! bs58 */ "./node_modules/@solana/web3.js/node_modules/bs58/index.js");
 /* harmony import */ var bs58__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(bs58__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony import */ var _noble_hashes_sha256__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @noble/hashes/sha256 */ "./node_modules/@noble/hashes/esm/sha256.js");
+/* harmony import */ var _noble_hashes_sha256__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @noble/hashes/sha256 */ "./node_modules/@noble/hashes/esm/sha256.js");
 /* harmony import */ var borsh__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! borsh */ "./node_modules/borsh/lib/index.js");
 /* harmony import */ var borsh__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(borsh__WEBPACK_IMPORTED_MODULE_3__);
 /* harmony import */ var _solana_buffer_layout__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @solana/buffer-layout */ "./node_modules/@solana/buffer-layout/lib/Layout.js");
-/* harmony import */ var bigint_buffer__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! bigint-buffer */ "./node_modules/bigint-buffer/dist/browser.js");
+/* harmony import */ var _solana_codecs_numbers__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @solana/codecs-numbers */ "./node_modules/@solana/web3.js/node_modules/@solana/codecs-numbers/dist/index.browser.mjs");
 /* harmony import */ var superstruct__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! superstruct */ "./node_modules/superstruct/dist/index.mjs");
-/* harmony import */ var jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! jayson/lib/client/browser */ "./node_modules/jayson/lib/client/browser/index.js");
-/* harmony import */ var jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_6__);
-/* harmony import */ var rpc_websockets__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! rpc-websockets */ "./node_modules/rpc-websockets/dist/index.browser.mjs");
+/* harmony import */ var jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! jayson/lib/client/browser */ "./node_modules/jayson/lib/client/browser/index.js");
+/* harmony import */ var jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var rpc_websockets__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rpc-websockets */ "./node_modules/rpc-websockets/dist/index.browser.mjs");
 /* harmony import */ var _noble_hashes_sha3__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @noble/hashes/sha3 */ "./node_modules/@noble/hashes/esm/sha3.js");
 /* harmony import */ var _noble_curves_secp256k1__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @noble/curves/secp256k1 */ "./node_modules/@noble/curves/esm/secp256k1.js");
 
@@ -48096,9 +48142,9 @@ __webpack_require__.r(__webpack_exports__);
  * Ed25519 Keypair
  */
 
-const generatePrivateKey = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__.ed25519.utils.randomPrivateKey;
+const generatePrivateKey = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__.ed25519.utils.randomPrivateKey;
 const generateKeypair = () => {
-  const privateScalar = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__.ed25519.utils.randomPrivateKey();
+  const privateScalar = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__.ed25519.utils.randomPrivateKey();
   const publicKey = getPublicKey(privateScalar);
   const secretKey = new Uint8Array(64);
   secretKey.set(privateScalar);
@@ -48108,17 +48154,17 @@ const generateKeypair = () => {
     secretKey
   };
 };
-const getPublicKey = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__.ed25519.getPublicKey;
+const getPublicKey = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__.ed25519.getPublicKey;
 function isOnCurve(publicKey) {
   try {
-    _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__.ed25519.ExtendedPoint.fromHex(publicKey);
+    _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__.ed25519.ExtendedPoint.fromHex(publicKey);
     return true;
   } catch {
     return false;
   }
 }
-const sign = (message, secretKey) => _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__.ed25519.sign(message, secretKey.slice(0, 32));
-const verify = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_8__.ed25519.verify;
+const sign = (message, secretKey) => _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__.ed25519.sign(message, secretKey.slice(0, 32));
+const verify = _noble_curves_ed25519__WEBPACK_IMPORTED_MODULE_7__.ed25519.verify;
 
 const toBuffer = arr => {
   if (buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.isBuffer(arr)) {
@@ -48290,7 +48336,7 @@ class PublicKey extends Struct {
   /* eslint-disable require-await */
   static async createWithSeed(fromPublicKey, seed, programId) {
     const buffer = buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.concat([fromPublicKey.toBuffer(), buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.from(seed), programId.toBuffer()]);
-    const publicKeyBytes = (0,_noble_hashes_sha256__WEBPACK_IMPORTED_MODULE_9__.sha256)(buffer);
+    const publicKeyBytes = (0,_noble_hashes_sha256__WEBPACK_IMPORTED_MODULE_8__.sha256)(buffer);
     return new PublicKey(publicKeyBytes);
   }
 
@@ -48307,7 +48353,7 @@ class PublicKey extends Struct {
       buffer = buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.concat([buffer, toBuffer(seed)]);
     });
     buffer = buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.concat([buffer, programId.toBuffer(), buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.from('ProgramDerivedAddress')]);
-    const publicKeyBytes = (0,_noble_hashes_sha256__WEBPACK_IMPORTED_MODULE_9__.sha256)(buffer);
+    const publicKeyBytes = (0,_noble_hashes_sha256__WEBPACK_IMPORTED_MODULE_8__.sha256)(buffer);
     if (isOnCurve(publicKeyBytes)) {
       throw new Error(`Invalid seeds, address must fall off the curve`);
     }
@@ -50446,32 +50492,22 @@ class NonceAccount {
   }
 }
 
-const encodeDecode = layout => {
+function u64(property) {
+  const layout = (0,_solana_buffer_layout__WEBPACK_IMPORTED_MODULE_4__.blob)(8 /* bytes */, property);
   const decode = layout.decode.bind(layout);
   const encode = layout.encode.bind(layout);
-  return {
-    decode,
-    encode
-  };
-};
-const bigInt = length => property => {
-  const layout = (0,_solana_buffer_layout__WEBPACK_IMPORTED_MODULE_4__.blob)(length, property);
-  const {
-    encode,
-    decode
-  } = encodeDecode(layout);
   const bigIntLayout = layout;
+  const codec = (0,_solana_codecs_numbers__WEBPACK_IMPORTED_MODULE_9__.getU64Codec)();
   bigIntLayout.decode = (buffer, offset) => {
     const src = decode(buffer, offset);
-    return (0,bigint_buffer__WEBPACK_IMPORTED_MODULE_5__.toBigIntLE)(buffer__WEBPACK_IMPORTED_MODULE_0__.Buffer.from(src));
+    return codec.decode(src);
   };
   bigIntLayout.encode = (bigInt, buffer, offset) => {
-    const src = (0,bigint_buffer__WEBPACK_IMPORTED_MODULE_5__.toBufferLE)(bigInt, length);
+    const src = codec.encode(bigInt);
     return encode(src, buffer, offset);
   };
   return bigIntLayout;
-};
-const u64 = bigInt(8);
+}
 
 /**
  * Create account system transaction params
@@ -51612,10 +51648,10 @@ class EpochSchedule {
 
 var fetchImpl = globalThis.fetch;
 
-class RpcWebSocketClient extends rpc_websockets__WEBPACK_IMPORTED_MODULE_7__.CommonClient {
+class RpcWebSocketClient extends rpc_websockets__WEBPACK_IMPORTED_MODULE_6__.CommonClient {
   constructor(address, options, generate_request_id) {
     const webSocketFactory = url => {
-      const rpc = (0,rpc_websockets__WEBPACK_IMPORTED_MODULE_7__.WebSocket)(url, {
+      const rpc = (0,rpc_websockets__WEBPACK_IMPORTED_MODULE_6__.WebSocket)(url, {
         autoconnect: true,
         max_reconnects: 5,
         reconnect: true,
@@ -52349,7 +52385,7 @@ function createRpcClient(url, httpHeaders, customFetch, fetchMiddleware, disable
       return await fetch(...modifiedFetchArgs);
     };
   }
-  const clientBrowser = new (jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_6___default())(async (request, callback) => {
+  const clientBrowser = new (jayson_lib_client_browser__WEBPACK_IMPORTED_MODULE_5___default())(async (request, callback) => {
     const options = {
       method: 'POST',
       body: request,
@@ -56470,7 +56506,7 @@ class AddressLookupTableProgram {
    */
   constructor() {}
   static createLookupTable(params) {
-    const [lookupTableAddress, bumpSeed] = PublicKey.findProgramAddressSync([params.authority.toBuffer(), (0,bigint_buffer__WEBPACK_IMPORTED_MODULE_5__.toBufferLE)(BigInt(params.recentSlot), 8)], this.programId);
+    const [lookupTableAddress, bumpSeed] = PublicKey.findProgramAddressSync([params.authority.toBuffer(), (0,_solana_codecs_numbers__WEBPACK_IMPORTED_MODULE_9__.getU64Encoder)().encode(params.recentSlot)], this.programId);
     const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CreateLookupTable;
     const data = encodeData(type, {
       recentSlot: BigInt(params.recentSlot),
@@ -58546,6 +58582,1958 @@ const LAMPORTS_PER_SOL = 1000000000;
 
 /***/ }),
 
+/***/ "./node_modules/@solana/web3.js/node_modules/@solana/codecs-core/dist/index.browser.mjs":
+/*!**********************************************************************************************!*\
+  !*** ./node_modules/@solana/web3.js/node_modules/@solana/codecs-core/dist/index.browser.mjs ***!
+  \**********************************************************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   addCodecSentinel: () => (/* binding */ addCodecSentinel),
+/* harmony export */   addCodecSizePrefix: () => (/* binding */ addCodecSizePrefix),
+/* harmony export */   addDecoderSentinel: () => (/* binding */ addDecoderSentinel),
+/* harmony export */   addDecoderSizePrefix: () => (/* binding */ addDecoderSizePrefix),
+/* harmony export */   addEncoderSentinel: () => (/* binding */ addEncoderSentinel),
+/* harmony export */   addEncoderSizePrefix: () => (/* binding */ addEncoderSizePrefix),
+/* harmony export */   assertByteArrayHasEnoughBytesForCodec: () => (/* binding */ assertByteArrayHasEnoughBytesForCodec),
+/* harmony export */   assertByteArrayIsNotEmptyForCodec: () => (/* binding */ assertByteArrayIsNotEmptyForCodec),
+/* harmony export */   assertByteArrayOffsetIsNotOutOfRange: () => (/* binding */ assertByteArrayOffsetIsNotOutOfRange),
+/* harmony export */   assertIsFixedSize: () => (/* binding */ assertIsFixedSize),
+/* harmony export */   assertIsVariableSize: () => (/* binding */ assertIsVariableSize),
+/* harmony export */   combineCodec: () => (/* binding */ combineCodec),
+/* harmony export */   containsBytes: () => (/* binding */ containsBytes),
+/* harmony export */   createCodec: () => (/* binding */ createCodec),
+/* harmony export */   createDecoder: () => (/* binding */ createDecoder),
+/* harmony export */   createEncoder: () => (/* binding */ createEncoder),
+/* harmony export */   fixBytes: () => (/* binding */ fixBytes),
+/* harmony export */   fixCodecSize: () => (/* binding */ fixCodecSize),
+/* harmony export */   fixDecoderSize: () => (/* binding */ fixDecoderSize),
+/* harmony export */   fixEncoderSize: () => (/* binding */ fixEncoderSize),
+/* harmony export */   getEncodedSize: () => (/* binding */ getEncodedSize),
+/* harmony export */   isFixedSize: () => (/* binding */ isFixedSize),
+/* harmony export */   isVariableSize: () => (/* binding */ isVariableSize),
+/* harmony export */   mergeBytes: () => (/* binding */ mergeBytes),
+/* harmony export */   offsetCodec: () => (/* binding */ offsetCodec),
+/* harmony export */   offsetDecoder: () => (/* binding */ offsetDecoder),
+/* harmony export */   offsetEncoder: () => (/* binding */ offsetEncoder),
+/* harmony export */   padBytes: () => (/* binding */ padBytes),
+/* harmony export */   padLeftCodec: () => (/* binding */ padLeftCodec),
+/* harmony export */   padLeftDecoder: () => (/* binding */ padLeftDecoder),
+/* harmony export */   padLeftEncoder: () => (/* binding */ padLeftEncoder),
+/* harmony export */   padRightCodec: () => (/* binding */ padRightCodec),
+/* harmony export */   padRightDecoder: () => (/* binding */ padRightDecoder),
+/* harmony export */   padRightEncoder: () => (/* binding */ padRightEncoder),
+/* harmony export */   resizeCodec: () => (/* binding */ resizeCodec),
+/* harmony export */   resizeDecoder: () => (/* binding */ resizeDecoder),
+/* harmony export */   resizeEncoder: () => (/* binding */ resizeEncoder),
+/* harmony export */   reverseCodec: () => (/* binding */ reverseCodec),
+/* harmony export */   reverseDecoder: () => (/* binding */ reverseDecoder),
+/* harmony export */   reverseEncoder: () => (/* binding */ reverseEncoder),
+/* harmony export */   transformCodec: () => (/* binding */ transformCodec),
+/* harmony export */   transformDecoder: () => (/* binding */ transformDecoder),
+/* harmony export */   transformEncoder: () => (/* binding */ transformEncoder)
+/* harmony export */ });
+/* harmony import */ var _solana_errors__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @solana/errors */ "./node_modules/@solana/web3.js/node_modules/@solana/errors/dist/index.browser.mjs");
+
+
+// src/add-codec-sentinel.ts
+
+// src/bytes.ts
+var mergeBytes = (byteArrays) => {
+  const nonEmptyByteArrays = byteArrays.filter((arr) => arr.length);
+  if (nonEmptyByteArrays.length === 0) {
+    return byteArrays.length ? byteArrays[0] : new Uint8Array();
+  }
+  if (nonEmptyByteArrays.length === 1) {
+    return nonEmptyByteArrays[0];
+  }
+  const totalLength = nonEmptyByteArrays.reduce((total, arr) => total + arr.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  nonEmptyByteArrays.forEach((arr) => {
+    result.set(arr, offset);
+    offset += arr.length;
+  });
+  return result;
+};
+var padBytes = (bytes, length) => {
+  if (bytes.length >= length) return bytes;
+  const paddedBytes = new Uint8Array(length).fill(0);
+  paddedBytes.set(bytes);
+  return paddedBytes;
+};
+var fixBytes = (bytes, length) => padBytes(bytes.length <= length ? bytes : bytes.slice(0, length), length);
+function containsBytes(data, bytes, offset) {
+  const slice = offset === 0 && data.length === bytes.length ? data : data.slice(offset, offset + bytes.length);
+  if (slice.length !== bytes.length) return false;
+  return bytes.every((b, i) => b === slice[i]);
+}
+function getEncodedSize(value, encoder) {
+  return "fixedSize" in encoder ? encoder.fixedSize : encoder.getSizeFromValue(value);
+}
+function createEncoder(encoder) {
+  return Object.freeze({
+    ...encoder,
+    encode: (value) => {
+      const bytes = new Uint8Array(getEncodedSize(value, encoder));
+      encoder.write(value, bytes, 0);
+      return bytes;
+    }
+  });
+}
+function createDecoder(decoder) {
+  return Object.freeze({
+    ...decoder,
+    decode: (bytes, offset = 0) => decoder.read(bytes, offset)[0]
+  });
+}
+function createCodec(codec) {
+  return Object.freeze({
+    ...codec,
+    decode: (bytes, offset = 0) => codec.read(bytes, offset)[0],
+    encode: (value) => {
+      const bytes = new Uint8Array(getEncodedSize(value, codec));
+      codec.write(value, bytes, 0);
+      return bytes;
+    }
+  });
+}
+function isFixedSize(codec) {
+  return "fixedSize" in codec && typeof codec.fixedSize === "number";
+}
+function assertIsFixedSize(codec) {
+  if (!isFixedSize(codec)) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__EXPECTED_FIXED_LENGTH);
+  }
+}
+function isVariableSize(codec) {
+  return !isFixedSize(codec);
+}
+function assertIsVariableSize(codec) {
+  if (!isVariableSize(codec)) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__EXPECTED_VARIABLE_LENGTH);
+  }
+}
+function combineCodec(encoder, decoder) {
+  if (isFixedSize(encoder) !== isFixedSize(decoder)) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__ENCODER_DECODER_SIZE_COMPATIBILITY_MISMATCH);
+  }
+  if (isFixedSize(encoder) && isFixedSize(decoder) && encoder.fixedSize !== decoder.fixedSize) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__ENCODER_DECODER_FIXED_SIZE_MISMATCH, {
+      decoderFixedSize: decoder.fixedSize,
+      encoderFixedSize: encoder.fixedSize
+    });
+  }
+  if (!isFixedSize(encoder) && !isFixedSize(decoder) && encoder.maxSize !== decoder.maxSize) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__ENCODER_DECODER_MAX_SIZE_MISMATCH, {
+      decoderMaxSize: decoder.maxSize,
+      encoderMaxSize: encoder.maxSize
+    });
+  }
+  return {
+    ...decoder,
+    ...encoder,
+    decode: decoder.decode,
+    encode: encoder.encode,
+    read: decoder.read,
+    write: encoder.write
+  };
+}
+
+// src/add-codec-sentinel.ts
+function addEncoderSentinel(encoder, sentinel) {
+  const write = (value, bytes, offset) => {
+    const encoderBytes = encoder.encode(value);
+    if (findSentinelIndex(encoderBytes, sentinel) >= 0) {
+      throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__ENCODED_BYTES_MUST_NOT_INCLUDE_SENTINEL, {
+        encodedBytes: encoderBytes,
+        hexEncodedBytes: hexBytes(encoderBytes),
+        hexSentinel: hexBytes(sentinel),
+        sentinel
+      });
+    }
+    bytes.set(encoderBytes, offset);
+    offset += encoderBytes.length;
+    bytes.set(sentinel, offset);
+    offset += sentinel.length;
+    return offset;
+  };
+  if (isFixedSize(encoder)) {
+    return createEncoder({ ...encoder, fixedSize: encoder.fixedSize + sentinel.length, write });
+  }
+  return createEncoder({
+    ...encoder,
+    ...encoder.maxSize != null ? { maxSize: encoder.maxSize + sentinel.length } : {},
+    getSizeFromValue: (value) => encoder.getSizeFromValue(value) + sentinel.length,
+    write
+  });
+}
+function addDecoderSentinel(decoder, sentinel) {
+  const read = (bytes, offset) => {
+    const candidateBytes = offset === 0 ? bytes : bytes.slice(offset);
+    const sentinelIndex = findSentinelIndex(candidateBytes, sentinel);
+    if (sentinelIndex === -1) {
+      throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__SENTINEL_MISSING_IN_DECODED_BYTES, {
+        decodedBytes: candidateBytes,
+        hexDecodedBytes: hexBytes(candidateBytes),
+        hexSentinel: hexBytes(sentinel),
+        sentinel
+      });
+    }
+    const preSentinelBytes = candidateBytes.slice(0, sentinelIndex);
+    return [decoder.decode(preSentinelBytes), offset + preSentinelBytes.length + sentinel.length];
+  };
+  if (isFixedSize(decoder)) {
+    return createDecoder({ ...decoder, fixedSize: decoder.fixedSize + sentinel.length, read });
+  }
+  return createDecoder({
+    ...decoder,
+    ...decoder.maxSize != null ? { maxSize: decoder.maxSize + sentinel.length } : {},
+    read
+  });
+}
+function addCodecSentinel(codec, sentinel) {
+  return combineCodec(addEncoderSentinel(codec, sentinel), addDecoderSentinel(codec, sentinel));
+}
+function findSentinelIndex(bytes, sentinel) {
+  return bytes.findIndex((byte, index, arr) => {
+    if (sentinel.length === 1) return byte === sentinel[0];
+    return containsBytes(arr, sentinel, index);
+  });
+}
+function hexBytes(bytes) {
+  return bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, "0"), "");
+}
+function assertByteArrayIsNotEmptyForCodec(codecDescription, bytes, offset = 0) {
+  if (bytes.length - offset <= 0) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__CANNOT_DECODE_EMPTY_BYTE_ARRAY, {
+      codecDescription
+    });
+  }
+}
+function assertByteArrayHasEnoughBytesForCodec(codecDescription, expected, bytes, offset = 0) {
+  const bytesLength = bytes.length - offset;
+  if (bytesLength < expected) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__INVALID_BYTE_LENGTH, {
+      bytesLength,
+      codecDescription,
+      expected
+    });
+  }
+}
+function assertByteArrayOffsetIsNotOutOfRange(codecDescription, offset, bytesLength) {
+  if (offset < 0 || offset > bytesLength) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__OFFSET_OUT_OF_RANGE, {
+      bytesLength,
+      codecDescription,
+      offset
+    });
+  }
+}
+
+// src/add-codec-size-prefix.ts
+function addEncoderSizePrefix(encoder, prefix) {
+  const write = (value, bytes, offset) => {
+    const encoderBytes = encoder.encode(value);
+    offset = prefix.write(encoderBytes.length, bytes, offset);
+    bytes.set(encoderBytes, offset);
+    return offset + encoderBytes.length;
+  };
+  if (isFixedSize(prefix) && isFixedSize(encoder)) {
+    return createEncoder({ ...encoder, fixedSize: prefix.fixedSize + encoder.fixedSize, write });
+  }
+  const prefixMaxSize = isFixedSize(prefix) ? prefix.fixedSize : prefix.maxSize ?? null;
+  const encoderMaxSize = isFixedSize(encoder) ? encoder.fixedSize : encoder.maxSize ?? null;
+  const maxSize = prefixMaxSize !== null && encoderMaxSize !== null ? prefixMaxSize + encoderMaxSize : null;
+  return createEncoder({
+    ...encoder,
+    ...maxSize !== null ? { maxSize } : {},
+    getSizeFromValue: (value) => {
+      const encoderSize = getEncodedSize(value, encoder);
+      return getEncodedSize(encoderSize, prefix) + encoderSize;
+    },
+    write
+  });
+}
+function addDecoderSizePrefix(decoder, prefix) {
+  const read = (bytes, offset) => {
+    const [bigintSize, decoderOffset] = prefix.read(bytes, offset);
+    const size = Number(bigintSize);
+    offset = decoderOffset;
+    if (offset > 0 || bytes.length > size) {
+      bytes = bytes.slice(offset, offset + size);
+    }
+    assertByteArrayHasEnoughBytesForCodec("addDecoderSizePrefix", size, bytes);
+    return [decoder.decode(bytes), offset + size];
+  };
+  if (isFixedSize(prefix) && isFixedSize(decoder)) {
+    return createDecoder({ ...decoder, fixedSize: prefix.fixedSize + decoder.fixedSize, read });
+  }
+  const prefixMaxSize = isFixedSize(prefix) ? prefix.fixedSize : prefix.maxSize ?? null;
+  const decoderMaxSize = isFixedSize(decoder) ? decoder.fixedSize : decoder.maxSize ?? null;
+  const maxSize = prefixMaxSize !== null && decoderMaxSize !== null ? prefixMaxSize + decoderMaxSize : null;
+  return createDecoder({ ...decoder, ...maxSize !== null ? { maxSize } : {}, read });
+}
+function addCodecSizePrefix(codec, prefix) {
+  return combineCodec(addEncoderSizePrefix(codec, prefix), addDecoderSizePrefix(codec, prefix));
+}
+
+// src/fix-codec-size.ts
+function fixEncoderSize(encoder, fixedBytes) {
+  return createEncoder({
+    fixedSize: fixedBytes,
+    write: (value, bytes, offset) => {
+      const variableByteArray = encoder.encode(value);
+      const fixedByteArray = variableByteArray.length > fixedBytes ? variableByteArray.slice(0, fixedBytes) : variableByteArray;
+      bytes.set(fixedByteArray, offset);
+      return offset + fixedBytes;
+    }
+  });
+}
+function fixDecoderSize(decoder, fixedBytes) {
+  return createDecoder({
+    fixedSize: fixedBytes,
+    read: (bytes, offset) => {
+      assertByteArrayHasEnoughBytesForCodec("fixCodecSize", fixedBytes, bytes, offset);
+      if (offset > 0 || bytes.length > fixedBytes) {
+        bytes = bytes.slice(offset, offset + fixedBytes);
+      }
+      if (isFixedSize(decoder)) {
+        bytes = fixBytes(bytes, decoder.fixedSize);
+      }
+      const [value] = decoder.read(bytes, 0);
+      return [value, offset + fixedBytes];
+    }
+  });
+}
+function fixCodecSize(codec, fixedBytes) {
+  return combineCodec(fixEncoderSize(codec, fixedBytes), fixDecoderSize(codec, fixedBytes));
+}
+
+// src/offset-codec.ts
+function offsetEncoder(encoder, config) {
+  return createEncoder({
+    ...encoder,
+    write: (value, bytes, preOffset) => {
+      const wrapBytes = (offset) => modulo(offset, bytes.length);
+      const newPreOffset = config.preOffset ? config.preOffset({ bytes, preOffset, wrapBytes }) : preOffset;
+      assertByteArrayOffsetIsNotOutOfRange("offsetEncoder", newPreOffset, bytes.length);
+      const postOffset = encoder.write(value, bytes, newPreOffset);
+      const newPostOffset = config.postOffset ? config.postOffset({ bytes, newPreOffset, postOffset, preOffset, wrapBytes }) : postOffset;
+      assertByteArrayOffsetIsNotOutOfRange("offsetEncoder", newPostOffset, bytes.length);
+      return newPostOffset;
+    }
+  });
+}
+function offsetDecoder(decoder, config) {
+  return createDecoder({
+    ...decoder,
+    read: (bytes, preOffset) => {
+      const wrapBytes = (offset) => modulo(offset, bytes.length);
+      const newPreOffset = config.preOffset ? config.preOffset({ bytes, preOffset, wrapBytes }) : preOffset;
+      assertByteArrayOffsetIsNotOutOfRange("offsetDecoder", newPreOffset, bytes.length);
+      const [value, postOffset] = decoder.read(bytes, newPreOffset);
+      const newPostOffset = config.postOffset ? config.postOffset({ bytes, newPreOffset, postOffset, preOffset, wrapBytes }) : postOffset;
+      assertByteArrayOffsetIsNotOutOfRange("offsetDecoder", newPostOffset, bytes.length);
+      return [value, newPostOffset];
+    }
+  });
+}
+function offsetCodec(codec, config) {
+  return combineCodec(offsetEncoder(codec, config), offsetDecoder(codec, config));
+}
+function modulo(dividend, divisor) {
+  if (divisor === 0) return 0;
+  return (dividend % divisor + divisor) % divisor;
+}
+function resizeEncoder(encoder, resize) {
+  if (isFixedSize(encoder)) {
+    const fixedSize = resize(encoder.fixedSize);
+    if (fixedSize < 0) {
+      throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH, {
+        bytesLength: fixedSize,
+        codecDescription: "resizeEncoder"
+      });
+    }
+    return createEncoder({ ...encoder, fixedSize });
+  }
+  return createEncoder({
+    ...encoder,
+    getSizeFromValue: (value) => {
+      const newSize = resize(encoder.getSizeFromValue(value));
+      if (newSize < 0) {
+        throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH, {
+          bytesLength: newSize,
+          codecDescription: "resizeEncoder"
+        });
+      }
+      return newSize;
+    }
+  });
+}
+function resizeDecoder(decoder, resize) {
+  if (isFixedSize(decoder)) {
+    const fixedSize = resize(decoder.fixedSize);
+    if (fixedSize < 0) {
+      throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH, {
+        bytesLength: fixedSize,
+        codecDescription: "resizeDecoder"
+      });
+    }
+    return createDecoder({ ...decoder, fixedSize });
+  }
+  return decoder;
+}
+function resizeCodec(codec, resize) {
+  return combineCodec(resizeEncoder(codec, resize), resizeDecoder(codec, resize));
+}
+
+// src/pad-codec.ts
+function padLeftEncoder(encoder, offset) {
+  return offsetEncoder(
+    resizeEncoder(encoder, (size) => size + offset),
+    { preOffset: ({ preOffset }) => preOffset + offset }
+  );
+}
+function padRightEncoder(encoder, offset) {
+  return offsetEncoder(
+    resizeEncoder(encoder, (size) => size + offset),
+    { postOffset: ({ postOffset }) => postOffset + offset }
+  );
+}
+function padLeftDecoder(decoder, offset) {
+  return offsetDecoder(
+    resizeDecoder(decoder, (size) => size + offset),
+    { preOffset: ({ preOffset }) => preOffset + offset }
+  );
+}
+function padRightDecoder(decoder, offset) {
+  return offsetDecoder(
+    resizeDecoder(decoder, (size) => size + offset),
+    { postOffset: ({ postOffset }) => postOffset + offset }
+  );
+}
+function padLeftCodec(codec, offset) {
+  return combineCodec(padLeftEncoder(codec, offset), padLeftDecoder(codec, offset));
+}
+function padRightCodec(codec, offset) {
+  return combineCodec(padRightEncoder(codec, offset), padRightDecoder(codec, offset));
+}
+
+// src/reverse-codec.ts
+function copySourceToTargetInReverse(source, target_WILL_MUTATE, sourceOffset, sourceLength, targetOffset = 0) {
+  while (sourceOffset < --sourceLength) {
+    const leftValue = source[sourceOffset];
+    target_WILL_MUTATE[sourceOffset + targetOffset] = source[sourceLength];
+    target_WILL_MUTATE[sourceLength + targetOffset] = leftValue;
+    sourceOffset++;
+  }
+  if (sourceOffset === sourceLength) {
+    target_WILL_MUTATE[sourceOffset + targetOffset] = source[sourceOffset];
+  }
+}
+function reverseEncoder(encoder) {
+  assertIsFixedSize(encoder);
+  return createEncoder({
+    ...encoder,
+    write: (value, bytes, offset) => {
+      const newOffset = encoder.write(value, bytes, offset);
+      copySourceToTargetInReverse(
+        bytes,
+        bytes,
+        offset,
+        offset + encoder.fixedSize
+      );
+      return newOffset;
+    }
+  });
+}
+function reverseDecoder(decoder) {
+  assertIsFixedSize(decoder);
+  return createDecoder({
+    ...decoder,
+    read: (bytes, offset) => {
+      const reversedBytes = bytes.slice();
+      copySourceToTargetInReverse(
+        bytes,
+        reversedBytes,
+        offset,
+        offset + decoder.fixedSize
+      );
+      return decoder.read(reversedBytes, offset);
+    }
+  });
+}
+function reverseCodec(codec) {
+  return combineCodec(reverseEncoder(codec), reverseDecoder(codec));
+}
+
+// src/transform-codec.ts
+function transformEncoder(encoder, unmap) {
+  return createEncoder({
+    ...isVariableSize(encoder) ? { ...encoder, getSizeFromValue: (value) => encoder.getSizeFromValue(unmap(value)) } : encoder,
+    write: (value, bytes, offset) => encoder.write(unmap(value), bytes, offset)
+  });
+}
+function transformDecoder(decoder, map) {
+  return createDecoder({
+    ...decoder,
+    read: (bytes, offset) => {
+      const [value, newOffset] = decoder.read(bytes, offset);
+      return [map(value, bytes, offset), newOffset];
+    }
+  });
+}
+function transformCodec(codec, unmap, map) {
+  return createCodec({
+    ...transformEncoder(codec, unmap),
+    read: map ? transformDecoder(codec, map).read : codec.read
+  });
+}
+
+
+//# sourceMappingURL=index.browser.mjs.map
+//# sourceMappingURL=index.browser.mjs.map
+
+/***/ }),
+
+/***/ "./node_modules/@solana/web3.js/node_modules/@solana/codecs-numbers/dist/index.browser.mjs":
+/*!*************************************************************************************************!*\
+  !*** ./node_modules/@solana/web3.js/node_modules/@solana/codecs-numbers/dist/index.browser.mjs ***!
+  \*************************************************************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Endian: () => (/* binding */ Endian),
+/* harmony export */   assertNumberIsBetweenForCodec: () => (/* binding */ assertNumberIsBetweenForCodec),
+/* harmony export */   getF32Codec: () => (/* binding */ getF32Codec),
+/* harmony export */   getF32Decoder: () => (/* binding */ getF32Decoder),
+/* harmony export */   getF32Encoder: () => (/* binding */ getF32Encoder),
+/* harmony export */   getF64Codec: () => (/* binding */ getF64Codec),
+/* harmony export */   getF64Decoder: () => (/* binding */ getF64Decoder),
+/* harmony export */   getF64Encoder: () => (/* binding */ getF64Encoder),
+/* harmony export */   getI128Codec: () => (/* binding */ getI128Codec),
+/* harmony export */   getI128Decoder: () => (/* binding */ getI128Decoder),
+/* harmony export */   getI128Encoder: () => (/* binding */ getI128Encoder),
+/* harmony export */   getI16Codec: () => (/* binding */ getI16Codec),
+/* harmony export */   getI16Decoder: () => (/* binding */ getI16Decoder),
+/* harmony export */   getI16Encoder: () => (/* binding */ getI16Encoder),
+/* harmony export */   getI32Codec: () => (/* binding */ getI32Codec),
+/* harmony export */   getI32Decoder: () => (/* binding */ getI32Decoder),
+/* harmony export */   getI32Encoder: () => (/* binding */ getI32Encoder),
+/* harmony export */   getI64Codec: () => (/* binding */ getI64Codec),
+/* harmony export */   getI64Decoder: () => (/* binding */ getI64Decoder),
+/* harmony export */   getI64Encoder: () => (/* binding */ getI64Encoder),
+/* harmony export */   getI8Codec: () => (/* binding */ getI8Codec),
+/* harmony export */   getI8Decoder: () => (/* binding */ getI8Decoder),
+/* harmony export */   getI8Encoder: () => (/* binding */ getI8Encoder),
+/* harmony export */   getShortU16Codec: () => (/* binding */ getShortU16Codec),
+/* harmony export */   getShortU16Decoder: () => (/* binding */ getShortU16Decoder),
+/* harmony export */   getShortU16Encoder: () => (/* binding */ getShortU16Encoder),
+/* harmony export */   getU128Codec: () => (/* binding */ getU128Codec),
+/* harmony export */   getU128Decoder: () => (/* binding */ getU128Decoder),
+/* harmony export */   getU128Encoder: () => (/* binding */ getU128Encoder),
+/* harmony export */   getU16Codec: () => (/* binding */ getU16Codec),
+/* harmony export */   getU16Decoder: () => (/* binding */ getU16Decoder),
+/* harmony export */   getU16Encoder: () => (/* binding */ getU16Encoder),
+/* harmony export */   getU32Codec: () => (/* binding */ getU32Codec),
+/* harmony export */   getU32Decoder: () => (/* binding */ getU32Decoder),
+/* harmony export */   getU32Encoder: () => (/* binding */ getU32Encoder),
+/* harmony export */   getU64Codec: () => (/* binding */ getU64Codec),
+/* harmony export */   getU64Decoder: () => (/* binding */ getU64Decoder),
+/* harmony export */   getU64Encoder: () => (/* binding */ getU64Encoder),
+/* harmony export */   getU8Codec: () => (/* binding */ getU8Codec),
+/* harmony export */   getU8Decoder: () => (/* binding */ getU8Decoder),
+/* harmony export */   getU8Encoder: () => (/* binding */ getU8Encoder)
+/* harmony export */ });
+/* harmony import */ var _solana_errors__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @solana/errors */ "./node_modules/@solana/web3.js/node_modules/@solana/errors/dist/index.browser.mjs");
+/* harmony import */ var _solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @solana/codecs-core */ "./node_modules/@solana/web3.js/node_modules/@solana/codecs-core/dist/index.browser.mjs");
+
+
+
+// src/assertions.ts
+function assertNumberIsBetweenForCodec(codecDescription, min, max, value) {
+  if (value < min || value > max) {
+    throw new _solana_errors__WEBPACK_IMPORTED_MODULE_0__.SolanaError(_solana_errors__WEBPACK_IMPORTED_MODULE_0__.SOLANA_ERROR__CODECS__NUMBER_OUT_OF_RANGE, {
+      codecDescription,
+      max,
+      min,
+      value
+    });
+  }
+}
+
+// src/common.ts
+var Endian = /* @__PURE__ */ ((Endian2) => {
+  Endian2[Endian2["Little"] = 0] = "Little";
+  Endian2[Endian2["Big"] = 1] = "Big";
+  return Endian2;
+})(Endian || {});
+function isLittleEndian(config) {
+  return config?.endian === 1 /* Big */ ? false : true;
+}
+function numberEncoderFactory(input) {
+  return (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.createEncoder)({
+    fixedSize: input.size,
+    write(value, bytes, offset) {
+      if (input.range) {
+        assertNumberIsBetweenForCodec(input.name, input.range[0], input.range[1], value);
+      }
+      const arrayBuffer = new ArrayBuffer(input.size);
+      input.set(new DataView(arrayBuffer), value, isLittleEndian(input.config));
+      bytes.set(new Uint8Array(arrayBuffer), offset);
+      return offset + input.size;
+    }
+  });
+}
+function numberDecoderFactory(input) {
+  return (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.createDecoder)({
+    fixedSize: input.size,
+    read(bytes, offset = 0) {
+      (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.assertByteArrayIsNotEmptyForCodec)(input.name, bytes, offset);
+      (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.assertByteArrayHasEnoughBytesForCodec)(input.name, input.size, bytes, offset);
+      const view = new DataView(toArrayBuffer(bytes, offset, input.size));
+      return [input.get(view, isLittleEndian(input.config)), offset + input.size];
+    }
+  });
+}
+function toArrayBuffer(bytes, offset, length) {
+  const bytesOffset = bytes.byteOffset + (offset ?? 0);
+  const bytesLength = length ?? bytes.byteLength;
+  return bytes.buffer.slice(bytesOffset, bytesOffset + bytesLength);
+}
+
+// src/f32.ts
+var getF32Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "f32",
+  set: (view, value, le) => view.setFloat32(0, Number(value), le),
+  size: 4
+});
+var getF32Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getFloat32(0, le),
+  name: "f32",
+  size: 4
+});
+var getF32Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getF32Encoder(config), getF32Decoder(config));
+var getF64Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "f64",
+  set: (view, value, le) => view.setFloat64(0, Number(value), le),
+  size: 8
+});
+var getF64Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getFloat64(0, le),
+  name: "f64",
+  size: 8
+});
+var getF64Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getF64Encoder(config), getF64Decoder(config));
+var getI128Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "i128",
+  range: [-BigInt("0x7fffffffffffffffffffffffffffffff") - 1n, BigInt("0x7fffffffffffffffffffffffffffffff")],
+  set: (view, value, le) => {
+    const leftOffset = le ? 8 : 0;
+    const rightOffset = le ? 0 : 8;
+    const rightMask = 0xffffffffffffffffn;
+    view.setBigInt64(leftOffset, BigInt(value) >> 64n, le);
+    view.setBigUint64(rightOffset, BigInt(value) & rightMask, le);
+  },
+  size: 16
+});
+var getI128Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => {
+    const leftOffset = le ? 8 : 0;
+    const rightOffset = le ? 0 : 8;
+    const left = view.getBigInt64(leftOffset, le);
+    const right = view.getBigUint64(rightOffset, le);
+    return (left << 64n) + right;
+  },
+  name: "i128",
+  size: 16
+});
+var getI128Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getI128Encoder(config), getI128Decoder(config));
+var getI16Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "i16",
+  range: [-Number("0x7fff") - 1, Number("0x7fff")],
+  set: (view, value, le) => view.setInt16(0, Number(value), le),
+  size: 2
+});
+var getI16Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getInt16(0, le),
+  name: "i16",
+  size: 2
+});
+var getI16Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getI16Encoder(config), getI16Decoder(config));
+var getI32Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "i32",
+  range: [-Number("0x7fffffff") - 1, Number("0x7fffffff")],
+  set: (view, value, le) => view.setInt32(0, Number(value), le),
+  size: 4
+});
+var getI32Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getInt32(0, le),
+  name: "i32",
+  size: 4
+});
+var getI32Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getI32Encoder(config), getI32Decoder(config));
+var getI64Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "i64",
+  range: [-BigInt("0x7fffffffffffffff") - 1n, BigInt("0x7fffffffffffffff")],
+  set: (view, value, le) => view.setBigInt64(0, BigInt(value), le),
+  size: 8
+});
+var getI64Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getBigInt64(0, le),
+  name: "i64",
+  size: 8
+});
+var getI64Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getI64Encoder(config), getI64Decoder(config));
+var getI8Encoder = () => numberEncoderFactory({
+  name: "i8",
+  range: [-Number("0x7f") - 1, Number("0x7f")],
+  set: (view, value) => view.setInt8(0, Number(value)),
+  size: 1
+});
+var getI8Decoder = () => numberDecoderFactory({
+  get: (view) => view.getInt8(0),
+  name: "i8",
+  size: 1
+});
+var getI8Codec = () => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getI8Encoder(), getI8Decoder());
+var getShortU16Encoder = () => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.createEncoder)({
+  getSizeFromValue: (value) => {
+    if (value <= 127) return 1;
+    if (value <= 16383) return 2;
+    return 3;
+  },
+  maxSize: 3,
+  write: (value, bytes, offset) => {
+    assertNumberIsBetweenForCodec("shortU16", 0, 65535, value);
+    const shortU16Bytes = [0];
+    for (let ii = 0; ; ii += 1) {
+      const alignedValue = Number(value) >> ii * 7;
+      if (alignedValue === 0) {
+        break;
+      }
+      const nextSevenBits = 127 & alignedValue;
+      shortU16Bytes[ii] = nextSevenBits;
+      if (ii > 0) {
+        shortU16Bytes[ii - 1] |= 128;
+      }
+    }
+    bytes.set(shortU16Bytes, offset);
+    return offset + shortU16Bytes.length;
+  }
+});
+var getShortU16Decoder = () => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.createDecoder)({
+  maxSize: 3,
+  read: (bytes, offset) => {
+    let value = 0;
+    let byteCount = 0;
+    while (++byteCount) {
+      const byteIndex = byteCount - 1;
+      const currentByte = bytes[offset + byteIndex];
+      const nextSevenBits = 127 & currentByte;
+      value |= nextSevenBits << byteIndex * 7;
+      if ((currentByte & 128) === 0) {
+        break;
+      }
+    }
+    return [value, offset + byteCount];
+  }
+});
+var getShortU16Codec = () => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getShortU16Encoder(), getShortU16Decoder());
+var getU128Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "u128",
+  range: [0n, BigInt("0xffffffffffffffffffffffffffffffff")],
+  set: (view, value, le) => {
+    const leftOffset = le ? 8 : 0;
+    const rightOffset = le ? 0 : 8;
+    const rightMask = 0xffffffffffffffffn;
+    view.setBigUint64(leftOffset, BigInt(value) >> 64n, le);
+    view.setBigUint64(rightOffset, BigInt(value) & rightMask, le);
+  },
+  size: 16
+});
+var getU128Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => {
+    const leftOffset = le ? 8 : 0;
+    const rightOffset = le ? 0 : 8;
+    const left = view.getBigUint64(leftOffset, le);
+    const right = view.getBigUint64(rightOffset, le);
+    return (left << 64n) + right;
+  },
+  name: "u128",
+  size: 16
+});
+var getU128Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getU128Encoder(config), getU128Decoder(config));
+var getU16Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "u16",
+  range: [0, Number("0xffff")],
+  set: (view, value, le) => view.setUint16(0, Number(value), le),
+  size: 2
+});
+var getU16Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getUint16(0, le),
+  name: "u16",
+  size: 2
+});
+var getU16Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getU16Encoder(config), getU16Decoder(config));
+var getU32Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "u32",
+  range: [0, Number("0xffffffff")],
+  set: (view, value, le) => view.setUint32(0, Number(value), le),
+  size: 4
+});
+var getU32Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getUint32(0, le),
+  name: "u32",
+  size: 4
+});
+var getU32Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getU32Encoder(config), getU32Decoder(config));
+var getU64Encoder = (config = {}) => numberEncoderFactory({
+  config,
+  name: "u64",
+  range: [0n, BigInt("0xffffffffffffffff")],
+  set: (view, value, le) => view.setBigUint64(0, BigInt(value), le),
+  size: 8
+});
+var getU64Decoder = (config = {}) => numberDecoderFactory({
+  config,
+  get: (view, le) => view.getBigUint64(0, le),
+  name: "u64",
+  size: 8
+});
+var getU64Codec = (config = {}) => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getU64Encoder(config), getU64Decoder(config));
+var getU8Encoder = () => numberEncoderFactory({
+  name: "u8",
+  range: [0, Number("0xff")],
+  set: (view, value) => view.setUint8(0, Number(value)),
+  size: 1
+});
+var getU8Decoder = () => numberDecoderFactory({
+  get: (view) => view.getUint8(0),
+  name: "u8",
+  size: 1
+});
+var getU8Codec = () => (0,_solana_codecs_core__WEBPACK_IMPORTED_MODULE_1__.combineCodec)(getU8Encoder(), getU8Decoder());
+
+
+//# sourceMappingURL=index.browser.mjs.map
+//# sourceMappingURL=index.browser.mjs.map
+
+/***/ }),
+
+/***/ "./node_modules/@solana/web3.js/node_modules/@solana/errors/dist/index.browser.mjs":
+/*!*****************************************************************************************!*\
+  !*** ./node_modules/@solana/web3.js/node_modules/@solana/errors/dist/index.browser.mjs ***!
+  \*****************************************************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   SOLANA_ERROR__ACCOUNTS__ACCOUNT_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__ACCOUNTS__ACCOUNT_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__ACCOUNTS__EXPECTED_ALL_ACCOUNTS_TO_BE_DECODED: () => (/* binding */ SOLANA_ERROR__ACCOUNTS__EXPECTED_ALL_ACCOUNTS_TO_BE_DECODED),
+/* harmony export */   SOLANA_ERROR__ACCOUNTS__EXPECTED_DECODED_ACCOUNT: () => (/* binding */ SOLANA_ERROR__ACCOUNTS__EXPECTED_DECODED_ACCOUNT),
+/* harmony export */   SOLANA_ERROR__ACCOUNTS__FAILED_TO_DECODE_ACCOUNT: () => (/* binding */ SOLANA_ERROR__ACCOUNTS__FAILED_TO_DECODE_ACCOUNT),
+/* harmony export */   SOLANA_ERROR__ACCOUNTS__ONE_OR_MORE_ACCOUNTS_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__ACCOUNTS__ONE_OR_MORE_ACCOUNTS_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__FAILED_TO_FIND_VIABLE_PDA_BUMP_SEED: () => (/* binding */ SOLANA_ERROR__ADDRESSES__FAILED_TO_FIND_VIABLE_PDA_BUMP_SEED),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__INVALID_BASE58_ENCODED_ADDRESS: () => (/* binding */ SOLANA_ERROR__ADDRESSES__INVALID_BASE58_ENCODED_ADDRESS),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__INVALID_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__ADDRESSES__INVALID_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__INVALID_ED25519_PUBLIC_KEY: () => (/* binding */ SOLANA_ERROR__ADDRESSES__INVALID_ED25519_PUBLIC_KEY),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE: () => (/* binding */ SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__MALFORMED_PDA: () => (/* binding */ SOLANA_ERROR__ADDRESSES__MALFORMED_PDA),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED: () => (/* binding */ SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED: () => (/* binding */ SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__PDA_BUMP_SEED_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__ADDRESSES__PDA_BUMP_SEED_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__PDA_ENDS_WITH_PDA_MARKER: () => (/* binding */ SOLANA_ERROR__ADDRESSES__PDA_ENDS_WITH_PDA_MARKER),
+/* harmony export */   SOLANA_ERROR__ADDRESSES__STRING_LENGTH_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__ADDRESSES__STRING_LENGTH_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__BLOCKHASH_STRING_LENGTH_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__BLOCKHASH_STRING_LENGTH_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED: () => (/* binding */ SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__CODECS__CANNOT_DECODE_EMPTY_BYTE_ARRAY: () => (/* binding */ SOLANA_ERROR__CODECS__CANNOT_DECODE_EMPTY_BYTE_ARRAY),
+/* harmony export */   SOLANA_ERROR__CODECS__CANNOT_USE_LEXICAL_VALUES_AS_ENUM_DISCRIMINATORS: () => (/* binding */ SOLANA_ERROR__CODECS__CANNOT_USE_LEXICAL_VALUES_AS_ENUM_DISCRIMINATORS),
+/* harmony export */   SOLANA_ERROR__CODECS__ENCODED_BYTES_MUST_NOT_INCLUDE_SENTINEL: () => (/* binding */ SOLANA_ERROR__CODECS__ENCODED_BYTES_MUST_NOT_INCLUDE_SENTINEL),
+/* harmony export */   SOLANA_ERROR__CODECS__ENCODER_DECODER_FIXED_SIZE_MISMATCH: () => (/* binding */ SOLANA_ERROR__CODECS__ENCODER_DECODER_FIXED_SIZE_MISMATCH),
+/* harmony export */   SOLANA_ERROR__CODECS__ENCODER_DECODER_MAX_SIZE_MISMATCH: () => (/* binding */ SOLANA_ERROR__CODECS__ENCODER_DECODER_MAX_SIZE_MISMATCH),
+/* harmony export */   SOLANA_ERROR__CODECS__ENCODER_DECODER_SIZE_COMPATIBILITY_MISMATCH: () => (/* binding */ SOLANA_ERROR__CODECS__ENCODER_DECODER_SIZE_COMPATIBILITY_MISMATCH),
+/* harmony export */   SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__CODECS__EXPECTED_FIXED_LENGTH: () => (/* binding */ SOLANA_ERROR__CODECS__EXPECTED_FIXED_LENGTH),
+/* harmony export */   SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__CODECS__EXPECTED_VARIABLE_LENGTH: () => (/* binding */ SOLANA_ERROR__CODECS__EXPECTED_VARIABLE_LENGTH),
+/* harmony export */   SOLANA_ERROR__CODECS__EXPECTED_ZERO_VALUE_TO_MATCH_ITEM_FIXED_SIZE: () => (/* binding */ SOLANA_ERROR__CODECS__EXPECTED_ZERO_VALUE_TO_MATCH_ITEM_FIXED_SIZE),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_CONSTANT: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_CONSTANT),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_DISCRIMINATED_UNION_VARIANT: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_DISCRIMINATED_UNION_VARIANT),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_ENUM_VARIANT: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_ENUM_VARIANT),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_LITERAL_UNION_VARIANT: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_LITERAL_UNION_VARIANT),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_NUMBER_OF_ITEMS: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_NUMBER_OF_ITEMS),
+/* harmony export */   SOLANA_ERROR__CODECS__INVALID_STRING_FOR_BASE: () => (/* binding */ SOLANA_ERROR__CODECS__INVALID_STRING_FOR_BASE),
+/* harmony export */   SOLANA_ERROR__CODECS__LITERAL_UNION_DISCRIMINATOR_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__CODECS__LITERAL_UNION_DISCRIMINATOR_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__CODECS__NUMBER_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__CODECS__NUMBER_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__CODECS__OFFSET_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__CODECS__OFFSET_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__CODECS__SENTINEL_MISSING_IN_DECODED_BYTES: () => (/* binding */ SOLANA_ERROR__CODECS__SENTINEL_MISSING_IN_DECODED_BYTES),
+/* harmony export */   SOLANA_ERROR__CODECS__UNION_VARIANT_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__CODECS__UNION_VARIANT_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__CRYPTO__RANDOM_VALUES_FUNCTION_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__CRYPTO__RANDOM_VALUES_FUNCTION_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_ALREADY_INITIALIZED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_ALREADY_INITIALIZED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_FAILED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_FAILED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_OUTSTANDING: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_OUTSTANDING),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_SIZE_CHANGED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_SIZE_CHANGED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_TOO_SMALL: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_TOO_SMALL),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_EXECUTABLE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_EXECUTABLE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_RENT_EXEMPT: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_RENT_EXEMPT),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ARITHMETIC_OVERFLOW: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ARITHMETIC_OVERFLOW),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__BORSH_IO_ERROR: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__BORSH_IO_ERROR),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__CALL_DEPTH: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__CALL_DEPTH),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__COMPUTATIONAL_BUDGET_EXCEEDED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__COMPUTATIONAL_BUDGET_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_INDEX: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_INDEX),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_OUT_OF_SYNC: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_OUT_OF_SYNC),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_ACCOUNT_NOT_RENT_EXEMPT: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_ACCOUNT_NOT_RENT_EXEMPT),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_DATA_MODIFIED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_DATA_MODIFIED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_LAMPORT_CHANGE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_LAMPORT_CHANGE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_MODIFIED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_MODIFIED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_DATA_MODIFIED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_DATA_MODIFIED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_LAMPORT_SPEND: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_LAMPORT_SPEND),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__GENERIC_ERROR: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__GENERIC_ERROR),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__ILLEGAL_OWNER: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__ILLEGAL_OWNER),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__IMMUTABLE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__IMMUTABLE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_AUTHORITY: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_AUTHORITY),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_PROGRAM_ID: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_PROGRAM_ID),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_DATA: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_DATA),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_OWNER: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_OWNER),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ARGUMENT: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ARGUMENT),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ERROR: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ERROR),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_INSTRUCTION_DATA: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_INSTRUCTION_DATA),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_REALLOC: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_REALLOC),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_SEEDS: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_SEEDS),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_EXCEEDED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MAX_SEED_LENGTH_EXCEEDED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MAX_SEED_LENGTH_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_ACCOUNT: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_ACCOUNT),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_REQUIRED_SIGNATURE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_REQUIRED_SIGNATURE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__MODIFIED_PROGRAM_ID: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__MODIFIED_PROGRAM_ID),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__NOT_ENOUGH_ACCOUNT_KEYS: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__NOT_ENOUGH_ACCOUNT_KEYS),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__PRIVILEGE_ESCALATION: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__PRIVILEGE_ESCALATION),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_ENVIRONMENT_SETUP_FAILURE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_ENVIRONMENT_SETUP_FAILURE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPILE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPILE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPLETE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPLETE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_DATA_MODIFIED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_DATA_MODIFIED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_LAMPORT_CHANGE: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_LAMPORT_CHANGE),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__REENTRANCY_NOT_ALLOWED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__REENTRANCY_NOT_ALLOWED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__RENT_EPOCH_MODIFIED: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__RENT_EPOCH_MODIFIED),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__UNBALANCED_INSTRUCTION: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__UNBALANCED_INSTRUCTION),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__UNINITIALIZED_ACCOUNT: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__UNINITIALIZED_ACCOUNT),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__UNKNOWN: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__UNKNOWN),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_PROGRAM_ID: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_PROGRAM_ID),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_SYSVAR: () => (/* binding */ SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_SYSVAR),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_ACCOUNTS: () => (/* binding */ SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_ACCOUNTS),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_DATA: () => (/* binding */ SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_DATA),
+/* harmony export */   SOLANA_ERROR__INSTRUCTION__PROGRAM_ID_MISMATCH: () => (/* binding */ SOLANA_ERROR__INSTRUCTION__PROGRAM_ID_MISMATCH),
+/* harmony export */   SOLANA_ERROR__INVALID_BLOCKHASH_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__INVALID_BLOCKHASH_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__INVALID_NONCE: () => (/* binding */ SOLANA_ERROR__INVALID_NONCE),
+/* harmony export */   SOLANA_ERROR__INVARIANT_VIOLATION__CACHED_ABORTABLE_ITERABLE_CACHE_ENTRY_MISSING: () => (/* binding */ SOLANA_ERROR__INVARIANT_VIOLATION__CACHED_ABORTABLE_ITERABLE_CACHE_ENTRY_MISSING),
+/* harmony export */   SOLANA_ERROR__INVARIANT_VIOLATION__DATA_PUBLISHER_CHANNEL_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__INVARIANT_VIOLATION__DATA_PUBLISHER_CHANNEL_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_MUST_NOT_POLL_BEFORE_RESOLVING_EXISTING_MESSAGE_PROMISE: () => (/* binding */ SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_MUST_NOT_POLL_BEFORE_RESOLVING_EXISTING_MESSAGE_PROMISE),
+/* harmony export */   SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_STATE_MISSING: () => (/* binding */ SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_STATE_MISSING),
+/* harmony export */   SOLANA_ERROR__INVARIANT_VIOLATION__SWITCH_MUST_BE_EXHAUSTIVE: () => (/* binding */ SOLANA_ERROR__INVARIANT_VIOLATION__SWITCH_MUST_BE_EXHAUSTIVE),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR: () => (/* binding */ SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__INVALID_PARAMS: () => (/* binding */ SOLANA_ERROR__JSON_RPC__INVALID_PARAMS),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__INVALID_REQUEST: () => (/* binding */ SOLANA_ERROR__JSON_RPC__INVALID_REQUEST),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__METHOD_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__JSON_RPC__METHOD_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__PARSE_ERROR: () => (/* binding */ SOLANA_ERROR__JSON_RPC__PARSE_ERROR),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SCAN_ERROR: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SCAN_ERROR),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_CLEANED_UP: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_CLEANED_UP),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_KEY_EXCLUDED_FROM_SECONDARY_INDEX: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_KEY_EXCLUDED_FROM_SECONDARY_INDEX),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_LONG_TERM_STORAGE_SLOT_SKIPPED: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_LONG_TERM_STORAGE_SLOT_SKIPPED),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NODE_UNHEALTHY: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NODE_UNHEALTHY),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NO_SNAPSHOT: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NO_SNAPSHOT),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_HISTORY_NOT_AVAILABLE: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_HISTORY_NOT_AVAILABLE),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_PRECOMPILE_VERIFICATION_FAILURE: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_PRECOMPILE_VERIFICATION_FAILURE),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_LEN_MISMATCH: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_LEN_MISMATCH),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_VERIFICATION_FAILURE: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_VERIFICATION_FAILURE),
+/* harmony export */   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_UNSUPPORTED_TRANSACTION_VERSION: () => (/* binding */ SOLANA_ERROR__JSON_RPC__SERVER_ERROR_UNSUPPORTED_TRANSACTION_VERSION),
+/* harmony export */   SOLANA_ERROR__KEYS__INVALID_KEY_PAIR_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__KEYS__INVALID_KEY_PAIR_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__KEYS__INVALID_PRIVATE_KEY_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__KEYS__INVALID_PRIVATE_KEY_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__KEYS__INVALID_SIGNATURE_BYTE_LENGTH: () => (/* binding */ SOLANA_ERROR__KEYS__INVALID_SIGNATURE_BYTE_LENGTH),
+/* harmony export */   SOLANA_ERROR__KEYS__PUBLIC_KEY_MUST_MATCH_PRIVATE_KEY: () => (/* binding */ SOLANA_ERROR__KEYS__PUBLIC_KEY_MUST_MATCH_PRIVATE_KEY),
+/* harmony export */   SOLANA_ERROR__KEYS__SIGNATURE_STRING_LENGTH_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__KEYS__SIGNATURE_STRING_LENGTH_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__LAMPORTS_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__LAMPORTS_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__MALFORMED_BIGINT_STRING: () => (/* binding */ SOLANA_ERROR__MALFORMED_BIGINT_STRING),
+/* harmony export */   SOLANA_ERROR__MALFORMED_JSON_RPC_ERROR: () => (/* binding */ SOLANA_ERROR__MALFORMED_JSON_RPC_ERROR),
+/* harmony export */   SOLANA_ERROR__MALFORMED_NUMBER_STRING: () => (/* binding */ SOLANA_ERROR__MALFORMED_NUMBER_STRING),
+/* harmony export */   SOLANA_ERROR__NONCE_ACCOUNT_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__NONCE_ACCOUNT_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__RPC_SUBSCRIPTIONS__CANNOT_CREATE_SUBSCRIPTION_PLAN: () => (/* binding */ SOLANA_ERROR__RPC_SUBSCRIPTIONS__CANNOT_CREATE_SUBSCRIPTION_PLAN),
+/* harmony export */   SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CLOSED_BEFORE_MESSAGE_BUFFERED: () => (/* binding */ SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CLOSED_BEFORE_MESSAGE_BUFFERED),
+/* harmony export */   SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CONNECTION_CLOSED: () => (/* binding */ SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CONNECTION_CLOSED),
+/* harmony export */   SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_FAILED_TO_CONNECT: () => (/* binding */ SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_FAILED_TO_CONNECT),
+/* harmony export */   SOLANA_ERROR__RPC_SUBSCRIPTIONS__EXPECTED_SERVER_SUBSCRIPTION_ID: () => (/* binding */ SOLANA_ERROR__RPC_SUBSCRIPTIONS__EXPECTED_SERVER_SUBSCRIPTION_ID),
+/* harmony export */   SOLANA_ERROR__RPC__API_PLAN_MISSING_FOR_RPC_METHOD: () => (/* binding */ SOLANA_ERROR__RPC__API_PLAN_MISSING_FOR_RPC_METHOD),
+/* harmony export */   SOLANA_ERROR__RPC__INTEGER_OVERFLOW: () => (/* binding */ SOLANA_ERROR__RPC__INTEGER_OVERFLOW),
+/* harmony export */   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR: () => (/* binding */ SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR),
+/* harmony export */   SOLANA_ERROR__RPC__TRANSPORT_HTTP_HEADER_FORBIDDEN: () => (/* binding */ SOLANA_ERROR__RPC__TRANSPORT_HTTP_HEADER_FORBIDDEN),
+/* harmony export */   SOLANA_ERROR__SIGNER__ADDRESS_CANNOT_HAVE_MULTIPLE_SIGNERS: () => (/* binding */ SOLANA_ERROR__SIGNER__ADDRESS_CANNOT_HAVE_MULTIPLE_SIGNERS),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_KEY_PAIR_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_KEY_PAIR_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_MODIFYING_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_MODIFYING_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_PARTIAL_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_PARTIAL_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_MODIFYING_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_MODIFYING_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_PARTIAL_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_PARTIAL_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SENDING_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SENDING_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SIGNER: () => (/* binding */ SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SIGNER),
+/* harmony export */   SOLANA_ERROR__SIGNER__TRANSACTION_CANNOT_HAVE_MULTIPLE_SENDING_SIGNERS: () => (/* binding */ SOLANA_ERROR__SIGNER__TRANSACTION_CANNOT_HAVE_MULTIPLE_SENDING_SIGNERS),
+/* harmony export */   SOLANA_ERROR__SIGNER__TRANSACTION_SENDING_SIGNER_MISSING: () => (/* binding */ SOLANA_ERROR__SIGNER__TRANSACTION_SENDING_SIGNER_MISSING),
+/* harmony export */   SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__CANNOT_EXPORT_NON_EXTRACTABLE_KEY: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__CANNOT_EXPORT_NON_EXTRACTABLE_KEY),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__DIGEST_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__DIGEST_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__DISALLOWED_IN_INSECURE_CONTEXT: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__DISALLOWED_IN_INSECURE_CONTEXT),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__ED25519_ALGORITHM_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__ED25519_ALGORITHM_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__EXPORT_FUNCTION_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__EXPORT_FUNCTION_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__GENERATE_FUNCTION_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__GENERATE_FUNCTION_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__SIGN_FUNCTION_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__SIGN_FUNCTION_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__SUBTLE_CRYPTO__VERIFY_FUNCTION_UNIMPLEMENTED: () => (/* binding */ SOLANA_ERROR__SUBTLE_CRYPTO__VERIFY_FUNCTION_UNIMPLEMENTED),
+/* harmony export */   SOLANA_ERROR__TIMESTAMP_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__TIMESTAMP_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_BORROW_OUTSTANDING: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_BORROW_OUTSTANDING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_IN_USE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_IN_USE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_LOADED_TWICE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_LOADED_TWICE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__ADDRESS_LOOKUP_TABLE_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__ADDRESS_LOOKUP_TABLE_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__ALREADY_PROCESSED: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__ALREADY_PROCESSED),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__CALL_CHAIN_TOO_DEEP: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__CALL_CHAIN_TOO_DEEP),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__CLUSTER_MAINTENANCE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__CLUSTER_MAINTENANCE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__DUPLICATE_INSTRUCTION: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__DUPLICATE_INSTRUCTION),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_RENT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_RENT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_FOR_FEE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_FOR_FEE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_INDEX: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_INDEX),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_DATA: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_DATA),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_INDEX: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_INDEX),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_OWNER: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_OWNER),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_LOADED_ACCOUNTS_DATA_SIZE_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_LOADED_ACCOUNTS_DATA_SIZE_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_PROGRAM_FOR_EXECUTION: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_PROGRAM_FOR_EXECUTION),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_RENT_PAYING_ACCOUNT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_RENT_PAYING_ACCOUNT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__INVALID_WRITABLE_ACCOUNT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__INVALID_WRITABLE_ACCOUNT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__MAX_LOADED_ACCOUNTS_DATA_SIZE_EXCEEDED: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__MAX_LOADED_ACCOUNTS_DATA_SIZE_EXCEEDED),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__MISSING_SIGNATURE_FOR_FEE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__MISSING_SIGNATURE_FOR_FEE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_ACCOUNT_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_ACCOUNT_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_EXECUTION_TEMPORARILY_RESTRICTED: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_EXECUTION_TEMPORARILY_RESTRICTED),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__RESANITIZATION_NEEDED: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__RESANITIZATION_NEEDED),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__SANITIZE_FAILURE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__SANITIZE_FAILURE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__SIGNATURE_FAILURE: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__SIGNATURE_FAILURE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__TOO_MANY_ACCOUNT_LOCKS: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__TOO_MANY_ACCOUNT_LOCKS),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__UNBALANCED_TRANSACTION: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__UNBALANCED_TRANSACTION),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__UNKNOWN: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__UNKNOWN),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__UNSUPPORTED_VERSION: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__UNSUPPORTED_VERSION),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_BLOCK_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_BLOCK_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_TOTAL_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_TOTAL_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_ACCOUNT_COST_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_ACCOUNT_COST_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_BLOCK_COST_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_BLOCK_COST_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_VOTE_COST_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_VOTE_COST_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__ADDRESSES_CANNOT_SIGN_TRANSACTION: () => (/* binding */ SOLANA_ERROR__TRANSACTION__ADDRESSES_CANNOT_SIGN_TRANSACTION),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__ADDRESS_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__ADDRESS_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__CANNOT_ENCODE_WITH_EMPTY_SIGNATURES: () => (/* binding */ SOLANA_ERROR__TRANSACTION__CANNOT_ENCODE_WITH_EMPTY_SIGNATURES),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__EXPECTED_BLOCKHASH_LIFETIME: () => (/* binding */ SOLANA_ERROR__TRANSACTION__EXPECTED_BLOCKHASH_LIFETIME),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__EXPECTED_NONCE_LIFETIME: () => (/* binding */ SOLANA_ERROR__TRANSACTION__EXPECTED_NONCE_LIFETIME),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_CONTENTS_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_CONTENTS_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_INDEX_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_INDEX_OUT_OF_RANGE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_FEE_PAYER_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_FEE_PAYER_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_INSTRUCTION_PROGRAM_ADDRESS_NOT_FOUND: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_INSTRUCTION_PROGRAM_ADDRESS_NOT_FOUND),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FAILED_WHEN_SIMULATING_TO_ESTIMATE_COMPUTE_LIMIT: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FAILED_WHEN_SIMULATING_TO_ESTIMATE_COMPUTE_LIMIT),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__FEE_PAYER_SIGNATURE_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__FEE_PAYER_SIGNATURE_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_FIRST_INSTRUCTION_MUST_BE_ADVANCE_NONCE: () => (/* binding */ SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_FIRST_INSTRUCTION_MUST_BE_ADVANCE_NONCE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_INSTRUCTIONS_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_INSTRUCTIONS_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_CANNOT_PAY_FEES: () => (/* binding */ SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_CANNOT_PAY_FEES),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_MUST_NOT_BE_WRITABLE: () => (/* binding */ SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_MUST_NOT_BE_WRITABLE),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__MESSAGE_SIGNATURES_MISMATCH: () => (/* binding */ SOLANA_ERROR__TRANSACTION__MESSAGE_SIGNATURES_MISMATCH),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__SIGNATURES_MISSING: () => (/* binding */ SOLANA_ERROR__TRANSACTION__SIGNATURES_MISSING),
+/* harmony export */   SOLANA_ERROR__TRANSACTION__VERSION_NUMBER_OUT_OF_RANGE: () => (/* binding */ SOLANA_ERROR__TRANSACTION__VERSION_NUMBER_OUT_OF_RANGE),
+/* harmony export */   SolanaError: () => (/* binding */ SolanaError),
+/* harmony export */   getSolanaErrorFromInstructionError: () => (/* binding */ getSolanaErrorFromInstructionError),
+/* harmony export */   getSolanaErrorFromJsonRpcError: () => (/* binding */ getSolanaErrorFromJsonRpcError),
+/* harmony export */   getSolanaErrorFromTransactionError: () => (/* binding */ getSolanaErrorFromTransactionError),
+/* harmony export */   isSolanaError: () => (/* binding */ isSolanaError),
+/* harmony export */   safeCaptureStackTrace: () => (/* binding */ safeCaptureStackTrace)
+/* harmony export */ });
+// src/codes.ts
+var SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED = 1;
+var SOLANA_ERROR__INVALID_NONCE = 2;
+var SOLANA_ERROR__NONCE_ACCOUNT_NOT_FOUND = 3;
+var SOLANA_ERROR__BLOCKHASH_STRING_LENGTH_OUT_OF_RANGE = 4;
+var SOLANA_ERROR__INVALID_BLOCKHASH_BYTE_LENGTH = 5;
+var SOLANA_ERROR__LAMPORTS_OUT_OF_RANGE = 6;
+var SOLANA_ERROR__MALFORMED_BIGINT_STRING = 7;
+var SOLANA_ERROR__MALFORMED_NUMBER_STRING = 8;
+var SOLANA_ERROR__TIMESTAMP_OUT_OF_RANGE = 9;
+var SOLANA_ERROR__MALFORMED_JSON_RPC_ERROR = 10;
+var SOLANA_ERROR__JSON_RPC__PARSE_ERROR = -32700;
+var SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR = -32603;
+var SOLANA_ERROR__JSON_RPC__INVALID_PARAMS = -32602;
+var SOLANA_ERROR__JSON_RPC__METHOD_NOT_FOUND = -32601;
+var SOLANA_ERROR__JSON_RPC__INVALID_REQUEST = -32600;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED = -32016;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_UNSUPPORTED_TRANSACTION_VERSION = -32015;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET = -32014;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_LEN_MISMATCH = -32013;
+var SOLANA_ERROR__JSON_RPC__SCAN_ERROR = -32012;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_HISTORY_NOT_AVAILABLE = -32011;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_KEY_EXCLUDED_FROM_SECONDARY_INDEX = -32010;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_LONG_TERM_STORAGE_SLOT_SKIPPED = -32009;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NO_SNAPSHOT = -32008;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED = -32007;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_PRECOMPILE_VERIFICATION_FAILURE = -32006;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NODE_UNHEALTHY = -32005;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE = -32004;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_VERIFICATION_FAILURE = -32003;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE = -32002;
+var SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_CLEANED_UP = -32001;
+var SOLANA_ERROR__ADDRESSES__INVALID_BYTE_LENGTH = 28e5;
+var SOLANA_ERROR__ADDRESSES__STRING_LENGTH_OUT_OF_RANGE = 2800001;
+var SOLANA_ERROR__ADDRESSES__INVALID_BASE58_ENCODED_ADDRESS = 2800002;
+var SOLANA_ERROR__ADDRESSES__INVALID_ED25519_PUBLIC_KEY = 2800003;
+var SOLANA_ERROR__ADDRESSES__MALFORMED_PDA = 2800004;
+var SOLANA_ERROR__ADDRESSES__PDA_BUMP_SEED_OUT_OF_RANGE = 2800005;
+var SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED = 2800006;
+var SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED = 2800007;
+var SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE = 2800008;
+var SOLANA_ERROR__ADDRESSES__FAILED_TO_FIND_VIABLE_PDA_BUMP_SEED = 2800009;
+var SOLANA_ERROR__ADDRESSES__PDA_ENDS_WITH_PDA_MARKER = 2800010;
+var SOLANA_ERROR__ACCOUNTS__ACCOUNT_NOT_FOUND = 323e4;
+var SOLANA_ERROR__ACCOUNTS__ONE_OR_MORE_ACCOUNTS_NOT_FOUND = 32300001;
+var SOLANA_ERROR__ACCOUNTS__FAILED_TO_DECODE_ACCOUNT = 3230002;
+var SOLANA_ERROR__ACCOUNTS__EXPECTED_DECODED_ACCOUNT = 3230003;
+var SOLANA_ERROR__ACCOUNTS__EXPECTED_ALL_ACCOUNTS_TO_BE_DECODED = 3230004;
+var SOLANA_ERROR__SUBTLE_CRYPTO__DISALLOWED_IN_INSECURE_CONTEXT = 361e4;
+var SOLANA_ERROR__SUBTLE_CRYPTO__DIGEST_UNIMPLEMENTED = 3610001;
+var SOLANA_ERROR__SUBTLE_CRYPTO__ED25519_ALGORITHM_UNIMPLEMENTED = 3610002;
+var SOLANA_ERROR__SUBTLE_CRYPTO__EXPORT_FUNCTION_UNIMPLEMENTED = 3610003;
+var SOLANA_ERROR__SUBTLE_CRYPTO__GENERATE_FUNCTION_UNIMPLEMENTED = 3610004;
+var SOLANA_ERROR__SUBTLE_CRYPTO__SIGN_FUNCTION_UNIMPLEMENTED = 3610005;
+var SOLANA_ERROR__SUBTLE_CRYPTO__VERIFY_FUNCTION_UNIMPLEMENTED = 3610006;
+var SOLANA_ERROR__SUBTLE_CRYPTO__CANNOT_EXPORT_NON_EXTRACTABLE_KEY = 3610007;
+var SOLANA_ERROR__CRYPTO__RANDOM_VALUES_FUNCTION_UNIMPLEMENTED = 3611e3;
+var SOLANA_ERROR__KEYS__INVALID_KEY_PAIR_BYTE_LENGTH = 3704e3;
+var SOLANA_ERROR__KEYS__INVALID_PRIVATE_KEY_BYTE_LENGTH = 3704001;
+var SOLANA_ERROR__KEYS__INVALID_SIGNATURE_BYTE_LENGTH = 3704002;
+var SOLANA_ERROR__KEYS__SIGNATURE_STRING_LENGTH_OUT_OF_RANGE = 3704003;
+var SOLANA_ERROR__KEYS__PUBLIC_KEY_MUST_MATCH_PRIVATE_KEY = 3704004;
+var SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_ACCOUNTS = 4128e3;
+var SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_DATA = 4128001;
+var SOLANA_ERROR__INSTRUCTION__PROGRAM_ID_MISMATCH = 4128002;
+var SOLANA_ERROR__INSTRUCTION_ERROR__UNKNOWN = 4615e3;
+var SOLANA_ERROR__INSTRUCTION_ERROR__GENERIC_ERROR = 4615001;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ARGUMENT = 4615002;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_INSTRUCTION_DATA = 4615003;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_DATA = 4615004;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_TOO_SMALL = 4615005;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS = 4615006;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_PROGRAM_ID = 4615007;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_REQUIRED_SIGNATURE = 4615008;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_ALREADY_INITIALIZED = 4615009;
+var SOLANA_ERROR__INSTRUCTION_ERROR__UNINITIALIZED_ACCOUNT = 4615010;
+var SOLANA_ERROR__INSTRUCTION_ERROR__UNBALANCED_INSTRUCTION = 4615011;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MODIFIED_PROGRAM_ID = 4615012;
+var SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_LAMPORT_SPEND = 4615013;
+var SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_DATA_MODIFIED = 4615014;
+var SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_LAMPORT_CHANGE = 4615015;
+var SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_DATA_MODIFIED = 4615016;
+var SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_INDEX = 4615017;
+var SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_MODIFIED = 4615018;
+var SOLANA_ERROR__INSTRUCTION_ERROR__RENT_EPOCH_MODIFIED = 4615019;
+var SOLANA_ERROR__INSTRUCTION_ERROR__NOT_ENOUGH_ACCOUNT_KEYS = 4615020;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_SIZE_CHANGED = 4615021;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_EXECUTABLE = 4615022;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_FAILED = 4615023;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_OUTSTANDING = 4615024;
+var SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_OUT_OF_SYNC = 4615025;
+var SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM = 4615026;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ERROR = 4615027;
+var SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_DATA_MODIFIED = 4615028;
+var SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_LAMPORT_CHANGE = 4615029;
+var SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_ACCOUNT_NOT_RENT_EXEMPT = 4615030;
+var SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_PROGRAM_ID = 4615031;
+var SOLANA_ERROR__INSTRUCTION_ERROR__CALL_DEPTH = 4615032;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_ACCOUNT = 4615033;
+var SOLANA_ERROR__INSTRUCTION_ERROR__REENTRANCY_NOT_ALLOWED = 4615034;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MAX_SEED_LENGTH_EXCEEDED = 4615035;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_SEEDS = 4615036;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_REALLOC = 4615037;
+var SOLANA_ERROR__INSTRUCTION_ERROR__COMPUTATIONAL_BUDGET_EXCEEDED = 4615038;
+var SOLANA_ERROR__INSTRUCTION_ERROR__PRIVILEGE_ESCALATION = 4615039;
+var SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_ENVIRONMENT_SETUP_FAILURE = 4615040;
+var SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPLETE = 4615041;
+var SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPILE = 4615042;
+var SOLANA_ERROR__INSTRUCTION_ERROR__IMMUTABLE = 4615043;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_AUTHORITY = 4615044;
+var SOLANA_ERROR__INSTRUCTION_ERROR__BORSH_IO_ERROR = 4615045;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_RENT_EXEMPT = 4615046;
+var SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_OWNER = 4615047;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ARITHMETIC_OVERFLOW = 4615048;
+var SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_SYSVAR = 4615049;
+var SOLANA_ERROR__INSTRUCTION_ERROR__ILLEGAL_OWNER = 4615050;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED = 4615051;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_EXCEEDED = 4615052;
+var SOLANA_ERROR__INSTRUCTION_ERROR__MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED = 4615053;
+var SOLANA_ERROR__INSTRUCTION_ERROR__BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS = 4615054;
+var SOLANA_ERROR__SIGNER__ADDRESS_CANNOT_HAVE_MULTIPLE_SIGNERS = 5508e3;
+var SOLANA_ERROR__SIGNER__EXPECTED_KEY_PAIR_SIGNER = 5508001;
+var SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_SIGNER = 5508002;
+var SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_MODIFYING_SIGNER = 5508003;
+var SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_PARTIAL_SIGNER = 5508004;
+var SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SIGNER = 5508005;
+var SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_MODIFYING_SIGNER = 5508006;
+var SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_PARTIAL_SIGNER = 5508007;
+var SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SENDING_SIGNER = 5508008;
+var SOLANA_ERROR__SIGNER__TRANSACTION_CANNOT_HAVE_MULTIPLE_SENDING_SIGNERS = 5508009;
+var SOLANA_ERROR__SIGNER__TRANSACTION_SENDING_SIGNER_MISSING = 5508010;
+var SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED = 5508011;
+var SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_CANNOT_PAY_FEES = 5663e3;
+var SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_MUST_NOT_BE_WRITABLE = 5663001;
+var SOLANA_ERROR__TRANSACTION__EXPECTED_BLOCKHASH_LIFETIME = 5663002;
+var SOLANA_ERROR__TRANSACTION__EXPECTED_NONCE_LIFETIME = 5663003;
+var SOLANA_ERROR__TRANSACTION__VERSION_NUMBER_OUT_OF_RANGE = 5663004;
+var SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_CONTENTS_MISSING = 5663005;
+var SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_INDEX_OUT_OF_RANGE = 5663006;
+var SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_INSTRUCTION_PROGRAM_ADDRESS_NOT_FOUND = 5663007;
+var SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_FEE_PAYER_MISSING = 5663008;
+var SOLANA_ERROR__TRANSACTION__SIGNATURES_MISSING = 5663009;
+var SOLANA_ERROR__TRANSACTION__ADDRESS_MISSING = 5663010;
+var SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING = 5663011;
+var SOLANA_ERROR__TRANSACTION__FEE_PAYER_SIGNATURE_MISSING = 5663012;
+var SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_INSTRUCTIONS_MISSING = 5663013;
+var SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_FIRST_INSTRUCTION_MUST_BE_ADVANCE_NONCE = 5663014;
+var SOLANA_ERROR__TRANSACTION__ADDRESSES_CANNOT_SIGN_TRANSACTION = 5663015;
+var SOLANA_ERROR__TRANSACTION__CANNOT_ENCODE_WITH_EMPTY_SIGNATURES = 5663016;
+var SOLANA_ERROR__TRANSACTION__MESSAGE_SIGNATURES_MISMATCH = 5663017;
+var SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT = 5663018;
+var SOLANA_ERROR__TRANSACTION__FAILED_WHEN_SIMULATING_TO_ESTIMATE_COMPUTE_LIMIT = 5663019;
+var SOLANA_ERROR__TRANSACTION_ERROR__UNKNOWN = 705e4;
+var SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_IN_USE = 7050001;
+var SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_LOADED_TWICE = 7050002;
+var SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND = 7050003;
+var SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_ACCOUNT_NOT_FOUND = 7050004;
+var SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE = 7050005;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_FOR_FEE = 7050006;
+var SOLANA_ERROR__TRANSACTION_ERROR__ALREADY_PROCESSED = 7050007;
+var SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND = 7050008;
+var SOLANA_ERROR__TRANSACTION_ERROR__CALL_CHAIN_TOO_DEEP = 7050009;
+var SOLANA_ERROR__TRANSACTION_ERROR__MISSING_SIGNATURE_FOR_FEE = 7050010;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_INDEX = 7050011;
+var SOLANA_ERROR__TRANSACTION_ERROR__SIGNATURE_FAILURE = 7050012;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_PROGRAM_FOR_EXECUTION = 7050013;
+var SOLANA_ERROR__TRANSACTION_ERROR__SANITIZE_FAILURE = 7050014;
+var SOLANA_ERROR__TRANSACTION_ERROR__CLUSTER_MAINTENANCE = 7050015;
+var SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_BORROW_OUTSTANDING = 7050016;
+var SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_BLOCK_COST_LIMIT = 7050017;
+var SOLANA_ERROR__TRANSACTION_ERROR__UNSUPPORTED_VERSION = 7050018;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_WRITABLE_ACCOUNT = 7050019;
+var SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_ACCOUNT_COST_LIMIT = 7050020;
+var SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_BLOCK_LIMIT = 7050021;
+var SOLANA_ERROR__TRANSACTION_ERROR__TOO_MANY_ACCOUNT_LOCKS = 7050022;
+var SOLANA_ERROR__TRANSACTION_ERROR__ADDRESS_LOOKUP_TABLE_NOT_FOUND = 7050023;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_OWNER = 7050024;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_DATA = 7050025;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_INDEX = 7050026;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_RENT_PAYING_ACCOUNT = 7050027;
+var SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_VOTE_COST_LIMIT = 7050028;
+var SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_TOTAL_LIMIT = 7050029;
+var SOLANA_ERROR__TRANSACTION_ERROR__DUPLICATE_INSTRUCTION = 7050030;
+var SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_RENT = 7050031;
+var SOLANA_ERROR__TRANSACTION_ERROR__MAX_LOADED_ACCOUNTS_DATA_SIZE_EXCEEDED = 7050032;
+var SOLANA_ERROR__TRANSACTION_ERROR__INVALID_LOADED_ACCOUNTS_DATA_SIZE_LIMIT = 7050033;
+var SOLANA_ERROR__TRANSACTION_ERROR__RESANITIZATION_NEEDED = 7050034;
+var SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_EXECUTION_TEMPORARILY_RESTRICTED = 7050035;
+var SOLANA_ERROR__TRANSACTION_ERROR__UNBALANCED_TRANSACTION = 7050036;
+var SOLANA_ERROR__CODECS__CANNOT_DECODE_EMPTY_BYTE_ARRAY = 8078e3;
+var SOLANA_ERROR__CODECS__INVALID_BYTE_LENGTH = 8078001;
+var SOLANA_ERROR__CODECS__EXPECTED_FIXED_LENGTH = 8078002;
+var SOLANA_ERROR__CODECS__EXPECTED_VARIABLE_LENGTH = 8078003;
+var SOLANA_ERROR__CODECS__ENCODER_DECODER_SIZE_COMPATIBILITY_MISMATCH = 8078004;
+var SOLANA_ERROR__CODECS__ENCODER_DECODER_FIXED_SIZE_MISMATCH = 8078005;
+var SOLANA_ERROR__CODECS__ENCODER_DECODER_MAX_SIZE_MISMATCH = 8078006;
+var SOLANA_ERROR__CODECS__INVALID_NUMBER_OF_ITEMS = 8078007;
+var SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE = 8078008;
+var SOLANA_ERROR__CODECS__INVALID_DISCRIMINATED_UNION_VARIANT = 8078009;
+var SOLANA_ERROR__CODECS__INVALID_ENUM_VARIANT = 8078010;
+var SOLANA_ERROR__CODECS__NUMBER_OUT_OF_RANGE = 8078011;
+var SOLANA_ERROR__CODECS__INVALID_STRING_FOR_BASE = 8078012;
+var SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH = 8078013;
+var SOLANA_ERROR__CODECS__OFFSET_OUT_OF_RANGE = 8078014;
+var SOLANA_ERROR__CODECS__INVALID_LITERAL_UNION_VARIANT = 8078015;
+var SOLANA_ERROR__CODECS__LITERAL_UNION_DISCRIMINATOR_OUT_OF_RANGE = 8078016;
+var SOLANA_ERROR__CODECS__UNION_VARIANT_OUT_OF_RANGE = 8078017;
+var SOLANA_ERROR__CODECS__INVALID_CONSTANT = 8078018;
+var SOLANA_ERROR__CODECS__EXPECTED_ZERO_VALUE_TO_MATCH_ITEM_FIXED_SIZE = 8078019;
+var SOLANA_ERROR__CODECS__ENCODED_BYTES_MUST_NOT_INCLUDE_SENTINEL = 8078020;
+var SOLANA_ERROR__CODECS__SENTINEL_MISSING_IN_DECODED_BYTES = 8078021;
+var SOLANA_ERROR__CODECS__CANNOT_USE_LEXICAL_VALUES_AS_ENUM_DISCRIMINATORS = 8078022;
+var SOLANA_ERROR__RPC__INTEGER_OVERFLOW = 81e5;
+var SOLANA_ERROR__RPC__TRANSPORT_HTTP_HEADER_FORBIDDEN = 8100001;
+var SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR = 8100002;
+var SOLANA_ERROR__RPC__API_PLAN_MISSING_FOR_RPC_METHOD = 8100003;
+var SOLANA_ERROR__RPC_SUBSCRIPTIONS__CANNOT_CREATE_SUBSCRIPTION_PLAN = 819e4;
+var SOLANA_ERROR__RPC_SUBSCRIPTIONS__EXPECTED_SERVER_SUBSCRIPTION_ID = 8190001;
+var SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CLOSED_BEFORE_MESSAGE_BUFFERED = 8190002;
+var SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CONNECTION_CLOSED = 8190003;
+var SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_FAILED_TO_CONNECT = 8190004;
+var SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_STATE_MISSING = 99e5;
+var SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_MUST_NOT_POLL_BEFORE_RESOLVING_EXISTING_MESSAGE_PROMISE = 9900001;
+var SOLANA_ERROR__INVARIANT_VIOLATION__CACHED_ABORTABLE_ITERABLE_CACHE_ENTRY_MISSING = 9900002;
+var SOLANA_ERROR__INVARIANT_VIOLATION__SWITCH_MUST_BE_EXHAUSTIVE = 9900003;
+var SOLANA_ERROR__INVARIANT_VIOLATION__DATA_PUBLISHER_CHANNEL_UNIMPLEMENTED = 9900004;
+
+// src/context.ts
+function encodeValue(value) {
+  if (Array.isArray(value)) {
+    const commaSeparatedValues = value.map(encodeValue).join(
+      "%2C%20"
+      /* ", " */
+    );
+    return "%5B" + commaSeparatedValues + /* "]" */
+    "%5D";
+  } else if (typeof value === "bigint") {
+    return `${value}n`;
+  } else {
+    return encodeURIComponent(
+      String(
+        value != null && Object.getPrototypeOf(value) === null ? (
+          // Plain objects with no prototype don't have a `toString` method.
+          // Convert them before stringifying them.
+          { ...value }
+        ) : value
+      )
+    );
+  }
+}
+function encodeObjectContextEntry([key, value]) {
+  return `${key}=${encodeValue(value)}`;
+}
+function encodeContextObject(context) {
+  const searchParamsString = Object.entries(context).map(encodeObjectContextEntry).join("&");
+  return btoa(searchParamsString);
+}
+
+// src/messages.ts
+var SolanaErrorMessages = {
+  [SOLANA_ERROR__ACCOUNTS__ACCOUNT_NOT_FOUND]: "Account not found at address: $address",
+  [SOLANA_ERROR__ACCOUNTS__EXPECTED_ALL_ACCOUNTS_TO_BE_DECODED]: "Not all accounts were decoded. Encoded accounts found at addresses: $addresses.",
+  [SOLANA_ERROR__ACCOUNTS__EXPECTED_DECODED_ACCOUNT]: "Expected decoded account at address: $address",
+  [SOLANA_ERROR__ACCOUNTS__FAILED_TO_DECODE_ACCOUNT]: "Failed to decode account data at address: $address",
+  [SOLANA_ERROR__ACCOUNTS__ONE_OR_MORE_ACCOUNTS_NOT_FOUND]: "Accounts not found at addresses: $addresses",
+  [SOLANA_ERROR__ADDRESSES__FAILED_TO_FIND_VIABLE_PDA_BUMP_SEED]: "Unable to find a viable program address bump seed.",
+  [SOLANA_ERROR__ADDRESSES__INVALID_BASE58_ENCODED_ADDRESS]: "$putativeAddress is not a base58-encoded address.",
+  [SOLANA_ERROR__ADDRESSES__INVALID_BYTE_LENGTH]: "Expected base58 encoded address to decode to a byte array of length 32. Actual length: $actualLength.",
+  [SOLANA_ERROR__ADDRESSES__INVALID_ED25519_PUBLIC_KEY]: "The `CryptoKey` must be an `Ed25519` public key.",
+  [SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE]: "Invalid seeds; point must fall off the Ed25519 curve.",
+  [SOLANA_ERROR__ADDRESSES__MALFORMED_PDA]: "Expected given program derived address to have the following format: [Address, ProgramDerivedAddressBump].",
+  [SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED]: "A maximum of $maxSeeds seeds, including the bump seed, may be supplied when creating an address. Received: $actual.",
+  [SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED]: "The seed at index $index with length $actual exceeds the maximum length of $maxSeedLength bytes.",
+  [SOLANA_ERROR__ADDRESSES__PDA_BUMP_SEED_OUT_OF_RANGE]: "Expected program derived address bump to be in the range [0, 255], got: $bump.",
+  [SOLANA_ERROR__ADDRESSES__PDA_ENDS_WITH_PDA_MARKER]: "Program address cannot end with PDA marker.",
+  [SOLANA_ERROR__ADDRESSES__STRING_LENGTH_OUT_OF_RANGE]: "Expected base58-encoded address string of length in the range [32, 44]. Actual length: $actualLength.",
+  [SOLANA_ERROR__BLOCKHASH_STRING_LENGTH_OUT_OF_RANGE]: "Expected base58-encoded blockash string of length in the range [32, 44]. Actual length: $actualLength.",
+  [SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED]: "The network has progressed past the last block for which this transaction could have been committed.",
+  [SOLANA_ERROR__CODECS__CANNOT_DECODE_EMPTY_BYTE_ARRAY]: "Codec [$codecDescription] cannot decode empty byte arrays.",
+  [SOLANA_ERROR__CODECS__CANNOT_USE_LEXICAL_VALUES_AS_ENUM_DISCRIMINATORS]: "Enum codec cannot use lexical values [$stringValues] as discriminators. Either remove all lexical values or set `useValuesAsDiscriminators` to `false`.",
+  [SOLANA_ERROR__CODECS__ENCODED_BYTES_MUST_NOT_INCLUDE_SENTINEL]: "Sentinel [$hexSentinel] must not be present in encoded bytes [$hexEncodedBytes].",
+  [SOLANA_ERROR__CODECS__ENCODER_DECODER_FIXED_SIZE_MISMATCH]: "Encoder and decoder must have the same fixed size, got [$encoderFixedSize] and [$decoderFixedSize].",
+  [SOLANA_ERROR__CODECS__ENCODER_DECODER_MAX_SIZE_MISMATCH]: "Encoder and decoder must have the same max size, got [$encoderMaxSize] and [$decoderMaxSize].",
+  [SOLANA_ERROR__CODECS__ENCODER_DECODER_SIZE_COMPATIBILITY_MISMATCH]: "Encoder and decoder must either both be fixed-size or variable-size.",
+  [SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE]: "Enum discriminator out of range. Expected a number in [$formattedValidDiscriminators], got $discriminator.",
+  [SOLANA_ERROR__CODECS__EXPECTED_FIXED_LENGTH]: "Expected a fixed-size codec, got a variable-size one.",
+  [SOLANA_ERROR__CODECS__EXPECTED_POSITIVE_BYTE_LENGTH]: "Codec [$codecDescription] expected a positive byte length, got $bytesLength.",
+  [SOLANA_ERROR__CODECS__EXPECTED_VARIABLE_LENGTH]: "Expected a variable-size codec, got a fixed-size one.",
+  [SOLANA_ERROR__CODECS__EXPECTED_ZERO_VALUE_TO_MATCH_ITEM_FIXED_SIZE]: "Codec [$codecDescription] expected zero-value [$hexZeroValue] to have the same size as the provided fixed-size item [$expectedSize bytes].",
+  [SOLANA_ERROR__CODECS__INVALID_BYTE_LENGTH]: "Codec [$codecDescription] expected $expected bytes, got $bytesLength.",
+  [SOLANA_ERROR__CODECS__INVALID_CONSTANT]: "Expected byte array constant [$hexConstant] to be present in data [$hexData] at offset [$offset].",
+  [SOLANA_ERROR__CODECS__INVALID_DISCRIMINATED_UNION_VARIANT]: "Invalid discriminated union variant. Expected one of [$variants], got $value.",
+  [SOLANA_ERROR__CODECS__INVALID_ENUM_VARIANT]: "Invalid enum variant. Expected one of [$stringValues] or a number in [$formattedNumericalValues], got $variant.",
+  [SOLANA_ERROR__CODECS__INVALID_LITERAL_UNION_VARIANT]: "Invalid literal union variant. Expected one of [$variants], got $value.",
+  [SOLANA_ERROR__CODECS__INVALID_NUMBER_OF_ITEMS]: "Expected [$codecDescription] to have $expected items, got $actual.",
+  [SOLANA_ERROR__CODECS__INVALID_STRING_FOR_BASE]: "Invalid value $value for base $base with alphabet $alphabet.",
+  [SOLANA_ERROR__CODECS__LITERAL_UNION_DISCRIMINATOR_OUT_OF_RANGE]: "Literal union discriminator out of range. Expected a number between $minRange and $maxRange, got $discriminator.",
+  [SOLANA_ERROR__CODECS__NUMBER_OUT_OF_RANGE]: "Codec [$codecDescription] expected number to be in the range [$min, $max], got $value.",
+  [SOLANA_ERROR__CODECS__OFFSET_OUT_OF_RANGE]: "Codec [$codecDescription] expected offset to be in the range [0, $bytesLength], got $offset.",
+  [SOLANA_ERROR__CODECS__SENTINEL_MISSING_IN_DECODED_BYTES]: "Expected sentinel [$hexSentinel] to be present in decoded bytes [$hexDecodedBytes].",
+  [SOLANA_ERROR__CODECS__UNION_VARIANT_OUT_OF_RANGE]: "Union variant out of range. Expected an index between $minRange and $maxRange, got $variant.",
+  [SOLANA_ERROR__CRYPTO__RANDOM_VALUES_FUNCTION_UNIMPLEMENTED]: "No random values implementation could be found.",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_ALREADY_INITIALIZED]: "instruction requires an uninitialized account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_FAILED]: "instruction tries to borrow reference for an account which is already borrowed",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_BORROW_OUTSTANDING]: "instruction left account with an outstanding borrowed reference",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_SIZE_CHANGED]: "program other than the account's owner changed the size of the account data",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_DATA_TOO_SMALL]: "account data too small for instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_EXECUTABLE]: "instruction expected an executable account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ACCOUNT_NOT_RENT_EXEMPT]: "An account does not have enough lamports to be rent-exempt",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ARITHMETIC_OVERFLOW]: "Program arithmetic overflowed",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__BORSH_IO_ERROR]: "Failed to serialize or deserialize account data: $encodedData",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS]: "Builtin programs must consume compute units",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__CALL_DEPTH]: "Cross-program invocation call depth too deep",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__COMPUTATIONAL_BUDGET_EXCEEDED]: "Computational budget exceeded",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM]: "custom program error: #$code",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_INDEX]: "instruction contains duplicate accounts",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__DUPLICATE_ACCOUNT_OUT_OF_SYNC]: "instruction modifications of multiply-passed account differ",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_ACCOUNT_NOT_RENT_EXEMPT]: "executable accounts must be rent exempt",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_DATA_MODIFIED]: "instruction changed executable accounts data",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_LAMPORT_CHANGE]: "instruction changed the balance of an executable account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__EXECUTABLE_MODIFIED]: "instruction changed executable bit of an account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_DATA_MODIFIED]: "instruction modified data of an account it does not own",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__EXTERNAL_ACCOUNT_LAMPORT_SPEND]: "instruction spent from the balance of an account it does not own",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__GENERIC_ERROR]: "generic instruction error",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__ILLEGAL_OWNER]: "Provided owner is not allowed",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__IMMUTABLE]: "Account is immutable",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_AUTHORITY]: "Incorrect authority provided",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INCORRECT_PROGRAM_ID]: "incorrect program id for instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS]: "insufficient funds for instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_DATA]: "invalid account data for instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ACCOUNT_OWNER]: "Invalid account owner",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ARGUMENT]: "invalid program argument",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_ERROR]: "program returned invalid error code",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_INSTRUCTION_DATA]: "invalid instruction data",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_REALLOC]: "Failed to reallocate account data",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__INVALID_SEEDS]: "Provided seeds do not result in a valid address",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED]: "Accounts data allocations exceeded the maximum allowed per transaction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MAX_ACCOUNTS_EXCEEDED]: "Max accounts exceeded",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED]: "Max instruction trace length exceeded",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MAX_SEED_LENGTH_EXCEEDED]: "Length of the seed is too long for address generation",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_ACCOUNT]: "An account required by the instruction is missing",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MISSING_REQUIRED_SIGNATURE]: "missing required signature for instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__MODIFIED_PROGRAM_ID]: "instruction illegally modified the program id of an account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__NOT_ENOUGH_ACCOUNT_KEYS]: "insufficient account keys for instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__PRIVILEGE_ESCALATION]: "Cross-program invocation with unauthorized signer or writable account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_ENVIRONMENT_SETUP_FAILURE]: "Failed to create program execution environment",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPILE]: "Program failed to compile",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__PROGRAM_FAILED_TO_COMPLETE]: "Program failed to complete",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_DATA_MODIFIED]: "instruction modified data of a read-only account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__READONLY_LAMPORT_CHANGE]: "instruction changed the balance of a read-only account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__REENTRANCY_NOT_ALLOWED]: "Cross-program invocation reentrancy not allowed for this instruction",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__RENT_EPOCH_MODIFIED]: "instruction modified rent epoch of an account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__UNBALANCED_INSTRUCTION]: "sum of account balances before and after instruction do not match",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__UNINITIALIZED_ACCOUNT]: "instruction requires an initialized account",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__UNKNOWN]: "",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_PROGRAM_ID]: "Unsupported program id",
+  [SOLANA_ERROR__INSTRUCTION_ERROR__UNSUPPORTED_SYSVAR]: "Unsupported sysvar",
+  [SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_ACCOUNTS]: "The instruction does not have any accounts.",
+  [SOLANA_ERROR__INSTRUCTION__EXPECTED_TO_HAVE_DATA]: "The instruction does not have any data.",
+  [SOLANA_ERROR__INSTRUCTION__PROGRAM_ID_MISMATCH]: "Expected instruction to have progress address $expectedProgramAddress, got $actualProgramAddress.",
+  [SOLANA_ERROR__INVALID_BLOCKHASH_BYTE_LENGTH]: "Expected base58 encoded blockhash to decode to a byte array of length 32. Actual length: $actualLength.",
+  [SOLANA_ERROR__INVALID_NONCE]: "The nonce `$expectedNonceValue` is no longer valid. It has advanced to `$actualNonceValue`",
+  [SOLANA_ERROR__INVARIANT_VIOLATION__CACHED_ABORTABLE_ITERABLE_CACHE_ENTRY_MISSING]: "Invariant violation: Found no abortable iterable cache entry for key `$cacheKey`. It should be impossible to hit this error; please file an issue at https://sola.na/web3invariant",
+  [SOLANA_ERROR__INVARIANT_VIOLATION__DATA_PUBLISHER_CHANNEL_UNIMPLEMENTED]: "Invariant violation: This data publisher does not publish to the channel named `$channelName`. Supported channels include $supportedChannelNames.",
+  [SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_MUST_NOT_POLL_BEFORE_RESOLVING_EXISTING_MESSAGE_PROMISE]: "Invariant violation: WebSocket message iterator state is corrupt; iterated without first resolving existing message promise. It should be impossible to hit this error; please file an issue at https://sola.na/web3invariant",
+  [SOLANA_ERROR__INVARIANT_VIOLATION__SUBSCRIPTION_ITERATOR_STATE_MISSING]: "Invariant violation: WebSocket message iterator is missing state storage. It should be impossible to hit this error; please file an issue at https://sola.na/web3invariant",
+  [SOLANA_ERROR__INVARIANT_VIOLATION__SWITCH_MUST_BE_EXHAUSTIVE]: "Invariant violation: Switch statement non-exhaustive. Received unexpected value `$unexpectedValue`. It should be impossible to hit this error; please file an issue at https://sola.na/web3invariant",
+  [SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR]: "JSON-RPC error: Internal JSON-RPC error ($__serverMessage)",
+  [SOLANA_ERROR__JSON_RPC__INVALID_PARAMS]: "JSON-RPC error: Invalid method parameter(s) ($__serverMessage)",
+  [SOLANA_ERROR__JSON_RPC__INVALID_REQUEST]: "JSON-RPC error: The JSON sent is not a valid `Request` object ($__serverMessage)",
+  [SOLANA_ERROR__JSON_RPC__METHOD_NOT_FOUND]: "JSON-RPC error: The method does not exist / is not available ($__serverMessage)",
+  [SOLANA_ERROR__JSON_RPC__PARSE_ERROR]: "JSON-RPC error: An error occurred on the server while parsing the JSON text ($__serverMessage)",
+  [SOLANA_ERROR__JSON_RPC__SCAN_ERROR]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_CLEANED_UP]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_KEY_EXCLUDED_FROM_SECONDARY_INDEX]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_LONG_TERM_STORAGE_SLOT_SKIPPED]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED]: "Minimum context slot has not been reached",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NODE_UNHEALTHY]: "Node is unhealthy; behind by $numSlotsBehind slots",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NO_SNAPSHOT]: "No snapshot",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE]: "Transaction simulation failed",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_HISTORY_NOT_AVAILABLE]: "Transaction history is not available from this node",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_PRECOMPILE_VERIFICATION_FAILURE]: "$__serverMessage",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_LEN_MISMATCH]: "Transaction signature length mismatch",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_SIGNATURE_VERIFICATION_FAILURE]: "Transaction signature verification failure",
+  [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_UNSUPPORTED_TRANSACTION_VERSION]: "$__serverMessage",
+  [SOLANA_ERROR__KEYS__INVALID_KEY_PAIR_BYTE_LENGTH]: "Key pair bytes must be of length 64, got $byteLength.",
+  [SOLANA_ERROR__KEYS__INVALID_PRIVATE_KEY_BYTE_LENGTH]: "Expected private key bytes with length 32. Actual length: $actualLength.",
+  [SOLANA_ERROR__KEYS__INVALID_SIGNATURE_BYTE_LENGTH]: "Expected base58-encoded signature to decode to a byte array of length 64. Actual length: $actualLength.",
+  [SOLANA_ERROR__KEYS__PUBLIC_KEY_MUST_MATCH_PRIVATE_KEY]: "The provided private key does not match the provided public key.",
+  [SOLANA_ERROR__KEYS__SIGNATURE_STRING_LENGTH_OUT_OF_RANGE]: "Expected base58-encoded signature string of length in the range [64, 88]. Actual length: $actualLength.",
+  [SOLANA_ERROR__LAMPORTS_OUT_OF_RANGE]: "Lamports value must be in the range [0, 2e64-1]",
+  [SOLANA_ERROR__MALFORMED_BIGINT_STRING]: "`$value` cannot be parsed as a `BigInt`",
+  [SOLANA_ERROR__MALFORMED_JSON_RPC_ERROR]: "$message",
+  [SOLANA_ERROR__MALFORMED_NUMBER_STRING]: "`$value` cannot be parsed as a `Number`",
+  [SOLANA_ERROR__NONCE_ACCOUNT_NOT_FOUND]: "No nonce account could be found at address `$nonceAccountAddress`",
+  [SOLANA_ERROR__RPC_SUBSCRIPTIONS__CANNOT_CREATE_SUBSCRIPTION_PLAN]: "The notification name must end in 'Notifications' and the API must supply a subscription plan creator function for the notification '$notificationName'.",
+  [SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CLOSED_BEFORE_MESSAGE_BUFFERED]: "WebSocket was closed before payload could be added to the send buffer",
+  [SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_CONNECTION_CLOSED]: "WebSocket connection closed",
+  [SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_FAILED_TO_CONNECT]: "WebSocket failed to connect",
+  [SOLANA_ERROR__RPC_SUBSCRIPTIONS__EXPECTED_SERVER_SUBSCRIPTION_ID]: "Failed to obtain a subscription id from the server",
+  [SOLANA_ERROR__RPC__API_PLAN_MISSING_FOR_RPC_METHOD]: "Could not find an API plan for RPC method: `$method`",
+  [SOLANA_ERROR__RPC__INTEGER_OVERFLOW]: "The $argumentLabel argument to the `$methodName` RPC method$optionalPathLabel was `$value`. This number is unsafe for use with the Solana JSON-RPC because it exceeds `Number.MAX_SAFE_INTEGER`.",
+  [SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR]: "HTTP error ($statusCode): $message",
+  [SOLANA_ERROR__RPC__TRANSPORT_HTTP_HEADER_FORBIDDEN]: "HTTP header(s) forbidden: $headers. Learn more at https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_header_name.",
+  [SOLANA_ERROR__SIGNER__ADDRESS_CANNOT_HAVE_MULTIPLE_SIGNERS]: "Multiple distinct signers were identified for address `$address`. Please ensure that you are using the same signer instance for each address.",
+  [SOLANA_ERROR__SIGNER__EXPECTED_KEY_PAIR_SIGNER]: "The provided value does not implement the `KeyPairSigner` interface",
+  [SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_MODIFYING_SIGNER]: "The provided value does not implement the `MessageModifyingSigner` interface",
+  [SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_PARTIAL_SIGNER]: "The provided value does not implement the `MessagePartialSigner` interface",
+  [SOLANA_ERROR__SIGNER__EXPECTED_MESSAGE_SIGNER]: "The provided value does not implement any of the `MessageSigner` interfaces",
+  [SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_MODIFYING_SIGNER]: "The provided value does not implement the `TransactionModifyingSigner` interface",
+  [SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_PARTIAL_SIGNER]: "The provided value does not implement the `TransactionPartialSigner` interface",
+  [SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SENDING_SIGNER]: "The provided value does not implement the `TransactionSendingSigner` interface",
+  [SOLANA_ERROR__SIGNER__EXPECTED_TRANSACTION_SIGNER]: "The provided value does not implement any of the `TransactionSigner` interfaces",
+  [SOLANA_ERROR__SIGNER__TRANSACTION_CANNOT_HAVE_MULTIPLE_SENDING_SIGNERS]: "More than one `TransactionSendingSigner` was identified.",
+  [SOLANA_ERROR__SIGNER__TRANSACTION_SENDING_SIGNER_MISSING]: "No `TransactionSendingSigner` was identified. Please provide a valid `ITransactionWithSingleSendingSigner` transaction.",
+  [SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED]: "Wallet account signers do not support signing multiple messages/transactions in a single operation",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__CANNOT_EXPORT_NON_EXTRACTABLE_KEY]: "Cannot export a non-extractable key.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__DIGEST_UNIMPLEMENTED]: "No digest implementation could be found.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__DISALLOWED_IN_INSECURE_CONTEXT]: "Cryptographic operations are only allowed in secure browser contexts. Read more here: https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__ED25519_ALGORITHM_UNIMPLEMENTED]: "This runtime does not support the generation of Ed25519 key pairs.\n\nInstall @solana/webcrypto-ed25519-polyfill and call its `install` function before generating keys in environments that do not support Ed25519.\n\nFor a list of runtimes that currently support Ed25519 operations, visit https://github.com/WICG/webcrypto-secure-curves/issues/20.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__EXPORT_FUNCTION_UNIMPLEMENTED]: "No signature verification implementation could be found.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__GENERATE_FUNCTION_UNIMPLEMENTED]: "No key generation implementation could be found.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__SIGN_FUNCTION_UNIMPLEMENTED]: "No signing implementation could be found.",
+  [SOLANA_ERROR__SUBTLE_CRYPTO__VERIFY_FUNCTION_UNIMPLEMENTED]: "No key export implementation could be found.",
+  [SOLANA_ERROR__TIMESTAMP_OUT_OF_RANGE]: "Timestamp value must be in the range [-(2n ** 63n), (2n ** 63n) - 1]. `$value` given",
+  [SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_BORROW_OUTSTANDING]: "Transaction processing left an account with an outstanding borrowed reference",
+  [SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_IN_USE]: "Account in use",
+  [SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_LOADED_TWICE]: "Account loaded twice",
+  [SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND]: "Attempt to debit an account but found no record of a prior credit.",
+  [SOLANA_ERROR__TRANSACTION_ERROR__ADDRESS_LOOKUP_TABLE_NOT_FOUND]: "Transaction loads an address table account that doesn't exist",
+  [SOLANA_ERROR__TRANSACTION_ERROR__ALREADY_PROCESSED]: "This transaction has already been processed",
+  [SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND]: "Blockhash not found",
+  [SOLANA_ERROR__TRANSACTION_ERROR__CALL_CHAIN_TOO_DEEP]: "Loader call chain is too deep",
+  [SOLANA_ERROR__TRANSACTION_ERROR__CLUSTER_MAINTENANCE]: "Transactions are currently disabled due to cluster maintenance",
+  [SOLANA_ERROR__TRANSACTION_ERROR__DUPLICATE_INSTRUCTION]: "Transaction contains a duplicate instruction ($index) that is not allowed",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE]: "Insufficient funds for fee",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_RENT]: "Transaction results in an account ($accountIndex) with insufficient funds for rent",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_FOR_FEE]: "This account may not be used to pay transaction fees",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ACCOUNT_INDEX]: "Transaction contains an invalid account reference",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_DATA]: "Transaction loads an address table account with invalid data",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_INDEX]: "Transaction address table lookup uses an invalid index",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_ADDRESS_LOOKUP_TABLE_OWNER]: "Transaction loads an address table account with an invalid owner",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_LOADED_ACCOUNTS_DATA_SIZE_LIMIT]: "LoadedAccountsDataSizeLimit set for transaction must be greater than 0.",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_PROGRAM_FOR_EXECUTION]: "This program may not be used for executing instructions",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_RENT_PAYING_ACCOUNT]: "Transaction leaves an account with a lower balance than rent-exempt minimum",
+  [SOLANA_ERROR__TRANSACTION_ERROR__INVALID_WRITABLE_ACCOUNT]: "Transaction loads a writable account that cannot be written",
+  [SOLANA_ERROR__TRANSACTION_ERROR__MAX_LOADED_ACCOUNTS_DATA_SIZE_EXCEEDED]: "Transaction exceeded max loaded accounts data size cap",
+  [SOLANA_ERROR__TRANSACTION_ERROR__MISSING_SIGNATURE_FOR_FEE]: "Transaction requires a fee but has no signature present",
+  [SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_ACCOUNT_NOT_FOUND]: "Attempt to load a program that does not exist",
+  [SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_EXECUTION_TEMPORARILY_RESTRICTED]: "Execution of the program referenced by account at index $accountIndex is temporarily restricted.",
+  [SOLANA_ERROR__TRANSACTION_ERROR__RESANITIZATION_NEEDED]: "ResanitizationNeeded",
+  [SOLANA_ERROR__TRANSACTION_ERROR__SANITIZE_FAILURE]: "Transaction failed to sanitize accounts offsets correctly",
+  [SOLANA_ERROR__TRANSACTION_ERROR__SIGNATURE_FAILURE]: "Transaction did not pass signature verification",
+  [SOLANA_ERROR__TRANSACTION_ERROR__TOO_MANY_ACCOUNT_LOCKS]: "Transaction locked too many accounts",
+  [SOLANA_ERROR__TRANSACTION_ERROR__UNBALANCED_TRANSACTION]: "Sum of account balances before and after transaction do not match",
+  [SOLANA_ERROR__TRANSACTION_ERROR__UNKNOWN]: "The transaction failed with the error `$errorName`",
+  [SOLANA_ERROR__TRANSACTION_ERROR__UNSUPPORTED_VERSION]: "Transaction version is unsupported",
+  [SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_BLOCK_LIMIT]: "Transaction would exceed account data limit within the block",
+  [SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_ACCOUNT_DATA_TOTAL_LIMIT]: "Transaction would exceed total account data limit",
+  [SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_ACCOUNT_COST_LIMIT]: "Transaction would exceed max account limit within the block",
+  [SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_BLOCK_COST_LIMIT]: "Transaction would exceed max Block Cost Limit",
+  [SOLANA_ERROR__TRANSACTION_ERROR__WOULD_EXCEED_MAX_VOTE_COST_LIMIT]: "Transaction would exceed max Vote Cost Limit",
+  [SOLANA_ERROR__TRANSACTION__ADDRESSES_CANNOT_SIGN_TRANSACTION]: "Attempted to sign a transaction with an address that is not a signer for it",
+  [SOLANA_ERROR__TRANSACTION__ADDRESS_MISSING]: "Transaction is missing an address at index: $index.",
+  [SOLANA_ERROR__TRANSACTION__CANNOT_ENCODE_WITH_EMPTY_SIGNATURES]: "Transaction has no expected signers therefore it cannot be encoded",
+  [SOLANA_ERROR__TRANSACTION__EXPECTED_BLOCKHASH_LIFETIME]: "Transaction does not have a blockhash lifetime",
+  [SOLANA_ERROR__TRANSACTION__EXPECTED_NONCE_LIFETIME]: "Transaction is not a durable nonce transaction",
+  [SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_CONTENTS_MISSING]: "Contents of these address lookup tables unknown: $lookupTableAddresses",
+  [SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_ADDRESS_LOOKUP_TABLE_INDEX_OUT_OF_RANGE]: "Lookup of address at index $highestRequestedIndex failed for lookup table `$lookupTableAddress`. Highest known index is $highestKnownIndex. The lookup table may have been extended since its contents were retrieved",
+  [SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_FEE_PAYER_MISSING]: "No fee payer set in CompiledTransaction",
+  [SOLANA_ERROR__TRANSACTION__FAILED_TO_DECOMPILE_INSTRUCTION_PROGRAM_ADDRESS_NOT_FOUND]: "Could not find program address at index $index",
+  [SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT]: "Failed to estimate the compute unit consumption for this transaction message. This is likely because simulating the transaction failed. Inspect the `cause` property of this error to learn more",
+  [SOLANA_ERROR__TRANSACTION__FAILED_WHEN_SIMULATING_TO_ESTIMATE_COMPUTE_LIMIT]: "Transaction failed when it was simulated in order to estimate the compute unit consumption. The compute unit estimate provided is for a transaction that failed when simulated and may not be representative of the compute units this transaction would consume if successful. Inspect the `cause` property of this error to learn more",
+  [SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING]: "Transaction is missing a fee payer.",
+  [SOLANA_ERROR__TRANSACTION__FEE_PAYER_SIGNATURE_MISSING]: "Could not determine this transaction's signature. Make sure that the transaction has been signed by its fee payer.",
+  [SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_FIRST_INSTRUCTION_MUST_BE_ADVANCE_NONCE]: "Transaction first instruction is not advance nonce account instruction.",
+  [SOLANA_ERROR__TRANSACTION__INVALID_NONCE_TRANSACTION_INSTRUCTIONS_MISSING]: "Transaction with no instructions cannot be durable nonce transaction.",
+  [SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_CANNOT_PAY_FEES]: "This transaction includes an address (`$programAddress`) which is both invoked and set as the fee payer. Program addresses may not pay fees",
+  [SOLANA_ERROR__TRANSACTION__INVOKED_PROGRAMS_MUST_NOT_BE_WRITABLE]: "This transaction includes an address (`$programAddress`) which is both invoked and marked writable. Program addresses may not be writable",
+  [SOLANA_ERROR__TRANSACTION__MESSAGE_SIGNATURES_MISMATCH]: "The transaction message expected the transaction to have $signerAddressesLength signatures, got $signaturesLength.",
+  [SOLANA_ERROR__TRANSACTION__SIGNATURES_MISSING]: "Transaction is missing signatures for addresses: $addresses.",
+  [SOLANA_ERROR__TRANSACTION__VERSION_NUMBER_OUT_OF_RANGE]: "Transaction version must be in the range [0, 127]. `$actualVersion` given"
+};
+
+// src/message-formatter.ts
+var START_INDEX = "i";
+var TYPE = "t";
+function getHumanReadableErrorMessage(code, context = {}) {
+  const messageFormatString = SolanaErrorMessages[code];
+  if (messageFormatString.length === 0) {
+    return "";
+  }
+  let state;
+  function commitStateUpTo(endIndex) {
+    if (state[TYPE] === 2 /* Variable */) {
+      const variableName = messageFormatString.slice(state[START_INDEX] + 1, endIndex);
+      fragments.push(
+        variableName in context ? (
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `${context[variableName]}`
+        ) : `$${variableName}`
+      );
+    } else if (state[TYPE] === 1 /* Text */) {
+      fragments.push(messageFormatString.slice(state[START_INDEX], endIndex));
+    }
+  }
+  const fragments = [];
+  messageFormatString.split("").forEach((char, ii) => {
+    if (ii === 0) {
+      state = {
+        [START_INDEX]: 0,
+        [TYPE]: messageFormatString[0] === "\\" ? 0 /* EscapeSequence */ : messageFormatString[0] === "$" ? 2 /* Variable */ : 1 /* Text */
+      };
+      return;
+    }
+    let nextState;
+    switch (state[TYPE]) {
+      case 0 /* EscapeSequence */:
+        nextState = { [START_INDEX]: ii, [TYPE]: 1 /* Text */ };
+        break;
+      case 1 /* Text */:
+        if (char === "\\") {
+          nextState = { [START_INDEX]: ii, [TYPE]: 0 /* EscapeSequence */ };
+        } else if (char === "$") {
+          nextState = { [START_INDEX]: ii, [TYPE]: 2 /* Variable */ };
+        }
+        break;
+      case 2 /* Variable */:
+        if (char === "\\") {
+          nextState = { [START_INDEX]: ii, [TYPE]: 0 /* EscapeSequence */ };
+        } else if (char === "$") {
+          nextState = { [START_INDEX]: ii, [TYPE]: 2 /* Variable */ };
+        } else if (!char.match(/\w/)) {
+          nextState = { [START_INDEX]: ii, [TYPE]: 1 /* Text */ };
+        }
+        break;
+    }
+    if (nextState) {
+      if (state !== nextState) {
+        commitStateUpTo(ii);
+      }
+      state = nextState;
+    }
+  });
+  commitStateUpTo();
+  return fragments.join("");
+}
+function getErrorMessage(code, context = {}) {
+  if (true) {
+    return getHumanReadableErrorMessage(code, context);
+  } else {}
+}
+
+// src/error.ts
+function isSolanaError(e, code) {
+  const isSolanaError2 = e instanceof Error && e.name === "SolanaError";
+  if (isSolanaError2) {
+    if (code !== undefined) {
+      return e.context.__code === code;
+    }
+    return true;
+  }
+  return false;
+}
+var SolanaError = class extends Error {
+  /**
+   * Indicates the root cause of this {@link SolanaError}, if any.
+   *
+   * For example, a transaction error might have an instruction error as its root cause. In this
+   * case, you will be able to access the instruction error on the transaction error as `cause`.
+   */
+  cause = this.cause;
+  /**
+   * Contains context that can assist in understanding or recovering from a {@link SolanaError}.
+   */
+  context;
+  constructor(...[code, contextAndErrorOptions]) {
+    let context;
+    let errorOptions;
+    if (contextAndErrorOptions) {
+      const { cause, ...contextRest } = contextAndErrorOptions;
+      if (cause) {
+        errorOptions = { cause };
+      }
+      if (Object.keys(contextRest).length > 0) {
+        context = contextRest;
+      }
+    }
+    const message = getErrorMessage(code, context);
+    super(message, errorOptions);
+    this.context = {
+      __code: code,
+      ...context
+    };
+    this.name = "SolanaError";
+  }
+};
+
+// src/stack-trace.ts
+function safeCaptureStackTrace(...args) {
+  if ("captureStackTrace" in Error && typeof Error.captureStackTrace === "function") {
+    Error.captureStackTrace(...args);
+  }
+}
+
+// src/rpc-enum-errors.ts
+function getSolanaErrorFromRpcError({ errorCodeBaseOffset, getErrorContext, orderedErrorNames, rpcEnumError }, constructorOpt) {
+  let rpcErrorName;
+  let rpcErrorContext;
+  if (typeof rpcEnumError === "string") {
+    rpcErrorName = rpcEnumError;
+  } else {
+    rpcErrorName = Object.keys(rpcEnumError)[0];
+    rpcErrorContext = rpcEnumError[rpcErrorName];
+  }
+  const codeOffset = orderedErrorNames.indexOf(rpcErrorName);
+  const errorCode = errorCodeBaseOffset + codeOffset;
+  const errorContext = getErrorContext(errorCode, rpcErrorName, rpcErrorContext);
+  const err = new SolanaError(errorCode, errorContext);
+  safeCaptureStackTrace(err, constructorOpt);
+  return err;
+}
+
+// src/instruction-error.ts
+var ORDERED_ERROR_NAMES = [
+  // Keep synced with RPC source: https://github.com/anza-xyz/agave/blob/master/sdk/program/src/instruction.rs
+  // If this list ever gets too large, consider implementing a compression strategy like this:
+  // https://gist.github.com/steveluscher/aaa7cbbb5433b1197983908a40860c47
+  "GenericError",
+  "InvalidArgument",
+  "InvalidInstructionData",
+  "InvalidAccountData",
+  "AccountDataTooSmall",
+  "InsufficientFunds",
+  "IncorrectProgramId",
+  "MissingRequiredSignature",
+  "AccountAlreadyInitialized",
+  "UninitializedAccount",
+  "UnbalancedInstruction",
+  "ModifiedProgramId",
+  "ExternalAccountLamportSpend",
+  "ExternalAccountDataModified",
+  "ReadonlyLamportChange",
+  "ReadonlyDataModified",
+  "DuplicateAccountIndex",
+  "ExecutableModified",
+  "RentEpochModified",
+  "NotEnoughAccountKeys",
+  "AccountDataSizeChanged",
+  "AccountNotExecutable",
+  "AccountBorrowFailed",
+  "AccountBorrowOutstanding",
+  "DuplicateAccountOutOfSync",
+  "Custom",
+  "InvalidError",
+  "ExecutableDataModified",
+  "ExecutableLamportChange",
+  "ExecutableAccountNotRentExempt",
+  "UnsupportedProgramId",
+  "CallDepth",
+  "MissingAccount",
+  "ReentrancyNotAllowed",
+  "MaxSeedLengthExceeded",
+  "InvalidSeeds",
+  "InvalidRealloc",
+  "ComputationalBudgetExceeded",
+  "PrivilegeEscalation",
+  "ProgramEnvironmentSetupFailure",
+  "ProgramFailedToComplete",
+  "ProgramFailedToCompile",
+  "Immutable",
+  "IncorrectAuthority",
+  "BorshIoError",
+  "AccountNotRentExempt",
+  "InvalidAccountOwner",
+  "ArithmeticOverflow",
+  "UnsupportedSysvar",
+  "IllegalOwner",
+  "MaxAccountsDataAllocationsExceeded",
+  "MaxAccountsExceeded",
+  "MaxInstructionTraceLengthExceeded",
+  "BuiltinProgramsMustConsumeComputeUnits"
+];
+function getSolanaErrorFromInstructionError(index, instructionError) {
+  const numberIndex = Number(index);
+  return getSolanaErrorFromRpcError(
+    {
+      errorCodeBaseOffset: 4615001,
+      getErrorContext(errorCode, rpcErrorName, rpcErrorContext) {
+        if (errorCode === SOLANA_ERROR__INSTRUCTION_ERROR__UNKNOWN) {
+          return {
+            errorName: rpcErrorName,
+            index: numberIndex,
+            ...rpcErrorContext !== undefined ? { instructionErrorContext: rpcErrorContext } : null
+          };
+        } else if (errorCode === SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM) {
+          return {
+            code: Number(rpcErrorContext),
+            index: numberIndex
+          };
+        } else if (errorCode === SOLANA_ERROR__INSTRUCTION_ERROR__BORSH_IO_ERROR) {
+          return {
+            encodedData: rpcErrorContext,
+            index: numberIndex
+          };
+        }
+        return { index: numberIndex };
+      },
+      orderedErrorNames: ORDERED_ERROR_NAMES,
+      rpcEnumError: instructionError
+    },
+    getSolanaErrorFromInstructionError
+  );
+}
+
+// src/transaction-error.ts
+var ORDERED_ERROR_NAMES2 = [
+  // Keep synced with RPC source: https://github.com/anza-xyz/agave/blob/master/sdk/src/transaction/error.rs
+  // If this list ever gets too large, consider implementing a compression strategy like this:
+  // https://gist.github.com/steveluscher/aaa7cbbb5433b1197983908a40860c47
+  "AccountInUse",
+  "AccountLoadedTwice",
+  "AccountNotFound",
+  "ProgramAccountNotFound",
+  "InsufficientFundsForFee",
+  "InvalidAccountForFee",
+  "AlreadyProcessed",
+  "BlockhashNotFound",
+  // `InstructionError` intentionally omitted; delegated to `getSolanaErrorFromInstructionError`
+  "CallChainTooDeep",
+  "MissingSignatureForFee",
+  "InvalidAccountIndex",
+  "SignatureFailure",
+  "InvalidProgramForExecution",
+  "SanitizeFailure",
+  "ClusterMaintenance",
+  "AccountBorrowOutstanding",
+  "WouldExceedMaxBlockCostLimit",
+  "UnsupportedVersion",
+  "InvalidWritableAccount",
+  "WouldExceedMaxAccountCostLimit",
+  "WouldExceedAccountDataBlockLimit",
+  "TooManyAccountLocks",
+  "AddressLookupTableNotFound",
+  "InvalidAddressLookupTableOwner",
+  "InvalidAddressLookupTableData",
+  "InvalidAddressLookupTableIndex",
+  "InvalidRentPayingAccount",
+  "WouldExceedMaxVoteCostLimit",
+  "WouldExceedAccountDataTotalLimit",
+  "DuplicateInstruction",
+  "InsufficientFundsForRent",
+  "MaxLoadedAccountsDataSizeExceeded",
+  "InvalidLoadedAccountsDataSizeLimit",
+  "ResanitizationNeeded",
+  "ProgramExecutionTemporarilyRestricted",
+  "UnbalancedTransaction"
+];
+function getSolanaErrorFromTransactionError(transactionError) {
+  if (typeof transactionError === "object" && "InstructionError" in transactionError) {
+    return getSolanaErrorFromInstructionError(
+      ...transactionError.InstructionError
+    );
+  }
+  return getSolanaErrorFromRpcError(
+    {
+      errorCodeBaseOffset: 7050001,
+      getErrorContext(errorCode, rpcErrorName, rpcErrorContext) {
+        if (errorCode === SOLANA_ERROR__TRANSACTION_ERROR__UNKNOWN) {
+          return {
+            errorName: rpcErrorName,
+            ...rpcErrorContext !== undefined ? { transactionErrorContext: rpcErrorContext } : null
+          };
+        } else if (errorCode === SOLANA_ERROR__TRANSACTION_ERROR__DUPLICATE_INSTRUCTION) {
+          return {
+            index: Number(rpcErrorContext)
+          };
+        } else if (errorCode === SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_RENT || errorCode === SOLANA_ERROR__TRANSACTION_ERROR__PROGRAM_EXECUTION_TEMPORARILY_RESTRICTED) {
+          return {
+            accountIndex: Number(rpcErrorContext.account_index)
+          };
+        }
+      },
+      orderedErrorNames: ORDERED_ERROR_NAMES2,
+      rpcEnumError: transactionError
+    },
+    getSolanaErrorFromTransactionError
+  );
+}
+
+// src/json-rpc-error.ts
+function getSolanaErrorFromJsonRpcError(putativeErrorResponse) {
+  let out;
+  if (isRpcErrorResponse(putativeErrorResponse)) {
+    const { code: rawCode, data, message } = putativeErrorResponse;
+    const code = Number(rawCode);
+    if (code === SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE) {
+      const { err, ...preflightErrorContext } = data;
+      const causeObject = err ? { cause: getSolanaErrorFromTransactionError(err) } : null;
+      out = new SolanaError(SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE, {
+        ...preflightErrorContext,
+        ...causeObject
+      });
+    } else {
+      let errorContext;
+      switch (code) {
+        case SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR:
+        case SOLANA_ERROR__JSON_RPC__INVALID_PARAMS:
+        case SOLANA_ERROR__JSON_RPC__INVALID_REQUEST:
+        case SOLANA_ERROR__JSON_RPC__METHOD_NOT_FOUND:
+        case SOLANA_ERROR__JSON_RPC__PARSE_ERROR:
+        case SOLANA_ERROR__JSON_RPC__SCAN_ERROR:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_CLEANED_UP:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_KEY_EXCLUDED_FROM_SECONDARY_INDEX:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_LONG_TERM_STORAGE_SLOT_SKIPPED:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_TRANSACTION_PRECOMPILE_VERIFICATION_FAILURE:
+        case SOLANA_ERROR__JSON_RPC__SERVER_ERROR_UNSUPPORTED_TRANSACTION_VERSION:
+          errorContext = { __serverMessage: message };
+          break;
+        default:
+          if (typeof data === "object" && !Array.isArray(data)) {
+            errorContext = data;
+          }
+      }
+      out = new SolanaError(code, errorContext);
+    }
+  } else {
+    const message = typeof putativeErrorResponse === "object" && putativeErrorResponse !== null && "message" in putativeErrorResponse && typeof putativeErrorResponse.message === "string" ? putativeErrorResponse.message : "Malformed JSON-RPC error with no message attribute";
+    out = new SolanaError(SOLANA_ERROR__MALFORMED_JSON_RPC_ERROR, { error: putativeErrorResponse, message });
+  }
+  safeCaptureStackTrace(out, getSolanaErrorFromJsonRpcError);
+  return out;
+}
+function isRpcErrorResponse(value) {
+  return typeof value === "object" && value !== null && "code" in value && "message" in value && (typeof value.code === "number" || typeof value.code === "bigint") && typeof value.message === "string";
+}
+
+
+//# sourceMappingURL=index.browser.mjs.map
+//# sourceMappingURL=index.browser.mjs.map
+
+/***/ }),
+
 /***/ "./node_modules/@solana/web3.js/node_modules/base-x/src/index.js":
 /*!***********************************************************************!*\
   !*** ./node_modules/@solana/web3.js/node_modules/base-x/src/index.js ***!
@@ -58986,87 +60974,6 @@ function fromByteArray (uint8) {
 
   return parts.join('')
 }
-
-
-/***/ }),
-
-/***/ "./node_modules/bigint-buffer/dist/browser.js":
-/*!****************************************************!*\
-  !*** ./node_modules/bigint-buffer/dist/browser.js ***!
-  \****************************************************/
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
-
-"use strict";
-/* provided dependency */ var Buffer = __webpack_require__(/*! buffer */ "./node_modules/buffer/index.js")["Buffer"];
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-let converter;
-/**
- * Convert a little-endian buffer into a BigInt.
- * @param buf The little-endian buffer to convert
- * @returns A BigInt with the little-endian representation of buf.
- */
-function toBigIntLE(buf) {
-    {
-        const reversed = Buffer.from(buf);
-        reversed.reverse();
-        const hex = reversed.toString('hex');
-        if (hex.length === 0) {
-            return BigInt(0);
-        }
-        return BigInt(`0x${hex}`);
-    }
-    return converter.toBigInt(buf, false);
-}
-exports.toBigIntLE = toBigIntLE;
-/**
- * Convert a big-endian buffer into a BigInt
- * @param buf The big-endian buffer to convert.
- * @returns A BigInt with the big-endian representation of buf.
- */
-function toBigIntBE(buf) {
-    {
-        const hex = buf.toString('hex');
-        if (hex.length === 0) {
-            return BigInt(0);
-        }
-        return BigInt(`0x${hex}`);
-    }
-    return converter.toBigInt(buf, true);
-}
-exports.toBigIntBE = toBigIntBE;
-/**
- * Convert a BigInt to a little-endian buffer.
- * @param num   The BigInt to convert.
- * @param width The number of bytes that the resulting buffer should be.
- * @returns A little-endian buffer representation of num.
- */
-function toBufferLE(num, width) {
-    {
-        const hex = num.toString(16);
-        const buffer = Buffer.from(hex.padStart(width * 2, '0').slice(0, width * 2), 'hex');
-        buffer.reverse();
-        return buffer;
-    }
-    // Allocation is done here, since it is slower using napi in C
-    return converter.fromBigInt(num, Buffer.allocUnsafe(width), false);
-}
-exports.toBufferLE = toBufferLE;
-/**
- * Convert a BigInt to a big-endian buffer.
- * @param num   The BigInt to convert.
- * @param width The number of bytes that the resulting buffer should be.
- * @returns A big-endian buffer representation of num.
- */
-function toBufferBE(num, width) {
-    {
-        const hex = num.toString(16);
-        return Buffer.from(hex.padStart(width * 2, '0').slice(0, width * 2), 'hex');
-    }
-    return converter.fromBigInt(num, Buffer.allocUnsafe(width), true);
-}
-exports.toBufferBE = toBufferBE;
 
 
 /***/ }),
