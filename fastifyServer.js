@@ -1512,12 +1512,33 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
 // Import robust cNFT transfer implementation
 const robustCnftTransfer = require('./robust-cnft-transfer');
 
-// Use existing endpoints for diagnostic and robust transfer
-// Our robust-cnft-transfer module is already imported at line 1121
-// and used in the existing robust-transfer endpoint at line 1093
+// Endpoint for robust cNFT transfer
+fastify.post('/api/robust-transfer', async (request, reply) => {
+  try {
+    return await robustCnftTransfer.processRobustTransferRequest(request, reply);
+  } catch (error) {
+    fastify.log.error(`Error in robust transfer endpoint: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to process robust transfer request',
+      message: error.message
+    });
+  }
+});
 
-// We're using the implementation from robust-cnft-transfer.js module
-// but the endpoint is already defined in this file
+// Endpoint for diagnostic test on a cNFT
+fastify.get('/api/diagnostic/:assetId', async (request, reply) => {
+  try {
+    return await robustCnftTransfer.processDiagnosticRequest(request, reply);
+  } catch (error) {
+    fastify.log.error(`Error in diagnostic endpoint: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to process diagnostic request',
+      message: error.message
+    });
+  }
+});
 
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;

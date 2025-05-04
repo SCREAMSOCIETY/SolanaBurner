@@ -213,6 +213,7 @@ const DirectTrashModal: React.FC<DirectTrashModalProps> = ({
           onClose={handleRobustClose}
           assetId={assetId}
           assetName={assetName}
+          assetImage={assetImage}
           onSuccess={handleRobustSuccess}
           onError={handleRobustError}
         />
