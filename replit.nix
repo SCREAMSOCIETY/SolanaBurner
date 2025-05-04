@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.jq
     pkgs.udev
     pkgs.binaryen
     pkgs.rustup

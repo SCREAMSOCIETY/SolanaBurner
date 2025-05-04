@@ -96,6 +96,8 @@ async function getProof(assetId) {
       throw new Error('HELIUS_API_KEY environment variable is not set');
     }
     
+    console.log(`[CLI] Fetching proof data for asset: ${assetId}`);
+    
     // Try multiple methods to get proof data
     let proofData = null;
     let errors = [];
@@ -111,6 +113,7 @@ async function getProof(assetId) {
         }
       };
       
+      console.log('[CLI] Trying Helius RPC API...');
       const response = await axios.post(
         `https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}`,
         payload
@@ -118,25 +121,58 @@ async function getProof(assetId) {
       
       if (response.data && response.data.result) {
         proofData = response.data.result;
-        console.log('Proof data fetched via Helius RPC API');
+        
+        // Add compression object if it doesn't exist
+        if (!proofData.compression) {
+          console.log('[CLI] Adding missing compression object to proof data');
+          proofData.compression = {
+            tree: proofData.tree_id,
+            proof: proofData.proof,
+            leaf_id: proofData.leaf_index
+          };
+          
+          if (proofData.data_hash) {
+            proofData.compression.data_hash = proofData.data_hash;
+          }
+          
+          if (proofData.creator_hash) {
+            proofData.compression.creator_hash = proofData.creator_hash;
+          }
+        }
+        
+        console.log('[CLI] Proof data fetched via Helius RPC API');
       }
     } catch (error) {
       errors.push(`Helius RPC API error: ${error.message}`);
+      console.error('[CLI] Helius RPC API error:', error.message);
     }
     
     // Method 2: Try Helius REST API if RPC failed
     if (!proofData) {
       try {
+        console.log('[CLI] Trying Helius REST API...');
         const response = await axios.get(
           `https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${process.env.HELIUS_API_KEY}`
         );
         
         if (response.data && response.data.proof) {
           proofData = response.data;
-          console.log('Proof data fetched via Helius REST API');
+          
+          // Add compression object if it doesn't exist
+          if (!proofData.compression) {
+            console.log('[CLI] Adding missing compression object to proof data');
+            proofData.compression = {
+              tree: proofData.tree || proofData.tree_id,
+              proof: proofData.proof,
+              leaf_id: proofData.leaf_index || proofData.node_index || 0
+            };
+          }
+          
+          console.log('[CLI] Proof data fetched via Helius REST API');
         }
       } catch (error) {
         errors.push(`Helius REST API error: ${error.message}`);
+        console.error('[CLI] Helius REST API error:', error.message);
       }
     }
     
