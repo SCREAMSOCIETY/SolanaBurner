@@ -991,6 +991,66 @@ const WalletAssets: React.FC = () => {
     }
   };
 
+  // Function to handle opening the Direct Trash Modal
+  const openDirectTrashModal = (cnft: CNFTData) => {
+    setSelectedCnftForTrash({
+      id: cnft.mint,
+      name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`
+    });
+    setDirectTrashModalOpen(true);
+  };
+  
+  // Handle successful direct trash operation
+  const handleDirectTrashSuccess = (signature: string) => {
+    if (!selectedCnftForTrash) return;
+    
+    console.log('[WalletAssets] Direct trash operation successful for asset:', selectedCnftForTrash.id);
+    console.log('[WalletAssets] Signature:', signature);
+    
+    // Track successful result in debug info
+    if (window.debugInfo) {
+      window.debugInfo.lastCnftSuccess = true;
+      window.debugInfo.lastCnftSignature = signature;
+      window.debugInfo.transferMethod = 'Direct CLI-based transfer';
+    }
+    
+    // Show success notification
+    if (window.BurnAnimations) {
+      window.BurnAnimations.createConfetti();
+      window.BurnAnimations.showNotification(
+        'cNFT Trashed! 🎉',
+        `Successfully trashed ${selectedCnftForTrash.name}`
+      );
+      window.BurnAnimations.checkAchievements('trash', 1);
+      window.BurnAnimations.checkAchievements('cnfts', 1);
+    }
+    
+    // Update UI to reflect the removal
+    setCnfts(prevCnfts => prevCnfts.filter(item => item.mint !== selectedCnftForTrash.id));
+    
+    // Close the modal
+    setDirectTrashModalOpen(false);
+    setSelectedCnftForTrash(null);
+    
+    // Show a success message
+    setError(`Successfully trashed compressed NFT "${selectedCnftForTrash.name}" via direct method! Transaction: ${signature.substring(0, 8)}...`);
+    setTimeout(() => setError(null), 8000);
+  };
+  
+  // Handle error in direct trash operation
+  const handleDirectTrashError = (error: string) => {
+    console.error('[WalletAssets] Direct trash operation error:', error);
+    
+    // Track error in debug info
+    if (window.debugInfo) {
+      window.debugInfo.lastCnftError = error;
+      window.debugInfo.lastCnftSuccess = false;
+    }
+    
+    // Keep the modal open to show the error
+    // The error will be displayed in the modal itself
+  };
+  
   // Function to handle burning compressed NFTs (cNFTs)
   const handleBurnCNFT = async (cnft: CNFTData) => {
     if (!publicKey || !connection) {
@@ -1003,11 +1063,11 @@ const WalletAssets: React.FC = () => {
       window.BurnAnimations.checkAchievements('cnft_attempts', 1);
     }
     
-    // Show notification explaining the transfer operation is processing
+    // Show notification explaining that we're opening the direct transfer option
     if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
       window.BurnAnimations.showNotification(
-        "Processing cNFT Transfer", 
-        "Creating transfer transaction to project wallet - this might take a moment..."
+        "Direct cNFT Trash Option", 
+        "Opening direct trash dialog which requires your private key..."
       );
     }
     
@@ -1018,109 +1078,20 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
-      // Create a CNFTHandler instance with the current connection and wallet
-      // Use the directly imported CNFTHandler class
-      console.log("Creating CNFTHandler instance from direct import");
-      
-      // Create a new handler instance
-      const handler = new CNFTHandler(connection, {
-        publicKey,
-        signTransaction
-      });
-      
-      // Extract the proof from the cNFT data if available
-      const proof = cnft.compression?.proof || cnft.proof || null;
-      
-      console.log("Sending transfer request for cNFT:", cnft.mint);
-      
-      // Execute the transfer request - use the new transferCNFT method instead of serverBurnCNFT
-      const result = await handler.transferCNFT(cnft.mint) as any;
-      
-      // Check if the operation was successful
-      if (result && result.success) {
-        console.log("cNFT transfer successful:", result);
-        
-        // Show the transfer animation (still using the burn animation for visual effect)
-        const cnftCard = document.querySelector(`[data-mint="${cnft.mint}"]`) as HTMLElement;
-        if (cnftCard && window.BurnAnimations?.applyBurnAnimation) {
-          window.BurnAnimations.applyBurnAnimation(cnftCard);
-        }
-        
-        // Show successful UI feedback
-        if (window.BurnAnimations?.createConfetti) {
-          window.BurnAnimations.createConfetti();
-        }
-        
-        // When using direct wallet transfer, the transfer should always be real (not simulated)
-        // Remove the NFT from the UI list since it has been transferred
-        setCnfts(prev => prev.filter(c => c.mint !== cnft.mint));
-        console.log(`Transfer complete: ${cnft.mint} has been transferred to the project wallet`);
-        
-        // Track achievement
-        if (window.BurnAnimations?.checkAchievements) {
-          window.BurnAnimations.checkAchievements('cnfts', 1);
-        }
-        
-        // Show success message with transaction details if available
-        let successMessage = `Successfully transferred compressed NFT "${cnft.name || 'cNFT'}" to project wallet!`;
-        
-        // Add transaction signature information if available
-        if (result.signature) {
-          const shortSig = result.signature.substring(0, 8) + '...';
-          const txUrl = result.explorerUrl || `https://solscan.io/tx/${result.signature}`;
-          
-          successMessage += ` Transaction: ${shortSig}`;
-          
-          // Add link to transaction
-          const txElem = document.createElement('div');
-          txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
-          
-          // Add to DOM after a small delay
-          setTimeout(() => {
-            if (document.querySelector('.error-message')) {
-              document.querySelector('.error-message')?.appendChild(txElem);
-            }
-          }, 100);
-        }
-        
-        // Add note about what happened to the cNFT
-        successMessage += " Your cNFT has been transferred to a project-managed wallet rather than burned.";
-        
-        setError(successMessage);
-        setTimeout(() => setError(null), 8000); // Give more time to see the message
-      } else {
-        // Handle the case where transfer appears to have failed
-        console.warn("cNFT transfer returned unsuccessful result:", result);
-        
-        // If there's a specific error message, display it
-        if (result && result.error) {
-          setError(`cNFT transfer operation failed: ${result.error}`);
-        } else {
-          // Fall back to more general messaging
-          setError("cNFT transfer operation failed. This could be due to a network issue or permission problem.");
-        }
-        
-        // Show a more detailed explanation
-        if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
-          window.BurnAnimations.showNotification(
-            "cNFT Transfer Failed", 
-            "We couldn't transfer your cNFT to the project wallet. Check console for details."
-          );
-        }
-        
-        setTimeout(() => setError(null), 8000);
-      }
+      // Instead of using the complex CNFTHandler approach, open the direct trash modal
+      console.log("[WalletAssets] Opening DirectTrashModal for cNFT:", cnft.mint);
+      openDirectTrashModal(cnft);
     } catch (error) {
-      console.error("Error during cNFT transfer:", error);
+      console.error("Error initiating direct trash operation:", error);
       
       // Show error to user
-      setError(`Error transferring cNFT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(`Error initiating trash operation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       
       // Show notification with more details
       if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
         window.BurnAnimations.showNotification(
-          "cNFT Transfer Error", 
-          "There was a problem with the transfer transaction. See details below."
+          "Direct Trash Error", 
+          "There was a problem opening the direct trash dialog. Please try again."
         );
       }
       
@@ -2244,6 +2215,17 @@ const WalletAssets: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {/* DirectTrashModal for cNFT trash operations */}
+      {directTrashModalOpen && selectedCnftForTrash && (
+        <DirectTrashModal
+          isOpen={directTrashModalOpen}
+          onClose={() => setDirectTrashModalOpen(false)}
+          assetId={selectedCnftForTrash.id}
+          assetName={selectedCnftForTrash.name}
+          onSuccess={handleDirectTrashSuccess}
+          onError={handleDirectTrashError}
+        />
       )}
     </div>
   );
