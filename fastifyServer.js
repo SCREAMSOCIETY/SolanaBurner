@@ -977,7 +977,21 @@ fastify.get('/api/helius/wallet-assets/:walletAddress', async (request, reply) =
 });
 
 // Catch-all route for SPA - always serve index.html
+// But distinguish between API requests and frontend routes
 fastify.setNotFoundHandler(async (request, reply) => {
+  // If this is an API request that wasn't found, return a JSON error
+  if (request.url.startsWith('/api/')) {
+    fastify.log.warn(`API endpoint not found: ${request.url}`);
+    return reply
+      .code(404)
+      .header('Content-Type', 'application/json')
+      .send(JSON.stringify({
+        success: false,
+        error: `API endpoint not found: ${request.url}`
+      }));
+  }
+  
+  // Otherwise, serve the SPA
   fastify.log.info(`Not found handler for: ${request.url}, serving index.html`);
   return reply.sendFile('index.html', path.join(__dirname, 'templates'));
 });
@@ -1057,10 +1071,9 @@ fastify.get('/api/cnft/diagnostic/:assetId', async (request, reply) => {
         leaf_id: leafId,
         proof_array_valid: proofArrayValid,
         proof_array_length: proofArrayLength,
-        owner: assetDetails.ownership.owner,
+        owner: assetDetails.ownership?.owner || 'Unknown',
         compression_data_present: !!proofData.compression,
-        content_type: assetDetails.content && assetDetails.content.metadata ? 
-                      assetDetails.content.metadata.attributes.find(attr => attr.trait_type === 'Content Type')?.value : 'Unknown'
+        content_type: 'cNFT'
       },
       details: {
         asset: assetDetails,
@@ -1072,6 +1085,89 @@ fastify.get('/api/cnft/diagnostic/:assetId', async (request, reply) => {
     return reply.code(500).send({
       success: false,
       error: `Diagnostic failed: ${error.message}`
+    });
+  }
+});
+
+// New robust endpoint for cNFT transfers that can handle incomplete proof data
+fastify.post('/api/cnft/robust-transfer', async (request, reply) => {
+  try {
+    const { assetId, senderPrivateKey, destinationAddress } = request.body;
+    
+    if (!assetId || !senderPrivateKey) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Required parameters missing: assetId and senderPrivateKey are required'
+      });
+    }
+    
+    // Use our robust transfer implementation
+    const bs58 = require('bs58');
+    const { Keypair } = require('@solana/web3.js');
+    
+    // Create the sender keypair
+    const secretKey = bs58.decode(senderPrivateKey);
+    const senderKeypair = Keypair.fromSecretKey(secretKey);
+    
+    // For security, redact the private key in logs
+    fastify.log.info({
+      msg: 'Processing robust cNFT transfer',
+      assetId,
+      sender: senderKeypair.publicKey.toString(),
+      destination: destinationAddress || PROJECT_WALLET
+    });
+    
+    // Import our robust transfer module
+    const { transferCnft } = require('./robust-cnft-transfer');
+    
+    // Attempt the transfer
+    const result = await transferCnft(
+      senderKeypair,
+      assetId,
+      destinationAddress || PROJECT_WALLET
+    );
+    
+    if (result.success) {
+      fastify.log.info({
+        msg: 'cNFT transfer successful',
+        assetId,
+        signature: result.signature
+      });
+      
+      return {
+        success: true,
+        message: 'Asset transferred successfully',
+        data: {
+          assetId,
+          signature: result.signature,
+          explorerUrl: `https://solscan.io/tx/${result.signature}`
+        }
+      };
+    } else {
+      fastify.log.error({
+        msg: 'cNFT transfer failed',
+        assetId,
+        error: result.error
+      });
+      
+      return {
+        success: false,
+        error: result.error,
+        data: {
+          assetId
+        }
+      };
+    }
+  } catch (error) {
+    fastify.log.error({
+      msg: 'Error in robust cNFT transfer endpoint',
+      error: error.message,
+      stack: error.stack
+    });
+    
+    return reply.code(500).send({
+      success: false,
+      error: `Error in robust transfer: ${error.message}`
     });
   }
 });
