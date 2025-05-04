@@ -1,493 +1,408 @@
 /**
- * Robust cNFT Transfer Script
+ * Robust cNFT Transfer Implementation
  * 
- * This script is designed to handle various issues with cNFT transfers:
- * 1. It doesn't require all proof data fields to be present
- * 2. It will attempt multiple fallback strategies if a field is missing
- * 3. It provides detailed logging of all steps for diagnostics
- * 
- * Usage:
- * node robust-cnft-transfer.js <PRIVATE_KEY_BASE58> <ASSET_ID> [DESTINATION_ADDRESS]
- * 
- * If DESTINATION_ADDRESS is not provided, it defaults to the project wallet.
+ * This server-side script provides a more resilient approach to transferring cNFTs
+ * when standard methods fail due to incomplete proof data. It leverages multiple
+ * fallback methods and enhanced error handling.
  */
 
-// Environment setup
-require('dotenv').config();
-const axios = require('axios');
-const bs58 = require('bs58');
+const { Connection, PublicKey, Keypair, Transaction } = require('@solana/web3.js');
 const { 
-  Connection, 
-  Keypair, 
-  PublicKey, 
-  Transaction, 
-  TransactionInstruction,
-  clusterApiUrl 
-} = require('@solana/web3.js');
+  createTransferInstruction,
+  BUBBLEGUM_PROGRAM_ID, 
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID,
+  MetadataArgs,
+  TokenProgramVersion,
+  TokenStandard
+} = require('@metaplex-foundation/mpl-bubblegum');
+const { heliusApiKey, quicknodeRpcUrl } = require('./config');
+const bs58 = require('bs58');
+const { fetchAssetDetails, fetchAssetProof } = require('./helius-api');
 
-// Constants
-const PROJECT_WALLET = "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
-const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
-const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey('SPL1C0MP5yuaDggoXBMcWX7pcwyTH3dZ8uJ8UBLKV5T');
-const SPL_NOOP_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const HELIUS_API_URL = 'https://mainnet.helius-rpc.com';
+// Default project wallet for sending cNFTs to (for trash functionality)
+const PROJECT_WALLET = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
 
-// Get a connection to Solana
+// Connection to Solana - with multiple fallback options
+let connection;
+
+/**
+ * Get a Solana connection with fallbacks
+ * @returns {Promise<Connection>} - A connected Solana connection
+ */
 async function getConnection() {
-  if (process.env.QUICKNODE_RPC_URL) {
-    console.log('Using QuickNode RPC URL for better reliability');
-    return new Connection(process.env.QUICKNODE_RPC_URL, 'confirmed');
+  if (connection) return connection;
+  
+  console.log('Creating new Solana connection');
+  
+  // Try QuickNode RPC first (preferred for good performance)
+  if (quicknodeRpcUrl) {
+    try {
+      connection = new Connection(quicknodeRpcUrl, 'confirmed');
+      await connection.getVersion();
+      console.log('Connected to Solana using QuickNode RPC');
+      return connection;
+    } catch (err) {
+      console.warn('QuickNode RPC connection failed, falling back to Helius', err);
+    }
   }
   
-  console.log('Using public Solana RPC (fallback)');
-  return new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
-}
-
-// Get full asset details for a cNFT
-async function getAssetDetails(assetId) {
-  console.log(`\n[1/5] Getting asset details for ${assetId}`);
-  
-  try {
-    const response = await axios.post(
-      HELIUS_API_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-asset',
-        method: 'getAsset',
-        params: { id: assetId }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': HELIUS_API_KEY
-        }
-      }
-    );
-    
-    if (!response.data || !response.data.result) {
-      throw new Error('Invalid response from Helius API when fetching asset details');
+  // Try Helius RPC next
+  if (heliusApiKey) {
+    try {
+      const heliusRpcUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+      connection = new Connection(heliusRpcUrl, 'confirmed');
+      await connection.getVersion();
+      console.log('Connected to Solana using Helius RPC');
+      return connection;
+    } catch (err) {
+      console.warn('Helius RPC connection failed, falling back to public RPC', err);
     }
-    
-    console.log('✅ Successfully fetched asset details');
-    return response.data.result;
-  } catch (error) {
-    console.error(`❌ Error getting asset details: ${error.message}`);
-    if (error.response) {
-      console.error(`Response status: ${error.response.status}`);
-      console.error('Response data:', error.response.data);
-    }
-    throw error;
   }
-}
-
-// Get proof data for a cNFT, with fallback strategies
-async function getProofData(assetId) {
-  console.log(`\n[2/5] Getting proof data for ${assetId}`);
   
-  try {
-    const response = await axios.post(
-      HELIUS_API_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-proof',
-        method: 'getAssetProof',
-        params: { id: assetId }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': HELIUS_API_KEY
-        }
-      }
-    );
-    
-    if (!response.data || !response.data.result) {
-      throw new Error('Invalid response from Helius API when fetching proof');
-    }
-    
-    const proofData = response.data.result;
-    
-    // Validate and fix proof data to make it as robust as possible
-    const enhancedProofData = enhanceProofData(proofData, assetId);
-    
-    console.log('✅ Successfully fetched and enhanced proof data');
-    return enhancedProofData;
-  } catch (error) {
-    console.error(`❌ Error getting proof data: ${error.message}`);
-    if (error.response) {
-      console.error(`Response status: ${error.response.status}`);
-      console.error('Response data:', error.response.data);
-    }
-    throw error;
-  }
+  // Final fallback to public RPC (slowest, rate-limited)
+  connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  await connection.getVersion();
+  console.log('Connected to Solana using public RPC (fallback)');
+  return connection;
 }
 
-// Enhance the proof data with fallbacks and default values
+/**
+ * Get enhanced proof data by filling in any missing fields from the asset data
+ * @param {object} proofData - The proof data from Helius API
+ * @param {string} assetId - The asset ID for context
+ * @returns {object} - The enhanced proof data
+ */
 function enhanceProofData(proofData, assetId) {
-  console.log('Enhancing proof data with fallbacks and defaults');
+  if (!proofData) {
+    throw new Error(`No proof data available for asset ${assetId}`);
+  }
+
+  // Create a deep copy to avoid modifying the original
+  const enhancedProof = JSON.parse(JSON.stringify(proofData));
   
-  // 1. Verify we have a proof array
-  if (!proofData.proof || !Array.isArray(proofData.proof)) {
-    console.error('Missing proof array in response!');
-    throw new Error('Proof array is missing in the response. Cannot proceed with transfer.');
+  // Ensure leaf_id exists - use node_index as fallback
+  if (!enhancedProof.leaf_id && enhancedProof.node_index) {
+    console.log(`[Robust] Using node_index as leaf_id for ${assetId}: ${enhancedProof.node_index}`);
+    enhancedProof.leaf_id = enhancedProof.node_index;
   }
   
-  // 2. Check for tree_id
-  if (!proofData.tree_id) {
-    console.warn('tree_id is missing, trying to locate it elsewhere...');
-    
-    if (proofData.compression && proofData.compression.tree) {
-      console.log('Found tree_id in compression.tree');
-      proofData.tree_id = proofData.compression.tree;
-    } else {
-      console.error('Could not locate tree_id in proof data');
-      throw new Error('Missing tree_id in proof data');
-    }
+  // Ensure tree_id exists
+  if (!enhancedProof.tree_id && enhancedProof.compression?.tree) {
+    console.log(`[Robust] Using compression.tree as tree_id for ${assetId}`);
+    enhancedProof.tree_id = enhancedProof.compression.tree;
   }
-  
-  // 3. Check for root
-  if (!proofData.root) {
-    console.warn('root is missing, trying to locate it elsewhere...');
-    
-    if (proofData.merkle_tree && proofData.merkle_tree.root) {
-      console.log('Found root in merkle_tree.root');
-      proofData.root = proofData.merkle_tree.root;
-    } else {
-      console.error('Could not locate root in proof data');
-      throw new Error('Missing root in proof data');
-    }
-  }
-  
-  // 4. Ensure we have a leaf_id/node_index
-  let leafId = null;
-  
-  if (proofData.leaf_id !== undefined) {
-    leafId = proofData.leaf_id;
-    console.log(`Using leaf_id: ${leafId}`);
-  } else if (proofData.node_index !== undefined) {
-    leafId = proofData.node_index;
-    console.log(`Using node_index as leaf_id: ${leafId}`);
-  } else if (proofData.leaf_index !== undefined) {
-    leafId = proofData.leaf_index;
-    console.log(`Using leaf_index as leaf_id: ${leafId}`);
-  } else if (proofData.compression && proofData.compression.leaf_id !== undefined) {
-    leafId = proofData.compression.leaf_id;
-    console.log(`Using compression.leaf_id: ${leafId}`);
-  } else if (proofData.compression && proofData.compression.node_index !== undefined) {
-    leafId = proofData.compression.node_index;
-    console.log(`Using compression.node_index: ${leafId}`);
-  } else {
-    console.warn('No leaf_id or node_index found in proof data');
-    console.log('Using 0 as default leaf_id for older tree format');
-    leafId = 0;
-  }
-  
-  // 5. Normalize the proof array
-  try {
-    const normalizedProof = proofData.proof.map((node, index) => {
-      if (typeof node === 'string') {
-        return Buffer.from(node, 'base64');
-      } else if (Array.isArray(node)) {
-        return Buffer.from(node);
-      } else {
-        throw new Error(`Unexpected proof node format at index ${index}`);
-      }
-    });
-    console.log(`Normalized ${normalizedProof.length} proof nodes to Buffer format`);
-    proofData._normalizedProof = normalizedProof;
-  } catch (error) {
-    console.error(`Error normalizing proof array: ${error.message}`);
-    throw new Error(`Failed to normalize proof array: ${error.message}`);
-  }
-  
-  // Store our enhanced values
-  proofData.leaf_id = leafId;
-  proofData.node_index = leafId;
   
   // Ensure compression data exists
-  if (!proofData.compression) {
-    proofData.compression = {};
+  if (!enhancedProof.compression) {
+    console.log(`[Robust] Creating compression object for ${assetId}`);
+    enhancedProof.compression = {
+      tree: enhancedProof.tree_id,
+      leaf_id: enhancedProof.leaf_id,
+      proof: enhancedProof.proof || []
+    };
   }
   
-  proofData.compression.leaf_id = leafId;
-  proofData.compression.tree = proofData.tree_id;
+  // Validate proof array
+  if (!Array.isArray(enhancedProof.proof) || enhancedProof.proof.length === 0) {
+    if (Array.isArray(enhancedProof.compression?.proof) && enhancedProof.compression.proof.length > 0) {
+      console.log(`[Robust] Using compression.proof as fallback for ${assetId}`);
+      enhancedProof.proof = enhancedProof.compression.proof;
+    } else {
+      throw new Error(`No valid proof array found for asset ${assetId}`);
+    }
+  }
   
-  return proofData;
+  return enhancedProof;
 }
 
-// Transfer a cNFT to a target address
-async function transferCnft(senderKeypair, assetId, receiverAddress = PROJECT_WALLET) {
+/**
+ * Transfer a cNFT using our robust approach with fallback methods
+ * @param {Keypair} senderKeypair - The sender's keypair (with private key)
+ * @param {string} assetId - The asset ID to transfer
+ * @param {string} receiverAddress - Where to send the cNFT (defaults to project wallet)
+ * @returns {Promise<object>} - The result of the transfer operation
+ */
+async function transferCnft(senderKeypair, assetId, receiverAddress = PROJECT_WALLET.toString()) {
   try {
-    // Convert string address to PublicKey if needed
-    const receiverPublicKey = typeof receiverAddress === 'string'
-      ? new PublicKey(receiverAddress)
-      : receiverAddress;
+    console.log(`[Robust] Starting robust transfer for ${assetId}`);
+    console.log(`[Robust] From: ${senderKeypair.publicKey.toString()}`);
+    console.log(`[Robust] To: ${receiverAddress}`);
     
-    console.log('\n[3/5] Setting up transfer');
-    console.log(`From: ${senderKeypair.publicKey.toString()}`);
-    console.log(`To: ${receiverPublicKey.toString()}`);
+    // Get connection with fallbacks
+    const conn = await getConnection();
     
-    // Get connection
-    const connection = await getConnection();
+    // Ensure receiver is a PublicKey
+    const receiverPublicKey = new PublicKey(receiverAddress);
     
-    // Get asset details and proof data
-    const assetDetails = await getAssetDetails(assetId);
-    const proofData = await getProofData(assetId);
-    
-    // Verify ownership
-    console.log('\n[4/5] Verifying ownership');
-    if (assetDetails.ownership.owner !== senderKeypair.publicKey.toString()) {
-      console.error(`❌ Ownership verification failed!`);
-      console.error(`Asset is owned by ${assetDetails.ownership.owner}`);
-      console.error(`But sender public key is ${senderKeypair.publicKey.toString()}`);
-      throw new Error('Asset is not owned by the sender');
+    // Get asset details
+    console.log(`[Robust] Fetching asset details for ${assetId}`);
+    const assetData = await fetchAssetDetails(assetId);
+    if (!assetData) {
+      throw new Error(`Asset data not found for ${assetId}`);
     }
-    console.log('✅ Ownership verified');
     
-    console.log('\n[5/5] Building transfer transaction');
+    // Get and enhance proof data
+    console.log(`[Robust] Fetching proof data for ${assetId}`);
+    let proofData = await fetchAssetProof(assetId);
+    proofData = enhanceProofData(proofData, assetId);
     
-    // Get the tree information
-    const treeId = proofData.tree_id;
-    const merkleTree = new PublicKey(treeId);
+    // Verify asset ownership
+    const currentOwner = assetData.ownership?.owner || 
+                         (assetData.ownership?.owner_address) || 
+                         assetData.owner;
+    if (!currentOwner) {
+      throw new Error(`Owner not found in asset data for ${assetId}`);
+    }
     
-    // Derive the tree authority PDA
+    // Convert to PublicKey
+    const currentOwnerPubkey = new PublicKey(currentOwner);
+    
+    // Confirm the sender is the owner
+    if (currentOwnerPubkey.toString() !== senderKeypair.publicKey.toString()) {
+      throw new Error(`Sender ${senderKeypair.publicKey.toString()} is not the owner of asset ${assetId}`);
+    }
+    
+    // Get merkle tree address
+    const treeAddress = new PublicKey(proofData.tree_id || proofData.compression?.tree);
+    console.log(`[Robust] Tree address: ${treeAddress.toString()}`);
+    
+    // Derive tree authority
     const [treeAuthority] = PublicKey.findProgramAddressSync(
-      [merkleTree.toBuffer()],
+      [treeAddress.toBuffer()],
+      BUBBLEGUM_PROGRAM_ID
+    );
+    console.log(`[Robust] Tree authority: ${treeAuthority.toString()}`);
+    
+    // Create the transfer instruction
+    const transferIx = createTransferInstruction(
+      {
+        merkleTree: treeAddress,
+        treeAuthority,
+        leafOwner: senderKeypair.publicKey,
+        leafDelegate: senderKeypair.publicKey,
+        newLeafOwner: receiverPublicKey,
+        logWrapper: SPL_NOOP_PROGRAM_ID,
+        compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        anchorRemainingAccounts: proofData.proof.map(node => ({
+          pubkey: new PublicKey(node),
+          isSigner: false,
+          isWritable: false
+        }))
+      },
+      {
+        root: [...Buffer.from(bs58.decode(proofData.root))],
+        dataHash: [...Buffer.from(bs58.decode(proofData.leaf || proofData.asset_hash || proofData.data_hash))],
+        creatorHash: [...Buffer.from(bs58.decode(proofData.creator_hash || proofData.creator_hash_v1 || '11111111111111111111111111111111'))],
+        nonce: proofData.leaf_id,
+        index: proofData.leaf_id
+      },
       BUBBLEGUM_PROGRAM_ID
     );
     
-    console.log(`Tree ID: ${treeId}`);
-    console.log(`Tree Authority: ${treeAuthority.toString()}`);
-    
-    // Create account list
-    const accounts = [
-      // Tree Authority
-      {
-        pubkey: treeAuthority,
-        isSigner: false,
-        isWritable: false,
-      },
-      // Leaf Owner (sender)
-      {
-        pubkey: senderKeypair.publicKey,
-        isSigner: true,
-        isWritable: false,
-      },
-      // Leaf Delegate (same as owner)
-      {
-        pubkey: senderKeypair.publicKey,
-        isSigner: true,
-        isWritable: false,
-      },
-      // New Leaf Owner (receiver)
-      {
-        pubkey: receiverPublicKey,
-        isSigner: false,
-        isWritable: false,
-      },
-      // Merkle Tree
-      {
-        pubkey: merkleTree,
-        isSigner: false,
-        isWritable: true,
-      },
-      // Log Wrapper
-      {
-        pubkey: SPL_NOOP_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-      // Compression Program
-      {
-        pubkey: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-    ];
-    
-    // Convert data to buffers
-    const root = Buffer.from(proofData.root, 'base64');
-    
-    // Get data_hash from appropriate location
-    let dataHash;
-    if (proofData.data_hash) {
-      dataHash = Buffer.from(proofData.data_hash, 'base64');
-    } else if (proofData.compression && proofData.compression.data_hash) {
-      dataHash = Buffer.from(proofData.compression.data_hash, 'base64');
-    } else {
-      throw new Error('Missing data_hash in proof data');
-    }
-    
-    // Get creator_hash from appropriate location
-    let creatorHash;
-    if (proofData.creator_hash) {
-      creatorHash = Buffer.from(proofData.creator_hash, 'base64');
-    } else if (proofData.compression && proofData.compression.creator_hash) {
-      creatorHash = Buffer.from(proofData.compression.creator_hash, 'base64');
-    } else {
-      throw new Error('Missing creator_hash in proof data');
-    }
-    
-    // Use our enhanced values
-    const nonce = proofData.leaf_id;
-    const index = proofData.leaf_id;
-    
-    console.log(`Nonce/Index: ${nonce}`);
-    
-    // Create nonce and index buffers
-    const nonceBuffer = Buffer.alloc(8);
-    nonceBuffer.writeBigUInt64LE(BigInt(nonce));
-    
-    const indexBuffer = Buffer.alloc(8);
-    indexBuffer.writeBigUInt64LE(BigInt(index));
-    
-    // Transfer instruction discriminator for Bubblegum program is 5
-    const TRANSFER_DISCRIMINATOR = Buffer.from([5, 0, 0, 0, 0, 0, 0, 0, 0]);
-    
-    // Create instruction data
-    const instructionData = Buffer.concat([
-      TRANSFER_DISCRIMINATOR,
-      root,
-      dataHash, 
-      creatorHash,
-      nonceBuffer,
-      indexBuffer,
-      ...proofData._normalizedProof // Use our normalized proof
-    ]);
-    
-    // Create transfer instruction
-    const transferInstruction = new TransactionInstruction({
-      keys: accounts,
-      programId: BUBBLEGUM_PROGRAM_ID,
-      data: instructionData
-    });
-    
-    // Create and configure transaction
-    const transaction = new Transaction();
-    transaction.add(transferInstruction);
-    transaction.feePayer = senderKeypair.publicKey;
+    // Create and sign the transaction
+    const tx = new Transaction().add(transferIx);
+    tx.feePayer = senderKeypair.publicKey;
     
     // Get recent blockhash
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-    transaction.recentBlockhash = blockhash;
+    const { blockhash } = await conn.getLatestBlockhash('confirmed');
+    tx.recentBlockhash = blockhash;
     
-    // Sign and send transaction
-    console.log('\nSending transaction...');
-    const signature = await connection.sendTransaction(transaction, [senderKeypair], {
-      skipPreflight: false,
-      maxRetries: 3
+    // Sign the transaction
+    const signedTx = await tx.sign(senderKeypair);
+    
+    // Send the transaction
+    console.log(`[Robust] Sending transaction`);
+    const signature = await conn.sendRawTransaction(signedTx.serialize(), {
+      skipPreflight: true,
+      preflightCommitment: 'confirmed'
     });
     
-    console.log(`Transaction signature: ${signature}`);
-    console.log(`Explorer URL: https://solscan.io/tx/${signature}`);
-    
-    // Confirm transaction
-    console.log('\nConfirming transaction...');
-    const confirmation = await connection.confirmTransaction({
+    // Wait for confirmation
+    console.log(`[Robust] Waiting for confirmation: ${signature}`);
+    const confirmation = await conn.confirmTransaction({
       signature,
       blockhash,
-      lastValidBlockHeight
-    });
+      lastValidBlockHeight: (await conn.getBlockHeight()) + 50
+    }, 'confirmed');
     
+    // Check for errors
     if (confirmation.value.err) {
-      console.error('\n❌ Transaction error:', confirmation.value.err);
-      return {
-        success: false,
-        error: `Transaction error: ${JSON.stringify(confirmation.value.err)}`,
-        signature
-      };
+      throw new Error(`Transaction confirmed but failed: ${confirmation.value.err}`);
     }
     
-    console.log('\n✅ Transaction confirmed successfully!');
+    // Generate explorer URL
+    const explorerUrl = `https://solscan.io/tx/${signature}`;
+    
+    console.log(`[Robust] Transfer successful: ${explorerUrl}`);
     return {
       success: true,
       signature,
-      message: `cNFT transferred successfully to ${receiverPublicKey.toString()}`
+      explorerUrl,
+      message: `Successfully transferred cNFT ${assetId} to ${receiverAddress}`
     };
   } catch (error) {
-    console.error('\n❌ Error transferring cNFT:', error.message);
-    
-    if (error.stack) {
-      console.error('\nStack trace:');
-      console.error(error.stack);
-    }
-    
-    if (error.message.includes('blockhash')) {
-      console.error('\nHint: This is likely due to an RPC issue or network congestion. Try again later.');
-    } else if (error.message.includes('signature verification failed')) {
-      console.error('\nHint: This is likely due to an invalid keypair or permissions issue.');
-    } else if (error.message.includes('insufficient funds')) {
-      console.error('\nHint: The wallet does not have enough SOL to cover transaction fees.');
-    }
-    
+    console.error(`[Robust] Transfer failed: ${error.message}`, error);
     return {
       success: false,
-      error: error.message
+      error: error.message || 'Unknown error occurred during transfer',
+      assetId
     };
   }
 }
 
-async function main() {
+/**
+ * Process a robust transfer request from the API
+ * @param {object} req - The express request object
+ * @param {object} res - The express response object
+ */
+async function processRobustTransferRequest(req, res) {
   try {
-    const args = process.argv.slice(2);
+    const { assetId, senderPrivateKey, destinationAddress } = req.body;
     
-    if (args.length < 2) {
-      console.error('Usage: node robust-cnft-transfer.js <PRIVATE_KEY_BASE58> <ASSET_ID> [DESTINATION_ADDRESS]');
-      process.exit(1);
+    // Validate inputs
+    if (!assetId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Asset ID is required' 
+      });
     }
     
-    const privateKeyBase58 = args[0];
-    const assetId = args[1];
-    const destinationAddress = args[2] || PROJECT_WALLET;
-    
-    if (!process.env.HELIUS_API_KEY) {
-      console.error('❌ HELIUS_API_KEY environment variable is not set');
-      process.exit(1);
+    if (!senderPrivateKey) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Sender private key is required' 
+      });
     }
     
-    // Create sender keypair
-    const secretKey = bs58.decode(privateKeyBase58);
-    const senderKeypair = Keypair.fromSecretKey(secretKey);
+    // Create keypair from private key
+    const senderKeypair = Keypair.fromSecretKey(
+      Buffer.from(bs58.decode(senderPrivateKey))
+    );
     
-    console.log('===== ROBUST CNFT TRANSFER TOOL =====');
-    console.log('This tool provides a robust approach to cNFT transfers');
-    console.log(`Sender: ${senderKeypair.publicKey.toString()}`);
-    console.log(`Asset ID: ${assetId}`);
-    console.log(`Destination: ${destinationAddress}`);
+    // Use default project wallet if destination not specified
+    const receiverAddress = destinationAddress || PROJECT_WALLET.toString();
     
-    // Attempt the transfer
-    const result = await transferCnft(senderKeypair, assetId, destinationAddress);
+    // Perform the transfer
+    const result = await transferCnft(senderKeypair, assetId, receiverAddress);
     
     if (result.success) {
-      console.log(`\n✅ Successfully transferred cNFT ${assetId}`);
-      console.log(`Transaction Signature: ${result.signature}`);
-      console.log(`Explorer URL: https://solscan.io/tx/${result.signature}`);
+      return res.json({
+        success: true,
+        message: result.message,
+        data: {
+          signature: result.signature,
+          explorerUrl: result.explorerUrl
+        }
+      });
     } else {
-      console.error(`\n❌ Transfer failed: ${result.error}`);
-      process.exit(1);
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
     }
   } catch (error) {
-    console.error(`\n❌ Unhandled error: ${error.message}`);
-    
-    if (error.stack) {
-      console.error('\nStack trace:');
-      console.error(error.stack);
-    }
-    
-    process.exit(1);
+    console.error('Robust transfer request failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
   }
 }
 
-// Export the transferCnft function for use in other modules
+/**
+ * Run diagnostic tests on a cNFT to identify issues
+ * @param {string} assetId - The asset ID to diagnose
+ * @returns {Promise<object>} - Diagnostic information
+ */
+async function runDiagnostic(assetId) {
+  try {
+    console.log(`Running diagnostic tests for cNFT: ${assetId}`);
+    
+    // Step 1: Fetch asset details
+    console.log(`Step 1: Fetching asset details...`);
+    const assetData = await fetchAssetDetails(assetId);
+    
+    if (!assetData) {
+      return {
+        success: false,
+        error: `Asset not found: ${assetId}`
+      };
+    }
+    
+    // Step 2: Fetch proof data
+    console.log(`Step 2: Fetching proof data...`);
+    const proofData = await fetchAssetProof(assetId);
+    
+    // Extract key information for diagnostics
+    const diagnostics = {
+      asset_found: !!assetData,
+      proof_found: !!proofData,
+      asset_id: assetId,
+      tree_id: proofData?.tree_id || proofData?.compression?.tree,
+      leaf_id: proofData?.leaf_id || proofData?.node_index,
+      proof_array_valid: Array.isArray(proofData?.proof) || Array.isArray(proofData?.compression?.proof),
+      proof_array_length: (proofData?.proof || proofData?.compression?.proof || []).length,
+      owner: assetData?.ownership?.owner || assetData?.owner,
+      compression_data_present: !!proofData?.compression,
+      content_type: assetData?.content?.metadata?.token_standard ? 'cNFT' : 'Unknown'
+    };
+    
+    if (diagnostics.leaf_id) {
+      console.log(`Found leaf_id: ${diagnostics.leaf_id}`);
+    }
+    
+    console.log(`Proof array valid: ${diagnostics.proof_array_valid}, length: ${diagnostics.proof_array_length}`);
+    
+    return {
+      success: true,
+      diagnostics,
+      details: {
+        asset: assetData,
+        proof: proofData
+      }
+    };
+  } catch (error) {
+    console.error(`Diagnostic error: ${error.message}`, error);
+    return {
+      success: false,
+      error: error.message || 'Unknown error occurred during diagnostic'
+    };
+  }
+}
+
+/**
+ * Process a diagnostic request from the API
+ * @param {object} req - The express request object
+ * @param {object} res - The express response object
+ */
+async function processDiagnosticRequest(req, res) {
+  try {
+    const assetId = req.params.assetId;
+    
+    if (!assetId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Asset ID is required'
+      });
+    }
+    
+    const result = await runDiagnostic(assetId);
+    return res.json(result);
+  } catch (error) {
+    console.error('Diagnostic request failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+}
+
 module.exports = {
   transferCnft,
-  getAssetDetails,
-  getProofData,
-  enhanceProofData
+  processRobustTransferRequest,
+  processDiagnosticRequest,
+  runDiagnostic,
+  enhanceProofData,
+  getConnection
 };
-
-// Only execute main function if this script is run directly
-if (require.main === module) {
-  main();
-}

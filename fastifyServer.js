@@ -1509,6 +1509,16 @@ fastify.post('/api/helius/burn-cnft', async (request, reply) => {
 // Note: Server transfer endpoints are already implemented directly in this file
 // No need to register the module separately
 
+// Import robust cNFT transfer implementation
+const robustCnftTransfer = require('./robust-cnft-transfer');
+
+// Use existing endpoints for diagnostic and robust transfer
+// Our robust-cnft-transfer module is already imported at line 1121
+// and used in the existing robust-transfer endpoint at line 1093
+
+// We're using the implementation from robust-cnft-transfer.js module
+// but the endpoint is already defined in this file
+
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
 const start = async () => {
