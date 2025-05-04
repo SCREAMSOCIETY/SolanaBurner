@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone cNFT Transfer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #4a65ff;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4a65ff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #3a55ee;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .asset-list {
+            margin-top: 20px;
+        }
+        .asset-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .asset-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            margin-right: 15px;
+            object-fit: cover;
+            background-color: #eee;
+        }
+        .asset-info {
+            flex-grow: 1;
+        }
+        .asset-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .asset-id {
+            font-size: 12px;
+            color: #888;
+            word-break: break-all;
+        }
+        .asset-actions {
+            margin-left: 15px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        #log-container {
+            margin-top: 20px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Standalone cNFT Transfer</h1>
+    
+    <div class="container">
+        <p>This page provides a direct cNFT transfer functionality that doesn't rely on the main application code.</p>
+        <p>It can transfer compressed NFTs from your wallet to the project wallet: <code>EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK</code></p>
+        
+        <button id="connectWalletBtn">Connect Wallet</button>
+        <button id="fetchAssetsBtn" disabled>Fetch cNFTs</button>
+        
+        <div id="walletInfo"></div>
+        
+        <div id="assetContainer" class="asset-list"></div>
+    </div>
+    
+    <div id="log-container">
+        <div class="log-entry info">System ready. Connect your wallet to begin.</div>
+    </div>
+
+    <!-- Load Web3.js from CDN -->
+    <script src="https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
+    
+    <script>
+        // Logging functions
+        const log = {
+            element: document.getElementById('log-container'),
+            add: function(message, type = 'info') {
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                entry.textContent = message;
+                this.element.appendChild(entry);
+                this.element.scrollTop = this.element.scrollHeight;
+            },
+            info: function(message) {
+                this.add(message, 'info');
+            },
+            success: function(message) {
+                this.add(message, 'success');
+            },
+            error: function(message) {
+                this.add(message, 'error');
+            }
+        };
+        
+        // Global variables
+        const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
+        const HELIUS_API_KEY = 'a3ded9fe-3dd9-4b3c-834a-0e4e2d84df94'; // Helius API key for testing
+        const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
+        const SPL_NOOP_PROGRAM_ID = 'noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV';
+        const COMPRESSION_PROGRAM_ID = 'SPL_Noop1111111111111111111111111111111111111111';
+        
+        let wallet = null;
+        const connection = new solanaWeb3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+        
+        // DOM elements
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const fetchAssetsBtn = document.getElementById('fetchAssetsBtn');
+        const walletInfo = document.getElementById('walletInfo');
+        const assetContainer = document.getElementById('assetContainer');
+        
+        // Buffer utility function for base64 conversion
+        function base64ToUint8Array(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+        
+        // Connect wallet
+        connectWalletBtn.addEventListener('click', async () => {
+            try {
+                log.info('Connecting wallet...');
+                
+                if (!window.solana) {
+                    throw new Error('Solana wallet not detected. Please install a Solana wallet extension.');
+                }
+                
+                if (!window.solana.isConnected) {
+                    await window.solana.connect();
+                }
+                
+                wallet = {
+                    publicKey: window.solana.publicKey,
+                    signTransaction: (tx) => window.solana.signTransaction(tx)
+                };
+                
+                log.success(`Wallet connected: ${wallet.publicKey.toString()}`);
+                walletInfo.textContent = `Connected: ${wallet.publicKey.toString()}`;
+                
+                connectWalletBtn.textContent = 'Wallet Connected';
+                fetchAssetsBtn.disabled = false;
+            } catch (error) {
+                log.error(`Error connecting wallet: ${error.message}`);
+            }
+        });
+        
+        // Fetch cNFTs from wallet
+        fetchAssetsBtn.addEventListener('click', async () => {
+            try {
+                if (!wallet) {
+                    throw new Error('Wallet not connected');
+                }
+                
+                assetContainer.innerHTML = '<p>Loading cNFTs...</p>';
+                log.info('Fetching cNFTs...');
+                
+                const ownerAddress = wallet.publicKey.toString();
+                const url = `https://api.helius.xyz/v0/addresses/${ownerAddress}/assets?compressed=true&api-key=${HELIUS_API_KEY}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const assets = data.items || [];
+                log.success(`Found ${assets.length} compressed NFTs`);
+                
+                if (assets.length === 0) {
+                    assetContainer.innerHTML = '<p>No compressed NFTs found in this wallet.</p>';
+                    return;
+                }
+                
+                renderAssets(assets);
+            } catch (error) {
+                log.error(`Error fetching assets: ${error.message}`);
+                assetContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        });
+        
+        // Render assets to the container
+        function renderAssets(assets) {
+            assetContainer.innerHTML = '';
+            
+            assets.forEach(asset => {
+                const card = document.createElement('div');
+                card.className = 'asset-card';
+                card.setAttribute('data-asset-id', asset.id);
+                
+                const img = document.createElement('img');
+                img.className = 'asset-image';
+                img.src = asset.content?.links?.image || asset.content?.files?.[0]?.uri || 'default-nft-image.svg';
+                img.alt = asset.content?.metadata?.name || 'NFT Image';
+                img.onerror = () => { img.src = 'default-nft-image.svg'; };
+                
+                const info = document.createElement('div');
+                info.className = 'asset-info';
+                
+                const name = document.createElement('div');
+                name.className = 'asset-name';
+                name.textContent = asset.content?.metadata?.name || 'Unnamed NFT';
+                
+                const id = document.createElement('div');
+                id.className = 'asset-id';
+                id.textContent = asset.id;
+                
+                const actions = document.createElement('div');
+                actions.className = 'asset-actions';
+                
+                const transferBtn = document.createElement('button');
+                transferBtn.textContent = 'Trash';
+                transferBtn.onclick = () => transferAsset(asset.id);
+                
+                info.appendChild(name);
+                info.appendChild(id);
+                actions.appendChild(transferBtn);
+                
+                card.appendChild(img);
+                card.appendChild(info);
+                card.appendChild(actions);
+                
+                assetContainer.appendChild(card);
+            });
+        }
+        
+        // Fetch asset proof
+        async function fetchAssetProof(assetId) {
+            log.info(`Fetching proof for asset: ${assetId}`);
+            
+            const url = `https://api.helius.xyz/v0/assets/${assetId}/proof?api-key=${HELIUS_API_KEY}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch proof: ${response.status}`);
+            }
+            
+            return await response.json();
+        }
+        
+        // Fetch asset details
+        async function fetchAssetDetails(assetId) {
+            log.info(`Fetching asset details: ${assetId}`);
+            
+            const url = `https://api.helius.xyz/v0/assets/${assetId}?api-key=${HELIUS_API_KEY}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch asset details: ${response.status}`);
+            }
+            
+            return await response.json();
+        }
+        
+        // Transfer asset function
+        async function transferAsset(assetId) {
+            try {
+                log.info(`Starting transfer for asset: ${assetId}`);
+                
+                if (!wallet) {
+                    throw new Error('Wallet not connected');
+                }
+                
+                // Disable the button and show loading
+                const card = document.querySelector(`.asset-card[data-asset-id="${assetId}"]`);
+                const transferBtn = card.querySelector('button');
+                transferBtn.disabled = true;
+                transferBtn.innerHTML = '<span class="loading"></span>';
+                
+                // Fetch asset details and proof
+                const [assetDetails, proofData] = await Promise.all([
+                    fetchAssetDetails(assetId),
+                    fetchAssetProof(assetId)
+                ]);
+                
+                // Verify ownership
+                if (assetDetails.ownership.owner !== wallet.publicKey.toString()) {
+                    throw new Error(`You don't own this asset. Owner is ${assetDetails.ownership.owner}`);
+                }
+                
+                log.info('Asset ownership verified');
+                
+                // Extract needed data from the proof
+                const {
+                    root,
+                    proof,
+                    node_index,
+                    tree_id,
+                    data_hash,
+                    creator_hash
+                } = proofData;
+                
+                log.info(`Building transaction with data from tree: ${tree_id}`);
+                
+                // Create the necessary Public Keys
+                const merkleTree = new solanaWeb3.PublicKey(tree_id);
+                const bubblegumProgram = new solanaWeb3.PublicKey(BUBBLEGUM_PROGRAM_ID);
+                const splNoopProgram = new solanaWeb3.PublicKey(SPL_NOOP_PROGRAM_ID);
+                const compressionProgram = new solanaWeb3.PublicKey(COMPRESSION_PROGRAM_ID);
+                const systemProgram = new solanaWeb3.PublicKey('11111111111111111111111111111111');
+                const receiverPublicKey = new solanaWeb3.PublicKey(PROJECT_WALLET);
+                const leafOwner = wallet.publicKey;
+                
+                // Derive tree authority
+                const [treeAuthority] = solanaWeb3.PublicKey.findProgramAddressSync(
+                    [merkleTree.toBuffer()],
+                    bubblegumProgram
+                );
+                
+                log.info(`Derived tree authority: ${treeAuthority.toString()}`);
+                
+                // Create accounts for the instruction
+                const accounts = [
+                    { pubkey: treeAuthority, isSigner: false, isWritable: false },
+                    { pubkey: leafOwner, isSigner: true, isWritable: false },
+                    { pubkey: leafOwner, isSigner: true, isWritable: false },
+                    { pubkey: receiverPublicKey, isSigner: false, isWritable: false },
+                    { pubkey: merkleTree, isSigner: false, isWritable: true },
+                    { pubkey: splNoopProgram, isSigner: false, isWritable: false },
+                    { pubkey: compressionProgram, isSigner: false, isWritable: false },
+                    { pubkey: systemProgram, isSigner: false, isWritable: false }
+                ];
+                
+                // Convert all base64 values to Uint8Array
+                const rootBuffer = base64ToUint8Array(root);
+                const dataHashBuffer = base64ToUint8Array(data_hash);
+                const creatorHashBuffer = base64ToUint8Array(creator_hash);
+                const proofBuffers = proof.map(p => base64ToUint8Array(p));
+                
+                log.info(`Creating instruction data with ${proofBuffers.length} proof elements`);
+                
+                // Create the full data buffer
+                const dataSize = 1 + 32 + 8 + 32 + 32 + 4 + (proofBuffers.length * 32);
+                const data = new Uint8Array(dataSize);
+                
+                // Write discriminator
+                data[0] = 3; // Transfer instruction
+                
+                // Write root (32 bytes)
+                data.set(rootBuffer, 1);
+                
+                // Write index as little-endian u64 (8 bytes)
+                const indexBytes = new Uint8Array(8);
+                const dataView = new DataView(indexBytes.buffer);
+                dataView.setBigUint64(0, BigInt(node_index), true); // true for little-endian
+                data.set(indexBytes, 33);
+                
+                // Write data hash (32 bytes)
+                data.set(dataHashBuffer, 41);
+                
+                // Write creator hash (32 bytes)
+                data.set(creatorHashBuffer, 73);
+                
+                // Write proof count (4 bytes) - little-endian u32
+                const proofCountBytes = new Uint8Array(4);
+                const proofDataView = new DataView(proofCountBytes.buffer);
+                proofDataView.setUint32(0, proofBuffers.length, true); // true for little-endian
+                data.set(proofCountBytes, 105);
+                
+                // Write proof elements
+                for (let i = 0; i < proofBuffers.length; i++) {
+                    data.set(proofBuffers[i], 109 + (i * 32));
+                }
+                
+                log.info('Instruction data created');
+                
+                // Create the instruction
+                const instruction = new solanaWeb3.TransactionInstruction({
+                    keys: accounts,
+                    programId: bubblegumProgram,
+                    data: Buffer.from(data)
+                });
+                
+                // Get recent blockhash
+                const { blockhash } = await connection.getLatestBlockhash();
+                log.info(`Got recent blockhash: ${blockhash}`);
+                
+                // Create the transaction
+                const transaction = new solanaWeb3.Transaction({
+                    feePayer: wallet.publicKey,
+                    recentBlockhash: blockhash
+                }).add(instruction);
+                
+                // Sign the transaction
+                log.info('Signing transaction');
+                const signedTransaction = await wallet.signTransaction(transaction);
+                
+                // Send the transaction
+                log.info('Sending transaction');
+                const signature = await connection.sendRawTransaction(
+                    signedTransaction.serialize()
+                );
+                
+                log.success(`Transaction sent with signature: ${signature}`);
+                log.info(`Explorer URL: https://solscan.io/tx/${signature}`);
+                
+                // Update UI
+                transferBtn.innerHTML = '✓ Sent';
+                card.style.opacity = '0.5';
+                
+                // Wait for confirmation
+                log.info('Waiting for confirmation...');
+                const confirmation = await connection.confirmTransaction(signature);
+                
+                if (confirmation.value.err) {
+                    throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+                }
+                
+                log.success('Transaction confirmed!');
+                
+                // Hide the card
+                setTimeout(() => {
+                    card.style.display = 'none';
+                }, 2000);
+                
+            } catch (error) {
+                log.error(`Error transferring asset: ${error.message}`);
+                
+                // Reset button
+                const card = document.querySelector(`.asset-card[data-asset-id="${assetId}"]`);
+                if (card) {
+                    const transferBtn = card.querySelector('button');
+                    transferBtn.disabled = false;
+                    transferBtn.textContent = 'Retry';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

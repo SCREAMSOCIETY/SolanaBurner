@@ -690,6 +690,12 @@ fastify.post('/api/cnft/transfer-request', async (request, reply) => {
   }
 });
 
+// Route for standalone cNFT transfer page
+fastify.get('/standalone', async (request, reply) => {
+  fastify.log.info('Serving standalone cNFT transfer page');
+  return reply.sendFile('standalone.html');
+});
+
 // Catch-all route for SPA - always serve index.html
 fastify.setNotFoundHandler(async (request, reply) => {
   fastify.log.info(`Not found handler for: ${request.url}, serving index.html`);

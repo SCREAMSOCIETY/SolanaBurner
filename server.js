@@ -38,7 +38,13 @@ try {
     res.sendFile('TREE_CREATION_GUIDE.md', { root: './' });
   });
 
-  // Serve index.html for all routes to support SPA
+  // Serve the standalone cNFT transfer page
+  app.get('/standalone', (req, res) => {
+    console.log('[SERVER] Serving standalone.html');
+    res.sendFile('standalone.html', { root: __dirname });
+  });
+
+  // Serve index.html for all other routes to support SPA
   app.get('*', (req, res) => {
     console.log('[SERVER] Serving index.html for path:', req.path);
     res.sendFile('templates/index.html', { root: __dirname });
