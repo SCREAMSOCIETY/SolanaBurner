@@ -269,9 +269,21 @@ async function fetchAssetProof(assetId) {
     
     // Safety check to make sure we have a valid response
     if (rpcResponse?.data?.result) {
-      const proofData = rpcResponse.data.result;
+      const rpcProofData = rpcResponse.data.result;
+      
+      // Transform the proof data to match the expected format in working-cnft-transfer.js
+      // This ensures compatibility with the existing transfer mechanism
+      const formattedProofData = {
+        ...rpcProofData,
+        compression: {
+          tree: rpcProofData.tree_id,
+          proof: rpcProofData.proof,
+          leaf_id: rpcProofData.leaf_index
+        }
+      };
+      
       console.log(`[Helius API] Successfully fetched proof for asset: ${assetId}`);
-      return proofData;
+      return formattedProofData;
     } else {
       console.warn('[Helius API] No proof data found in RPC response');
       return null;
