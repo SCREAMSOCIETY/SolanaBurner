@@ -152,7 +152,7 @@ const WalletAssets: React.FC = () => {
   
   // State for Direct Trash Modal
   const [directTrashModalOpen, setDirectTrashModalOpen] = useState<boolean>(false);
-  const [selectedCnftForTrash, setSelectedCnftForTrash] = useState<{ id: string; name: string } | null>(null);
+  const [selectedCnftForTrash, setSelectedCnftForTrash] = useState<{ id: string; name: string; image?: string } | null>(null);
   
   // Fetch API key on component load
   useEffect(() => {
@@ -2223,6 +2223,7 @@ const WalletAssets: React.FC = () => {
           onClose={() => setDirectTrashModalOpen(false)}
           assetId={selectedCnftForTrash.id}
           assetName={selectedCnftForTrash.name}
+          assetImage={selectedCnftForTrash.image || '../../default-nft-image.svg'}
           onSuccess={handleDirectTrashSuccess}
           onError={handleDirectTrashError}
         />

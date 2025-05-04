@@ -28,178 +28,185 @@ const RobustTransferModal: React.FC<RobustTransferModalProps> = ({
   onSuccess,
   onError
 }) => {
-  const [privateKey, setPrivateKey] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [showPrivateKey, setShowPrivateKey] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string>('');
-
-  // Clear state when modal opens or closes
+  const [privateKey, setPrivateKey] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusType, setStatusType] = useState<'error' | 'success' | 'processing'>('processing');
+  const [explorerUrl, setExplorerUrl] = useState('');
+  const [publicKey, setPublicKey] = useState('');
+  const [isValid, setIsValid] = useState(false);
+  
+  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setPrivateKey('');
-      setError(null);
-      setIsLoading(false);
-      setPublicKey(null);
-      setShowPrivateKey(false);
       setStatusMessage('');
+      setIsLoading(false);
+      setExplorerUrl('');
+      setPublicKey('');
+      setIsValid(false);
     }
   }, [isOpen]);
-
-  // Update public key when private key changes
+  
+  // Validate private key as user types
   useEffect(() => {
-    if (privateKey && isValidPrivateKey(privateKey)) {
-      const pubKey = getPublicKeyFromPrivate(privateKey);
-      setPublicKey(pubKey);
-      setError(null);
-    } else if (privateKey) {
-      setPublicKey(null);
-      setError('Invalid private key format');
-    }
-  }, [privateKey]);
-
-  // Handle private key input change
-  const handlePrivateKeyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPrivateKey(e.target.value.trim());
-  };
-
-  // Toggle private key visibility
-  const togglePrivateKeyVisibility = () => {
-    setShowPrivateKey(prev => !prev);
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate private key
-    if (!privateKey || !isValidPrivateKey(privateKey)) {
-      setError('Please enter a valid private key');
+    if (!privateKey) {
+      setIsValid(false);
+      setPublicKey('');
       return;
     }
     
-    // Reset error state
-    setError(null);
+    const valid = isValidPrivateKey(privateKey);
+    setIsValid(valid);
+    
+    if (valid) {
+      try {
+        const pubKey = getPublicKeyFromPrivate(privateKey);
+        setPublicKey(pubKey);
+      } catch (error) {
+        setPublicKey('');
+      }
+    } else {
+      setPublicKey('');
+    }
+  }, [privateKey]);
+  
+  const handleTransfer = async () => {
+    if (!isValid) return;
+    
     setIsLoading(true);
-    setStatusMessage('Initiating robust transfer...');
+    setStatusType('processing');
+    setStatusMessage('Processing transfer...');
     
     try {
-      // Execute the robust transfer
       const result = await executeRobustTransfer(privateKey, assetId);
       
       if (result && typeof result === 'object' && 'success' in result && result.success) {
-        setStatusMessage('Transfer successful! Redirecting...');
-        // Notify parent component of success
-        if ('signature' in result && 'explorerUrl' in result) {
-          onSuccess(
-            result.signature as string, 
-            result.explorerUrl as string
-          );
+        setStatusType('success');
+        setStatusMessage('Successfully transferred cNFT to project wallet.');
+        
+        if ('explorerUrl' in result) {
+          setExplorerUrl(result.explorerUrl as string);
         }
         
-        // Close modal after a short delay
-        setTimeout(() => {
-          onClose();
-        }, 2000);
+        // Notify parent of success
+        if ('signature' in result && 'explorerUrl' in result) {
+          onSuccess(result.signature as string, result.explorerUrl as string);
+        }
       } else {
-        const errorMsg = result && typeof result === 'object' && 'error' in result 
-          ? result.error as string 
-          : 'Transfer failed';
-        setError(errorMsg);
-        setIsLoading(false);
+        setStatusType('error');
+        const errorMsg = (result && typeof result === 'object' && 'error' in result) 
+          ? (result.error as string) 
+          : 'Failed to transfer cNFT.';
+        setStatusMessage(errorMsg);
+        onError(errorMsg);
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred');
+    } catch (error: any) {
+      console.error('Transfer error:', error);
+      setStatusType('error');
+      const errorMsg = error && error.message ? error.message : 'An unexpected error occurred.';
+      setStatusMessage(errorMsg);
+      onError(errorMsg);
+    } finally {
       setIsLoading(false);
     }
   };
-
-  // If modal is not open, don't render anything
+  
   if (!isOpen) return null;
-
+  
   return (
-    <div className="robust-transfer-modal-overlay">
-      <div className="robust-transfer-modal">
-        <div className="robust-transfer-modal-header">
-          <h2>Robust Transfer Mode</h2>
-          <button className="close-button" onClick={onClose} disabled={isLoading}>✕</button>
+    <div className="robust-transfer-modal">
+      <div className="robust-transfer-container">
+        <div className="robust-modal-header">
+          <h2>Advanced cNFT Trash</h2>
+          <button className="robust-modal-close" onClick={onClose} disabled={isLoading}>×</button>
         </div>
         
-        <div className="robust-transfer-modal-content">
-          <div className="asset-info">
-            <div className="asset-image-container">
-              <img src={assetImage || '/default-nft-image.svg'} alt={assetName} className="asset-image" />
-            </div>
-            <div className="asset-details">
-              <h3>{assetName || 'Unnamed NFT'}</h3>
-              <p className="asset-id">{assetId}</p>
+        <div className="robust-modal-content">
+          <div className="robust-asset-info">
+            <img
+              src={assetImage || '../../default-nft-image.svg'}
+              alt={assetName}
+              className="robust-asset-image"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = '../../default-nft-image.svg';
+              }}
+            />
+            <div className="robust-asset-details">
+              <div className="robust-asset-name">{assetName || 'Unknown cNFT'}</div>
+              <div className="robust-asset-id">{assetId}</div>
             </div>
           </div>
           
-          <div className="robust-transfer-description">
+          <div className="robust-explanation">
             <p>
-              This is a fallback transfer method for problematic cNFTs that have incomplete
-              proof data. It uses a server-side approach to handle the transfer more reliably.
-            </p>
-            <p>
-              <strong>Note:</strong> For security reasons, this method requires you to
-              manually enter your wallet's private key. Your key is only used for this
-              specific transfer and is never stored or saved.
+              This cNFT requires an advanced transfer method due to its structure. 
+              To proceed, please enter your wallet's private key. This key will only be 
+              used for this transaction and never stored.
             </p>
           </div>
           
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="privateKey">Your Wallet's Private Key:</label>
-              <div className="private-key-input-container">
-                <textarea
-                  id="privateKey"
-                  value={privateKey}
-                  onChange={handlePrivateKeyChange}
-                  placeholder="Enter your wallet's private key"
-                  className={`private-key-input ${showPrivateKey ? "" : "password-field"}`}
-                  style={{...(showPrivateKey ? {} : {fontFamily: 'password'})}}
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  className="toggle-visibility-button"
-                  onClick={togglePrivateKeyVisibility}
-                  disabled={isLoading}
-                >
-                  {showPrivateKey ? "Hide" : "Show"}
-                </button>
+          <div className="robust-input-group">
+            <label htmlFor="privateKey">Enter your wallet's private key (Secret Key):</label>
+            <input
+              type="password"
+              id="privateKey"
+              value={privateKey}
+              onChange={(e) => setPrivateKey(e.target.value)}
+              placeholder="Enter your private key (base58 encoded)"
+              disabled={isLoading}
+            />
+          </div>
+          
+          {publicKey && (
+            <div className="robust-input-group">
+              <label>Wallet Address:</label>
+              <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#46aaff', wordBreak: 'break-all' }}>
+                {publicKey}
               </div>
-              {publicKey && (
-                <div className="public-key-display">
-                  <span>Wallet: {publicKey}</span>
-                </div>
+            </div>
+          )}
+          
+          {statusMessage && (
+            <div className={`robust-status ${statusType}`}>
+              {statusMessage}
+              {statusType === 'success' && explorerUrl && (
+                <a 
+                  href={explorerUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="robust-explorer-link"
+                >
+                  View on explorer
+                </a>
               )}
             </div>
-            
-            {error && <div className="error-message">{error}</div>}
-            
-            {statusMessage && <div className="status-message">{statusMessage}</div>}
-            
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="cancel-button"
-                onClick={onClose}
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="submit-button"
-                disabled={isLoading || !isValidPrivateKey(privateKey)}
-              >
-                {isLoading ? "Processing..." : "Transfer to Project Wallet"}
-              </button>
-            </div>
-          </form>
+          )}
+        </div>
+        
+        <div className="robust-buttons">
+          <button 
+            className="robust-cancel-button"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            className="robust-transfer-button"
+            onClick={handleTransfer}
+            disabled={!isValid || isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span className="robust-loader"></span>
+                Processing...
+              </>
+            ) : (
+              'Confirm Trash'
+            )}
+          </button>
         </div>
       </div>
     </div>
