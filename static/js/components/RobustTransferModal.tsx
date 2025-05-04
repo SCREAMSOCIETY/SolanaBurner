@@ -88,17 +88,25 @@ const RobustTransferModal: React.FC<RobustTransferModalProps> = ({
       // Execute the robust transfer
       const result = await executeRobustTransfer(privateKey, assetId);
       
-      if (result.success) {
+      if (result && typeof result === 'object' && 'success' in result && result.success) {
         setStatusMessage('Transfer successful! Redirecting...');
         // Notify parent component of success
-        onSuccess(result.signature, result.explorerUrl);
+        if ('signature' in result && 'explorerUrl' in result) {
+          onSuccess(
+            result.signature as string, 
+            result.explorerUrl as string
+          );
+        }
         
         // Close modal after a short delay
         setTimeout(() => {
           onClose();
         }, 2000);
       } else {
-        setError(result.error || 'Transfer failed');
+        const errorMsg = result && typeof result === 'object' && 'error' in result 
+          ? result.error as string 
+          : 'Transfer failed';
+        setError(errorMsg);
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -151,7 +159,7 @@ const RobustTransferModal: React.FC<RobustTransferModalProps> = ({
                   onChange={handlePrivateKeyChange}
                   placeholder="Enter your wallet's private key"
                   className={`private-key-input ${showPrivateKey ? "" : "password-field"}`}
-                  style={{WebkitTextSecurity: showPrivateKey ? 'none' : 'disc'}}
+                  style={{...(showPrivateKey ? {} : {fontFamily: 'password'})}}
                   disabled={isLoading}
                 />
                 <button

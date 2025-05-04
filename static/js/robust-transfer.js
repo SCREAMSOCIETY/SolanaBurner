@@ -6,14 +6,14 @@
  * server-side robust transfer endpoint to handle problematic cNFTs.
  */
 
-import axios from 'axios';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
+import axios from 'axios';
 
 /**
  * Default project wallet to use as destination if none is provided
  */
-const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
+export const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
 
 /**
  * Execute a robust transfer for a cNFT using the server endpoint
@@ -26,50 +26,58 @@ const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
  */
 export async function executeRobustTransfer(privateKeyBase58, assetId, destinationAddress = PROJECT_WALLET) {
   try {
-    console.log(`Starting robust transfer for asset: ${assetId}`);
-    
-    // Make sure we have the required parameters
-    if (!privateKeyBase58 || !assetId) {
-      throw new Error('Missing required parameters: privateKey and assetId are required');
+    // Validate the inputs
+    if (!isValidPrivateKey(privateKeyBase58)) {
+      throw new Error('Invalid private key format');
     }
     
-    // Step 1: Request diagnostic info for this asset (optional but helpful for debugging)
-    const diagnosticResponse = await axios.get(`/api/cnft/diagnostic/${assetId}`);
-    console.log('Diagnostic data:', diagnosticResponse.data);
+    if (!isValidAssetId(assetId)) {
+      throw new Error('Invalid asset ID format');
+    }
     
-    // Step 2: Send the transfer request to our robust endpoint
-    const response = await axios.post('/api/cnft/robust-transfer', {
-      assetId,
+    // Send the request to the server
+    const response = await axios.post('/api/robust-transfer', {
       senderPrivateKey: privateKeyBase58,
-      destinationAddress: destinationAddress || PROJECT_WALLET
+      assetId,
+      destinationAddress
     });
     
-    // Check the response and format it
-    if (response.data.success) {
-      console.log('Robust transfer successful:', response.data);
-      
-      // Build a Solana explorer URL for the transaction
-      const signature = response.data.signature;
-      const explorerUrl = `https://solscan.io/tx/${signature}`;
-      
+    // Return the result from the server
+    if (response.data && response.data.success) {
       return {
         success: true,
-        signature,
-        explorerUrl,
-        message: response.data.message || 'Transfer completed successfully',
-        method: 'robust'
+        signature: response.data.signature,
+        explorerUrl: response.data.explorerUrl,
+        message: response.data.message || 'cNFT transferred successfully'
       };
     } else {
-      console.error('Robust transfer failed:', response.data);
-      throw new Error(response.data.error || 'Transfer failed');
+      throw new Error(response.data?.error || 'Transfer failed with unknown error');
     }
   } catch (error) {
-    console.error('Error in robust transfer:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error during robust transfer',
-      method: 'robust'
-    };
+    // Handle axios errors
+    if (error.response) {
+      // The request was made and the server responded with an error
+      const errorMessage = error.response.data?.error || 'Server returned an error';
+      console.error('Robust transfer server error:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received from the server', error.request);
+      return {
+        success: false,
+        error: 'No response from server. Please check your connection.'
+      };
+    } else {
+      // Something happened in setting up the request
+      console.error('Error in robust transfer request:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
 
@@ -79,8 +87,13 @@ export async function executeRobustTransfer(privateKeyBase58, assetId, destinati
  * @returns {boolean} - Whether the asset ID format is valid
  */
 export function isValidAssetId(assetId) {
-  // Basic validation: base58 addresses in Solana are at least 32 characters
-  return typeof assetId === 'string' && assetId.length >= 32 && assetId.length <= 44;
+  if (!assetId || typeof assetId !== 'string') {
+    return false;
+  }
+  
+  // Simple validation for Solana public key format
+  // A Solana public key is a base58 encoded string, typically 32-44 characters
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(assetId);
 }
 
 /**
@@ -90,21 +103,17 @@ export function isValidAssetId(assetId) {
  */
 export function isValidPrivateKey(privateKey) {
   try {
-    // Try to decode the key from base58
-    const secretKey = bs58.decode(privateKey);
-    
-    // Valid Solana keypairs have 64-byte private keys
-    if (secretKey.length !== 64) {
+    if (!privateKey || typeof privateKey !== 'string') {
       return false;
     }
     
-    // Try to create a keypair from the secret key
-    Keypair.fromSecretKey(secretKey);
+    // Attempt to decode the base58 private key
+    const decoded = bs58.decode(privateKey);
     
-    // If we got here, the key is valid
-    return true;
+    // A Solana private key is 64 bytes (32 for private key, 32 for public key)
+    return decoded.length === 64;
   } catch (error) {
-    console.error('Invalid private key format:', error.message);
+    console.error('Error validating private key:', error.message);
     return false;
   }
 }
@@ -120,7 +129,7 @@ export function getPublicKeyFromPrivate(privateKeyBase58) {
     const keypair = Keypair.fromSecretKey(secretKey);
     return keypair.publicKey.toString();
   } catch (error) {
-    console.error('Error deriving public key:', error);
+    console.error('Error getting public key:', error.message);
     return null;
   }
 }
@@ -132,13 +141,40 @@ export function getPublicKeyFromPrivate(privateKeyBase58) {
  */
 export async function runDiagnostic(assetId) {
   try {
-    const response = await axios.get(`/api/cnft/diagnostic/${assetId}`);
-    return response.data;
+    // Validate the asset ID
+    if (!isValidAssetId(assetId)) {
+      throw new Error('Invalid asset ID format');
+    }
+    
+    // Send the request to the server
+    const response = await axios.get(`/api/diagnostic/${assetId}`);
+    
+    // Return the diagnostic results
+    if (response.data && response.data.success) {
+      return {
+        success: true,
+        diagnostics: response.data.diagnostics
+      };
+    } else {
+      throw new Error(response.data?.error || 'Diagnostic failed with unknown error');
+    }
   } catch (error) {
-    console.error('Error running diagnostic:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to run diagnostic'
-    };
+    // Handle errors in a similar way to executeRobustTransfer
+    if (error.response) {
+      return {
+        success: false,
+        error: error.response.data?.error || 'Server returned an error'
+      };
+    } else if (error.request) {
+      return {
+        success: false,
+        error: 'No response from server. Please check your connection.'
+      };
+    } else {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
