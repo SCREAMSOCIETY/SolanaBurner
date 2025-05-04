@@ -187,19 +187,34 @@ async function transferCnft(senderKeypair, proofData, receiverAddress = PROJECT_
     // Get connection
     const connection = await getConnection();
     
+    // DEBUG: Log the complete proofData structure
+    console.log('=== DEBUG: PROOF DATA STRUCTURE ===');
+    console.log(JSON.stringify(proofData, null, 2));
+    
     // Convert string address to PublicKey if needed
     const receiverPublicKey = typeof receiverAddress === 'string'
       ? new PublicKey(receiverAddress)
       : receiverAddress;
     
+    console.log(`\nTransferring cNFT from ${senderKeypair.publicKey.toString()} to ${receiverPublicKey.toString()}`);
+    
     // Parse the tree and root from proof data
-    const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
+    const treeId = proofData.tree_id || (proofData.compression && proofData.compression.tree);
+    console.log(`Tree ID: ${treeId}`);
+    
+    if (!treeId) {
+      throw new Error('Tree ID not found in proof data');
+    }
+    
+    const merkleTree = new PublicKey(treeId);
     
     // Derive the tree authority PDA
     const [treeAuthority] = PublicKey.findProgramAddressSync(
       [merkleTree.toBuffer()],
       BUBBLEGUM_PROGRAM_ID
     );
+    
+    console.log(`Tree Authority: ${treeAuthority.toString()}`);
     
     // Create manual instruction
     // This is where the original approach failed in browser, but works in Node.js
@@ -251,21 +266,62 @@ async function transferCnft(senderKeypair, proofData, receiverAddress = PROJECT_
     ];
     
     // 2. Extract data from proof
-    const root = Buffer.from(proofData.root, 'base64');
-    const dataHash = Buffer.from(
-      proofData.leaf && proofData.leaf.data_hash 
-        ? proofData.leaf.data_hash 
-        : '11111111111111111111111111111111',
-      'base64'
-    );
-    const creatorHash = Buffer.from(
-      proofData.leaf && proofData.leaf.creator_hash 
-        ? proofData.leaf.creator_hash 
-        : '11111111111111111111111111111111',
-      'base64'
-    );
-    const nonce = proofData.node_index || 0;
-    const index = proofData.node_index || 0;
+    // Check different possible locations for these values in the proof data
+    let rootValue = proofData.root;
+    if (!rootValue && proofData.merkle_tree) {
+      rootValue = proofData.merkle_tree.root;
+    }
+    
+    if (!rootValue) {
+      console.warn('Root value not found in proof data, using placeholder');
+      rootValue = '11111111111111111111111111111111';
+    }
+    
+    console.log(`Root value: ${rootValue}`);
+    const root = Buffer.from(rootValue, 'base64');
+    
+    // First try to get data_hash and creator_hash from the best locations
+    let dataHashValue = null;
+    if (proofData.data_hash) {
+      dataHashValue = proofData.data_hash;
+    } else if (proofData.compression && proofData.compression.data_hash) {
+      dataHashValue = proofData.compression.data_hash;
+    } else if (proofData.leaf && proofData.leaf.data_hash) {
+      dataHashValue = proofData.leaf.data_hash;
+    }
+    
+    if (!dataHashValue) {
+      console.warn('Data hash not found in proof data, using placeholder');
+      dataHashValue = '11111111111111111111111111111111';
+    }
+    
+    console.log(`Data hash value: ${dataHashValue}`);
+    const dataHash = Buffer.from(dataHashValue, 'base64');
+    
+    let creatorHashValue = null;
+    if (proofData.creator_hash) {
+      creatorHashValue = proofData.creator_hash;
+    } else if (proofData.compression && proofData.compression.creator_hash) {
+      creatorHashValue = proofData.compression.creator_hash;
+    } else if (proofData.leaf && proofData.leaf.creator_hash) {
+      creatorHashValue = proofData.leaf.creator_hash;
+    }
+    
+    if (!creatorHashValue) {
+      console.warn('Creator hash not found in proof data, using placeholder');
+      creatorHashValue = '11111111111111111111111111111111';
+    }
+    
+    console.log(`Creator hash value: ${creatorHashValue}`);
+    const creatorHash = Buffer.from(creatorHashValue, 'base64');
+    
+    // Look for node index in various locations
+    const nonce = proofData.leaf_id || proofData.node_index || 
+                 (proofData.compression && proofData.compression.leaf_id) || 
+                 proofData.leaf_index || 0;
+    const index = nonce; // Same value for both
+    
+    console.log(`Nonce/Index: ${nonce}`);
     
     // Convert string proofs to Buffer array
     const leafProof = proofData.proof.map(proofNode => 
