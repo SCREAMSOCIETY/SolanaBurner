@@ -984,6 +984,9 @@ fastify.setNotFoundHandler(async (request, reply) => {
 
 // Diagnostic endpoint for testing cNFT transfer issues
 fastify.get('/api/cnft/diagnostic/:assetId', async (request, reply) => {
+  // Set content type to JSON
+  reply.type('application/json');
+  
   try {
     const { assetId } = request.params;
     

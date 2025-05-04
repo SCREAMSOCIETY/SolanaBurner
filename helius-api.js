@@ -271,25 +271,94 @@ async function fetchAssetProof(assetId) {
     if (rpcResponse?.data?.result) {
       const rpcProofData = rpcResponse.data.result;
       
+      // Validate the proof data has the necessary fields
+      if (!rpcProofData.proof || !Array.isArray(rpcProofData.proof) || rpcProofData.proof.length === 0) {
+        console.error(`[Helius API] Missing proof array in response for asset: ${assetId}`);
+        console.error(`[Helius API] Proof data:`, rpcProofData);
+        throw new Error('Missing proof array in Helius API response');
+      }
+      
+      // Check for tree_id - needed for transfer
+      if (!rpcProofData.tree_id) {
+        console.error(`[Helius API] Missing tree_id in proof data for asset: ${assetId}`);
+        
+        // Try to find it elsewhere
+        if (rpcProofData.compression && rpcProofData.compression.tree) {
+          console.log(`[Helius API] Found tree in compression field, using this value`);
+          rpcProofData.tree_id = rpcProofData.compression.tree;
+        } else {
+          console.error(`[Helius API] Could not find tree_id value in any field`);
+          throw new Error('Missing tree_id in proof data');
+        }
+      }
+      
+      // Check for root - needed for transfer
+      if (!rpcProofData.root) {
+        console.error(`[Helius API] Missing root in proof data for asset: ${assetId}`);
+        
+        // Try to find it elsewhere
+        if (rpcProofData.merkle_tree && rpcProofData.merkle_tree.root) {
+          console.log(`[Helius API] Found root in merkle_tree field, using this value`);
+          rpcProofData.root = rpcProofData.merkle_tree.root;
+        } else {
+          console.error(`[Helius API] Could not find root value in any field`);
+          throw new Error('Missing root in proof data');
+        }
+      }
+      
+      // Make sure we have a leaf_id or node_index
+      let leafId = null;
+      if (rpcProofData.leaf_id !== undefined) {
+        leafId = rpcProofData.leaf_id;
+        console.log(`[Helius API] Found leaf_id: ${leafId}`);
+      } else if (rpcProofData.node_index !== undefined) {
+        leafId = rpcProofData.node_index;
+        console.log(`[Helius API] Found node_index, using as leaf_id: ${leafId}`);
+      } else if (rpcProofData.leaf_index !== undefined) {
+        leafId = rpcProofData.leaf_index;
+        console.log(`[Helius API] Found leaf_index, using as leaf_id: ${leafId}`);
+      } else if (rpcProofData.compression && rpcProofData.compression.leaf_id !== undefined) {
+        leafId = rpcProofData.compression.leaf_id;
+        console.log(`[Helius API] Found compression.leaf_id, using as leaf_id: ${leafId}`);
+      } else if (rpcProofData.compression && rpcProofData.compression.node_index !== undefined) {
+        leafId = rpcProofData.compression.node_index;
+        console.log(`[Helius API] Found compression.node_index, using as leaf_id: ${leafId}`);
+      }
+      
+      if (leafId === null) {
+        console.warn(`[Helius API] Could not find leaf_id or node_index in proof data`);
+        // For older trees, we'll assume 0 if not specified
+        leafId = 0;
+        console.log(`[Helius API] Setting default leaf_id to 0 for older tree format`);
+      }
+      
       // Transform the proof data to match the expected format in working-cnft-transfer.js
       // This ensures compatibility with the existing transfer mechanism
       const formattedProofData = {
         ...rpcProofData,
+        leaf_id: leafId,
+        node_index: leafId,
         compression: {
           tree: rpcProofData.tree_id,
           proof: rpcProofData.proof,
-          leaf_id: rpcProofData.node_index || rpcProofData.leaf_index || 0
+          leaf_id: leafId,
+          node_index: leafId
         }
       };
       
       console.log(`[Helius API] Successfully fetched proof for asset: ${assetId}`);
       return formattedProofData;
     } else {
-      console.warn('[Helius API] No proof data found in RPC response');
-      return null;
+      console.error('[Helius API] No proof data found in RPC response');
+      console.error('[Helius API] Response:', rpcResponse?.data);
+      throw new Error('Invalid response from Helius API when fetching proof');
     }
   } catch (error) {
     console.error('[Helius API] Error fetching asset proof:', error.message);
+    if (error.response) {
+      console.error(`[Helius API] Response status: ${error.response.status}`);
+      console.error(`[Helius API] Response data:`, error.response.data);
+    }
     throw error;
   }
 }
