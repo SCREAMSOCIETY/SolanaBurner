@@ -714,6 +714,12 @@ fastify.get('/working', async (request, reply) => {
   return reply.sendFile('working-transfer.html');
 });
 
+// Route for pure manual cNFT transfer implementation
+fastify.get('/pure', async (request, reply) => {
+  fastify.log.info('Serving pure manual cNFT transfer implementation');
+  return reply.sendFile('pure-browser-transfer.html');
+});
+
 // Import server-side cNFT handler
 const serverSideCnftHandler = require('./server-side-cnft-handler');
 
