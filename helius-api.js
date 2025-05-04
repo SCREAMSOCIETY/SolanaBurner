@@ -223,7 +223,7 @@ function formatHeliusV0NFTData(nft) {
         compression: nft.compression,
         tree: nft.compression?.tree,
         proof: nft.compression?.proof,
-        leafId: nft.compression?.leaf_id || nft.compression?.leafId,
+        leafId: nft.compression?.node_index || nft.compression?.leaf_id || nft.compression?.leafId || 0,
         data_hash: nft.compression?.data_hash,
         creator_hash: nft.compression?.creator_hash,
       })
@@ -278,7 +278,7 @@ async function fetchAssetProof(assetId) {
         compression: {
           tree: rpcProofData.tree_id,
           proof: rpcProofData.proof,
-          leaf_id: rpcProofData.leaf_index
+          leaf_id: rpcProofData.node_index || rpcProofData.leaf_index || 0
         }
       };
       
@@ -336,7 +336,7 @@ function formatHeliusNFTData(heliusNFT) {
         compression,
         tree: compression.tree,
         proof: compression.proof,
-        leafId: compression.leaf_id,
+        leafId: compression.node_index || compression.leaf_id || 0,
         data_hash: compression.data_hash,
         creator_hash: compression.creator_hash
       })

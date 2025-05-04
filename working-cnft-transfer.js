@@ -128,7 +128,7 @@ async function getProof(assetId) {
           proofData.compression = {
             tree: proofData.tree_id,
             proof: proofData.proof,
-            leaf_id: proofData.leaf_index
+            leaf_id: proofData.node_index || proofData.leaf_index
           };
           
           if (proofData.data_hash) {
@@ -164,7 +164,7 @@ async function getProof(assetId) {
             proofData.compression = {
               tree: proofData.tree || proofData.tree_id,
               proof: proofData.proof,
-              leaf_id: proofData.leaf_index || proofData.node_index || 0
+              leaf_id: proofData.node_index || proofData.leaf_index || 0
             };
           }
           
