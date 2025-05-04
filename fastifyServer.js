@@ -982,6 +982,97 @@ fastify.setNotFoundHandler(async (request, reply) => {
   return reply.sendFile('index.html', path.join(__dirname, 'templates'));
 });
 
+// Diagnostic endpoint for testing cNFT transfer issues
+fastify.get('/api/cnft/diagnostic/:assetId', async (request, reply) => {
+  try {
+    const { assetId } = request.params;
+    
+    if (!assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Asset ID is required'
+      });
+    }
+    
+    fastify.log.info(`Running diagnostic tests for cNFT: ${assetId}`);
+    
+    // 1. Fetch asset details
+    fastify.log.info(`Step 1: Fetching asset details...`);
+    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    
+    if (!assetDetails) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset not found via Helius API'
+      });
+    }
+    
+    // 2. Fetch the asset proof data
+    fastify.log.info(`Step 2: Fetching proof data...`);
+    const proofData = await heliusApi.fetchAssetProof(assetId);
+    
+    if (!proofData || !proofData.proof) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Proof data not available'
+      });
+    }
+    
+    // 3. Check for leaf_id or node_index
+    let leafId = null;
+    
+    if (proofData.leaf_id !== undefined) {
+      leafId = proofData.leaf_id;
+      fastify.log.info(`Found leaf_id: ${leafId}`);
+    } else if (proofData.node_index !== undefined) {
+      leafId = proofData.node_index;
+      fastify.log.info(`Found node_index: ${leafId}`);
+    } else if (proofData.compression && proofData.compression.leaf_id !== undefined) {
+      leafId = proofData.compression.leaf_id;
+      fastify.log.info(`Found compression.leaf_id: ${leafId}`);
+    } else if (proofData.compression && proofData.compression.node_index !== undefined) {
+      leafId = proofData.compression.node_index;
+      fastify.log.info(`Found compression.node_index: ${leafId}`);
+    } else {
+      fastify.log.warn(`No leaf_id or node_index found in proof data`);
+    }
+    
+    // 4. Validate proof array
+    let proofArrayValid = Array.isArray(proofData.proof);
+    let proofArrayLength = proofData.proof ? proofData.proof.length : 0;
+    
+    fastify.log.info(`Proof array valid: ${proofArrayValid}, length: ${proofArrayLength}`);
+    
+    // 5. Return the diagnostic results
+    return {
+      success: true,
+      diagnostics: {
+        asset_found: true,
+        proof_found: true,
+        asset_id: assetId,
+        tree_id: proofData.tree_id || (proofData.compression && proofData.compression.tree),
+        leaf_id: leafId,
+        proof_array_valid: proofArrayValid,
+        proof_array_length: proofArrayLength,
+        owner: assetDetails.ownership.owner,
+        compression_data_present: !!proofData.compression,
+        content_type: assetDetails.content && assetDetails.content.metadata ? 
+                      assetDetails.content.metadata.attributes.find(attr => attr.trait_type === 'Content Type')?.value : 'Unknown'
+      },
+      details: {
+        asset: assetDetails,
+        proof: proofData
+      }
+    };
+  } catch (error) {
+    fastify.log.error(`Error in diagnostic endpoint: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Diagnostic failed: ${error.message}`
+    });
+  }
+});
+
 // Log uncaught errors
 process.on('uncaughtException', (err) => {
   fastify.log.error({

@@ -352,17 +352,86 @@ async function transferCnft(senderKeypair, proofData, receiverAddress = PROJECT_
     const creatorHash = Buffer.from(creatorHashValue, 'base64');
     
     // Look for node index in various locations
-    const nonce = proofData.leaf_id || proofData.node_index || 
-                 (proofData.compression && proofData.compression.leaf_id) || 
-                 proofData.leaf_index || 0;
-    const index = nonce; // Same value for both
+    let nonce = null;
+    let index = null;
+
+    // Check all possible locations for the leaf ID (different APIs use different fields)
+    if (proofData.leaf_id !== undefined) {
+      nonce = proofData.leaf_id;
+      console.log(`Using proofData.leaf_id: ${nonce}`);
+    } else if (proofData.node_index !== undefined) {
+      nonce = proofData.node_index;
+      console.log(`Using proofData.node_index: ${nonce}`);
+    } else if (proofData.compression && proofData.compression.leaf_id !== undefined) {
+      nonce = proofData.compression.leaf_id;
+      console.log(`Using proofData.compression.leaf_id: ${nonce}`);
+    } else if (proofData.leaf_index !== undefined) {
+      nonce = proofData.leaf_index;
+      console.log(`Using proofData.leaf_index: ${nonce}`);
+    } else if (proofData.compression && proofData.compression.node_index !== undefined) {
+      nonce = proofData.compression.node_index;
+      console.log(`Using proofData.compression.node_index: ${nonce}`);
+    } else {
+      // If all else fails, try to parse the leaf ID from the asset ID
+      console.warn('No leaf ID found in proof data, checking alternative sources');
+      
+      // Check if we have a raw_asset field that might have the info
+      if (proofData.raw_asset && proofData.raw_asset.compression) {
+        nonce = proofData.raw_asset.compression.leaf_id || proofData.raw_asset.compression.node_index;
+        console.log(`Using raw_asset compression data: ${nonce}`);
+      }
+    }
+    
+    // If we still don't have a nonce, this is a critical error
+    if (nonce === null) {
+      console.error('CRITICAL ERROR: Could not find leaf_id or node_index in proof data');
+      console.error(JSON.stringify(proofData, null, 2));
+      throw new Error('Missing leaf_id or node_index in proof data. This is required for cNFT transfers.');
+    }
+    
+    // Use the same value for index
+    index = nonce;
     
     console.log(`Nonce/Index: ${nonce}`);
     
-    // Convert string proofs to Buffer array
-    const leafProof = proofData.proof.map(proofNode => 
-      Buffer.from(proofNode, 'base64')
-    );
+    // Process the proof array with better error handling
+    let leafProof = [];
+    if (Array.isArray(proofData.proof)) {
+      try {
+        // Go through each proof and ensure it's properly formatted
+        leafProof = proofData.proof.map((proofNode, index) => {
+          if (!proofNode) {
+            throw new Error(`Proof node at index ${index} is null or undefined`);
+          }
+          
+          console.log(`Processing proof node ${index}: ${typeof proofNode}`);
+          
+          // Handle different formats (base64 string or byte array)
+          if (typeof proofNode === 'string') {
+            try {
+              return Buffer.from(proofNode, 'base64');
+            } catch (decodeErr) {
+              console.error(`Failed to decode proof node ${index} as base64:`, decodeErr);
+              throw new Error(`Invalid proof format at index ${index}: ${decodeErr.message}`);
+            }
+          } else if (Array.isArray(proofNode)) {
+            // If it's already an array of numbers, convert to Buffer
+            return Buffer.from(proofNode);
+          } else {
+            throw new Error(`Unsupported proof node format at index ${index}: ${typeof proofNode}`);
+          }
+        });
+      } catch (proofErr) {
+        console.error('Error processing proof data:', proofErr);
+        console.error('Raw proof data:', proofData.proof);
+        throw new Error(`Failed to process proof data: ${proofErr.message}`);
+      }
+    } else {
+      console.error('Proof data is not an array:', proofData.proof);
+      throw new Error('Proof data is missing or not in array format');
+    }
+    
+    console.log(`Processed ${leafProof.length} proof elements`);
     
     // 3. Create instruction data
     // Transfer instruction discriminator for Bubblegum program is 5
