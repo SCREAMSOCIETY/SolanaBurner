@@ -58,15 +58,37 @@ async function fetchAllNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs for wallet: ${walletAddress}`);
     
-    // Use the proxy API endpoint instead of direct Helius API access
-    const url = `/api/helius/wallet-assets/${walletAddress}`;
-    const response = await axios.get(url);
+    // Direct API call to Helius RPC endpoint to avoid circular references
+    const rpcResponse = await axios.post(
+      HELIUS_RPC_URL,
+      {
+        jsonrpc: '2.0',
+        id: 'helius-wallet-assets',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: walletAddress,
+          page: 1, 
+          limit: 1000,
+          displayOptions: {
+            showCollectionMetadata: true
+          }
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': HELIUS_API_KEY
+        }
+      }
+    );
     
-    if (response.data && response.data.success && response.data.data) {
-      console.log(`[Helius API] Found ${response.data.data.length} NFTs/assets`);
-      return response.data.data;
+    // Safety check to make sure we have a valid response
+    if (rpcResponse?.data?.result?.items) {
+      const assets = rpcResponse.data.result.items;
+      console.log(`[Helius API] Found ${assets.length} NFTs/assets`);
+      return assets;
     } else {
-      console.warn('[Helius API] No items found in response:', response.data);
+      console.warn('[Helius API] No items found in RPC response');
       return [];
     }
   } catch (error) {
@@ -84,14 +106,35 @@ async function fetchAssetDetails(assetId) {
   try {
     console.log(`[Helius API] Fetching asset details for: ${assetId}`);
     
-    // Use the proxy API endpoint instead of direct Helius API access
-    const url = `/api/helius/asset/${assetId}`;
-    const response = await axios.get(url);
+    // Direct API call to Helius RPC endpoint to avoid circular references
+    const rpcResponse = await axios.post(
+      HELIUS_RPC_URL,
+      {
+        jsonrpc: '2.0',
+        id: 'helius-asset-details',
+        method: 'getAsset',
+        params: {
+          id: assetId,
+          displayOptions: {
+            showCollectionMetadata: true
+          }
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': HELIUS_API_KEY
+        }
+      }
+    );
     
-    if (response.data && response.data.success && response.data.data) {
-      return response.data.data;
+    // Safety check to make sure we have a valid response
+    if (rpcResponse?.data?.result) {
+      const asset = rpcResponse.data.result;
+      console.log(`[Helius API] Successfully fetched details for asset: ${assetId}`);
+      return asset;
     } else {
-      console.warn('[Helius API] No asset details found:', response.data);
+      console.warn('[Helius API] No asset details found in RPC response');
       return null;
     }
   } catch (error) {
@@ -205,14 +248,32 @@ async function fetchAssetProof(assetId) {
   try {
     console.log(`[Helius API] Fetching proof data for asset: ${assetId}`);
     
-    // Use the proxy API endpoint instead of direct Helius API access
-    const url = `/api/helius/asset-proof/${assetId}`;
-    const response = await axios.get(url);
+    // Direct API call to Helius RPC endpoint to avoid circular references
+    const rpcResponse = await axios.post(
+      HELIUS_RPC_URL,
+      {
+        jsonrpc: '2.0',
+        id: 'helius-asset-proof',
+        method: 'getAssetProof',
+        params: {
+          id: assetId
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': HELIUS_API_KEY
+        }
+      }
+    );
     
-    if (response.data && response.data.success) {
-      return response.data.data;
+    // Safety check to make sure we have a valid response
+    if (rpcResponse?.data?.result) {
+      const proofData = rpcResponse.data.result;
+      console.log(`[Helius API] Successfully fetched proof for asset: ${assetId}`);
+      return proofData;
     } else {
-      console.warn('[Helius API] No proof data found:', response.data);
+      console.warn('[Helius API] No proof data found in RPC response');
       return null;
     }
   } catch (error) {
