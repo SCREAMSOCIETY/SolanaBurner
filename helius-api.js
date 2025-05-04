@@ -6,8 +6,15 @@ const axios = require('axios');
 
 // Configuration for Helius API
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-const HELIUS_REST_URL = `https://api.helius.xyz/v0`;
+
+// Check if API key is available
+if (!HELIUS_API_KEY) {
+  console.warn('WARNING: HELIUS_API_KEY environment variable is not set. API calls will fail.');
+}
+
+// Use more consistent URLs that will work on both dev and production
+const HELIUS_RPC_URL = 'https://mainnet.helius-rpc.com';
+const HELIUS_REST_URL = 'https://api.helius.xyz/v0';
 
 /**
  * Fetches all NFTs (both regular and compressed) for a wallet address using Helius API's v0 endpoint
@@ -18,19 +25,19 @@ async function fetchAllWalletNFTs(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs (regular + compressed) for wallet: ${walletAddress}`);
     
-    const url = `${HELIUS_REST_URL}/addresses/${walletAddress}/nfts?api-key=${HELIUS_API_KEY}`;
+    // Use the proxy API endpoint instead of direct Helius API access
+    const url = `/api/helius/wallet/nfts/${walletAddress}`;
     const response = await axios.get(url);
     
-    if (response.data && Array.isArray(response.data)) {
-      const regularNFTs = response.data.filter(nft => !nft.compression?.compressed);
-      const compressedNFTs = response.data.filter(nft => nft.compression?.compressed);
+    if (response.data && response.data.success) {
+      const { regularNfts, compressedNfts } = response.data.data;
       
-      console.log(`[Helius API] Found ${response.data.length} total NFTs (${regularNFTs.length} regular, ${compressedNFTs.length} compressed)`);
+      console.log(`[Helius API] Found ${regularNfts.length + compressedNfts.length} total NFTs (${regularNfts.length} regular, ${compressedNfts.length} compressed)`);
       
       return {
-        allNfts: response.data,
-        regularNfts: regularNFTs,
-        compressedNfts: compressedNFTs
+        allNfts: [...regularNfts, ...compressedNfts],
+        regularNfts: regularNfts,
+        compressedNfts: compressedNfts
       };
     } else {
       console.warn('[Helius API] Invalid response format:', response.data);
@@ -51,28 +58,13 @@ async function fetchAllNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs for wallet: ${walletAddress}`);
     
-    const response = await axios.post(
-      HELIUS_RPC_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-nft-fetch',
-        method: 'getAssetsByOwner',
-        params: {
-          ownerAddress: walletAddress,
-          page: 1, // Start with first page
-          limit: 100 // Fetch up to 100 assets at once
-        }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // Use the proxy API endpoint instead of direct Helius API access
+    const url = `/api/helius/wallet-assets/${walletAddress}`;
+    const response = await axios.get(url);
     
-    if (response.data && response.data.result && response.data.result.items) {
-      console.log(`[Helius API] Found ${response.data.result.items.length} NFTs/assets`);
-      return response.data.result.items;
+    if (response.data && response.data.success && response.data.data) {
+      console.log(`[Helius API] Found ${response.data.data.length} NFTs/assets`);
+      return response.data.data;
     } else {
       console.warn('[Helius API] No items found in response:', response.data);
       return [];
@@ -92,25 +84,12 @@ async function fetchAssetDetails(assetId) {
   try {
     console.log(`[Helius API] Fetching asset details for: ${assetId}`);
     
-    const response = await axios.post(
-      HELIUS_RPC_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-asset-details',
-        method: 'getAsset',
-        params: {
-          id: assetId
-        }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // Use the proxy API endpoint instead of direct Helius API access
+    const url = `/api/helius/asset/${assetId}`;
+    const response = await axios.get(url);
     
-    if (response.data && response.data.result) {
-      return response.data.result;
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
     } else {
       console.warn('[Helius API] No asset details found:', response.data);
       return null;
@@ -130,33 +109,14 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching compressed NFTs for wallet: ${walletAddress}`);
     
-    // Using getAssetsByOwner and then filtering the results for compressed NFTs
-    // The displayOptions for compression was causing errors, so we'll get all NFTs and filter
-    const response = await axios.post(
-      HELIUS_RPC_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-cnft-fetch',
-        method: 'getAssetsByOwner',
-        params: {
-          ownerAddress: walletAddress,
-          page: 1,
-          limit: 100
-        }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // Use the proxy API endpoint instead of direct Helius API access
+    const url = `/api/helius/wallet/nfts/${walletAddress}`;
+    const response = await axios.get(url);
     
-    if (response.data && response.data.result && response.data.result.items) {
-      const compressedNFTs = response.data.result.items.filter(item => 
-        item.compression && item.compression.compressed === true
-      );
-      console.log(`[Helius API] Found ${compressedNFTs.length} compressed NFTs`);
-      return compressedNFTs;
+    if (response.data && response.data.success && response.data.data) {
+      const { compressedNfts } = response.data.data;
+      console.log(`[Helius API] Found ${compressedNfts.length} compressed NFTs`);
+      return compressedNfts;
     } else {
       console.warn('[Helius API] No compressed NFTs found:', response.data);
       return [];
@@ -221,25 +181,12 @@ async function fetchAssetProof(assetId) {
   try {
     console.log(`[Helius API] Fetching proof data for asset: ${assetId}`);
     
-    const response = await axios.post(
-      HELIUS_RPC_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-proof',
-        method: 'getAssetProof',
-        params: {
-          id: assetId
-        }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // Use the proxy API endpoint instead of direct Helius API access
+    const url = `/api/helius/asset-proof/${assetId}`;
+    const response = await axios.get(url);
     
-    if (response.data && response.data.result) {
-      return response.data.result;
+    if (response.data && response.data.success) {
+      return response.data.data;
     } else {
       console.warn('[Helius API] No proof data found:', response.data);
       return null;
