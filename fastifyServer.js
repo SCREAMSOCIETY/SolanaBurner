@@ -823,35 +823,76 @@ fastify.post('/api/cnft/direct-transfer', async (request, reply) => {
     
     fastify.log.info(`Executing CLI command for asset ${asset_id}`);
     
-    // Execute the command
-    const { stdout, stderr } = await execPromise(command);
-    
-    if (stderr) {
-      fastify.log.error(`Command error: ${stderr}`);
+    // Execute the command with improved error handling
+    fastify.log.info(`About to execute CLI transfer command`);
+    try {
+      const { stdout, stderr } = await execPromise(command);
+      
+      // Log the complete output for debugging
+      fastify.log.info(`Command stdout: ${stdout}`);
+      
+      if (stderr) {
+        fastify.log.error(`Command stderr: ${stderr}`);
+        return reply.code(500).send({
+          success: false,
+          error: stderr
+        });
+      }
+    } catch (execError) {
+      fastify.log.error(`Command execution failed: ${execError.message}`);
+      
+      // Check if we have stderr in the execError
+      if (execError.stderr) {
+        fastify.log.error(`Command stderr from error: ${execError.stderr}`);
+      }
+      
       return reply.code(500).send({
         success: false,
-        error: stderr
+        error: `Command execution failed: ${execError.message}`,
+        details: execError.stderr || 'No additional error details'
       });
     }
     
-    // Parse the output to find transaction signature
-    let signature = null;
-    const signatureMatch = stdout.match(/Transaction Signature: ([a-zA-Z0-9]+)/);
-    if (signatureMatch && signatureMatch[1]) {
-      signature = signatureMatch[1];
+    // Since we moved the stdout capture inside the try block, we need to define it here
+    let stdout = '';
+    
+    // Ensure stdout is properly defined in the enclosing scope
+    try {
+      // Get the stdout value from the correct scope
+      const lastResponse = await execPromise(command);
+      stdout = lastResponse.stdout;
+      
+      // Parse the output to find transaction signature
+      let signature = null;
+      const signatureMatch = stdout.match(/Transaction Signature: ([a-zA-Z0-9]+)/);
+      if (signatureMatch && signatureMatch[1]) {
+        signature = signatureMatch[1];
+      }
+      
+      // Check for success message
+      const success = stdout.includes('Successfully transferred cNFT');
+      
+      fastify.log.info(`CLI command completed with success=${success}`);
+      
+      // If we have a signature but success is false, log this unusual state
+      if (signature && !success) {
+        fastify.log.warn(`Found signature ${signature} but success indicator is false. Full stdout: ${stdout}`);
+      }
+      
+      return reply.code(200).send({
+        success,
+        output: stdout,
+        signature,
+        explorerUrl: signature ? `https://solscan.io/tx/${signature}` : null
+      });
+    } catch (error) {
+      fastify.log.error(`Error parsing command output: ${error.message}`);
+      return reply.code(500).send({
+        success: false,
+        error: `Error parsing command output: ${error.message}`,
+        output: stdout || 'No output available'
+      });
     }
-    
-    // Check for success message
-    const success = stdout.includes('Successfully transferred cNFT');
-    
-    fastify.log.info(`CLI command completed with success=${success}`);
-    
-    return {
-      success,
-      output: stdout,
-      signature,
-      explorerUrl: signature ? `https://solscan.io/tx/${signature}` : null
-    };
   } catch (error) {
     fastify.log.error(`Error in direct-transfer endpoint: ${error.message}`);
     return reply.code(500).send({

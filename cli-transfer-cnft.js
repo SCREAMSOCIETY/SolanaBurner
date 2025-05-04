@@ -118,10 +118,26 @@ async function main() {
         console.log(`Explorer URL: https://solscan.io/tx/${result.signature}`);
       } else {
         console.error(`\n❌ Transfer failed: ${result.error}`);
+        
+        // Log more detailed information to help diagnose issues
+        console.error('\n=== DETAILED ERROR INFORMATION ===');
+        
+        if (result.originalError) {
+          console.error(`Original error: ${result.originalError}`);
+        }
+        
         if (result.stack) {
           console.error('Error stack trace:');
           console.error(result.stack);
         }
+        
+        // Dump proof data for diagnostic purposes
+        if (proofData) {
+          console.error('\n=== PROOF DATA STRUCTURE ===');
+          console.error(JSON.stringify(proofData, null, 2));
+        }
+        
+        console.error('\n⚠️ Check the error message above for details on what went wrong.');
         process.exit(1);
       }
     } catch (error) {

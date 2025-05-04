@@ -431,9 +431,32 @@ async function transferCnft(senderKeypair, proofData, receiverAddress = PROJECT_
     };
   } catch (error) {
     console.error('Error transferring cNFT:', error);
+    
+    // Enhance error reporting by capturing more details
+    let detailedError = `Transfer error: ${error.message}`;
+    
+    // Add stack trace for better debugging
+    if (error.stack) {
+      console.error('Stack trace:', error.stack);
+      detailedError += '\nStack: ' + error.stack.split('\n')[1];
+    }
+    
+    // Check for specific error types
+    if (error.message.includes('blockhash')) {
+      detailedError += '\nHint: This might be due to a blockhash issue. Network could be congested.';
+    } else if (error.message.includes('signature verification failed')) {
+      detailedError += '\nHint: This is likely due to an invalid signature. Check your keypair or permissions.';
+    } else if (error.message.includes('insufficient funds')) {
+      detailedError += '\nHint: The wallet does not have enough SOL to cover transaction fees.';
+    } else if (error.message.includes('Buffer')) {
+      detailedError += '\nHint: Data formatting error in the proofData structure.';
+    }
+    
     return {
       success: false,
-      error: error.message
+      error: detailedError,
+      originalError: error.message,
+      stack: error.stack
     };
   }
 }
