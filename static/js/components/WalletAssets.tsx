@@ -12,6 +12,9 @@ import axios from 'axios';
 // Import the CNFTHandler class
 import { CNFTHandler } from '../cnft-handler';
 
+// Import the DirectTrashModal component
+import DirectTrashModal from './DirectTrashModal';
+
 // Add global variable to global window object to access in console for debugging
 declare global {
   interface Window {
@@ -146,6 +149,10 @@ const WalletAssets: React.FC = () => {
   
   // Handle API key for Solscan
   const [solscanApiKey, setSolscanApiKey] = useState<string | null>(null);
+  
+  // State for Direct Trash Modal
+  const [directTrashModalOpen, setDirectTrashModalOpen] = useState<boolean>(false);
+  const [selectedCnftForTrash, setSelectedCnftForTrash] = useState<{ id: string; name: string } | null>(null);
   
   // Fetch API key on component load
   useEffect(() => {
