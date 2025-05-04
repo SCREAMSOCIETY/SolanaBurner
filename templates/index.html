@@ -41,14 +41,53 @@
     <script src="/static/dist/hidden-assets.js"></script>
     <script src="/static/dist/animations.js"></script>
     <script>
-        window.addEventListener('load', function() {
-            console.log('[index.html] Document loaded, initializing App');
-            if (window.App && typeof window.App.render === 'function') {
-                window.App.render();
-            } else {
-                console.error('[index.html] App.render not found');
-            }
-        });
+        // Initialize ENV values
+        window.ENV = window.ENV || {};
+        
+        // Fetch configuration from backend
+        fetch('/api/config')
+            .then(response => response.json())
+            .then(config => {
+                console.log('[index.html] Loaded API config from server');
+                
+                // Store configuration values 
+                window.ENV.HELIUS_API_KEY = config.heliusApiKey || '';
+                window.ENV.SOLSCAN_API_KEY = config.solscanApiKey || '';
+                window.ENV.QUICKNODE_RPC_URL = config.quicknodeRpcUrl || '';
+                window.ENV.ENVIRONMENT = config.environment || 'development';
+                
+                // Store tree information
+                if (config.treeInfo) {
+                    window.ENV.TREE_INFO = config.treeInfo;
+                }
+                
+                // Log environment status (don't log actual keys)
+                console.log('[index.html] Environment initialized:', {
+                    heliusKeyPresent: !!window.ENV.HELIUS_API_KEY,
+                    quicknodeRpcPresent: !!window.ENV.QUICKNODE_RPC_URL,
+                    solscanKeyPresent: !!window.ENV.SOLSCAN_API_KEY,
+                    environment: window.ENV.ENVIRONMENT
+                });
+                
+                // Initialize the app after config is loaded
+                if (window.App && typeof window.App.render === 'function') {
+                    console.log('[index.html] Initializing App after config load');
+                    window.App.render();
+                } else {
+                    console.error('[index.html] App.render not found after config load');
+                }
+            })
+            .catch(error => {
+                console.error('[index.html] Failed to load API config:', error);
+                
+                // Still try to initialize the app even if config failed
+                if (window.App && typeof window.App.render === 'function') {
+                    console.log('[index.html] Initializing App despite config error');
+                    window.App.render();
+                } else {
+                    console.error('[index.html] App.render not found after config error');
+                }
+            });
     </script>
 </body>
 </html>

@@ -228,49 +228,43 @@ export class CNFTHandler {
                 errors.push(apiError.message);
             }
             
-            // Method 3: Try direct Helius API if we have the key
-            console.log("Method 3: Trying direct Helius API access...");
-            if (typeof window !== "undefined" && window.ENV && window.ENV.HELIUS_API_KEY) {
-                try {
-                    const apiKey = window.ENV.HELIUS_API_KEY;
-                    const directResponse = await fetch(`https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${apiKey}`);
-                    const directData = await directResponse.json();
+            // Method 3: Try server-side proxy for Helius API
+            console.log("Method 3: Trying server-side Helius API access via proxy...");
+            try {
+                // Use our server-side proxy instead of direct API call to ensure API key is available
+                const directResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
+                const directData = await directResponse.json();
+                
+                console.log("Direct API Response:", directData);
+                
+                if (directData && directData.proof && Array.isArray(directData.proof) && directData.proof.length > 0) {
+                    console.log("Successfully fetched proof via server proxy");
                     
-                    console.log("Direct API Response:", directData);
-                    
-                    if (directData && directData.proof && Array.isArray(directData.proof) && directData.proof.length > 0) {
-                        console.log("Successfully fetched proof via direct Helius API");
-                        
-                        // Create a properly structured response
-                        return {
-                            assetId: assetId,
-                            proof: directData.proof,
-                            root: directData.root,
-                            tree_id: directData.tree_id,
-                            node_index: directData.node_index,
-                            leaf: directData.leaf,
-                            compression: {
-                                compressed: true,
-                                tree: directData.tree_id || "11111111111111111111111111111111",
-                                root: directData.root || "11111111111111111111111111111111",
-                                leaf_id: directData.node_index || 0,
-                                data_hash: directData.leaf && directData.leaf.data_hash ? directData.leaf.data_hash : "11111111111111111111111111111111",
-                                creator_hash: directData.leaf && directData.leaf.creator_hash ? directData.leaf.creator_hash : "11111111111111111111111111111111"
-                            }
-                        };
-                    } else {
-                        console.warn("Proof array is missing or empty in direct API response");
-                        throw new Error("Invalid proof data from direct Helius API");
-                    }
-                } catch (directError) {
-                    console.log("Method 3 error:", directError);
-                    attempts.push("direct Helius API");
-                    errors.push(directError.message);
+                    // Create a properly structured response
+                    return {
+                        assetId: assetId,
+                        proof: directData.proof,
+                        root: directData.root,
+                        tree_id: directData.tree_id,
+                        node_index: directData.node_index,
+                        leaf: directData.leaf,
+                        compression: {
+                            compressed: true,
+                            tree: directData.tree_id || "11111111111111111111111111111111",
+                            root: directData.root || "11111111111111111111111111111111",
+                            leaf_id: directData.node_index || 0,
+                            data_hash: directData.leaf && directData.leaf.data_hash ? directData.leaf.data_hash : "11111111111111111111111111111111",
+                            creator_hash: directData.leaf && directData.leaf.creator_hash ? directData.leaf.creator_hash : "11111111111111111111111111111111"
+                        }
+                    };
+                } else {
+                    console.warn("Proof array is missing or empty in direct API response");
+                    throw new Error("Invalid proof data from server proxy");
                 }
-            } else {
-                console.log("Method 3: Skipped - No Helius API key available");
-                attempts.push("direct Helius API");
-                errors.push("No API key available");
+            } catch (directError) {
+                console.log("Method 3 error:", directError);
+                attempts.push("Server proxy API");
+                errors.push(directError.message);
             }
             
             // If all methods failed, update debugging info and show warnings

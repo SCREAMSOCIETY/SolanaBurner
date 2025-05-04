@@ -74,10 +74,18 @@ fastify.get('/api/config', async (request, reply) => {
   const hasTreeAuthority = !!process.env.TREE_AUTHORITY_SECRET_KEY;
   const treeAddress = process.env.TREE_ADDRESS || '';
   
+  const heliusApiKey = process.env.HELIUS_API_KEY || '';
+  const heliusPresent = heliusApiKey ? 'present' : '';
+  
+  // Log environment variable status for debugging
+  fastify.log.info(`API Config: Helius API Key ${heliusPresent ? 'is present' : 'is missing'}`);
+  fastify.log.info(`API Config: QuickNode RPC URL ${process.env.QUICKNODE_RPC_URL ? 'is present' : 'is missing'}`);
+  fastify.log.info(`API Config: Solscan API Key ${process.env.SOLSCAN_API_KEY ? 'is present' : 'is missing'}`);
+  
   return { 
     solscanApiKey: process.env.SOLSCAN_API_KEY || '',
     quicknodeRpcUrl: process.env.QUICKNODE_RPC_URL || '',
-    heliusApiKey: process.env.HELIUS_API_KEY ? 'present' : '', // Don't expose actual key
+    heliusApiKey: heliusPresent, // Don't expose actual key in response
     environment: process.env.NODE_ENV || 'development',
     // Include tree information for the client side
     treeInfo: {
@@ -315,6 +323,37 @@ fastify.get('/api/helius/asset/:assetId', async (request, reply) => {
     return reply.code(500).send({
       success: false,
       error: 'Failed to fetch asset details',
+      message: error.message
+    });
+  }
+});
+
+// Endpoint to fetch asset proof data
+fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
+  const { assetId } = request.params;
+  
+  if (!assetId) {
+    return reply.code(400).send({ error: 'Asset ID is required' });
+  }
+  
+  try {
+    fastify.log.info(`Fetching proof data for asset: ${assetId}`);
+    const proofData = await heliusApi.fetchAssetProof(assetId);
+    
+    if (!proofData || !proofData.proof) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset proof not found'
+      });
+    }
+    
+    // Return the raw proof data
+    return proofData;
+  } catch (error) {
+    fastify.log.error(`Error fetching asset proof: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to fetch asset proof',
       message: error.message
     });
   }
@@ -921,210 +960,6 @@ process.on('unhandledRejection', (reason, promise) => {
   });
 });
 
-// Endpoint already defined earlier in the file
-// We're removing this duplicate endpoint to fix the error
-
-// Endpoint specifically for fetching asset proof data for cNFTs
-fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
-  try {
-    const { assetId } = request.params;
-    
-    if (!assetId) {
-      return reply.code(400).send({
-        success: false,
-        error: 'Asset ID is required'
-      });
-    }
-    
-    fastify.log.info(`Fetching proof data for asset: ${assetId}`);
-    
-    // Keep track of attempts and errors for debugging
-    const attempts = [];
-    const errors = [];
-    
-    // Attempt 1: RPC call using Helius API key
-    try {
-      // Use Helius API to get the asset details with proof
-      const heliusApiKey = process.env.HELIUS_API_KEY;
-      if (!heliusApiKey) {
-        throw new Error('HELIUS_API_KEY environment variable is not set');
-      }
-      
-      // Construct the RPC payload to request proof data
-      const payload = {
-        jsonrpc: '2.0',
-        id: 'helius-proof-request',
-        method: 'getAssetProof',
-        params: {
-          id: assetId
-        }
-      };
-      
-      // Make the request to Helius RPC API
-      const response = await axios.post(
-        `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
-        payload
-      );
-      
-      if (response.data && response.data.result) {
-        // Extract the proof and return it with some additional metadata
-        const proofData = response.data.result;
-        
-        fastify.log.info(`Successfully fetched proof data for asset ${assetId}`);
-        
-        // Return successful response with all required data
-        return {
-          success: true,
-          data: {
-            assetId,
-            proof: proofData.proof,
-            root: proofData.root,
-            tree_id: proofData.tree_id || proofData.tree,
-            compression: {
-              tree: proofData.tree_id || proofData.merkle_tree || proofData.tree,
-              root: proofData.root,
-              leaf_id: proofData.node_index,
-              data_hash: proofData.leaf && proofData.leaf.data_hash ? proofData.leaf.data_hash : "11111111111111111111111111111111",
-              creator_hash: proofData.leaf && proofData.leaf.creator_hash ? proofData.leaf.creator_hash : "11111111111111111111111111111111",
-              compressed: true
-            },
-            node_index: proofData.node_index,
-            leaf: proofData.leaf
-          }
-        };
-      } else {
-        throw new Error('Invalid response format from Helius RPC API');
-      }
-    } catch (rpcError) {
-      // Log the error but continue to next fallback
-      fastify.log.error(`RPC API error for asset ${assetId}: ${rpcError.message}`);
-      attempts.push('Helius RPC API');
-      errors.push(rpcError.message);
-    }
-    
-    // Attempt 2: REST API call to Helius directly
-    try {
-      const heliusApiKey = process.env.HELIUS_API_KEY;
-      if (!heliusApiKey) {
-        throw new Error('HELIUS_API_KEY environment variable is not set');
-      }
-      
-      const restResponse = await axios.get(
-        `https://api.helius.xyz/v0/assets/${assetId}/asset-proof?api-key=${heliusApiKey}`
-      );
-      
-      if (restResponse.data && restResponse.data.proof) {
-        const proofData = restResponse.data;
-        
-        fastify.log.info(`Successfully fetched proof data for asset ${assetId} via REST API`);
-        
-        // Return successful response with all required data
-        return {
-          success: true,
-          data: {
-            assetId,
-            proof: proofData.proof,
-            root: proofData.root,
-            tree_id: proofData.tree_id || proofData.tree,
-            compression: {
-              tree: proofData.tree_id || proofData.merkle_tree || proofData.tree,
-              root: proofData.root,
-              leaf_id: proofData.node_index,
-              data_hash: proofData.leaf && proofData.leaf.data_hash ? proofData.leaf.data_hash : "11111111111111111111111111111111",
-              creator_hash: proofData.leaf && proofData.leaf.creator_hash ? proofData.leaf.creator_hash : "11111111111111111111111111111111",
-              compressed: true
-            },
-            node_index: proofData.node_index,
-            leaf: proofData.leaf
-          }
-        };
-      } else {
-        throw new Error('Invalid response format from Helius REST API');
-      }
-    } catch (restError) {
-      // Log the error but continue to next fallback
-      fastify.log.error(`REST API error for asset ${assetId}: ${restError.message}`);
-      attempts.push('Helius REST API');
-      errors.push(restError.message);
-    }
-    
-    // Attempt 3: Try with QuickNode API if available
-    try {
-      const quicknodeUrl = process.env.QUICKNODE_RPC_URL;
-      if (!quicknodeUrl) {
-        throw new Error('QUICKNODE_RPC_URL environment variable is not set');
-      }
-      
-      // Construct the RPC payload to request proof data
-      const payload = {
-        jsonrpc: '2.0',
-        id: 'quicknode-proof-request',
-        method: 'getAssetProof',
-        params: {
-          id: assetId
-        }
-      };
-      
-      // Make the request to QuickNode API
-      const response = await axios.post(quicknodeUrl, payload);
-      
-      if (response.data && response.data.result) {
-        // Extract the proof and return it with some additional metadata
-        const proofData = response.data.result;
-        
-        fastify.log.info(`Successfully fetched proof data for asset ${assetId} via QuickNode`);
-        
-        // Return successful response with all required data
-        return {
-          success: true,
-          data: {
-            assetId,
-            proof: proofData.proof,
-            root: proofData.root,
-            tree_id: proofData.tree_id || proofData.tree,
-            compression: {
-              tree: proofData.tree_id || proofData.merkle_tree || proofData.tree,
-              root: proofData.root,
-              leaf_id: proofData.node_index,
-              data_hash: proofData.leaf && proofData.leaf.data_hash ? proofData.leaf.data_hash : "11111111111111111111111111111111",
-              creator_hash: proofData.leaf && proofData.leaf.creator_hash ? proofData.leaf.creator_hash : "11111111111111111111111111111111",
-              compressed: true
-            },
-            node_index: proofData.node_index,
-            leaf: proofData.leaf
-          }
-        };
-      } else {
-        throw new Error('Invalid response format from QuickNode API');
-      }
-    } catch (quicknodeError) {
-      // Log the error
-      fastify.log.error(`QuickNode API error for asset ${assetId}: ${quicknodeError.message}`);
-      attempts.push('QuickNode RPC');
-      errors.push(quicknodeError.message);
-    }
-    
-    // If we've tried all methods and failed, return a detailed error
-    fastify.log.error(`All proof fetching methods failed for asset ${assetId}`);
-    fastify.log.error(`Attempts: ${attempts.join(', ')}`);
-    fastify.log.error(`Errors: ${errors.join(', ')}`);
-    
-    return reply.code(500).send({
-      success: false,
-      error: `Failed to fetch proof data after multiple attempts. Please try again later.`,
-      details: {
-        attempts,
-        errors
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching asset proof:', error);
-    return reply.code(500).send({
-      success: false,
-      error: `Error fetching asset proof: ${error.message}`
-    });
-  }
-});
 
 // NOTE: We're using the new implementation with cnft-burn-server above
 
