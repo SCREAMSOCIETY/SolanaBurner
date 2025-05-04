@@ -109,16 +109,40 @@ async function fetchCompressedNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching compressed NFTs for wallet: ${walletAddress}`);
     
-    // Use the proxy API endpoint instead of direct Helius API access
-    const url = `/api/helius/wallet/nfts/${walletAddress}`;
-    const response = await axios.get(url);
+    // Direct API call to Helius RPC endpoint to avoid circular references
+    const rpcResponse = await axios.post(
+      HELIUS_RPC_URL,
+      {
+        jsonrpc: '2.0',
+        id: 'helius-compressed-nfts',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: walletAddress,
+          page: 1, 
+          limit: 1000,
+          displayOptions: {
+            showCollectionMetadata: true
+          }
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': HELIUS_API_KEY
+        }
+      }
+    );
     
-    if (response.data && response.data.success && response.data.data) {
-      const { compressedNfts } = response.data.data;
-      console.log(`[Helius API] Found ${compressedNfts.length} compressed NFTs`);
+    // Safety check to make sure we have a valid response
+    if (rpcResponse?.data?.result?.items) {
+      // Filter to only compressed NFTs
+      const allItems = rpcResponse.data.result.items || [];
+      const compressedNfts = allItems.filter(nft => nft.compression?.compressed);
+      
+      console.log(`[Helius API] Found ${compressedNfts.length} compressed NFTs out of ${allItems.length} total items`);
       return compressedNfts;
     } else {
-      console.warn('[Helius API] No compressed NFTs found:', response.data);
+      console.warn('[Helius API] No compressed NFTs found in RPC response');
       return [];
     }
   } catch (error) {
