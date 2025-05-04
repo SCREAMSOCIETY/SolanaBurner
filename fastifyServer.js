@@ -702,6 +702,12 @@ fastify.get('/server-side', async (request, reply) => {
   return reply.sendFile('server-side-transfer.html');
 });
 
+// Route for ultra-minimal cNFT transfer page
+fastify.get('/ultra', async (request, reply) => {
+  fastify.log.info('Serving ultra-minimal cNFT transfer page');
+  return reply.sendFile('ultra-minimal.html');
+});
+
 // Import server-side cNFT handler
 const serverSideCnftHandler = require('./server-side-cnft-handler');
 
@@ -829,6 +835,9 @@ process.on('unhandledRejection', (reason, promise) => {
     time: new Date().toISOString()
   });
 });
+
+// Endpoint already defined earlier in the file
+// We're removing this duplicate endpoint to fix the error
 
 // Endpoint specifically for fetching asset proof data for cNFTs
 fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {

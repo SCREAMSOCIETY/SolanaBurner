@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Server-Side cNFT Transfer</title>
+    <title>Ultra-Minimal cNFT Transfer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -31,10 +31,6 @@
         button:hover {
             background-color: #3a55ee;
         }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
         input {
             width: 100%;
             padding: 8px;
@@ -59,9 +55,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>Server-Side cNFT Transfer</h1>
-        <p>This page uses a server-side approach that avoids the TransactionInstruction error by creating the transaction on the server. The user only signs the transaction but doesn't create it.</p>
-        <p>Target Project Wallet: <code>EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK</code></p>
+        <h1>Ultra-Minimal cNFT Transfer</h1>
+        <p>This page uses a completely minimal approach with no dependencies to transfer cNFTs to the project wallet: <code>EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK</code></p>
         
         <div>
             <button id="connectWalletBtn">Connect Wallet</button>
@@ -112,7 +107,7 @@
         let walletPublicKey = null;
         const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
         
-        // Connect wallet button click handler
+        // Connect wallet
         connectWalletBtn.addEventListener('click', async () => {
             try {
                 if (!window.solana) {
@@ -133,7 +128,7 @@
             }
         });
         
-        // Transfer cNFT button click handler
+        // Transfer cNFT
         transferBtn.addEventListener('click', async () => {
             const assetId = assetIdInput.value.trim();
             if (!assetId) {
@@ -147,9 +142,34 @@
             }
             
             try {
-                log.info(`Starting server-side transfer for asset: ${assetId}`);
+                log.info(`Starting transfer for asset: ${assetId}`);
                 transferBtn.disabled = true;
                 transferBtn.textContent = 'Processing...';
+                
+                // Fetch asset proof from server
+                log.info('Fetching asset proof...');
+                const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
+                const proofData = await proofResponse.json();
+                
+                if (!proofData.success) {
+                    throw new Error(`Failed to fetch asset proof: ${proofData.error}`);
+                }
+                
+                // Fetch asset details from server
+                log.info('Fetching asset details...');
+                const assetResponse = await fetch(`/api/helius/asset/${assetId}`);
+                const assetData = await assetResponse.json();
+                
+                if (!assetData.success) {
+                    throw new Error(`Failed to fetch asset details: ${assetData.error}`);
+                }
+                
+                // Check ownership
+                if (assetData.data.ownership.owner !== walletPublicKey) {
+                    throw new Error(`You don't own this asset. Owner is ${assetData.data.ownership.owner}`);
+                }
+                
+                log.info('Ownership verified. Preparing server-side transfer...');
                 
                 // Use server API to generate a transaction
                 log.info('Requesting transaction from server...');
@@ -170,13 +190,13 @@
                     throw new Error(`Server error: ${generateResult.error}`);
                 }
                 
-                log.success('Transaction prepared successfully by server');
+                log.success('Transaction prepared successfully');
                 
                 // Now we need to sign the transaction
                 log.info('Signing transaction...');
                 const { serializedTransaction } = generateResult.data;
                 
-                // Convert base64 to Uint8Array
+                // Decode base64 transaction
                 const transactionBuffer = Uint8Array.from(atob(serializedTransaction), c => c.charCodeAt(0));
                 
                 // Sign transaction with wallet
@@ -193,7 +213,7 @@
                 }
                 
                 // Submit the signed transaction to server
-                log.info('Submitting signed transaction to server...');
+                log.info('Submitting signed transaction...');
                 const submitResponse = await fetch('/api/cnft/submit-transaction', {
                     method: 'POST',
                     headers: {

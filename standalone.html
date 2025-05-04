@@ -1,21 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Standalone cNFT Transfer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
             line-height: 1.6;
+        }
+        .container {
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            color: #333;
+            background-color: #f5f5f5;
+            border-radius: 8px;
         }
         h1 {
             color: #4a65ff;
-            margin-bottom: 20px;
         }
         button {
             background-color: #4a65ff;
@@ -24,9 +26,7 @@
             padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
-            margin: 10px 0;
-            transition: background-color 0.2s;
+            margin-top: 10px;
         }
         button:hover {
             background-color: #3a55ee;
@@ -35,109 +35,65 @@
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        .container {
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .asset-list {
-            margin-top: 20px;
-        }
-        .asset-card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .asset-image {
-            width: 60px;
-            height: 60px;
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
             border-radius: 4px;
-            margin-right: 15px;
-            object-fit: cover;
-            background-color: #eee;
         }
-        .asset-info {
-            flex-grow: 1;
-        }
-        .asset-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .asset-id {
-            font-size: 12px;
-            color: #888;
-            word-break: break-all;
-        }
-        .asset-actions {
-            margin-left: 15px;
-        }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        #log-container {
+        .log {
             margin-top: 20px;
+            padding: 10px;
             background-color: #f0f0f0;
             border-radius: 4px;
-            padding: 10px;
             max-height: 200px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 14px;
-        }
-        .log-entry {
-            margin-bottom: 5px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
         }
         .success { color: green; }
         .error { color: red; }
-        .info { color: blue; }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        .info { color: #0066cc; }
     </style>
+    <!-- CDN imports - load @solana/web3.js directly -->
+    <script src="https://unpkg.com/@solana/web3.js@1.50.1/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/bs58@5.0.0/index.js"></script>
 </head>
 <body>
-    <h1>Standalone cNFT Transfer</h1>
-    
     <div class="container">
-        <p>This page provides a direct cNFT transfer functionality that doesn't rely on the main application code.</p>
-        <p>It can transfer compressed NFTs from your wallet to the project wallet: <code>EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK</code></p>
+        <h1>Standalone cNFT Transfer</h1>
+        <p>This page loads @solana/web3.js directly from CDN instead of using webpack bundled code. This approach should avoid the TransactionInstruction error.</p>
+        <p>Target Project Wallet: <code>EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK</code></p>
         
-        <button id="connectWalletBtn">Connect Wallet</button>
-        <button id="fetchAssetsBtn" disabled>Fetch cNFTs</button>
+        <div>
+            <button id="connectWalletBtn">Connect Wallet</button>
+            <div id="walletStatus">Not connected</div>
+        </div>
         
-        <div id="walletInfo"></div>
+        <div id="assetInputSection" style="margin-top: 20px; display: none;">
+            <h3>Enter cNFT Asset ID</h3>
+            <input type="text" id="assetIdInput" placeholder="Enter Asset ID (e.g., HWgd4xSyUHgg6Qkp2YaAQXMhgj3nwYP33USzHakREJxQ)">
+            <button id="transferBtn">Transfer cNFT</button>
+        </div>
         
-        <div id="assetContainer" class="asset-list"></div>
+        <div id="log" class="log">
+            <div class="info">Ready to start. Connect your wallet first.</div>
+        </div>
     </div>
-    
-    <div id="log-container">
-        <div class="log-entry info">System ready. Connect your wallet to begin.</div>
-    </div>
-
-    <!-- Load Web3.js from CDN -->
-    <script src="https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
     
     <script>
-        // Logging functions
+        // Constants for the application
+        const PROJECT_WALLET = new solanaWeb3.PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+        const BUBBLEGUM_PROGRAM_ID = new solanaWeb3.PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+        const connection = new solanaWeb3.Connection('https://broken-prettiest-needle.solana-mainnet.quiknode.pro/84bb745fca3e8888fc4ac36c2f76d61892c7dda1');
+        
+        // Log utility functions
         const log = {
-            element: document.getElementById('log-container'),
-            add: function(message, type = 'info') {
+            element: document.getElementById('log'),
+            add: function(message, type) {
                 const entry = document.createElement('div');
-                entry.className = `log-entry ${type}`;
+                entry.className = type;
                 entry.textContent = message;
                 this.element.appendChild(entry);
                 this.element.scrollTop = this.element.scrollHeight;
@@ -153,337 +109,187 @@
             }
         };
         
-        // Global variables
-        const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
-        const HELIUS_API_KEY = 'a3ded9fe-3dd9-4b3c-834a-0e4e2d84df94'; // Helius API key for testing
-        const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
-        const SPL_NOOP_PROGRAM_ID = 'noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV';
-        const COMPRESSION_PROGRAM_ID = 'SPL_Noop1111111111111111111111111111111111111111';
-        
-        let wallet = null;
-        const connection = new solanaWeb3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-        
-        // DOM elements
+        // DOM Elements
         const connectWalletBtn = document.getElementById('connectWalletBtn');
-        const fetchAssetsBtn = document.getElementById('fetchAssetsBtn');
-        const walletInfo = document.getElementById('walletInfo');
-        const assetContainer = document.getElementById('assetContainer');
+        const walletStatus = document.getElementById('walletStatus');
+        const assetInputSection = document.getElementById('assetInputSection');
+        const assetIdInput = document.getElementById('assetIdInput');
+        const transferBtn = document.getElementById('transferBtn');
         
-        // Buffer utility function for base64 conversion
-        function base64ToUint8Array(base64) {
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            return bytes;
-        }
+        // Global vars
+        let walletPublicKey = null;
         
-        // Connect wallet
+        // Connect wallet button click handler
         connectWalletBtn.addEventListener('click', async () => {
             try {
-                log.info('Connecting wallet...');
-                
                 if (!window.solana) {
-                    throw new Error('Solana wallet not detected. Please install a Solana wallet extension.');
+                    throw new Error('Solana wallet not detected. Please install a compatible wallet extension like Phantom.');
                 }
                 
-                if (!window.solana.isConnected) {
-                    await window.solana.connect();
-                }
+                log.info('Connecting to wallet...');
+                const resp = await window.solana.connect();
+                walletPublicKey = resp.publicKey.toString();
                 
-                wallet = {
-                    publicKey: window.solana.publicKey,
-                    signTransaction: (tx) => window.solana.signTransaction(tx)
-                };
-                
-                log.success(`Wallet connected: ${wallet.publicKey.toString()}`);
-                walletInfo.textContent = `Connected: ${wallet.publicKey.toString()}`;
-                
+                walletStatus.textContent = `Connected: ${walletPublicKey.substring(0, 6)}...${walletPublicKey.substring(walletPublicKey.length - 6)}`;
                 connectWalletBtn.textContent = 'Wallet Connected';
-                fetchAssetsBtn.disabled = false;
-            } catch (error) {
-                log.error(`Error connecting wallet: ${error.message}`);
+                
+                log.success(`Successfully connected to wallet: ${walletPublicKey}`);
+                assetInputSection.style.display = 'block';
+            } catch (err) {
+                log.error(`Error connecting to wallet: ${err.message}`);
             }
         });
         
-        // Fetch cNFTs from wallet
-        fetchAssetsBtn.addEventListener('click', async () => {
-            try {
-                if (!wallet) {
-                    throw new Error('Wallet not connected');
-                }
-                
-                assetContainer.innerHTML = '<p>Loading cNFTs...</p>';
-                log.info('Fetching cNFTs...');
-                
-                const ownerAddress = wallet.publicKey.toString();
-                const url = `https://api.helius.xyz/v0/addresses/${ownerAddress}/assets?compressed=true&api-key=${HELIUS_API_KEY}`;
-                
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                const assets = data.items || [];
-                log.success(`Found ${assets.length} compressed NFTs`);
-                
-                if (assets.length === 0) {
-                    assetContainer.innerHTML = '<p>No compressed NFTs found in this wallet.</p>';
-                    return;
-                }
-                
-                renderAssets(assets);
-            } catch (error) {
-                log.error(`Error fetching assets: ${error.message}`);
-                assetContainer.innerHTML = `<p>Error: ${error.message}</p>`;
-            }
-        });
-        
-        // Render assets to the container
-        function renderAssets(assets) {
-            assetContainer.innerHTML = '';
-            
-            assets.forEach(asset => {
-                const card = document.createElement('div');
-                card.className = 'asset-card';
-                card.setAttribute('data-asset-id', asset.id);
-                
-                const img = document.createElement('img');
-                img.className = 'asset-image';
-                img.src = asset.content?.links?.image || asset.content?.files?.[0]?.uri || 'default-nft-image.svg';
-                img.alt = asset.content?.metadata?.name || 'NFT Image';
-                img.onerror = () => { img.src = 'default-nft-image.svg'; };
-                
-                const info = document.createElement('div');
-                info.className = 'asset-info';
-                
-                const name = document.createElement('div');
-                name.className = 'asset-name';
-                name.textContent = asset.content?.metadata?.name || 'Unnamed NFT';
-                
-                const id = document.createElement('div');
-                id.className = 'asset-id';
-                id.textContent = asset.id;
-                
-                const actions = document.createElement('div');
-                actions.className = 'asset-actions';
-                
-                const transferBtn = document.createElement('button');
-                transferBtn.textContent = 'Trash';
-                transferBtn.onclick = () => transferAsset(asset.id);
-                
-                info.appendChild(name);
-                info.appendChild(id);
-                actions.appendChild(transferBtn);
-                
-                card.appendChild(img);
-                card.appendChild(info);
-                card.appendChild(actions);
-                
-                assetContainer.appendChild(card);
-            });
-        }
-        
-        // Fetch asset proof
-        async function fetchAssetProof(assetId) {
-            log.info(`Fetching proof for asset: ${assetId}`);
-            
-            const url = `https://api.helius.xyz/v0/assets/${assetId}/proof?api-key=${HELIUS_API_KEY}`;
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to fetch proof: ${response.status}`);
-            }
-            
-            return await response.json();
-        }
-        
-        // Fetch asset details
+        // Helper function to fetch asset details from server
         async function fetchAssetDetails(assetId) {
-            log.info(`Fetching asset details: ${assetId}`);
-            
-            const url = `https://api.helius.xyz/v0/assets/${assetId}?api-key=${HELIUS_API_KEY}`;
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to fetch asset details: ${response.status}`);
+            log.info('Fetching asset details...');
+            const response = await fetch(`/api/helius/asset/${assetId}`);
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(`Failed to fetch asset details: ${data.error}`);
             }
-            
-            return await response.json();
+            return data.data;
         }
         
-        // Transfer asset function
-        async function transferAsset(assetId) {
-            try {
-                log.info(`Starting transfer for asset: ${assetId}`);
-                
-                if (!wallet) {
-                    throw new Error('Wallet not connected');
-                }
-                
-                // Disable the button and show loading
-                const card = document.querySelector(`.asset-card[data-asset-id="${assetId}"]`);
-                const transferBtn = card.querySelector('button');
-                transferBtn.disabled = true;
-                transferBtn.innerHTML = '<span class="loading"></span>';
-                
-                // Fetch asset details and proof
-                const [assetDetails, proofData] = await Promise.all([
-                    fetchAssetDetails(assetId),
-                    fetchAssetProof(assetId)
-                ]);
-                
-                // Verify ownership
-                if (assetDetails.ownership.owner !== wallet.publicKey.toString()) {
-                    throw new Error(`You don't own this asset. Owner is ${assetDetails.ownership.owner}`);
-                }
-                
-                log.info('Asset ownership verified');
-                
-                // Extract needed data from the proof
-                const {
-                    root,
-                    proof,
-                    node_index,
-                    tree_id,
-                    data_hash,
-                    creator_hash
-                } = proofData;
-                
-                log.info(`Building transaction with data from tree: ${tree_id}`);
-                
-                // Create the necessary Public Keys
-                const merkleTree = new solanaWeb3.PublicKey(tree_id);
-                const bubblegumProgram = new solanaWeb3.PublicKey(BUBBLEGUM_PROGRAM_ID);
-                const splNoopProgram = new solanaWeb3.PublicKey(SPL_NOOP_PROGRAM_ID);
-                const compressionProgram = new solanaWeb3.PublicKey(COMPRESSION_PROGRAM_ID);
-                const systemProgram = new solanaWeb3.PublicKey('11111111111111111111111111111111');
-                const receiverPublicKey = new solanaWeb3.PublicKey(PROJECT_WALLET);
-                const leafOwner = wallet.publicKey;
-                
-                // Derive tree authority
-                const [treeAuthority] = solanaWeb3.PublicKey.findProgramAddressSync(
-                    [merkleTree.toBuffer()],
-                    bubblegumProgram
-                );
-                
-                log.info(`Derived tree authority: ${treeAuthority.toString()}`);
-                
-                // Create accounts for the instruction
-                const accounts = [
-                    { pubkey: treeAuthority, isSigner: false, isWritable: false },
-                    { pubkey: leafOwner, isSigner: true, isWritable: false },
-                    { pubkey: leafOwner, isSigner: true, isWritable: false },
-                    { pubkey: receiverPublicKey, isSigner: false, isWritable: false },
-                    { pubkey: merkleTree, isSigner: false, isWritable: true },
-                    { pubkey: splNoopProgram, isSigner: false, isWritable: false },
-                    { pubkey: compressionProgram, isSigner: false, isWritable: false },
-                    { pubkey: systemProgram, isSigner: false, isWritable: false }
-                ];
-                
-                // Convert all base64 values to Uint8Array
-                const rootBuffer = base64ToUint8Array(root);
-                const dataHashBuffer = base64ToUint8Array(data_hash);
-                const creatorHashBuffer = base64ToUint8Array(creator_hash);
-                const proofBuffers = proof.map(p => base64ToUint8Array(p));
-                
-                log.info(`Creating instruction data with ${proofBuffers.length} proof elements`);
-                
-                // Create the full data buffer
-                const dataSize = 1 + 32 + 8 + 32 + 32 + 4 + (proofBuffers.length * 32);
-                const data = new Uint8Array(dataSize);
-                
-                // Write discriminator
-                data[0] = 3; // Transfer instruction
-                
-                // Write root (32 bytes)
-                data.set(rootBuffer, 1);
-                
-                // Write index as little-endian u64 (8 bytes)
-                const indexBytes = new Uint8Array(8);
-                const dataView = new DataView(indexBytes.buffer);
-                dataView.setBigUint64(0, BigInt(node_index), true); // true for little-endian
-                data.set(indexBytes, 33);
-                
-                // Write data hash (32 bytes)
-                data.set(dataHashBuffer, 41);
-                
-                // Write creator hash (32 bytes)
-                data.set(creatorHashBuffer, 73);
-                
-                // Write proof count (4 bytes) - little-endian u32
-                const proofCountBytes = new Uint8Array(4);
-                const proofDataView = new DataView(proofCountBytes.buffer);
-                proofDataView.setUint32(0, proofBuffers.length, true); // true for little-endian
-                data.set(proofCountBytes, 105);
-                
-                // Write proof elements
-                for (let i = 0; i < proofBuffers.length; i++) {
-                    data.set(proofBuffers[i], 109 + (i * 32));
-                }
-                
-                log.info('Instruction data created');
-                
-                // Create the instruction
-                const instruction = new solanaWeb3.TransactionInstruction({
-                    keys: accounts,
-                    programId: bubblegumProgram,
-                    data: Buffer.from(data)
-                });
-                
-                // Get recent blockhash
-                const { blockhash } = await connection.getLatestBlockhash();
-                log.info(`Got recent blockhash: ${blockhash}`);
-                
-                // Create the transaction
-                const transaction = new solanaWeb3.Transaction({
-                    feePayer: wallet.publicKey,
-                    recentBlockhash: blockhash
-                }).add(instruction);
-                
-                // Sign the transaction
-                log.info('Signing transaction');
-                const signedTransaction = await wallet.signTransaction(transaction);
-                
-                // Send the transaction
-                log.info('Sending transaction');
-                const signature = await connection.sendRawTransaction(
-                    signedTransaction.serialize()
-                );
-                
-                log.success(`Transaction sent with signature: ${signature}`);
-                log.info(`Explorer URL: https://solscan.io/tx/${signature}`);
-                
-                // Update UI
-                transferBtn.innerHTML = '✓ Sent';
-                card.style.opacity = '0.5';
-                
-                // Wait for confirmation
-                log.info('Waiting for confirmation...');
-                const confirmation = await connection.confirmTransaction(signature);
-                
-                if (confirmation.value.err) {
-                    throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-                }
-                
-                log.success('Transaction confirmed!');
-                
-                // Hide the card
-                setTimeout(() => {
-                    card.style.display = 'none';
-                }, 2000);
-                
-            } catch (error) {
-                log.error(`Error transferring asset: ${error.message}`);
-                
-                // Reset button
-                const card = document.querySelector(`.asset-card[data-asset-id="${assetId}"]`);
-                if (card) {
-                    const transferBtn = card.querySelector('button');
-                    transferBtn.disabled = false;
-                    transferBtn.textContent = 'Retry';
-                }
+        // Helper function to fetch asset proof from server
+        async function fetchAssetProof(assetId) {
+            log.info('Fetching asset proof...');
+            const response = await fetch(`/api/helius/asset-proof/${assetId}`);
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(`Failed to fetch asset proof: ${data.error}`);
             }
+            return data.data;
         }
+        
+        // Manual creation of transfer instruction to avoid TransactionInstruction issues
+        function createTransferInstruction(accounts, programId, data) {
+            // Build the instruction object directly
+            return {
+                programId,
+                keys: accounts,
+                data
+            };
+        }
+        
+        // Helper function for transferring the cNFT
+        async function transferCNFT(assetId) {
+            log.info(`Starting transfer for asset: ${assetId}`);
+            
+            if (!walletPublicKey) {
+                throw new Error('Wallet not connected');
+            }
+            
+            // Fetch asset details
+            const assetData = await fetchAssetDetails(assetId);
+            
+            // Verify ownership
+            if (assetData.ownership.owner !== walletPublicKey) {
+                throw new Error(`You don't own this asset. Owner is ${assetData.ownership.owner}`);
+            }
+            
+            // Fetch asset proof
+            const proofData = await fetchAssetProof(assetId);
+            
+            // Extract the tree pubkey from the proof data
+            const treeAddress = new solanaWeb3.PublicKey(proofData.tree_id || proofData.tree);
+            
+            // Derive tree authority PDA
+            const [treeAuthority] = solanaWeb3.PublicKey.findProgramAddressSync(
+                [treeAddress.toBuffer()],
+                BUBBLEGUM_PROGRAM_ID
+            );
+            
+            // Convert proof nodes to PublicKey objects
+            const proofNodes = (proofData.proof || []).map(p => new solanaWeb3.PublicKey(p));
+            
+            // Create data buffer: 8 bytes for anchor instruction discriminator for transfer
+            const transferDiscriminator = [101, 185, 186, 2, 163, 45, 146, 64];
+            const data = Buffer.from(transferDiscriminator);
+            
+            // Build account metas for the transfer instruction
+            const accountMetas = [
+                { pubkey: treeAuthority, isWritable: true, isSigner: false },
+                { pubkey: new solanaWeb3.PublicKey(walletPublicKey), isWritable: false, isSigner: true },
+                { pubkey: PROJECT_WALLET, isWritable: false, isSigner: false },
+                { pubkey: treeAddress, isWritable: true, isSigner: false },
+                // Add all proof nodes
+                ...proofNodes.map(node => ({
+                    pubkey: node,
+                    isWritable: false,
+                    isSigner: false
+                })),
+                { pubkey: BUBBLEGUM_PROGRAM_ID, isWritable: false, isSigner: false },
+            ];
+            
+            // Create a new transaction
+            const transaction = new solanaWeb3.Transaction();
+            
+            // Add a system instruction to transfer a tiny amount of SOL to make transaction unique
+            transaction.add(
+                solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: new solanaWeb3.PublicKey(walletPublicKey),
+                    toPubkey: PROJECT_WALLET,
+                    lamports: 1 // Minimal amount
+                })
+            );
+            
+            // Create and add the transfer instruction
+            const transferInstruction = createTransferInstruction(accountMetas, BUBBLEGUM_PROGRAM_ID, data);
+            transaction.add(transferInstruction);
+            
+            // Set recent blockhash and fee payer
+            transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+            transaction.feePayer = new solanaWeb3.PublicKey(walletPublicKey);
+            
+            // Sign and send the transaction
+            log.info('Signing transaction...');
+            const signed = await window.solana.signTransaction(transaction);
+            
+            log.info('Sending transaction...');
+            const txid = await connection.sendRawTransaction(signed.serialize());
+            
+            log.info('Confirming transaction...');
+            const confirmation = await connection.confirmTransaction(txid);
+            
+            if (confirmation.value.err) {
+                throw new Error(`Transaction error: ${JSON.stringify(confirmation.value.err)}`);
+            }
+            
+            return {
+                signature: txid,
+                status: 'success'
+            };
+        }
+        
+        // Transfer cNFT button click handler
+        transferBtn.addEventListener('click', async () => {
+            const assetId = assetIdInput.value.trim();
+            if (!assetId) {
+                log.error('Please enter a valid Asset ID');
+                return;
+            }
+            
+            transferBtn.disabled = true;
+            transferBtn.textContent = 'Processing...';
+            
+            try {
+                const result = await transferCNFT(assetId);
+                log.success(`Transaction successful! Signature: ${result.signature}`);
+                log.info(`View on explorer: https://solscan.io/tx/${result.signature}`);
+                
+                transferBtn.textContent = 'Transfer Complete!';
+                setTimeout(() => {
+                    transferBtn.disabled = false;
+                    transferBtn.textContent = 'Transfer cNFT';
+                    assetIdInput.value = '';
+                }, 3000);
+            } catch (err) {
+                log.error(`Error transferring asset: ${err.message}`);
+                transferBtn.disabled = false;
+                transferBtn.textContent = 'Transfer cNFT';
+            }
+        });
     </script>
 </body>
 </html>
