@@ -43,6 +43,12 @@ try {
     console.log('[SERVER] Serving standalone.html');
     res.sendFile('standalone.html', { root: __dirname });
   });
+  
+  // Serve the server-side cNFT transfer page
+  app.get('/server-side', (req, res) => {
+    console.log('[SERVER] Serving server-side-transfer.html');
+    res.sendFile('server-side-transfer.html', { root: __dirname });
+  });
 
   // Serve index.html for all other routes to support SPA
   app.get('*', (req, res) => {

@@ -696,6 +696,115 @@ fastify.get('/standalone', async (request, reply) => {
   return reply.sendFile('standalone.html');
 });
 
+// Route for server-side cNFT transfer page
+fastify.get('/server-side', async (request, reply) => {
+  fastify.log.info('Serving server-side cNFT transfer page');
+  return reply.sendFile('server-side-transfer.html');
+});
+
+// Import server-side cNFT handler
+const serverSideCnftHandler = require('./server-side-cnft-handler');
+
+// Endpoint for generating a transfer transaction
+fastify.post('/api/cnft/generate-transfer', async (request, reply) => {
+  try {
+    return await serverSideCnftHandler.processTransferRequest(request, reply);
+  } catch (error) {
+    fastify.log.error(`Error in generate-transfer endpoint: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Error generating transfer: ${error.message}`
+    });
+  }
+});
+
+// Endpoint for submitting a signed transaction
+fastify.post('/api/cnft/submit-transaction', async (request, reply) => {
+  try {
+    return await serverSideCnftHandler.submitTransaction(request, reply);
+  } catch (error) {
+    fastify.log.error(`Error in submit-transaction endpoint: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Error submitting transaction: ${error.message}`
+    });
+  }
+});
+
+// Endpoint for fetching all assets for a wallet
+fastify.get('/api/helius/wallet-assets/:walletAddress', async (request, reply) => {
+  try {
+    const { walletAddress } = request.params;
+    
+    if (!walletAddress) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Wallet address is required'
+      });
+    }
+    
+    fastify.log.info(`Fetching all NFTs for wallet: ${walletAddress}`);
+    
+    // Use Helius API to get the assets
+    const heliusApiKey = process.env.HELIUS_API_KEY;
+    if (!heliusApiKey) {
+      throw new Error('HELIUS_API_KEY environment variable is not set');
+    }
+    
+    fastify.log.info(`Fetching all NFTs for wallet: ${walletAddress} using RPC API`);
+    
+    // Make the RPC request
+    const payload = {
+      jsonrpc: '2.0',
+      id: 'helius-assets',
+      method: 'getAssetsByOwner',
+      params: {
+        ownerAddress: walletAddress,
+        displayOptions: {
+          showUnverifiedCollections: true,
+          showCollectionMetadata: true,
+          showFungible: true
+        }
+      }
+    };
+    
+    const response = await axios.post(
+      `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+      payload
+    );
+    
+    // Check if we got a valid response
+    if (!response.data || !response.data.result || !response.data.result.items) {
+      throw new Error('Invalid response format from Helius API');
+    }
+    
+    // Extract the assets
+    const assets = response.data.result.items;
+    
+    // Filter for compressed NFTs
+    const compressedNFTs = assets.filter(asset => 
+      asset.compression && asset.compression.compressed
+    );
+    
+    fastify.log.info(`Found ${compressedNFTs.length} compressed NFTs out of ${assets.length} total assets`);
+    
+    return {
+      success: true,
+      data: assets,
+      stats: {
+        total: assets.length,
+        compressed: compressedNFTs.length
+      }
+    };
+  } catch (error) {
+    fastify.log.error(`Error fetching wallet assets: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Error fetching wallet assets: ${error.message}`
+    });
+  }
+});
+
 // Catch-all route for SPA - always serve index.html
 fastify.setNotFoundHandler(async (request, reply) => {
   fastify.log.info(`Not found handler for: ${request.url}, serving index.html`);
