@@ -12,8 +12,9 @@ import axios from 'axios';
 // Import the CNFTHandler class
 import { CNFTHandler } from '../cnft-handler';
 
-// Import the DirectTrashModal component
+// Import the modal components
 import DirectTrashModal from './DirectTrashModal';
+import QueueTransferModal from './QueueTransferModal';
 
 // Add global variable to global window object to access in console for debugging
 declare global {
@@ -153,6 +154,10 @@ const WalletAssets: React.FC = () => {
   // State for Direct Trash Modal
   const [directTrashModalOpen, setDirectTrashModalOpen] = useState<boolean>(false);
   const [selectedCnftForTrash, setSelectedCnftForTrash] = useState<{ id: string; name: string; image?: string } | null>(null);
+  
+  // State for Queue Transfer Modal (for bulk transfers)
+  const [queueTransferModalOpen, setQueueTransferModalOpen] = useState<boolean>(false);
+  const [selectedCnftsForQueueTransfer, setSelectedCnftsForQueueTransfer] = useState<any[]>([]);
   
   // Fetch API key on component load
   useEffect(() => {
