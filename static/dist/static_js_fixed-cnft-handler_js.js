@@ -262,12 +262,20 @@ async function safeTransferCNFT(params) {
         // Add the transfer instruction
         tx.add(transferIx);
         
-        // Set fee payer and get recent blockhash
+        // Set fee payer first
         tx.feePayer = wallet.publicKey;
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-        tx.recentBlockhash = blockhash;
         
         try {
+            // Get a fresh blockhash immediately before signing
+            // This is critical for ensuring that proof data validation works correctly
+            console.log("Getting fresh blockhash for individual transfer transaction...");
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+            tx.recentBlockhash = blockhash;
+            console.log(`Using fresh blockhash for individual transfer: ${blockhash}`);
+            
+            // Small delay to ensure blockchain synchronization
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
             console.log("Signing transfer transaction...");
             
             // Sign the transaction
