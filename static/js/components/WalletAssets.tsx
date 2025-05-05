@@ -1005,6 +1005,33 @@ const WalletAssets: React.FC = () => {
     setDirectTrashModalOpen(true);
   };
   
+  // Function to handle opening the Queue Transfer Modal for bulk operations
+  const openQueueTransferModal = () => {
+    if (selectedCNFTs.length === 0) {
+      console.log('[WalletAssets] No cNFTs selected for queue transfer');
+      if (typeof window !== 'undefined' && window.BurnAnimations) {
+        window.BurnAnimations.showNotification(
+          'No cNFTs Selected',
+          'Please select at least one cNFT to trash using the bulk queue system.'
+        );
+      }
+      return;
+    }
+    
+    // Prepare selected assets data
+    const selectedAssets = cnfts
+      .filter(cnft => selectedCNFTs.includes(cnft.mint))
+      .map(cnft => ({
+        mint: cnft.mint,
+        name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`,
+        image: cnft.image
+      }));
+    
+    console.log('[WalletAssets] Opening queue transfer modal for assets:', selectedAssets);
+    setSelectedCnftsForQueueTransfer(selectedAssets);
+    setQueueTransferModalOpen(true);
+  };
+  
   // Handle successful direct trash operation
   const handleDirectTrashSuccess = (signature: string) => {
     if (!selectedCnftForTrash) return;
@@ -1199,6 +1226,29 @@ const WalletAssets: React.FC = () => {
     };
   };
 
+  // Handle successful queue transfer
+  const handleQueueTransferSuccess = () => {
+    console.log('[WalletAssets] Queue transfer completed');
+    
+    // Update UI - remove processed cNFTs
+    // We'll do a full refresh to ensure we have the latest data
+    refreshAllAssets();
+    
+    // Clear selected CNFTs
+    setSelectedCNFTs([]);
+    
+    // Close the modal
+    setQueueTransferModalOpen(false);
+    
+    // Clear the selected assets
+    setTimeout(() => {
+      setSelectedCnftsForQueueTransfer([]);
+    }, 500);
+    
+    // Set burning state to false
+    setIsBurning(false);
+  };
+  
   // Toggle bulk burn mode
   const toggleBulkBurnMode = () => {
     setBulkBurnMode(!bulkBurnMode);
@@ -2041,15 +2091,25 @@ const WalletAssets: React.FC = () => {
                 )}
                 
                 {selectedCNFTs.length > 0 && (
-                  <div className="selection-group">
+                  <div className="selection-group cnft-selection-group">
                     <span>{selectedCNFTs.length} cNFTs selected</span>
-                    <button 
-                      className="bulk-burn-button"
-                      disabled={isBurning}
-                      onClick={handleBulkBurnCNFTs}
-                    >
-                      Trash Selected
-                    </button>
+                    <div className="button-group">
+                      <button 
+                        className="bulk-burn-button"
+                        disabled={isBurning}
+                        onClick={handleBulkBurnCNFTs}
+                      >
+                        Trash Selected
+                      </button>
+                      <button 
+                        className="queue-transfer-button"
+                        disabled={isBurning}
+                        onClick={openQueueTransferModal}
+                        title="Use the queue-based approach for better reliability"
+                      >
+                        Queue Trash
+                      </button>
+                    </div>
                   </div>
                 )}
                 
