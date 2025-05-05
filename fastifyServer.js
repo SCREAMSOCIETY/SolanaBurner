@@ -12,6 +12,7 @@ const heliusApi = require('./helius-api');
 const cnftBurnServer = require('./cnft-burn-server');
 const cnftTransferServer = require('./cnft-transfer-server');
 const serverTransfer = require('./server-transfer');
+const queueTransferManager = require('./queue-transfer-manager');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
@@ -1535,6 +1536,99 @@ fastify.get('/api/diagnostic/:assetId', async (request, reply) => {
     return reply.code(500).send({
       success: false,
       error: 'Failed to process diagnostic request',
+      message: error.message
+    });
+  }
+});
+
+// Queue-based transfer endpoints
+fastify.post('/api/queue/transfer-batch', async (request, reply) => {
+  try {
+    const { ownerAddress, assetIds, destinationAddress } = request.body;
+    
+    if (!ownerAddress || !assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Owner address and an array of asset IDs are required'
+      });
+    }
+    
+    fastify.log.info(`Queue transfer request received for ${assetIds.length} assets from ${ownerAddress}`);
+    
+    // Limit batch size to 10 assets per request
+    const maxBatchSize = 10;
+    if (assetIds.length > maxBatchSize) {
+      return reply.code(400).send({
+        success: false,
+        error: `Batch size limit exceeded. Maximum ${maxBatchSize} assets per request.`
+      });
+    }
+    
+    // Queue the batch for processing
+    const result = queueTransferManager.queueTransferBatch(
+      ownerAddress, 
+      assetIds, 
+      destinationAddress
+    );
+    
+    return {
+      success: true,
+      message: `Successfully queued ${assetIds.length} assets for transfer.`,
+      batchId: result.batchId,
+      queueStatus: result.queueStatus
+    };
+  } catch (error) {
+    fastify.log.error(`Error queuing batch transfer: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to queue batch transfer',
+      message: error.message
+    });
+  }
+});
+
+// Endpoint to check the status of a batch transfer
+fastify.get('/api/queue/status/:batchId', async (request, reply) => {
+  try {
+    const { batchId } = request.params;
+    
+    if (!batchId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Batch ID is required'
+      });
+    }
+    
+    const status = queueTransferManager.getBatchStatus(batchId);
+    
+    if (!status.success) {
+      return reply.code(404).send({
+        success: false,
+        error: status.error || 'Batch not found'
+      });
+    }
+    
+    return status;
+  } catch (error) {
+    fastify.log.error(`Error checking batch status: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to check batch status',
+      message: error.message
+    });
+  }
+});
+
+// Endpoint to check the overall queue status
+fastify.get('/api/queue/status', async (request, reply) => {
+  try {
+    const status = queueTransferManager.getQueueStatus();
+    return status;
+  } catch (error) {
+    fastify.log.error(`Error checking queue status: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to check queue status',
       message: error.message
     });
   }
