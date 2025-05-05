@@ -8,6 +8,7 @@ interface QueueTransferModalProps {
   onClose: () => void;
   selectedAssets: any[];
   wallet: any;
+  onSuccess?: () => void;  // Optional callback for when transfer is successful
 }
 
 /**
@@ -19,7 +20,8 @@ const QueueTransferModal: React.FC<QueueTransferModalProps> = ({
   isOpen, 
   onClose, 
   selectedAssets,
-  wallet
+  wallet,
+  onSuccess
 }) => {
   // State hooks for tracking transfer progress
   const [isProcessing, setIsProcessing] = useState(false);
@@ -183,6 +185,13 @@ const QueueTransferModal: React.FC<QueueTransferModalProps> = ({
               'cNFTs Trashed! 🎉',
               `Successfully trashed ${status.completed} cNFTs to the project wallet.`
             );
+          }
+          
+          // Call the onSuccess callback if provided
+          if (onSuccess && status.completed > 0) {
+            setTimeout(() => {
+              onSuccess();
+            }, 2000); // Allow time for the UI to update before closing
           }
         }
       } catch (error: any) {
