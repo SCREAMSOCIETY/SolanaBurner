@@ -251,6 +251,77 @@ export async function safeTransferCNFT(params) {
         tx.feePayer = wallet.publicKey;
         
         try {
+            // Get fully fresh proof data for better validation
+            console.log(`Getting fresh proof data for final validation check...`);
+            let freshProofData;
+            try {
+                const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
+                const proofResult = await proofResponse.json();
+                
+                if (proofResult.success && proofResult.data) {
+                    console.log(`Got fresh proof data for final validation check`);
+                    freshProofData = proofResult.data;
+                    
+                    // Update the transaction with the latest proof
+                    // Remove existing instructions
+                    tx.instructions = [];
+                    
+                    // Re-add compute budget instructions
+                    tx.add(
+                        ComputeBudgetProgram.setComputeUnitLimit({ units: 1000000 })
+                    );
+                    
+                    // Add priority fee to help the transaction get processed faster
+                    tx.add(
+                        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 })
+                    );
+                    
+                    // Create new instruction with fresh proof
+                    const freshMerkleTree = new PublicKey(freshProofData.tree_id || freshProofData.tree);
+                    const freshTransferIx = createTransferInstruction(
+                        {
+                            treeAuthority: getTreeAuthorityPDA(freshMerkleTree),
+                            leafOwner: wallet.publicKey,
+                            leafDelegate: wallet.publicKey,
+                            newLeafOwner: new PublicKey(targetAddress),
+                            merkleTree: freshMerkleTree,
+                            logWrapper: PublicKey.findProgramAddressSync(
+                                [Buffer.from('log', 'utf8')],
+                                new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV')
+                            )[0],
+                            compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+                            anchorRemainingAccounts: freshProofData.proof.map((node) => ({
+                                pubkey: new PublicKey(node),
+                                isSigner: false,
+                                isWritable: false
+                            }))
+                        },
+                        {
+                            root: [...new PublicKey(freshProofData.root).toBytes()],
+                            dataHash: [...new PublicKey(
+                                freshProofData.data_hash || 
+                                (assetData.leaf && assetData.leaf.data_hash) || 
+                                "11111111111111111111111111111111"
+                            ).toBytes()],
+                            creatorHash: [...new PublicKey(
+                                freshProofData.creator_hash || 
+                                (assetData.leaf && assetData.leaf.creator_hash) || 
+                                "11111111111111111111111111111111"
+                            ).toBytes()],
+                            nonce: freshProofData.leaf_id || 0,
+                            index: freshProofData.leaf_id || 0,
+                        }
+                    );
+                    
+                    // Add the refreshed transfer instruction
+                    tx.add(freshTransferIx);
+                    console.log("Transaction rebuilt with fresh proof data");
+                }
+            } catch (refreshError) {
+                console.warn(`Error refreshing proof data before signing:`, refreshError);
+                // Continue with original transaction
+            }
+            
             // Get a fresh blockhash immediately before signing
             // This is critical for ensuring that proof data validation works correctly
             console.log("Getting fresh blockhash for individual transfer transaction...");
@@ -259,7 +330,7 @@ export async function safeTransferCNFT(params) {
             console.log(`Using fresh blockhash for individual transfer: ${blockhash}`);
             
             // Small delay to ensure blockchain synchronization
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             console.log("Signing transfer transaction...");
             
@@ -267,6 +338,9 @@ export async function safeTransferCNFT(params) {
             if (!wallet.signTransaction) {
                 throw new Error("Wallet doesn't support signTransaction");
             }
+            
+            // Add a short delay right before signing
+            await new Promise(resolve => setTimeout(resolve, 200));
             
             const signed = await wallet.signTransaction(tx);
             console.log("Transaction signed successfully");

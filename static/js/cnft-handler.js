@@ -1387,14 +1387,50 @@ export class CNFTHandler {
                             // Process each asset and add transfer instructions
                             const processedAssets = [];
                             const failedAssets = [];
+                            const refreshedProofs = {};
                             
+                            // COMPLETELY REFRESH ALL PROOFS BEFORE BUILDING TRANSACTION
+                            console.log("Starting COMPLETE proof refresh for all assets in batch");
                             for (const asset of assets) {
                                 try {
-                                    const { assetId, proofData } = asset;
+                                    const { assetId } = asset;
+                                    console.log(`Refreshing proof data for ${assetId} before building transaction...`);
+                                    
+                                    // Get fresh proof data directly from Helius API
+                                    const proofResponse = await fetch(`/api/helius/asset-proof/${assetId}`);
+                                    const proofResult = await proofResponse.json();
+                                    
+                                    if (proofResult.success && proofResult.data) {
+                                        console.log(`Got fresh proof for ${assetId}`);
+                                        refreshedProofs[assetId] = proofResult.data;
+                                    } else {
+                                        console.warn(`Failed to refresh proof for ${assetId}`);
+                                        refreshedProofs[assetId] = asset.proofData; // Fall back to original
+                                    }
+                                    
+                                    // Add small delay between refreshes to avoid rate limiting
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                } catch (refreshError) {
+                                    console.error(`Error refreshing proof for ${asset.assetId}:`, refreshError);
+                                    refreshedProofs[asset.assetId] = asset.proofData; // Fall back to original
+                                }
+                            }
+                            
+                            // Process assets with fresh proofs
+                            for (const asset of assets) {
+                                try {
+                                    const { assetId } = asset;
+                                    
+                                    // Use the refreshed proof if available, otherwise fall back to original
+                                    const proofData = refreshedProofs[assetId] || asset.proofData;
                                     
                                     // Create the transfer instruction
                                     const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
                                     const newLeafOwner = new PublicKey(destinationAddress);
+                                    
+                                    // Log details for debugging
+                                    console.log(`Building transfer for ${assetId} with root: ${proofData.root}`);
+                                    console.log(`Proof nodes: ${proofData.proof.length}`);
                                     
                                     // Create the transfer instruction
                                     const transferIx = createTransferInstruction(
