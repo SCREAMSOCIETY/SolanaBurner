@@ -2293,6 +2293,17 @@ const WalletAssets: React.FC = () => {
           onError={handleDirectTrashError}
         />
       )}
+
+      {/* QueueTransferModal for bulk cNFT trash operations */}
+      {queueTransferModalOpen && selectedCnftsForQueueTransfer && selectedCnftsForQueueTransfer.length > 0 && (
+        <QueueTransferModal
+          isOpen={queueTransferModalOpen}
+          onClose={() => setQueueTransferModalOpen(false)}
+          selectedAssets={selectedCnftsForQueueTransfer}
+          wallet={publicKey ? publicKey.toString() : ''}
+          onSuccess={handleQueueTransferSuccess}
+        />
+      )}
     </div>
   );
 };
