@@ -1,0 +1,268 @@
+/* Queue Transfer Modal Styles */
+.queue-transfer-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.queue-transfer-modal {
+  background-color: #1a1a2e;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: #e6e6e6;
+  border: 1px solid #38b6ff;
+  animation: modal-appear 0.3s ease-out;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.queue-transfer-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #303053;
+  position: sticky;
+  top: 0;
+  background-color: #1a1a2e;
+  z-index: 10;
+  border-radius: 16px 16px 0 0;
+}
+
+.queue-transfer-modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #38b6ff;
+}
+
+.queue-transfer-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: #e6e6e6;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.queue-transfer-modal-close:hover {
+  color: #ff3e3e;
+}
+
+.queue-transfer-modal-content {
+  padding: 24px;
+}
+
+.queue-transfer-modal-content p {
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.selected-assets-preview {
+  margin: 24px 0;
+  background-color: #222244;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.selected-assets-preview h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #38b6ff;
+}
+
+.assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 12px;
+}
+
+.asset-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.asset-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  background-color: #303053;
+  margin-bottom: 8px;
+}
+
+.asset-name {
+  font-size: 0.75rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.more-assets {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #303053;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  height: 64px;
+  color: #38b6ff;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+button.queue-button,
+button.cancel-button,
+button.close-button,
+button.retry-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+button.primary {
+  background-color: #38b6ff;
+  color: #1a1a2e;
+}
+
+button.primary:hover {
+  background-color: #60c2ff;
+}
+
+button.secondary {
+  background-color: transparent;
+  color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+}
+
+button.secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Status states */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(56, 182, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #38b6ff;
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.error-details {
+  background-color: #222244;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 16px;
+  width: 100%;
+  text-align: left;
+  overflow-x: auto;
+}
+
+/* Batch status styles */
+.batch-status {
+  width: 100%;
+}
+
+.progress-container {
+  margin: 24px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 16px;
+  background-color: #222244;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #38b6ff;
+  border-radius: 8px;
+  transition: width 0.5s ease;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: #a0a0a0;
+}
+
+.success-count {
+  margin-top: 12px;
+  color: #4caf50;
+}
+
+.failed-count {
+  margin-top: 8px;
+  color: #ff3e3e;
+}
+
+/* Responsive adjustments */
+@media (max-width: 500px) {
+  .queue-transfer-modal {
+    width: 95%;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .assets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  }
+}

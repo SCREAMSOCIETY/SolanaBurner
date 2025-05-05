@@ -7,42 +7,40 @@
  * and using fresh proof data for each operation.
  */
 
-const { 
-  Connection, 
-  PublicKey, 
-  Keypair,
-  Transaction,
-  ComputeBudgetProgram
-} = require('@solana/web3.js');
+const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
+const { BUBBLEGUM_PROGRAM_ID } = require('@metaplex-foundation/mpl-bubblegum');
 const bs58 = require('bs58');
-const { getDataHashFromAsset, getCreatorHashFromAsset } = require('./utils/asset-utils');
+const axios = require('axios');
 const heliusApi = require('./helius-api');
-require('dotenv').config();
+const serverTransfer = require('./server-transfer');
+const config = require('./config');
 
-// Constants
-const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
-const COMPRESSION_PROGRAM_ID = new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
-const LOG_WRAPPER_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
+// Set the project wallet as the default destination
+const PROJECT_WALLET = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
 
-// Initialize connection to Solana network
-const MAINNET_RPC_URL = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
-const connection = new Connection(MAINNET_RPC_URL, 'confirmed');
+// RPC connection
+const connection = new Connection(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com');
 
-// Define project wallet - this is where cNFTs will be transferred to
-const PROJECT_WALLET = process.env.PROJECT_WALLET || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
-
-// In-memory queue for transfer operations
-const transferQueue = {
-  items: [],
-  isProcessing: false,
-  results: {}, // Map of batchId -> results
-  stats: {
-    totalQueued: 0,
-    totalProcessed: 0,
-    totalSucceeded: 0,
-    totalFailed: 0
-  }
+// Queue configuration
+const QUEUE_CONFIG = {
+  processingDelay: 5000, // Delay 5 seconds between operations
+  retryDelay: 10000,     // Wait 10 seconds before retrying failed operations
+  maxRetries: 2,         // Maximum number of retry attempts per item
+  batchConcurrency: 1,   // Process this many items at once (always 1 for sequential processing)
 };
+
+// In-memory storage for the transfer queue
+// In a production environment, this would be stored in a database
+const transferQueue = [];
+const processingItems = new Set();
+const completedItems = [];
+const batchMap = new Map(); // Maps batch IDs to items
+let isProcessing = false;   // Flag to track if queue processor is running
+
+// Generate a unique batch ID
+function generateBatchId() {
+  return `batch_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+}
 
 /**
  * Get tree authority PDA for a merkle tree
@@ -65,54 +63,62 @@ function getTreeAuthorityPDA(merkleTree) {
  * @returns {object} - Queue status and batch ID for tracking
  */
 function queueTransferBatch(ownerAddress, assetIds, destinationAddress = null) {
-  // Generate a unique batch ID
-  const batchId = `batch-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  // Generate a batch ID
+  const batchId = generateBatchId();
+  
+  // Default to project wallet if no destination provided
+  const destination = destinationAddress ? new PublicKey(destinationAddress) : PROJECT_WALLET;
   
   // Create queue items for each asset
-  const queueItems = assetIds.map(assetId => ({
+  const items = assetIds.map(assetId => ({
+    id: `${batchId}_${assetId}`,
+    batchId,
     assetId,
     ownerAddress,
-    destinationAddress: destinationAddress || PROJECT_WALLET,
-    status: 'queued',
-    attempts: 0,
-    maxAttempts: 3,
-    batchId,
-    queuedAt: Date.now()
+    destinationAddress: destination.toString(),
+    status: 'pending',
+    retries: 0,
+    error: null,
+    createdAt: Date.now(),
+    startedAt: null,
+    completedAt: null,
   }));
   
   // Add items to the queue
-  transferQueue.items.push(...queueItems);
-  transferQueue.stats.totalQueued += queueItems.length;
+  transferQueue.push(...items);
   
-  // Initialize results for this batch
-  transferQueue.results[batchId] = {
-    batchId,
-    totalItems: queueItems.length,
-    processed: 0,
-    succeeded: 0,
-    failed: 0,
-    status: 'queued',
-    items: queueItems.map(item => ({
-      assetId: item.assetId,
-      status: item.status
-    })),
-    startedAt: null,
-    completedAt: null
-  };
+  // Add batch reference
+  batchMap.set(batchId, {
+    id: batchId,
+    ownerAddress,
+    destinationAddress: destination.toString(),
+    assetIds,
+    status: 'pending',
+    startedAt: Date.now(),
+    completedAt: null,
+    stats: {
+      total: items.length,
+      pending: items.length,
+      processing: 0,
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+    }
+  });
   
-  // Start processing the queue if it's not already running
-  if (!transferQueue.isProcessing) {
-    setTimeout(processQueue, 100);
+  // Start processing the queue if not already running
+  if (!isProcessing) {
+    isProcessing = true;
+    processQueue();
   }
   
   return {
     success: true,
-    message: `Queued ${queueItems.length} assets for transfer`,
     batchId,
     queueStatus: {
-      totalQueued: transferQueue.stats.totalQueued,
-      totalProcessed: transferQueue.stats.totalProcessed
-    }
+      totalItems: transferQueue.length,
+      batchItems: items.length,
+    },
   };
 }
 
@@ -121,124 +127,59 @@ function queueTransferBatch(ownerAddress, assetIds, destinationAddress = null) {
  * This function processes one item at a time with delays between operations
  */
 async function processQueue() {
-  if (transferQueue.items.length === 0 || transferQueue.isProcessing) {
-    return;
-  }
+  console.log(`[Queue] Starting queue processor with ${transferQueue.length} items`);
   
-  transferQueue.isProcessing = true;
-  
-  // Get the next item from the queue
-  const item = transferQueue.items.shift();
-  
-  // Update batch results
-  const batchResults = transferQueue.results[item.batchId];
-  if (batchResults) {
-    if (!batchResults.startedAt) {
-      batchResults.startedAt = Date.now();
-      batchResults.status = 'processing';
-    }
-    
-    // Find the item in the batch results
-    const resultItem = batchResults.items.find(i => i.assetId === item.assetId);
-    if (resultItem) {
-      resultItem.status = 'processing';
-    }
-  }
-  
-  try {
-    console.log(`[Queue] Processing ${item.assetId} from batch ${item.batchId}`);
-    
-    // Update item status
-    item.status = 'processing';
-    item.attempts += 1;
-    
-    // Process the transfer
-    const result = await processQueueItem(item);
-    
-    // Update queue stats
-    transferQueue.stats.totalProcessed += 1;
-    
-    if (result.success) {
-      transferQueue.stats.totalSucceeded += 1;
+  // Continue processing while there are items in the queue
+  while (transferQueue.length > 0 || processingItems.size > 0) {
+    // Process up to batchConcurrency items at a time
+    while (processingItems.size < QUEUE_CONFIG.batchConcurrency && transferQueue.length > 0) {
+      const item = transferQueue.shift();
+      processingItems.add(item.id);
       
-      // Update batch results
-      if (batchResults) {
-        batchResults.processed += 1;
-        batchResults.succeeded += 1;
-        
-        // Update the item status in batch results
-        const resultItem = batchResults.items.find(i => i.assetId === item.assetId);
-        if (resultItem) {
-          resultItem.status = 'succeeded';
-          resultItem.signature = result.signature;
-        }
+      // Update batch stats
+      const batch = batchMap.get(item.batchId);
+      if (batch) {
+        batch.stats.pending--;
+        batch.stats.processing++;
       }
-    } else {
-      // Handle retry logic
-      if (item.attempts < item.maxAttempts) {
-        console.log(`[Queue] Retrying ${item.assetId} (attempt ${item.attempts}/${item.maxAttempts})`);
-        item.status = 'queued';
-        transferQueue.items.push(item);
-      } else {
-        console.error(`[Queue] Failed to process ${item.assetId} after ${item.attempts} attempts`);
-        transferQueue.stats.totalFailed += 1;
+      
+      // Process the item asynchronously
+      processQueueItem(item).then(result => {
+        processingItems.delete(item.id);
+        completedItems.push(result);
         
-        // Update batch results
-        if (batchResults) {
-          batchResults.processed += 1;
-          batchResults.failed += 1;
+        // Update batch stats
+        const batch = batchMap.get(item.batchId);
+        if (batch) {
+          batch.stats.processing--;
+          batch.stats.processed++;
           
-          // Update the item status in batch results
-          const resultItem = batchResults.items.find(i => i.assetId === item.assetId);
-          if (resultItem) {
-            resultItem.status = 'failed';
-            resultItem.error = result.error;
+          if (result.status === 'succeeded') {
+            batch.stats.succeeded++;
+          } else if (result.status === 'failed') {
+            batch.stats.failed++;
+          }
+          
+          // Check if batch is complete
+          if (batch.stats.processed === batch.stats.total) {
+            batch.status = 'completed';
+            batch.completedAt = Date.now();
           }
         }
-      }
+      });
+      
+      // Delay before processing the next item
+      await new Promise(resolve => setTimeout(resolve, QUEUE_CONFIG.processingDelay));
     }
     
-    // Check if batch is complete
-    if (batchResults && 
-        batchResults.processed === batchResults.totalItems) {
-      batchResults.status = 'completed';
-      batchResults.completedAt = Date.now();
-    }
-    
-  } catch (error) {
-    console.error(`[Queue] Error processing queue item:`, error);
-    
-    // Update queue stats
-    transferQueue.stats.totalProcessed += 1;
-    transferQueue.stats.totalFailed += 1;
-    
-    // Update batch results
-    if (batchResults) {
-      batchResults.processed += 1;
-      batchResults.failed += 1;
-      
-      // Update the item status in batch results
-      const resultItem = batchResults.items.find(i => i.assetId === item.assetId);
-      if (resultItem) {
-        resultItem.status = 'failed';
-        resultItem.error = error.message;
-      }
-      
-      // Check if batch is complete
-      if (batchResults.processed === batchResults.totalItems) {
-        batchResults.status = 'completed';
-        batchResults.completedAt = Date.now();
-      }
+    // If we've hit the concurrency limit, wait before checking again
+    if (processingItems.size >= QUEUE_CONFIG.batchConcurrency) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
   
-  // Add a delay before processing the next item to avoid rate limits and blockchain congestion
-  transferQueue.isProcessing = false;
-  
-  // Schedule the next queue processing after a delay
-  if (transferQueue.items.length > 0) {
-    setTimeout(processQueue, 2000); // 2 second delay between operations
-  }
+  console.log('[Queue] Queue processor finished');
+  isProcessing = false;
 }
 
 /**
@@ -247,59 +188,91 @@ async function processQueue() {
  * @returns {Promise<object>} - Result of the operation
  */
 async function processQueueItem(item) {
+  console.log(`[Queue] Processing item ${item.id} for asset ${item.assetId}`);
+  
+  // Update item status
+  item.status = 'processing';
+  item.startedAt = Date.now();
+  
   try {
-    // 1. Fetch the latest asset details
-    console.log(`[Queue] Fetching details for ${item.assetId}`);
+    // Fetch asset details and proof data
     const assetDetails = await heliusApi.fetchAssetDetails(item.assetId);
-    
-    if (!assetDetails) {
-      return {
-        success: false,
-        error: 'Asset not found',
-        assetId: item.assetId
-      };
-    }
-    
-    // 2. Verify ownership
-    if (assetDetails.ownership && assetDetails.ownership.owner !== item.ownerAddress) {
-      return {
-        success: false,
-        error: 'Asset not owned by specified wallet',
-        assetId: item.assetId
-      };
-    }
-    
-    // 3. Get fresh proof data
-    console.log(`[Queue] Fetching proof data for ${item.assetId}`);
     const proofData = await heliusApi.fetchAssetProof(item.assetId);
     
-    if (!proofData || !proofData.proof) {
-      return {
-        success: false,
-        error: 'Unable to fetch proof data',
-        assetId: item.assetId
-      };
+    if (!assetDetails || !proofData || !proofData.proof) {
+      throw new Error('Failed to get required asset data or proof data');
     }
     
-    // 4. Simulate a successful transfer
-    // In a real implementation, this would create and send a transaction
-    const simulatedSignature = bs58.encode(Buffer.from(new Array(64).fill(0).map(() => Math.floor(Math.random() * 256))));
+    // Verify the asset's owner matches the expected owner
+    const currentOwner = assetDetails.ownership?.owner || assetDetails.owner?.toString();
+    if (currentOwner !== item.ownerAddress) {
+      throw new Error(`Asset owner mismatch. Expected: ${item.ownerAddress}, Actual: ${currentOwner}`);
+    }
+    
+    // Use signature-based verification message to authenticate
+    const message = `Transferring cNFT ${item.assetId} to project wallet`;
+    
+    // Call the server transfer function which should handle all the complexity of the transfer
+    const result = await serverTransfer.performServerTransfer(
+      item.ownerAddress,
+      item.assetId,
+      null, // No signed message in server mode
+      proofData,
+      assetDetails,
+      item.destinationAddress
+    );
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Transfer failed');
+    }
+    
+    // Update item with success
+    item.status = 'succeeded';
+    item.completedAt = Date.now();
+    console.log(`[Queue] Successfully processed item ${item.id} for asset ${item.assetId}`);
     
     return {
-      success: true,
-      assetId: item.assetId,
-      message: `Transfer of ${assetDetails.content?.metadata?.name || 'Unknown NFT'} to ${item.destinationAddress} was simulated successfully`,
-      signature: simulatedSignature,
-      explorerUrl: `https://solscan.io/tx/${simulatedSignature}`
+      ...item,
+      result
     };
-    
   } catch (error) {
-    console.error(`[Queue] Error processing queue item ${item.assetId}:`, error);
-    return {
-      success: false,
-      assetId: item.assetId,
-      error: error.message || 'Unknown error during transfer'
-    };
+    console.error(`[Queue] Error processing item ${item.id}:`, error);
+    
+    // Check if we should retry
+    if (item.retries < QUEUE_CONFIG.maxRetries) {
+      // Increment retry count
+      item.retries++;
+      item.status = 'pending';
+      item.error = error.message;
+      
+      // Add back to the queue with a delay
+      setTimeout(() => {
+        transferQueue.push(item);
+        
+        // Update batch stats
+        const batch = batchMap.get(item.batchId);
+        if (batch) {
+          batch.stats.pending++;
+        }
+        
+        console.log(`[Queue] Retrying item ${item.id} (attempt ${item.retries})`);
+      }, QUEUE_CONFIG.retryDelay);
+      
+      return {
+        ...item,
+        status: 'retrying'
+      };
+    } else {
+      // Mark as failed after exhausting retries
+      item.status = 'failed';
+      item.error = error.message;
+      item.completedAt = Date.now();
+      
+      return {
+        ...item,
+        error: error.message
+      };
+    }
   }
 }
 
@@ -309,29 +282,30 @@ async function processQueueItem(item) {
  * @returns {object} - Status information for the batch
  */
 function getBatchStatus(batchId) {
-  const batchResults = transferQueue.results[batchId];
+  const batch = batchMap.get(batchId);
   
-  if (!batchResults) {
+  if (!batch) {
     return {
       success: false,
       error: 'Batch not found'
     };
   }
   
+  // Get the items for this batch
+  const batchItems = completedItems.filter(item => item.batchId === batchId);
+  
   return {
     success: true,
     batchId,
-    status: batchResults.status,
-    stats: {
-      total: batchResults.totalItems,
-      processed: batchResults.processed,
-      succeeded: batchResults.succeeded,
-      failed: batchResults.failed,
-      pending: batchResults.totalItems - batchResults.processed
-    },
-    items: batchResults.items,
-    startedAt: batchResults.startedAt,
-    completedAt: batchResults.completedAt
+    status: batch.status,
+    startedAt: batch.startedAt,
+    completedAt: batch.completedAt,
+    stats: batch.stats,
+    items: batchItems.map(item => ({
+      assetId: item.assetId,
+      status: item.status,
+      error: item.error
+    }))
   };
 }
 
@@ -342,17 +316,15 @@ function getBatchStatus(batchId) {
 function getQueueStatus() {
   return {
     success: true,
-    queueLength: transferQueue.items.length,
-    isProcessing: transferQueue.isProcessing,
-    stats: { ...transferQueue.stats },
-    activeBatches: Object.keys(transferQueue.results)
-      .filter(batchId => transferQueue.results[batchId].status !== 'completed')
-      .map(batchId => ({
-        batchId,
-        status: transferQueue.results[batchId].status,
-        processed: transferQueue.results[batchId].processed,
-        total: transferQueue.results[batchId].totalItems
-      }))
+    totalBatches: batchMap.size,
+    queueLength: transferQueue.length,
+    processing: processingItems.size,
+    completed: completedItems.length,
+    batches: Array.from(batchMap.values()).map(batch => ({
+      batchId: batch.id,
+      status: batch.status,
+      stats: batch.stats
+    }))
   };
 }
 
