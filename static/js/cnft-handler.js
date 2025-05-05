@@ -1371,15 +1371,11 @@ export class CNFTHandler {
                                 return treeAuthority;
                             };
                             
-                            // Get the latest blockhash for the transaction
-                            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                            // Create a new transaction first
+                            const transaction = new Transaction();
                             
-                            // Create a new transaction
-                            const transaction = new Transaction({
-                                feePayer: wallet.publicKey,
-                                blockhash,
-                                lastValidBlockHeight,
-                            });
+                            // Set fee payer
+                            transaction.feePayer = wallet.publicKey;
                             
                             // Add compute budget instruction for complex operations
                             transaction.add(
@@ -1450,8 +1446,18 @@ export class CNFTHandler {
                                 throw new Error("Could not add any assets to the batch transaction");
                             }
                             
-                            // Sign and send the transaction
-                            console.log(`Sending batch transaction with ${processedAssets.length} cNFTs`);
+                            // Always fetch a fresh blockhash right before sending the transaction
+                            // This is critical for ensuring the proof data validation works correctly
+                            console.log("Getting fresh blockhash for transaction...");
+                            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+                            transaction.recentBlockhash = blockhash;
+                            
+                            console.log(`Sending batch transaction with ${processedAssets.length} cNFTs using blockhash: ${blockhash}`);
+                            
+                            // Add small delay before signing to ensure blockchain sync
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            
+                            // Sign with the updated blockhash
                             const signedTx = await wallet.signTransaction(transaction);
                             
                             // Improved transaction options for better reliability
@@ -1460,12 +1466,10 @@ export class CNFTHandler {
                             const options = {
                                 skipPreflight: true,  // Skip client-side verification
                                 maxRetries: 5,        // Retry more times
-                                preflightCommitment: 'processed'  // Faster commitment level
+                                preflightCommitment: 'confirmed'  // More reliable commitment level
                             };
                             
-                            // Add small delay before sending to ensure blockchain sync
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                            
+                            // Send immediately after getting fresh blockhash
                             const signature = await connection.sendRawTransaction(
                                 signedTx.serialize(),
                                 options
