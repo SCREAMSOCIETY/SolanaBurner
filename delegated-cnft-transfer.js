@@ -41,12 +41,12 @@ async function processDelegatedTransfer(
   destinationAddress = null
 ) {
   try {
-    console.log(`Processing delegated transfer for asset: ${assetId}`);
+    console.log(`[Delegated Transfer] Processing delegated transfer for asset: ${assetId}`);
     
     // If no destination address provided, use the project wallet
     if (!destinationAddress) {
       destinationAddress = PROJECT_WALLET.toString();
-      console.log(`Using default project wallet as destination: ${destinationAddress}`);
+      console.log(`[Delegated Transfer] Using default project wallet as destination: ${destinationAddress}`);
     }
     
     // Verify the asset exists and get details
@@ -55,6 +55,15 @@ async function processDelegatedTransfer(
       return {
         success: false,
         error: 'Asset not found or details unavailable'
+      };
+    }
+    
+    // Fetch proof data for compressed NFT
+    const proofData = await fetchAssetProof(assetId);
+    if (!proofData) {
+      return {
+        success: false,
+        error: 'Failed to get required proof data for the cNFT. Cannot complete transfer'
       };
     }
     
@@ -93,7 +102,8 @@ async function processDelegatedTransfer(
       assetId,
       ownerAddress,
       destinationAddress,
-      delegateAddress
+      delegateAddress,
+      proofData
     );
     
     if (transferResponse.success) {
@@ -114,7 +124,7 @@ async function processDelegatedTransfer(
       };
     }
   } catch (error) {
-    console.error('Error in delegated transfer:', error);
+    console.error('[Delegated Transfer] Error in delegated transfer:', error);
     return {
       success: false,
       error: error.message || 'Unknown error during transfer',
@@ -146,6 +156,38 @@ async function fetchAssetDetails(assetId) {
     return null;
   } catch (error) {
     console.error('Error fetching asset details:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch asset proof data from Helius API
+ * @param {string} assetId - The asset ID
+ * @returns {Promise<object|null>} - Asset proof or null if not found
+ */
+async function fetchAssetProof(assetId) {
+  try {
+    console.log(`[Delegated Transfer] Fetching proof data for asset: ${assetId}`);
+    
+    const response = await axios.post(HELIUS_RPC_URL, {
+      jsonrpc: '2.0',
+      id: 'helius-js',
+      method: 'getAssetProof',
+      params: {
+        id: assetId
+      }
+    });
+    
+    if (response.data && response.data.result) {
+      console.log(`[Delegated Transfer] Successfully fetched proof for asset: ${assetId}`);
+      return response.data.result;
+    } else {
+      console.error(`[Delegated Transfer] No proof data in response for asset: ${assetId}`);
+      console.error('Response:', JSON.stringify(response.data));
+      return null;
+    }
+  } catch (error) {
+    console.error(`[Delegated Transfer] Error fetching asset proof: ${error.message}`);
     return null;
   }
 }
@@ -203,9 +245,10 @@ function verifySignedMessage(publicKey, message, signatureBase64) {
  * @param {string} sourceOwner - The source wallet address
  * @param {string} destinationOwner - The destination wallet address
  * @param {string} delegateAuthority - Optional delegate authority
+ * @param {object} proofData - The merkle proof data for the cNFT
  * @returns {Promise<object>} - Transfer result
  */
-async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegateAuthority = null) {
+async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegateAuthority = null, proofData = null) {
   try {
     // Prepare the request parameters
     const params = {
@@ -220,7 +263,18 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
       params.delegate = delegateAuthority;
     }
     
-    console.log('Submitting transfer via Helius:', params);
+    // Add proof data if provided (important for cNFTs)
+    if (proofData) {
+      // Add proof data as PoA (Proof of Authority)
+      params.proof = proofData.proof;
+      
+      // Add additional required parameters from proof data
+      if (proofData.root) params.root = proofData.root;
+      if (proofData.tree_id) params.tree_id = proofData.tree_id;
+      if (proofData.node_index !== undefined) params.leaf_id = proofData.node_index;
+    }
+    
+    console.log('[Delegated Transfer] Submitting transfer via Helius:', JSON.stringify(params, null, 2));
     
     // Make the API call
     const response = await axios.post(HELIUS_RPC_URL, {
@@ -230,7 +284,7 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
       params
     });
     
-    console.log('Helius transfer response:', response.data);
+    console.log('[Delegated Transfer] Helius transfer response:', JSON.stringify(response.data, null, 2));
     
     if (response.data && response.data.result) {
       return {
@@ -252,7 +306,7 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
       details: response.data
     };
   } catch (error) {
-    console.error('Error in Helius transfer:', error);
+    console.error('[Delegated Transfer] Error in Helius transfer:', error);
     return {
       success: false,
       error: error.message || 'Transfer request to Helius failed',
