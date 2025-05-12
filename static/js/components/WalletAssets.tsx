@@ -1022,16 +1022,6 @@ const WalletAssets: React.FC = () => {
     setDelegatedTransferModalOpen(true);
   };
   
-  // Function to handle opening the Delegated Transfer Modal
-  const openDelegatedTransferModal = (cnft: CNFTData) => {
-    setSelectedCnftForDelegatedTransfer({
-      id: cnft.mint,
-      name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`,
-      image: cnft.image
-    });
-    setDelegatedTransferModalOpen(true);
-  };
-  
   // Function to handle opening the Queue Transfer Modal for bulk operations
   const openQueueTransferModal = () => {
     if (selectedCNFTs.length === 0) {

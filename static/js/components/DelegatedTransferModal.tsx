@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import axios from 'axios';
-import '../delegated-transfer-modal.css';
+import '../../delegated-transfer-modal.css';
 
 interface DelegatedTransferModalProps {
   isOpen: boolean;
