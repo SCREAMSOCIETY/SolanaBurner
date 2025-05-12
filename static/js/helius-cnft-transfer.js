@@ -7,13 +7,13 @@
  */
 
 import axios from 'axios';
-import { getConfig } from './config-handler';
+import { getConfig, getProjectWallet } from './config-handler';
 
 /**
  * Transfer a cNFT using Helius API
  * @param {object} params - Transfer parameters
  * @param {string} params.sender - Sender wallet address
- * @param {string} params.receiver - Receiver wallet address
+ * @param {string} params.receiver - Receiver wallet address (optional, defaults to project wallet)
  * @param {string} params.assetId - The asset ID (mint ID) of the cNFT
  * @param {string} params.delegateAuthority - Optional, if transferring as a delegated signer
  * @param {string} params.signedMessage - Optional, signature for authentication
@@ -21,69 +21,45 @@ import { getConfig } from './config-handler';
  */
 export async function transferCnftViaHelius({
   sender,
-  receiver,
+  receiver = null,
   assetId,
   delegateAuthority = null,
   signedMessage = null
 }) {
   try {
-    console.log(`[HeliusTransfer] Initiating transfer of ${assetId} from ${sender} to ${receiver}`);
-    
-    // Get API key from configuration
-    const config = await getConfig();
-    const apiKey = config.heliusApiKey;
-    
-    if (!apiKey) {
-      throw new Error('Helius API key not found in configuration');
+    // If no receiver is specified, use the project wallet
+    if (!receiver) {
+      receiver = await getProjectWallet();
     }
-    
-    // Prepare request body
+
+    // Prepare the request body
     const requestBody = {
-      sender,
-      receiver,
       assetId,
+      ownerAddress: sender,
+      destinationAddress: receiver
     };
-    
+
     // Add optional parameters if provided
     if (delegateAuthority) {
-      requestBody.delegateAuthority = delegateAuthority;
+      requestBody.delegateAddress = delegateAuthority;
     }
-    
-    // Include authorization header with signed message if provided
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-    
+
     if (signedMessage) {
-      headers.Authorization = `Bearer ${signedMessage}`;
+      requestBody.signedMessage = signedMessage;
     }
-    
-    // Make API request to Helius
-    const response = await axios.post(
-      `https://api.helius.xyz/v0/transfer-asset?api-key=${apiKey}`,
-      requestBody,
-      { headers }
-    );
-    
-    console.log('[HeliusTransfer] Transfer response:', response.data);
-    
-    // Process response
-    if (response.data.success) {
-      return {
-        success: true,
-        signature: response.data.signature || response.data.txid,
-        message: 'Transfer completed successfully via Helius API',
-        method: 'helius-api',
-        details: response.data
-      };
-    } else {
-      throw new Error(response.data.error || 'Unknown error from Helius API');
-    }
+
+    console.log('Submitting delegated transfer request:', requestBody);
+
+    // Make the API call to our backend
+    const response = await axios.post('/api/delegate/transfer', requestBody);
+    console.log('Delegated transfer response:', response.data);
+
+    return response.data;
   } catch (error) {
-    console.error('[HeliusTransfer] Error transferring cNFT:', error);
+    console.error('Error in Helius cNFT transfer:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error during Helius transfer',
+      error: error.response?.data?.error || error.message || 'Transfer request failed',
       details: error.response?.data || {}
     };
   }
@@ -96,10 +72,10 @@ export async function transferCnftViaHelius({
  * @returns {Promise<object>} - Result of the transfer operation
  */
 export async function transferCnftWithDelegation(params) {
-  // Add delegation-specific logic here
+  // This is a wrapper around the main function with delegation flag set
   return transferCnftViaHelius({
     ...params,
-    // Set explicit delegation parameters
+    delegateAuthority: params.delegateAuthority || params.delegate
   });
 }
 
@@ -110,32 +86,61 @@ export async function transferCnftWithDelegation(params) {
  */
 export async function checkCnftDelegation(assetId) {
   try {
-    const config = await getConfig();
-    const apiKey = config.heliusApiKey;
-    
-    const response = await axios.get(
-      `https://api.helius.xyz/v0/assets/${assetId}?api-key=${apiKey}`
-    );
-    
-    // Extract delegation information
-    const asset = response.data;
-    const delegated = asset.ownership?.delegated || false;
-    const delegate = asset.ownership?.delegate || null;
-    
-    return {
-      success: true,
-      delegated,
-      delegate,
-      owner: asset.ownership?.owner || null,
-      details: asset
-    };
+    if (!assetId) {
+      throw new Error('Asset ID is required');
+    }
+
+    const response = await axios.get(`/api/delegate/info/${assetId}`);
+    return response.data;
   } catch (error) {
-    console.error('[HeliusTransfer] Error checking cNFT delegation:', error);
+    console.error('Error checking cNFT delegation:', error);
     return {
       success: false,
-      error: error.message,
-      delegated: false,
-      delegate: null
+      error: error.response?.data?.error || error.message || 'Failed to check delegation',
+      delegationInfo: null
     };
+  }
+}
+
+/**
+ * Verify if a wallet address has delegate authority for a specific cNFT
+ * @param {string} assetId - The asset ID to check
+ * @param {string} delegateAddress - The delegate address to verify
+ * @returns {Promise<boolean>} - Whether the address has valid delegate authority
+ */
+export async function verifyDelegateAuthority(assetId, delegateAddress) {
+  try {
+    if (!assetId || !delegateAddress) {
+      throw new Error('Asset ID and delegate address are required');
+    }
+
+    const response = await axios.get(`/api/delegate/verify/${assetId}/${delegateAddress}`);
+    return response.data.isValidDelegate === true;
+  } catch (error) {
+    console.error('Error verifying delegate authority:', error);
+    return false;
+  }
+}
+
+/**
+ * Sign a message for cNFT transfer using the wallet adapter
+ * @param {object} wallet - The wallet adapter instance
+ * @param {string} assetId - The asset ID being transferred
+ * @returns {Promise<string>} - Base64 encoded signature
+ */
+export async function signTransferMessage(wallet, assetId) {
+  try {
+    if (!wallet || !wallet.signMessage) {
+      throw new Error('Wallet adapter with signMessage capability is required');
+    }
+
+    const message = `Transfer cNFT with ID: ${assetId}`;
+    const encodedMessage = new TextEncoder().encode(message);
+    const signature = await wallet.signMessage(encodedMessage);
+    
+    return Buffer.from(signature).toString('base64');
+  } catch (error) {
+    console.error('Error signing transfer message:', error);
+    throw new Error('Failed to sign message: ' + error.message);
   }
 }

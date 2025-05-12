@@ -10,54 +10,36 @@ import axios from 'axios';
 
 // Cache for configuration
 let configCache = null;
-let lastFetchTime = 0;
-const CACHE_TTL = 60 * 1000; // 1 minute cache time to live
 
 /**
- * Fetch configuration from server
- * @returns {Promise<object>} Configuration object
+ * Get application configuration from the server
+ * @returns {Promise<object>} Application configuration
  */
 export async function getConfig() {
-  const now = Date.now();
-  
-  // Return cached config if valid
-  if (configCache && (now - lastFetchTime < CACHE_TTL)) {
-    return configCache;
-  }
-  
   try {
-    console.log('[Config] Fetching fresh configuration from server');
-    const response = await axios.get('/api/config');
-    
-    if (response.data && response.data.success) {
-      // Update cache
-      configCache = {
-        heliusApiKey: response.data.heliusApiKey || null,
-        quicknodeRpcUrl: response.data.quicknodeRpcUrl || null,
-        solscanApiKey: response.data.solscanApiKey || null,
-        projectWallet: response.data.projectWallet || 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK',
-        ...response.data.additional
-      };
-      lastFetchTime = now;
-      
-      return configCache;
-    } else {
-      console.error('[Config] Invalid config response from server:', response.data);
-      throw new Error('Invalid configuration response');
-    }
-  } catch (error) {
-    console.error('[Config] Error fetching configuration:', error);
-    
-    // Fallback to cached config if available, otherwise return default values
+    // Use cached config if available
     if (configCache) {
       return configCache;
     }
     
+    // Fetch config from server
+    const response = await axios.get('/api/config');
+    
+    if (response.data && response.data.config) {
+      // Cache the config
+      configCache = response.data.config;
+      return configCache;
+    }
+    
+    throw new Error('Invalid configuration response');
+  } catch (error) {
+    console.error('Error fetching configuration:', error);
+    // Return default config in case of error
     return {
+      projectWallet: 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK',
+      heliusEnabled: false,
       heliusApiKey: null,
-      quicknodeRpcUrl: null,
-      solscanApiKey: null,
-      projectWallet: 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'
+      rpcEndpoint: 'https://api.mainnet-beta.solana.com'
     };
   }
 }
@@ -67,12 +49,24 @@ export async function getConfig() {
  * @returns {Promise<object>} Fresh configuration
  */
 export async function refreshConfig() {
-  // Invalidate cache
-  configCache = null;
-  lastFetchTime = 0;
-  
-  // Fetch fresh config
-  return await getConfig();
+  try {
+    // Clear the cache
+    configCache = null;
+    
+    // Fetch fresh config
+    const response = await axios.get('/api/config?refresh=true');
+    
+    if (response.data && response.data.config) {
+      // Cache the config
+      configCache = response.data.config;
+      return configCache;
+    }
+    
+    throw new Error('Invalid configuration response');
+  } catch (error) {
+    console.error('Error refreshing configuration:', error);
+    throw error;
+  }
 }
 
 /**
@@ -82,4 +76,22 @@ export async function refreshConfig() {
 export async function getProjectWallet() {
   const config = await getConfig();
   return config.projectWallet || 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
+}
+
+/**
+ * Check if Helius API is enabled
+ * @returns {Promise<boolean>} Whether Helius API is enabled
+ */
+export async function isHeliusEnabled() {
+  const config = await getConfig();
+  return config.heliusEnabled === true;
+}
+
+/**
+ * Get the appropriate RPC endpoint based on configuration
+ * @returns {Promise<string>} RPC endpoint URL
+ */
+export async function getRpcEndpoint() {
+  const config = await getConfig();
+  return config.rpcEndpoint || 'https://api.mainnet-beta.solana.com';
 }
