@@ -83,8 +83,8 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
           console.warn('[DelegatedTransferModal] Helius endpoint returned invalid proof data structure');
           console.log('[DelegatedTransferModal] Helius response:', JSON.stringify(heliusResponse.data, null, 2));
         }
-      } catch (method1Error) {
-        console.warn(`[DelegatedTransferModal] Method 1 failed: ${method1Error.message}`);
+      } catch (error: any) {
+        console.warn(`[DelegatedTransferModal] Method 1 failed: ${error.message || 'Unknown error'}`);
       }
       
       // Method 2: Try delegate endpoint
@@ -104,8 +104,8 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
         } else {
           console.warn('[DelegatedTransferModal] Delegate endpoint failed to return valid proof data');
         }
-      } catch (method2Error) {
-        console.warn(`[DelegatedTransferModal] Method 2 failed: ${method2Error.message}`);
+      } catch (error: any) {
+        console.warn(`[DelegatedTransferModal] Method 2 failed: ${error.message || 'Unknown error'}`);
       }
       
       // Method 3: Try diagnostic endpoint for detailed inspection
@@ -123,8 +123,8 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
             return; // Exit if we have valid proof data
           }
         }
-      } catch (method3Error) {
-        console.warn(`[DelegatedTransferModal] Method 3 failed: ${method3Error.message}`);
+      } catch (error: any) {
+        console.warn(`[DelegatedTransferModal] Method 3 failed: ${error.message || 'Unknown error'}`);
       }
       
       // If we reach here, all methods failed

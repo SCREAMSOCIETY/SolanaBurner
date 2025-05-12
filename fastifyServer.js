@@ -1902,6 +1902,138 @@ fastify.get('/api/delegate/proof/:assetId', async (request, reply) => {
 
 // Endpoint already exists at line 334, no need for a duplicate
 
+// New asset diagnostic endpoint with detailed analysis
+fastify.get('/api/asset/diagnostic/:assetId', async (request, reply) => {
+  try {
+    const { assetId } = request.params;
+    
+    if (!assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Asset ID is required'
+      });
+    }
+    
+    fastify.log.info(`[Asset Diagnostic] Running analysis for asset: ${assetId}`);
+    
+    // Step 1: Fetch asset details from multiple sources
+    let assetDetails = null;
+    try {
+      fastify.log.info(`[Asset Diagnostic] Step 1: Fetching asset details`);
+      assetDetails = await delegatedTransfer.fetchAssetDetails(assetId);
+      fastify.log.info(`[Asset Diagnostic] Asset details fetched: ${assetDetails ? 'Success' : 'Failed'}`);
+    } catch (step1Error) {
+      fastify.log.error(`[Asset Diagnostic] Error fetching asset details: ${step1Error.message}`);
+    }
+    
+    // Step 2: Fetch proof data from all possible sources
+    fastify.log.info(`[Asset Diagnostic] Step 2: Fetching proof data from multiple sources`);
+    
+    // Try the delegated transfer module
+    let delegatedProofData = null;
+    try {
+      fastify.log.info(`[Asset Diagnostic] Fetching proof via delegated transfer module`);
+      delegatedProofData = await delegatedTransfer.fetchAssetProof(assetId);
+      fastify.log.info(`[Asset Diagnostic] Delegated proof fetch: ${delegatedProofData ? 'Success' : 'Failed'}`);
+    } catch (delegatedError) {
+      fastify.log.error(`[Asset Diagnostic] Error in delegated proof fetch: ${delegatedError.message}`);
+    }
+    
+    // Try direct Helius API
+    let directProofData = null;
+    try {
+      fastify.log.info(`[Asset Diagnostic] Fetching proof via direct Helius RPC`);
+      const response = await axios.post(HELIUS_RPC_URL, {
+        jsonrpc: '2.0',
+        id: 'helius-js',
+        method: 'getAssetProof',
+        params: {
+          id: assetId
+        }
+      });
+      
+      if (response.data && response.data.result) {
+        directProofData = response.data.result;
+        fastify.log.info(`[Asset Diagnostic] Direct proof fetch: Success`);
+      } else {
+        fastify.log.error(`[Asset Diagnostic] Direct proof fetch: Failed (No valid response data)`);
+      }
+    } catch (directError) {
+      fastify.log.error(`[Asset Diagnostic] Error in direct proof fetch: ${directError.message}`);
+    }
+    
+    // Step 3: Try DAS API as a last resort
+    let dasProofData = null;
+    try {
+      fastify.log.info(`[Asset Diagnostic] Fetching asset via DAS API`);
+      const dasResponse = await axios.get(`https://api.helius.xyz/v0/assets/${assetId}?api-key=${HELIUS_API_KEY}`);
+      
+      if (dasResponse.data && dasResponse.data.compression) {
+        dasProofData = {
+          tree_id: dasResponse.data.compression.tree,
+          leaf_id: dasResponse.data.compression.leaf_id || dasResponse.data.compression.leaf_index,
+          compression: dasResponse.data.compression,
+          // Other fields may be missing
+        };
+        fastify.log.info(`[Asset Diagnostic] DAS API fetch: Success`);
+      } else {
+        fastify.log.error(`[Asset Diagnostic] DAS API fetch: Failed (No valid compression data)`);
+      }
+    } catch (dasError) {
+      fastify.log.error(`[Asset Diagnostic] Error in DAS API fetch: ${dasError.message}`);
+    }
+    
+    // Step 4: Analyze what we've got and see what's usable
+    const proofAnalysis = {
+      delegated_method: {
+        success: !!delegatedProofData,
+        has_proof_array: delegatedProofData && Array.isArray(delegatedProofData.proof),
+        proof_array_length: delegatedProofData && delegatedProofData.proof ? delegatedProofData.proof.length : 0,
+        has_tree_id: !!delegatedProofData?.tree_id,
+        has_leaf_id: delegatedProofData?.leaf_id !== undefined || delegatedProofData?.node_index !== undefined
+      },
+      direct_method: {
+        success: !!directProofData,
+        has_proof_array: directProofData && Array.isArray(directProofData.proof),
+        proof_array_length: directProofData && directProofData.proof ? directProofData.proof.length : 0,
+        has_tree_id: !!directProofData?.tree_id,
+        has_leaf_id: directProofData?.leaf_id !== undefined || directProofData?.node_index !== undefined
+      },
+      das_method: {
+        success: !!dasProofData,
+        has_compression: !!dasProofData?.compression,
+        has_tree_id: !!dasProofData?.tree_id,
+        has_leaf_id: dasProofData?.leaf_id !== undefined
+      }
+    };
+    
+    // Step 5: Construct the most complete proof data possible
+    const bestProofData = delegatedProofData || directProofData || dasProofData || null;
+    
+    return {
+      success: true,
+      asset_id: assetId,
+      methods_tried: ['delegated_transfer', 'direct_helius', 'das_api'],
+      analysis: proofAnalysis,
+      asset_found: !!assetDetails,
+      proof_found: !!bestProofData,
+      best_available_method: delegatedProofData ? 'delegated_transfer' : 
+                            (directProofData ? 'direct_helius' : 
+                            (dasProofData ? 'das_api' : 'none')),
+      details: {
+        asset: assetDetails,
+        proof: bestProofData
+      }
+    };
+  } catch (error) {
+    fastify.log.error(`[Asset Diagnostic] Fatal error: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Error running asset diagnostic: ${error.message}`
+    });
+  }
+});
+
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
 const start = async () => {
