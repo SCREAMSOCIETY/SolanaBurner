@@ -1013,6 +1013,17 @@ const WalletAssets: React.FC = () => {
   
   // Function to handle opening the Delegated Transfer Modal
   const openDelegatedTransferModal = (cnft: CNFTData) => {
+    console.log("[WalletAssets] Selected cNFT for delegated transfer:", cnft.mint);
+    setSelectedCnftForDelegatedTransfer({
+      id: cnft.mint,
+      name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`,
+      image: cnft.image
+    });
+    setDelegatedTransferModalOpen(true);
+  };
+  
+  // Function to handle opening the Delegated Transfer Modal
+  const openDelegatedTransferModal = (cnft: CNFTData) => {
     setSelectedCnftForDelegatedTransfer({
       id: cnft.mint,
       name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`,

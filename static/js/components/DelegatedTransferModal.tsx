@@ -1,9 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { 
-  transferCnftViaHelius, 
-  signTransferMessage 
-} from '../helius-cnft-transfer';
+import axios from 'axios';
 import '../delegated-transfer-modal.css';
 
 interface DelegatedTransferModalProps {
@@ -18,8 +15,9 @@ interface DelegatedTransferModalProps {
 /**
  * DelegatedTransferModal
  * 
- * A modal for transferring cNFTs using the delegated transfer approach
- * with direct Helius API integration
+ * A modal for transferring cNFTs using delegation approach with Helius API
+ * This provides a more reliable method for transferring cNFTs when the asset
+ * has delegation set up.
  */
 const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
   isOpen,
@@ -30,178 +28,187 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
   onSuccess
 }) => {
   const { publicKey, signMessage } = useWallet();
-  const [status, setStatus] = useState<'idle' | 'signing' | 'processing' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<string>('initial');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
+  const [delegateInfo, setDelegateInfo] = useState<any>(null);
 
-  // Reset state when modal opens/closes
+  // Fetch delegation info on load
   useEffect(() => {
-    if (isOpen) {
-      setStatus('idle');
-      setError(null);
-      setResult(null);
-      setSignature(null);
+    if (isOpen && assetId) {
+      fetchDelegateInfo();
     }
-  }, [isOpen]);
+  }, [isOpen, assetId]);
 
-  // Handle successful transfer
-  useEffect(() => {
-    if (result && result.success && onSuccess) {
-      onSuccess(result);
+  const fetchDelegateInfo = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/delegate/info/${assetId}`);
+      if (response.data && response.data.success) {
+        setDelegateInfo(response.data.delegationInfo);
+      } else {
+        setError('Could not fetch delegation information for this asset.');
+      }
+    } catch (err) {
+      console.error('Error fetching delegate info:', err);
+      setError('Failed to fetch delegation information: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
-  }, [result, onSuccess]);
+  };
 
-  const handleTransfer = useCallback(async () => {
+  const handleTransfer = async () => {
     if (!publicKey || !signMessage) {
-      setError('Wallet connection required');
+      setError('Wallet connection required for signing');
       return;
     }
 
     try {
+      setLoading(true);
       setStatus('signing');
+      setError(null);
+
+      // Create the message to sign
+      const message = `Authorize delegated transfer of asset ${assetId} to the project collection wallet`;
       
-      // Sign the message
-      const signedMessage = await signTransferMessage({
-        publicKey,
-        signMessage
-      }, assetId);
+      // Get the signature from wallet
+      const encodedMessage = new TextEncoder().encode(message);
+      const signatureBytes = await signMessage(encodedMessage);
+      const signatureBase64 = Buffer.from(signatureBytes).toString('base64');
       
-      setSignature(signedMessage);
-      setStatus('processing');
-      
-      // Perform the transfer
-      const transferResult = await transferCnftViaHelius({
+      setSignature(signatureBase64);
+      setStatus('transferring');
+
+      // Send the transfer request
+      const response = await axios.post('/api/delegated-transfer', {
         sender: publicKey.toString(),
         assetId,
-        signedMessage
+        signedMessage: signatureBase64
       });
-      
-      setResult(transferResult);
-      
-      if (transferResult.success) {
+
+      if (response.data && response.data.success) {
         setStatus('success');
+        setExplorerUrl(response.data.explorerUrl || null);
+        
+        // Call onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess(response.data);
+        }
       } else {
         setStatus('error');
-        setError(transferResult.error || 'Transfer failed');
+        setError(response.data && response.data.error ? response.data.error : 'Transfer failed');
       }
-    } catch (err: any) {
-      console.error('Error in delegated transfer:', err);
+    } catch (err) {
+      console.error('Error during delegated transfer:', err);
       setStatus('error');
-      setError(err.message || 'Unknown error during transfer');
+      setError('Transfer failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
-  }, [publicKey, signMessage, assetId]);
+  };
 
-  // Don't render anything if modal is closed
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="delegated-transfer-modal">
-        <div className="modal-header">
-          <h2>Trash cNFT: {assetName}</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+    <div className="delegated-transfer-modal">
+      <div className="delegated-transfer-content">
+        <button 
+          className="delegated-transfer-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
+
+        <div className="delegated-transfer-header">
+          <h2>Delegated Transfer</h2>
         </div>
-        
-        <div className="modal-content">
-          {assetImage && (
-            <div className="asset-preview">
-              <img 
-                src={assetImage} 
-                alt={assetName} 
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/static/default-nft-image.svg';
-                }} 
-              />
-            </div>
-          )}
-          
-          <div className="transfer-info">
-            <p>
-              This will move your cNFT to a trash collection wallet. 
-              This operation cannot be undone.
-            </p>
-            
-            <div className="status-container">
-              {status === 'idle' && (
-                <button 
-                  className="primary-button" 
-                  onClick={handleTransfer}
-                  disabled={!publicKey}
-                >
-                  Trash cNFT
-                </button>
-              )}
-              
-              {status === 'signing' && (
-                <div className="status-message">
-                  <div className="spinner"></div>
-                  <p>Please sign the message with your wallet...</p>
-                </div>
-              )}
-              
-              {status === 'processing' && (
-                <div className="status-message">
-                  <div className="spinner"></div>
-                  <p>Processing transfer...</p>
-                </div>
-              )}
-              
-              {status === 'success' && (
-                <div className="status-message success">
-                  <div className="success-icon">✓</div>
-                  <p>cNFT successfully trashed!</p>
-                  {result && result.signature && (
-                    <a
-                      href={`https://solscan.io/tx/${result.signature}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="explorer-link"
-                    >
-                      View on Solscan
-                    </a>
-                  )}
-                </div>
-              )}
-              
-              {status === 'error' && (
-                <div className="status-message error">
-                  <div className="error-icon">✗</div>
-                  <p>Error: {error || 'Unknown error'}</p>
-                  <button
-                    className="secondary-button"
-                    onClick={() => {
-                      setStatus('idle');
-                      setError(null);
-                    }}
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
+
+        <div className="delegated-transfer-asset">
+          <img 
+            src={assetImage || '../../default-nft-image.svg'} 
+            alt={assetName}
+            className="delegated-transfer-asset-image"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '../../default-nft-image.svg';
+            }}
+          />
+          <div className="delegated-transfer-asset-info">
+            <h3>{assetName}</h3>
+            <p>Asset ID: {assetId.slice(0, 6)}...{assetId.slice(-4)}</p>
+            {delegateInfo && delegateInfo.delegated && (
+              <p>Delegate: {delegateInfo.delegate.slice(0, 6)}...{delegateInfo.delegate.slice(-4)}</p>
+            )}
           </div>
         </div>
-        
-        <div className="modal-footer">
-          {status !== 'success' && (
+
+        <div className="delegated-transfer-message">
+          <p>
+            This asset can be transferred using delegation authority, which is a more reliable method
+            than direct transfers. Your asset will be sent to the project trash collection wallet.
+          </p>
+        </div>
+
+        {loading && (
+          <div className="delegated-transfer-loading">
+            <div className="delegated-transfer-spinner"></div>
+            <p>{status === 'signing' ? 'Please sign the message with your wallet...' : 'Processing transfer...'}</p>
+          </div>
+        )}
+
+        {status === 'success' && (
+          <div className="delegated-transfer-status success">
+            <p>Transfer successful!</p>
+            {explorerUrl && (
+              <a 
+                href={explorerUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="delegated-transfer-explorer-link"
+              >
+                View on Solana Explorer
+              </a>
+            )}
+          </div>
+        )}
+
+        {status === 'error' && error && (
+          <div className="delegated-transfer-status error">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {status !== 'success' && (
+          <div className="delegated-transfer-buttons">
             <button 
-              className="secondary-button"
+              className="delegated-transfer-button primary"
+              onClick={handleTransfer}
+              disabled={loading || !delegateInfo || !delegateInfo.delegated}
+            >
+              {loading ? 'Processing...' : 'Transfer to Trash Collection'}
+            </button>
+            
+            <button 
+              className="delegated-transfer-button secondary"
               onClick={onClose}
             >
               Cancel
             </button>
-          )}
-          
-          {status === 'success' && (
+          </div>
+        )}
+
+        {status === 'success' && (
+          <div className="delegated-transfer-buttons">
             <button 
-              className="primary-button"
+              className="delegated-transfer-button primary"
               onClick={onClose}
             >
               Close
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
