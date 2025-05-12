@@ -64,15 +64,38 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
   const fetchProofData = async () => {
     try {
       console.log(`Fetching proof data for asset: ${assetId}`);
-      const response = await axios.get(`/api/delegate/proof/${assetId}`);
-      if (response.data && response.data.success) {
+      
+      // Create a timeout to handle API request failures
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error('Proof data request timed out')), 10000);
+      });
+      
+      // Main API request
+      const fetchPromise = axios.get(`/api/delegate/proof/${assetId}`);
+      
+      // Race the fetch against the timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      
+      if (response && response.data && response.data.success) {
         console.log('Successfully fetched proof data:', response.data.proofData);
         setProofData(response.data.proofData);
       } else {
-        console.error('Failed to fetch proof data:', response.data);
+        console.error('Failed to fetch proof data:', response?.data || 'Unknown error');
+        
+        // If the first attempt fails, try the direct API call
+        console.log('Trying alternative proof data source...');
+        const altResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
+        
+        if (altResponse.data) {
+          console.log('Successfully fetched proof data from alternative source');
+          setProofData(altResponse.data);
+        } else {
+          throw new Error('All proof data fetch attempts failed');
+        }
       }
     } catch (err) {
       console.error('Error fetching proof data:', err);
+      setError(`Failed to fetch required proof data: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 

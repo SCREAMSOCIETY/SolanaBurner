@@ -339,24 +339,79 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
   }
   
   try {
-    fastify.log.info(`Fetching proof data for asset: ${assetId}`);
-    const proofData = await heliusApi.fetchAssetProof(assetId);
+    fastify.log.info(`[Helius API] Fetching proof data for asset: ${assetId}`);
     
-    if (!proofData || !proofData.proof) {
-      return reply.code(404).send({
-        success: false,
-        error: 'Asset proof not found'
-      });
+    // Method 1: Try the enhanced implementation first
+    try {
+      fastify.log.info(`[Helius API] Attempt 1: Using delegatedTransfer module`);
+      const proofData = await delegatedTransfer.fetchAssetProof(assetId);
+      
+      if (proofData && proofData.proof && Array.isArray(proofData.proof)) {
+        fastify.log.info(`[Helius API] Successfully fetched proof using delegatedTransfer`);
+        // Return the raw proof data
+        return proofData;
+      } else {
+        fastify.log.warn(`[Helius API] delegatedTransfer failed to provide valid proof data`);
+        throw new Error('Invalid proof data from delegatedTransfer');
+      }
+    } catch (method1Error) {
+      fastify.log.warn(`[Helius API] Method 1 failed: ${method1Error.message}`);
     }
     
-    // Return the raw proof data
-    return proofData;
+    // Method 2: Fall back to the original heliusApi module
+    try {
+      fastify.log.info(`[Helius API] Attempt 2: Using original heliusApi module`);
+      const proofData = await heliusApi.fetchAssetProof(assetId);
+      
+      if (proofData && proofData.proof && Array.isArray(proofData.proof)) {
+        fastify.log.info(`[Helius API] Successfully fetched proof using heliusApi`);
+        return proofData;
+      } else {
+        fastify.log.warn(`[Helius API] heliusApi failed to provide valid proof data`);
+        throw new Error('Invalid proof data from heliusApi');
+      }
+    } catch (method2Error) {
+      fastify.log.warn(`[Helius API] Method 2 failed: ${method2Error.message}`);
+    }
+    
+    // Method 3: Direct RPC call as last resort
+    try {
+      fastify.log.info(`[Helius API] Attempt 3: Using direct RPC call`);
+      
+      const response = await axios.post(HELIUS_RPC_URL, {
+        jsonrpc: '2.0',
+        id: 'helius-js',
+        method: 'getAssetProof',
+        params: {
+          id: assetId
+        }
+      });
+      
+      if (response.data && response.data.result && response.data.result.proof) {
+        fastify.log.info(`[Helius API] Successfully fetched proof using direct RPC call`);
+        return response.data.result;
+      } else {
+        fastify.log.warn(`[Helius API] Direct RPC call failed to provide valid proof data`);
+        throw new Error('Invalid proof data from direct RPC call');
+      }
+    } catch (method3Error) {
+      fastify.log.warn(`[Helius API] Method 3 failed: ${method3Error.message}`);
+    }
+    
+    // If all methods fail, return an error
+    fastify.log.error(`[Helius API] All proof fetching methods failed for asset: ${assetId}`);
+    return reply.code(404).send({
+      success: false,
+      error: 'Asset proof not found after multiple attempts',
+      assetId
+    });
   } catch (error) {
-    fastify.log.error(`Error fetching asset proof: ${error.message}`);
+    fastify.log.error(`[Helius API] Fatal error fetching asset proof: ${error.message}`);
     return reply.code(500).send({
       success: false,
       error: 'Failed to fetch asset proof',
-      message: error.message
+      message: error.message,
+      assetId
     });
   }
 });
@@ -1844,6 +1899,8 @@ fastify.get('/api/delegate/proof/:assetId', async (request, reply) => {
     });
   }
 });
+
+// Endpoint already exists at line 334, no need for a duplicate
 
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
