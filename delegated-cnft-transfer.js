@@ -77,7 +77,7 @@ async function processDelegatedTransfer(
     // Verify signed message
     const messageValid = verifySignedMessage(
       ownerAddress,
-      `Transfer cNFT with ID: ${assetId}`,
+      `Authorize delegated transfer of asset ${assetId} to the project collection wallet`,
       signedMessage
     );
     

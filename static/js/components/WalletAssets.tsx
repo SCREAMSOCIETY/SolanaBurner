@@ -1050,17 +1050,34 @@ const WalletAssets: React.FC = () => {
   };
   
   // Handle successful direct trash operation
-  const handleDirectTrashSuccess = (signature: string) => {
-    if (!selectedCnftForTrash) return;
+  const handleDirectTrashSuccess = (result: any) => {
+    // Check which modal was active
+    if (selectedCnftForTrash && directTrashModalOpen) {
+      console.log('[WalletAssets] Direct trash operation successful for asset:', selectedCnftForTrash.id);
+      
+      // Track successful result in debug info
+      if (window.debugInfo) {
+        window.debugInfo.lastCnftSuccess = true;
+        window.debugInfo.lastCnftSignature = result.signature || '';
+        window.debugInfo.transferMethod = 'Direct CLI-based transfer';
+      }
+    } 
+    // Handle delegated transfer success
+    else if (selectedCnftForDelegatedTransfer && delegatedTransferModalOpen) {
+      console.log('[WalletAssets] Delegated transfer successful for asset:', selectedCnftForDelegatedTransfer.id);
+      console.log('[WalletAssets] Result:', result);
+      
+      // Track successful result in debug info
+      if (window.debugInfo) {
+        window.debugInfo.lastCnftSuccess = true;
+        window.debugInfo.lastCnftSignature = result.signature || '';
+        window.debugInfo.transferMethod = 'Delegated Helius transfer';
+      }
+    }
     
-    console.log('[WalletAssets] Direct trash operation successful for asset:', selectedCnftForTrash.id);
-    console.log('[WalletAssets] Signature:', signature);
-    
-    // Track successful result in debug info
-    if (window.debugInfo) {
-      window.debugInfo.lastCnftSuccess = true;
-      window.debugInfo.lastCnftSignature = signature;
-      window.debugInfo.transferMethod = 'Direct CLI-based transfer';
+    // Log signature if available
+    if (result && result.signature) {
+      console.log('[WalletAssets] Signature:', result.signature);
     }
     
     // Show success notification

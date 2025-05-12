@@ -1676,6 +1676,41 @@ fastify.post('/api/delegate/transfer', async (request, reply) => {
 });
 
 /**
+ * Alternative endpoint for delegated transfers that matches the client component
+ */
+fastify.post('/api/delegated-transfer', async (request, reply) => {
+  try {
+    const { assetId, sender, signedMessage, delegateAddress, destinationAddress } = request.body;
+    
+    // Validate required parameters
+    if (!assetId || !sender || !signedMessage) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Missing required parameters: assetId, sender, and signedMessage are required'
+      });
+    }
+    
+    fastify.log.info(`Processing delegated transfer via /api/delegated-transfer for asset: ${assetId}`);
+    
+    const result = await delegatedTransfer.processDelegatedTransfer(
+      assetId,
+      sender,
+      signedMessage,
+      delegateAddress,
+      destinationAddress
+    );
+    
+    return result;
+  } catch (error) {
+    fastify.log.error(`Error processing delegated transfer: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: error.message || 'Error processing delegated transfer'
+    });
+  }
+});
+
+/**
  * Verify if a wallet has delegate authority for a cNFT
  */
 fastify.get('/api/delegate/verify/:assetId/:delegateAddress', async (request, reply) => {
