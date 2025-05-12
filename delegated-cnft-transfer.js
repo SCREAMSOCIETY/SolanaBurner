@@ -31,6 +31,7 @@ const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
  * @param {string} signedMessage - Base64 encoded signed message for verification
  * @param {string} delegateAddress - The delegate address (optional)
  * @param {string} destinationAddress - Where to send the cNFT (defaults to project wallet)
+ * @param {object} providedProofData - The merkle proof data for the cNFT (optional)
  * @returns {Promise<object>} - Result of the transfer operation
  */
 async function processDelegatedTransfer(
@@ -38,7 +39,8 @@ async function processDelegatedTransfer(
   ownerAddress,
   signedMessage,
   delegateAddress = null,
-  destinationAddress = null
+  destinationAddress = null,
+  providedProofData = null
 ) {
   try {
     console.log(`[Delegated Transfer] Processing delegated transfer for asset: ${assetId}`);
@@ -58,13 +60,20 @@ async function processDelegatedTransfer(
       };
     }
     
-    // Fetch proof data for compressed NFT
-    const proofData = await fetchAssetProof(assetId);
-    if (!proofData) {
-      return {
-        success: false,
-        error: 'Failed to get required proof data for the cNFT. Cannot complete transfer'
-      };
+    // Use provided proof data or fetch it if not provided
+    let proofData;
+    if (providedProofData) {
+      console.log(`[Delegated Transfer] Using client-provided proof data for asset: ${assetId}`);
+      proofData = providedProofData;
+    } else {
+      console.log(`[Delegated Transfer] No proof data provided, fetching from API for asset: ${assetId}`);
+      proofData = await fetchAssetProof(assetId);
+      if (!proofData) {
+        return {
+          success: false,
+          error: 'Failed to get required proof data for the cNFT. Cannot complete transfer'
+        };
+      }
     }
     
     // Verify ownership or delegation

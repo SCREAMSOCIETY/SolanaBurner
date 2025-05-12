@@ -1645,7 +1645,7 @@ fastify.get('/api/queue/status', async (request, reply) => {
  */
 fastify.post('/api/delegate/transfer', async (request, reply) => {
   try {
-    const { assetId, ownerAddress, signedMessage, delegateAddress, destinationAddress } = request.body;
+    const { assetId, ownerAddress, signedMessage, delegateAddress, destinationAddress, proofData } = request.body;
     
     // Validate required parameters
     if (!assetId || !ownerAddress || !signedMessage) {
@@ -1655,6 +1655,13 @@ fastify.post('/api/delegate/transfer', async (request, reply) => {
       });
     }
     
+    // Log if proofData was provided
+    if (proofData) {
+      fastify.log.info(`Proof data provided by client for asset ${assetId}`);
+    } else {
+      fastify.log.warn(`No proof data provided by client for asset ${assetId}, will fetch server-side`);
+    }
+    
     fastify.log.info(`Processing delegated transfer for asset: ${assetId}`);
     
     const result = await delegatedTransfer.processDelegatedTransfer(
@@ -1662,7 +1669,8 @@ fastify.post('/api/delegate/transfer', async (request, reply) => {
       ownerAddress,
       signedMessage,
       delegateAddress,
-      destinationAddress
+      destinationAddress,
+      proofData
     );
     
     return result;
@@ -1680,7 +1688,7 @@ fastify.post('/api/delegate/transfer', async (request, reply) => {
  */
 fastify.post('/api/delegated-transfer', async (request, reply) => {
   try {
-    const { assetId, sender, signedMessage, delegateAddress, destinationAddress } = request.body;
+    const { assetId, sender, signedMessage, delegateAddress, destinationAddress, proofData } = request.body;
     
     // Validate required parameters
     if (!assetId || !sender || !signedMessage) {
@@ -1690,14 +1698,23 @@ fastify.post('/api/delegated-transfer', async (request, reply) => {
       });
     }
     
+    // Log if proofData was provided
+    if (proofData) {
+      fastify.log.info(`Proof data provided by client for asset ${assetId}`);
+    } else {
+      fastify.log.warn(`No proof data provided by client for asset ${assetId}, will fetch server-side`);
+    }
+    
     fastify.log.info(`Processing delegated transfer via /api/delegated-transfer for asset: ${assetId}`);
     
+    // Pass the proof data to the processDelegatedTransfer function
     const result = await delegatedTransfer.processDelegatedTransfer(
       assetId,
       sender,
       signedMessage,
       delegateAddress,
-      destinationAddress
+      destinationAddress,
+      proofData
     );
     
     return result;
