@@ -416,6 +416,138 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
   }
 });
 
+/**
+ * Asset Diagnostics Endpoint
+ * Provides comprehensive details about an asset, including proof data and troubleshooting info
+ */
+fastify.get('/api/asset/diagnostic/:assetId', async (request, reply) => {
+  const { assetId } = request.params;
+  console.log(`[Diagnostic API] Running comprehensive analysis for asset: ${assetId}`);
+  
+  try {
+    // Step 1: Get asset details
+    console.log(`[Diagnostic API] Fetching asset details for ${assetId}`);
+    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    
+    if (!assetDetails) {
+      return reply.code(404).send({ 
+        success: false, 
+        error: 'Asset not found',
+        assetId
+      });
+    }
+
+    // Step 2: Get proof data using multiple methods
+    let proofData = null;
+    let proofError = null;
+    let proofMethod = null;
+    
+    try {
+      // Method 1: Standard Helius getAssetProof
+      console.log(`[Diagnostic API] Method 1: Using Helius getAssetProof for ${assetId}`);
+      proofData = await heliusApi.fetchAssetProof(assetId);
+      proofMethod = 'helius-standard';
+      console.log(`[Diagnostic API] Successfully obtained proof data using standard method`);
+    } catch (error) {
+      console.warn(`[Diagnostic API] Standard proof method failed: ${error.message}`);
+      proofError = error.message;
+      
+      // Method 2: Try delegated transfer module
+      try {
+        console.log(`[Diagnostic API] Method 2: Using delegated transfer module`);
+        
+        // Get proof through delegatedTransfer's specialized method
+        const delegatedTransfer = require('./delegated-cnft-transfer');
+        proofData = await delegatedTransfer.fetchAssetProof(assetId);
+        proofMethod = 'delegated-transfer';
+        console.log(`[Diagnostic API] Successfully obtained proof data using delegated transfer module`);
+      } catch (error2) {
+        console.warn(`[Diagnostic API] Delegated transfer module method failed: ${error2.message}`);
+        
+        // Method 3: Try RPC direct call with custom parameters
+        try {
+          console.log(`[Diagnostic API] Method 3: Using direct RPC call`);
+          
+          // Make direct RPC call to Helius
+          const axios = require('axios');
+          const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=' + process.env.HELIUS_API_KEY;
+          const response = await axios.post(
+            HELIUS_RPC_URL,
+            {
+              jsonrpc: '2.0',
+              id: 'diagnostic-' + Date.now(),
+              method: 'getAssetProof',
+              params: { id: assetId }
+            }
+          );
+          
+          if (response.data && response.data.result) {
+            proofData = response.data.result;
+            proofMethod = 'direct-rpc';
+            console.log(`[Diagnostic API] Successfully obtained proof data using direct RPC call`);
+          } else {
+            throw new Error('Invalid response from RPC call');
+          }
+        } catch (error3) {
+          console.error(`[Diagnostic API] All proof fetch methods failed, cannot obtain proof data`);
+          proofError = 'All proof fetch methods failed: ' + error.message;
+        }
+      }
+    }
+    
+    // Step 3: Analyze compression suitability
+    let compressionAnalysis = {
+      isCompressed: assetDetails.compression?.compressed === true,
+      hasProofData: !!proofData,
+      validProofStructure: false,
+      validLeafId: false,
+      canProcessTransfer: false,
+      treeId: assetDetails.compression?.tree || null
+    };
+    
+    if (proofData) {
+      // Check for critical proof structure
+      compressionAnalysis.validProofStructure = Array.isArray(proofData.proof) || 
+                                            (proofData.compression && Array.isArray(proofData.compression.proof));
+      
+      // Check for valid leaf ID which is critical for transfers
+      const leafId = proofData.leaf_id || 
+                     proofData.leafId || 
+                     proofData.compression?.leaf_id || 
+                     proofData.node_index;
+                     
+      compressionAnalysis.validLeafId = typeof leafId === 'number' || typeof leafId === 'string';
+      
+      // Overall assessment: can we process a transfer with this data
+      compressionAnalysis.canProcessTransfer = compressionAnalysis.validProofStructure && 
+                                             compressionAnalysis.validLeafId && 
+                                             !!compressionAnalysis.treeId;
+    }
+
+    // Return comprehensive diagnostic data
+    return reply.send({
+      success: true,
+      assetId,
+      details: {
+        asset: assetDetails,
+        proof: proofData,
+        proofMethod,
+        proofError,
+        compressionAnalysis,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error(`[Diagnostic API] Error analyzing asset:`, error);
+    return reply.code(500).send({ 
+      success: false, 
+      error: error.message || 'Failed to analyze asset',
+      assetId
+    });
+  }
+});
+
 // Endpoint for delegating authority for a cNFT to our server
 fastify.post('/api/cnft/delegate', async (request, reply) => {
   try {
@@ -1900,9 +2032,9 @@ fastify.get('/api/delegate/proof/:assetId', async (request, reply) => {
   }
 });
 
-// Endpoint already exists at line 334, no need for a duplicate
-
-// New asset diagnostic endpoint with detailed analysis
+// This endpoint is now implemented at the top of the file
+// DO NOT UNCOMMENT - keeping for reference only
+/*
 fastify.get('/api/asset/diagnostic/:assetId', async (request, reply) => {
   try {
     const { assetId } = request.params;
@@ -2033,6 +2165,7 @@ fastify.get('/api/asset/diagnostic/:assetId', async (request, reply) => {
     });
   }
 });
+*/
 
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
