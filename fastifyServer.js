@@ -13,6 +13,7 @@ const cnftBurnServer = require('./cnft-burn-server');
 const cnftTransferServer = require('./cnft-transfer-server');
 const serverTransfer = require('./server-transfer');
 const queueTransferManager = require('./queue-transfer-manager');
+const delegatedTransfer = require('./delegated-cnft-transfer');
 
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
