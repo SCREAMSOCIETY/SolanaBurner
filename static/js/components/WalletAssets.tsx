@@ -1126,14 +1126,38 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
-      // Instead of using the complex CNFTHandler approach, open the direct trash modal
-      console.log("[WalletAssets] Opening DirectTrashModal for cNFT:", cnft.mint);
-      openDirectTrashModal(cnft);
+      // Check if the asset has delegation set
+      // If yes, we can use the delegated transfer which is more reliable
+      // If no, we fall back to the direct trash modal
+      console.log("[WalletAssets] Checking delegation support for cNFT:", cnft.mint);
+      
+      axios.get(`/api/delegate/info/${cnft.mint}`)
+        .then(response => {
+          const isDelegationAvailable = response.data?.success && 
+                                       response.data?.delegationInfo?.delegated === true;
+          
+          if (isDelegationAvailable) {
+            console.log("[WalletAssets] Delegation available, opening DelegatedTransferModal");
+            openDelegatedTransferModal(cnft);
+          } else {
+            console.log("[WalletAssets] No delegation, using DirectTrashModal");
+            openDirectTrashModal(cnft);
+          }
+        })
+        .catch(error => {
+          // If there's an error checking delegation, fallback to direct trash
+          console.error("Error checking delegation:", error);
+          openDirectTrashModal(cnft);
+        });
+        
     } catch (error) {
-      console.error("Error initiating direct trash operation:", error);
+      console.error("Error initiating trash operation:", error);
       
       // Show error to user
       setError(`Error initiating trash operation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Fallback to direct trash modal
+      openDirectTrashModal(cnft);
       
       // Show notification with more details
       if (typeof window !== 'undefined' && window.BurnAnimations?.showNotification) {
@@ -2318,6 +2342,18 @@ const WalletAssets: React.FC = () => {
           assetImage={selectedCnftForTrash.image || '../../default-nft-image.svg'}
           onSuccess={handleDirectTrashSuccess}
           onError={handleDirectTrashError}
+        />
+      )}
+
+      {/* DelegatedTransferModal for delegated cNFT transfers */}
+      {delegatedTransferModalOpen && selectedCnftForDelegatedTransfer && (
+        <DelegatedTransferModal
+          isOpen={delegatedTransferModalOpen}
+          onClose={() => setDelegatedTransferModalOpen(false)}
+          assetId={selectedCnftForDelegatedTransfer.id}
+          assetName={selectedCnftForDelegatedTransfer.name}
+          assetImage={selectedCnftForDelegatedTransfer.image || '../../default-nft-image.svg'}
+          onSuccess={handleDirectTrashSuccess}
         />
       )}
 
