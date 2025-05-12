@@ -1789,6 +1789,45 @@ fastify.get('/api/delegate/info/:assetId', async (request, reply) => {
   }
 });
 
+/**
+ * Get asset proof data for a cNFT
+ * This is required for transferring compressed NFTs
+ */
+fastify.get('/api/delegate/proof/:assetId', async (request, reply) => {
+  try {
+    const { assetId } = request.params;
+    
+    if (!assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Missing required parameter: assetId'
+      });
+    }
+    
+    fastify.log.info(`Fetching proof data for asset: ${assetId}`);
+    
+    const proofData = await delegatedTransfer.fetchAssetProof(assetId);
+    
+    if (!proofData) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Asset proof not found or unavailable'
+      });
+    }
+    
+    return {
+      success: true,
+      proofData
+    };
+  } catch (error) {
+    fastify.log.error(`Error fetching asset proof: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: error.message || 'Error fetching asset proof'
+    });
+  }
+});
+
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
 const start = async () => {

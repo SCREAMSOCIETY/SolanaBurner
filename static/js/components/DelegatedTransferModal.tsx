@@ -34,11 +34,13 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
   const [delegateInfo, setDelegateInfo] = useState<any>(null);
+  const [proofData, setProofData] = useState<any>(null);
 
-  // Fetch delegation info on load
+  // Fetch delegation info and proof data on load
   useEffect(() => {
     if (isOpen && assetId) {
       fetchDelegateInfo();
+      fetchProofData();
     }
   }, [isOpen, assetId]);
 
@@ -56,6 +58,21 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
       setError('Failed to fetch delegation information: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProofData = async () => {
+    try {
+      console.log(`Fetching proof data for asset: ${assetId}`);
+      const response = await axios.get(`/api/delegate/proof/${assetId}`);
+      if (response.data && response.data.success) {
+        console.log('Successfully fetched proof data:', response.data.proofData);
+        setProofData(response.data.proofData);
+      } else {
+        console.error('Failed to fetch proof data:', response.data);
+      }
+    } catch (err) {
+      console.error('Error fetching proof data:', err);
     }
   };
 
@@ -81,11 +98,19 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
       setSignature(signatureBase64);
       setStatus('transferring');
 
-      // Send the transfer request
+      // Check if we have proof data
+      if (!proofData) {
+        // If proof data is missing, attempt to fetch it again
+        console.log('Proof data not available. Attempting to fetch it now...');
+        await fetchProofData();
+      }
+
+      // Send the transfer request with proof data if available
       const response = await axios.post('/api/delegated-transfer', {
         sender: publicKey.toString(),
         assetId,
-        signedMessage: signatureBase64
+        signedMessage: signatureBase64,
+        proofData: proofData || null
       });
 
       if (response.data && response.data.success) {

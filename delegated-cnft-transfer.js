@@ -319,5 +319,6 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
 module.exports = {
   processDelegatedTransfer,
   fetchAssetDetails,
+  fetchAssetProof,
   verifyDelegateAuthority
 };
