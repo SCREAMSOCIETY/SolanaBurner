@@ -1226,6 +1226,17 @@ const WalletAssets: React.FC = () => {
     };
   };
 
+  // Function to refresh all wallet assets
+  const refreshAllAssets = () => {
+    if (publicKey) {
+      console.log('[WalletAssets] Refreshing all wallet assets');
+      // Refetch all asset types
+      fetchTokens();
+      fetchAllNFTs();
+      fetchCNFTsWithHandler();
+    }
+  };
+
   // Handle successful queue transfer
   const handleQueueTransferSuccess = () => {
     console.log('[WalletAssets] Queue transfer completed');
