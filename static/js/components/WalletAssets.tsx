@@ -15,6 +15,7 @@ import { CNFTHandler } from '../cnft-handler';
 // Import the modal components
 import DirectTrashModal from './DirectTrashModal';
 import QueueTransferModal from './QueueTransferModal';
+import DelegatedTransferModal from './DelegatedTransferModal';
 
 // Add global variable to global window object to access in console for debugging
 declare global {
@@ -158,6 +159,10 @@ const WalletAssets: React.FC = () => {
   // State for Queue Transfer Modal (for bulk transfers)
   const [queueTransferModalOpen, setQueueTransferModalOpen] = useState<boolean>(false);
   const [selectedCnftsForQueueTransfer, setSelectedCnftsForQueueTransfer] = useState<any[]>([]);
+  
+  // State for Delegated Transfer Modal
+  const [delegatedTransferModalOpen, setDelegatedTransferModalOpen] = useState<boolean>(false);
+  const [selectedCnftForDelegatedTransfer, setSelectedCnftForDelegatedTransfer] = useState<{ id: string; name: string; image?: string } | null>(null);
   
   // Fetch API key on component load
   useEffect(() => {
@@ -1000,9 +1005,20 @@ const WalletAssets: React.FC = () => {
   const openDirectTrashModal = (cnft: CNFTData) => {
     setSelectedCnftForTrash({
       id: cnft.mint,
-      name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`
+      name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`,
+      image: cnft.image
     });
     setDirectTrashModalOpen(true);
+  };
+  
+  // Function to handle opening the Delegated Transfer Modal
+  const openDelegatedTransferModal = (cnft: CNFTData) => {
+    setSelectedCnftForDelegatedTransfer({
+      id: cnft.mint,
+      name: cnft.name || `Asset ${cnft.mint.slice(0, 8)}...`,
+      image: cnft.image
+    });
+    setDelegatedTransferModalOpen(true);
   };
   
   // Function to handle opening the Queue Transfer Modal for bulk operations
