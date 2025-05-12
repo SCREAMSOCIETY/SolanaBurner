@@ -63,39 +63,75 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
 
   const fetchProofData = async () => {
     try {
-      console.log(`Fetching proof data for asset: ${assetId}`);
+      console.log(`[DelegatedTransferModal] Fetching proof data for asset: ${assetId}`);
       
       // Create a timeout to handle API request failures
       const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('Proof data request timed out')), 10000);
+        setTimeout(() => reject(new Error('Proof data request timed out')), 15000); // Extended timeout
       });
       
-      // Main API request
-      const fetchPromise = axios.get(`/api/delegate/proof/${assetId}`);
-      
-      // Race the fetch against the timeout
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
-      
-      if (response && response.data && response.data.success) {
-        console.log('Successfully fetched proof data:', response.data.proofData);
-        setProofData(response.data.proofData);
-      } else {
-        console.error('Failed to fetch proof data:', response?.data || 'Unknown error');
+      // Method 1: Try direct Helius endpoint first - most reliable
+      try {
+        console.log(`[DelegatedTransferModal] Method 1: Using direct Helius endpoint`);
+        const heliusResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
         
-        // If the first attempt fails, try the direct API call
-        console.log('Trying alternative proof data source...');
-        const altResponse = await axios.get(`/api/helius/asset-proof/${assetId}`);
-        
-        if (altResponse.data) {
-          console.log('Successfully fetched proof data from alternative source');
-          setProofData(altResponse.data);
+        if (heliusResponse.data && (heliusResponse.data.proof || (heliusResponse.data.compression && heliusResponse.data.compression.proof))) {
+          console.log('[DelegatedTransferModal] Successfully fetched proof data from Helius endpoint');
+          setProofData(heliusResponse.data);
+          return; // Exit early if successful
         } else {
-          throw new Error('All proof data fetch attempts failed');
+          console.warn('[DelegatedTransferModal] Helius endpoint returned invalid proof data structure');
+          console.log('[DelegatedTransferModal] Helius response:', JSON.stringify(heliusResponse.data, null, 2));
         }
+      } catch (method1Error) {
+        console.warn(`[DelegatedTransferModal] Method 1 failed: ${method1Error.message}`);
       }
+      
+      // Method 2: Try delegate endpoint
+      try {
+        console.log(`[DelegatedTransferModal] Method 2: Using delegate endpoint`);
+        // Main API request
+        const fetchPromise = axios.get(`/api/delegate/proof/${assetId}`);
+        
+        // Race the fetch against the timeout
+        const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
+        
+        if (response && response.data && response.data.success) {
+          console.log('[DelegatedTransferModal] Successfully fetched proof data from delegate endpoint:', 
+            JSON.stringify(response.data.proofData, null, 2));
+          setProofData(response.data.proofData);
+          return; // Exit early if successful
+        } else {
+          console.warn('[DelegatedTransferModal] Delegate endpoint failed to return valid proof data');
+        }
+      } catch (method2Error) {
+        console.warn(`[DelegatedTransferModal] Method 2 failed: ${method2Error.message}`);
+      }
+      
+      // Method 3: Try diagnostic endpoint for detailed inspection
+      try {
+        console.log(`[DelegatedTransferModal] Method 3: Using diagnostic endpoint`);
+        const diagnosticResponse = await axios.get(`/api/asset/diagnostic/${assetId}`);
+        
+        if (diagnosticResponse.data && diagnosticResponse.data.success) {
+          console.log('[DelegatedTransferModal] Got diagnostic data:', 
+            JSON.stringify(diagnosticResponse.data.diagnostics, null, 2));
+          
+          if (diagnosticResponse.data.details && diagnosticResponse.data.details.proof) {
+            console.log('[DelegatedTransferModal] Extracting proof data from diagnostic response');
+            setProofData(diagnosticResponse.data.details.proof);
+            return; // Exit if we have valid proof data
+          }
+        }
+      } catch (method3Error) {
+        console.warn(`[DelegatedTransferModal] Method 3 failed: ${method3Error.message}`);
+      }
+      
+      // If we reach here, all methods failed
+      throw new Error('All proof data fetching methods failed');
     } catch (err) {
-      console.error('Error fetching proof data:', err);
-      setError(`Failed to fetch required proof data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('[DelegatedTransferModal] Critical error fetching proof data:', err);
+      setError(`Failed to fetch required proof data for the cNFT. Cannot complete transfer and no wallet transaction will be made.`);
     }
   };
 
