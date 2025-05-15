@@ -12,9 +12,9 @@
  */
 
 // Token bucket configuration
-const MAX_TOKENS = 5;      // Maximum tokens (for burst capacity)
-const REFILL_RATE = 2;     // Tokens added per second
-const MIN_REFILL_MS = 150; // Minimum time between refills in milliseconds
+const MAX_TOKENS = 3;      // Maximum tokens (for burst capacity) - reduced from 5
+const REFILL_RATE = 0.5;   // Tokens added per second - reduced from 2
+const MIN_REFILL_MS = 500; // Minimum time between refills in milliseconds - increased from 150
 
 // Internal state
 let tokens = MAX_TOKENS;    // Current token count
