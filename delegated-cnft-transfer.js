@@ -76,12 +76,12 @@ async function processDelegatedTransfer(
       // Try fetching with our enhanced multi-method approach
       proofData = await fetchAssetProof(assetId);
       
-      // If still no valid proof data, try one more method using DAS v1 API
+      // If still no valid proof data, try more methods with exponential backoff
       if (!proofData || !proofData.proof || !Array.isArray(proofData.proof) || proofData.proof.length === 0) {
         console.log(`[Delegated Transfer] Standard methods failed, trying emergency DAS v1 API call`);
         
         try {
-          // Try to get the asset data from DAS v1 API directly
+          // First attempt with DAS v1 API 
           const dasV1Response = await axios.get(`https://api.helius.xyz/v1/assets?api-key=${HELIUS_API_KEY}&assetId=${assetId}`);
           
           // Check if we got a valid response with compression data
@@ -110,6 +110,42 @@ async function processDelegatedTransfer(
           }
         } catch (emergencyError) {
           console.error(`[Delegated Transfer] Emergency DAS v1 API method failed: ${emergencyError.message}`);
+        }
+      }
+      
+      // Last resort: Try direct QuickNode approach if Helius methods failed
+      if (!proofData || !proofData.proof || !Array.isArray(proofData.proof)) {
+        // Wait 3 seconds to let any potential blockchain state updates propagate
+        console.log(`[Delegated Transfer] Waiting 3 seconds before final proof attempt...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        try {
+          console.log(`[Delegated Transfer] All normal methods failed, attempting direct QuickNode fallback`);
+          const quicknodeRpcUrl = process.env.QUICKNODE_RPC_URL;
+          
+          if (quicknodeRpcUrl) {
+            // Try QuickNode as a completely separate RPC provider
+            const response = await axios.post(quicknodeRpcUrl, {
+              jsonrpc: '2.0',
+              id: `quicknode-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              method: 'getAssetProof',
+              params: {
+                id: assetId
+              }
+            }, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+              }
+            });
+            
+            if (response.data && response.data.result && response.data.result.proof) {
+              console.log(`[Delegated Transfer] Successfully fetched proof from QuickNode alternative RPC!`);
+              proofData = response.data.result;
+            }
+          }
+        } catch (quicknodeError) {
+          console.error(`[Delegated Transfer] QuickNode fallback method failed: ${quicknodeError.message}`);
         }
       }
       

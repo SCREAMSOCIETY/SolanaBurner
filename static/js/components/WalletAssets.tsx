@@ -1372,12 +1372,13 @@ const WalletAssets: React.FC = () => {
       
       // Add compute budget instructions to avoid insufficient SOL errors
       const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-        units: 400000 // Higher compute units for multiple operations
+        units: 200000 * Math.min(5, selectedTokens.size || 1) // Scale compute units based on number of tokens with a cap
       });
       
       // Add a compute budget instruction to set a very low prioritization fee 
+      // Using same fee as single burns to keep costs consistent
       const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: 1 // Minimum possible fee
+        microLamports: 1 // Minimum possible fee (consistent with single burn)
       });
       
       // Add compute budget instructions to transaction
@@ -1598,7 +1599,7 @@ const WalletAssets: React.FC = () => {
       
       // Add compute budget instructions to avoid insufficient SOL errors
       const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-        units: 200000 * Math.min(5, selectedNFTs.length) // Scale compute units proportionally with a cap
+        units: 200000 * Math.min(5, selectedNFTs.length || 1) // Scale compute units proportionally with a cap
       });
       
       // Add a compute budget instruction to set a very low prioritization fee 
