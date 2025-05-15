@@ -2309,6 +2309,7 @@ const WalletAssets: React.FC = () => {
                   key={cnft.mint} 
                   className={`nft-card ${bulkBurnMode && selectedCNFTs.includes(cnft.mint) ? 'selected' : ''}`} 
                   data-mint={cnft.mint}
+                  data-asset-id={cnft.mint}
                   onClick={bulkBurnMode ? () => handleCNFTSelection(cnft.mint) : undefined}
                 >
                   <div className="nft-info">
@@ -2327,7 +2328,8 @@ const WalletAssets: React.FC = () => {
                   </div>
                   {!bulkBurnMode && (
                     <button 
-                      className="burn-button" 
+                      className="burn-button cnft-transfer-button"
+                      data-asset-id={cnft.mint}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleBurnCNFT(cnft);
