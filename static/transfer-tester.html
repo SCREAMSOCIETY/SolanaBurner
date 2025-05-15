@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>cNFT Transfer Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .buttons {
+            margin-top: 20px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+            border: 1px solid #ebccd1;
+        }
+        .info {
+            background-color: #d9edf7;
+            color: #31708f;
+            border: 1px solid #bce8f1;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>cNFT Transfer Tester</h1>
+        <p>This page tests the improved server-side transfer implementation for cNFTs.</p>
+        
+        <div class="form-group">
+            <label for="assetId">Asset ID (cNFT):</label>
+            <input type="text" id="assetId" placeholder="Enter the cNFT asset ID">
+        </div>
+        
+        <div class="buttons">
+            <button id="connectWallet">Connect Wallet</button>
+            <button id="transferCNFT" disabled>Transfer cNFT</button>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div id="log"></div>
+    </div>
+    
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="/static/js/improved-server-transfer.js"></script>
+    <script>
+        // Display log messages
+        function logMessage(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const logItem = document.createElement('div');
+            logItem.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logItem.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            logElement.appendChild(logItem);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // Show status message
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = 'status ' + type;
+            statusElement.style.display = 'block';
+        }
+        
+        // Connect wallet button
+        document.getElementById('connectWallet').addEventListener('click', async () => {
+            try {
+                logMessage('Connecting wallet...');
+                
+                if (!window.solana) {
+                    showStatus('No wallet provider found. Please install Phantom or Solflare extension.', 'error');
+                    logMessage('No wallet provider found. Please install Phantom or Solflare extension.', 'error');
+                    return;
+                }
+                
+                // Connect to the wallet
+                await window.solana.connect();
+                
+                showStatus('Wallet connected: ' + window.solana.publicKey.toString(), 'success');
+                logMessage('Wallet connected: ' + window.solana.publicKey.toString(), 'success');
+                
+                // Enable the transfer button
+                document.getElementById('transferCNFT').disabled = false;
+            } catch (error) {
+                showStatus('Error connecting wallet: ' + error.message, 'error');
+                logMessage('Error connecting wallet: ' + error.message, 'error');
+            }
+        });
+        
+        // Transfer cNFT button
+        document.getElementById('transferCNFT').addEventListener('click', async () => {
+            try {
+                const assetId = document.getElementById('assetId').value.trim();
+                
+                if (!assetId) {
+                    showStatus('Please enter an asset ID', 'error');
+                    logMessage('Please enter an asset ID', 'error');
+                    return;
+                }
+                
+                if (!window.solana || !window.solana.isConnected) {
+                    showStatus('Wallet not connected', 'error');
+                    logMessage('Wallet not connected', 'error');
+                    return;
+                }
+                
+                showStatus('Processing transfer...', 'info');
+                logMessage('Starting transfer for asset: ' + assetId);
+                
+                // Call the ImprovedServerTransfer method
+                const result = await window.ImprovedServerTransfer.transferCNFT(assetId);
+                
+                if (result.success) {
+                    showStatus('Transfer successful! Signature: ' + result.signature, 'success');
+                    logMessage('Transfer successful! Signature: ' + result.signature, 'success');
+                } else {
+                    showStatus('Transfer failed: ' + result.error, 'error');
+                    logMessage('Transfer failed: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error processing transfer: ' + error.message, 'error');
+                logMessage('Error processing transfer: ' + error.message, 'error');
+            }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            logMessage('Transfer tester initialized.');
+            if (window.solana && window.solana.isConnected) {
+                showStatus('Wallet already connected: ' + window.solana.publicKey.toString(), 'success');
+                logMessage('Wallet already connected: ' + window.solana.publicKey.toString(), 'success');
+                document.getElementById('transferCNFT').disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

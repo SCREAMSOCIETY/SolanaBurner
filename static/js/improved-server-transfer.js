@@ -9,100 +9,79 @@
  * and improves reliability.
  */
 
+// Self-invoking function to avoid polluting global namespace
 (function() {
-  'use strict';
-  
-  // Project wallet - used as the default destination for trasferred cNFTs
-  const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
+  // Make the transfer function available globally
+  window.ImprovedServerTransfer = {
+    transferCNFT
+  };
 
   /**
    * Transfer a cNFT to the project wallet using the improved server transfer approach
    * @param {string} assetId - The asset ID of the cNFT to transfer
    * @returns {Promise<object>} - Result of the transfer operation
    */
-  async function improvedServerTransferCNFT(assetId) {
+  async function transferCNFT(assetId) {
     try {
-      if (!window.solana || !window.solana.isConnected) {
+      console.log('[ImprovedServer] Starting improved server-side transfer for', assetId);
+      
+      // Get the wallet adapter
+      const wallet = window.solana;
+      
+      if (!wallet || !wallet.isConnected) {
         throw new Error('Wallet not connected');
       }
       
-      console.log('[Improved Transfer] Starting improved server transfer for asset:', assetId);
+      // Get the owner address
+      const ownerAddress = wallet.publicKey.toString();
       
-      // Get the current wallet public key
-      const ownerPublicKey = window.solana.publicKey.toString();
-      
-      console.log('[Improved Transfer] Owner public key:', ownerPublicKey);
-      
-      // Show notification if we have the BurnAnimations module
-      if (window.BurnAnimations?.showNotification) {
-        window.BurnAnimations.showNotification(
-          'Preparing Transfer',
-          'Building transaction on server...'
-        );
-      }
-      
-      // Step 1: Prepare transaction on the server
-      console.log('[Improved Transfer] Preparing transaction on server');
+      // 1. Prepare the transaction on the server
+      console.log('[ImprovedServer] Preparing transaction on server');
       const prepareResponse = await fetch('/api/server-transfer/prepare', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          ownerPublicKey,
-          assetId
+          assetId,
+          ownerAddress
         })
       });
       
       const prepareData = await prepareResponse.json();
       
       if (!prepareData.success) {
-        console.error('[Improved Transfer] Failed to prepare transaction:', prepareData.error);
-        throw new Error(prepareData.error || 'Failed to prepare transaction');
+        throw new Error(`Server failed to prepare transaction: ${prepareData.error}`);
       }
       
-      console.log('[Improved Transfer] Transaction prepared successfully');
+      console.log('[ImprovedServer] Transaction prepared successfully', prepareData);
       
-      // Show notification if we have the BurnAnimations module
-      if (window.BurnAnimations?.showNotification) {
-        window.BurnAnimations.showNotification(
-          'Transaction Ready',
-          'Please approve the transaction in your wallet'
-        );
-      }
+      // 2. Sign the transaction using the wallet
+      console.log('[ImprovedServer] Requesting signature from wallet');
       
-      // Step 2: Sign the transaction with the wallet
-      console.log('[Improved Transfer] Requesting signature from wallet');
+      // Convert base64 transaction to Uint8Array
+      const transaction = _base64ToUint8Array(prepareData.transaction);
       
-      // Convert base64 transaction to Uint8Array for signing
-      const transaction = prepareData.transaction;
-      const transactionBytes = _base64ToUint8Array(transaction);
+      // Request signing
+      const signedTransaction = await wallet.signTransaction(transaction);
       
-      // Request signature from wallet
-      const signature = await window.solana.signTransaction(transactionBytes);
+      // Wait for the prompt to be dismissed
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Convert the signed transaction back to base64
-      const signedTransaction = _uint8ArrayToBase64(signature.serialize());
+      // Convert the signed transaction to base64
+      const signedBase64 = _uint8ArrayToBase64(signedTransaction);
       
-      console.log('[Improved Transfer] Transaction signed successfully');
+      console.log('[ImprovedServer] Transaction signed successfully');
       
-      // Show notification if we have the BurnAnimations module
-      if (window.BurnAnimations?.showNotification) {
-        window.BurnAnimations.showNotification(
-          'Submitting Transaction',
-          'Sending to Solana network...'
-        );
-      }
-      
-      // Step 3: Submit the signed transaction to the server
-      console.log('[Improved Transfer] Submitting signed transaction to server');
+      // 3. Submit the signed transaction to the server
+      console.log('[ImprovedServer] Submitting signed transaction to server');
       const submitResponse = await fetch('/api/server-transfer/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          signedTransaction,
+          signedTransaction: signedBase64,
           assetId
         })
       });
@@ -110,57 +89,23 @@
       const submitData = await submitResponse.json();
       
       if (!submitData.success) {
-        console.error('[Improved Transfer] Failed to submit transaction:', submitData.error);
-        throw new Error(submitData.error || 'Failed to submit transaction');
+        throw new Error(`Server failed to submit transaction: ${submitData.error}`);
       }
       
-      console.log('[Improved Transfer] Transaction submitted successfully:', submitData);
-      
-      // Show success notification if we have the BurnAnimations module
-      if (window.BurnAnimations?.showNotification) {
-        window.BurnAnimations.showNotification(
-          'Transfer Successful!',
-          'Your cNFT has been transferred to the project wallet'
-        );
-      }
-      
-      // Apply burn animation if available
-      if (window.BurnAnimations?.applyBurnAnimation) {
-        const element = document.querySelector(`[data-asset-id="${assetId}"]`);
-        if (element) {
-          console.log('[Improved Transfer] Applying burn animation to element');
-          window.BurnAnimations.applyBurnAnimation(element);
-        } else {
-          console.warn('[Improved Transfer] Element not found for burn animation');
-        }
-      }
-      
-      // Add to hidden assets if that function exists
-      if (window.hiddenAssets && typeof window.hiddenAssets.addHiddenAsset === 'function') {
-        console.log('[Improved Transfer] Adding asset to hidden assets');
-        window.hiddenAssets.addHiddenAsset(assetId);
-      }
+      console.log('[ImprovedServer] Transaction submitted successfully', submitData);
       
       return {
         success: true,
         signature: submitData.signature,
-        explorerUrl: submitData.explorerUrl,
-        assetId
+        assetId,
+        message: 'cNFT transferred successfully'
       };
     } catch (error) {
-      console.error('[Improved Transfer] Error:', error);
-      
-      // Show error notification if we have the BurnAnimations module
-      if (window.BurnAnimations?.showNotification) {
-        window.BurnAnimations.showNotification(
-          'Transfer Failed',
-          `Error: ${error.message}`
-        );
-      }
-      
+      console.error('[ImprovedServer] Error in cNFT transfer:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        assetId
       };
     }
   }
@@ -172,10 +117,11 @@
    * @private
    */
   function _base64ToUint8Array(base64) {
-    const binary = window.atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
   }
@@ -188,12 +134,15 @@
    */
   function _uint8ArrayToBase64(uint8Array) {
     let binary = '';
-    for (let i = 0; i < uint8Array.length; i++) {
+    const len = uint8Array.length;
+    for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(uint8Array[i]);
     }
     return window.btoa(binary);
   }
-  
-  // Export the function to the global scope
-  window.improvedServerTransferCNFT = improvedServerTransferCNFT;
 })();
+
+// Initialize the component when the DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('[ImprovedServer] Improved server transfer component initialized');
+});

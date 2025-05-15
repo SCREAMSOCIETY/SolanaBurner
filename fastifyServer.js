@@ -782,111 +782,7 @@ fastify.post('/api/cnft/burn-request', async (request, reply) => {
   }
 });
 
-// Endpoint for transferring a cNFT to the project wallet
-// Add server-side transfer endpoints for overcoming client-side TransactionInstruction issues
-fastify.post('/api/server-transfer/prepare', async (request, reply) => {
-  try {
-    const { ownerPublicKey, assetId } = request.body;
-    
-    if (!ownerPublicKey || !assetId) {
-      return reply.code(400).json({
-        success: false,
-        error: "Missing required parameters: ownerPublicKey or assetId"
-      });
-    }
-    
-    // Log the request
-    fastify.log.info(`Processing server-transfer prepare request for ${assetId} from ${ownerPublicKey}`);
-    
-    // Check if proofData is provided
-    if (!request.body.proofData) {
-      return reply.code(400).json({
-        success: false,
-        error: "Missing proof data for the asset"
-      });
-    }
-    fastify.log.info(`[SERVER] Preparing transfer for asset ${assetId} from ${ownerPublicKey}`);
-    
-    // Fetch asset details to confirm ownership
-    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
-    
-    if (!assetDetails) {
-      return reply.code(404).json({
-        success: false,
-        error: 'Asset not found'
-      });
-    }
-    
-    // Verify ownership
-    if (assetDetails.ownership.owner !== ownerPublicKey) {
-      return reply.code(403).json({
-        success: false,
-        error: 'Ownership verification failed'
-      });
-    }
-    
-    // Fetch the asset proof data
-    const proofData = await heliusApi.fetchAssetProof(assetId);
-    
-    if (!proofData || !proofData.proof) {
-      return reply.code(404).json({
-        success: false,
-        error: 'Proof data not available'
-      });
-    }
-    
-    // Process using our server-side transfer handler
-    const serverTransfer = require('./server-transfer');
-    
-    // Create the transaction for client to sign
-    return await serverTransfer.processTransferRequest({
-      body: {
-        assetId,
-        ownerPublicKey,
-        proofData
-      }
-    }, reply);
-  } catch (error) {
-    fastify.log.error(`[SERVER] Error preparing transfer: ${error.message}`);
-    return reply.code(500).json({
-      success: false,
-      error: `Server error: ${error.message}`
-    });
-  }
-});
-
-fastify.post('/api/server-transfer/submit', async (request, reply) => {
-  try {
-    const { signedTransaction, assetId } = request.body;
-    
-    if (!signedTransaction) {
-      return reply.code(400).json({
-        success: false,
-        error: "Missing signed transaction"
-      });
-    }
-    
-    // Log the request
-    fastify.log.info(`[SERVER] Submitting transfer for asset ${assetId}`);
-    
-    // Process using our server-side transfer handler
-    const serverTransfer = require('./server-transfer');
-    
-    // Submit the signed transaction
-    return await serverTransfer.submitSignedTransaction({
-      body: {
-        signedTransaction,
-        assetId
-      }
-    }, reply);
-  } catch (error) {
-    fastify.log.error(`[SERVER] Error submitting transfer: ${error.message}`);
-    return reply.code(500).json({
-      success: false,
-      error: `Server error: ${error.message}`
-    });
-  }
-});
+// Original server-side transfer endpoints were replaced with improved versions near the end of the file
 
 // Original transfer endpoint
 fastify.post('/api/cnft/transfer-request', async (request, reply) => {
@@ -2251,6 +2147,49 @@ fastify.get('/api/asset/diagnostic/:assetId', async (request, reply) => {
   }
 });
 */
+
+// Improved server-side transfer endpoints
+// These endpoints are designed to avoid TransactionInstruction dependency in the browser
+
+// Prepare transaction endpoint
+fastify.post('/api/server-transfer/prepare', async (request, reply) => {
+  try {
+    fastify.log.info(`[SERVER] Preparing server-side transfer transaction`);
+    return await serverTransfer.prepareTransferTransaction(request, reply);
+  } catch (error) {
+    fastify.log.error(`[SERVER] Error preparing transfer: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Server error preparing transaction: ${error.message}`
+    });
+  }
+});
+
+// Submit transaction endpoint
+fastify.post('/api/server-transfer/submit', async (request, reply) => {
+  try {
+    const { signedTransaction, assetId } = request.body;
+    
+    if (!signedTransaction) {
+      return reply.code(400).send({
+        success: false,
+        error: "Missing signed transaction"
+      });
+    }
+    
+    // Log the request
+    fastify.log.info(`[SERVER] Submitting transfer for asset ${assetId}`);
+    
+    // Submit the signed transaction
+    return await serverTransfer.submitSignedTransaction(request, reply);
+  } catch (error) {
+    fastify.log.error(`[SERVER] Error submitting transfer: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: `Server error submitting transaction: ${error.message}`
+    });
+  }
+});
 
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
