@@ -82,13 +82,24 @@ async function prepareTransferTransaction(request, reply) {
       sourceOwner: ownerAddress,
       destinationOwner: destinationAddress,
       proof: proofData.proof,
+      computeUnits: 200000, // Max compute units for compression transactions
     };
     
     try {
       console.log('[SERVER] Calling Helius DAS API to create transfer transaction');
+      console.log(`[SERVER] Transfer params: ${JSON.stringify({...transferParams, proof: "..." })}`);
       
+      // Check if the asset is actually a cNFT
+      if (!assetDetails.compression || !assetDetails.compression.compressed) {
+        return reply.code(400).send({
+          success: false,
+          error: 'This asset is not a compressed NFT'
+        });
+      }
+      
+      // Update to use the newer v1 endpoint
       const response = await fetch(
-        `https://api.helius.xyz/v0/compression/createTransferTransaction?api-key=${process.env.HELIUS_API_KEY}`,
+        `https://api.helius.xyz/v1/compression/create-transfer-tx?api-key=${process.env.HELIUS_API_KEY}`,
         {
           method: 'POST',
           headers: {
@@ -100,19 +111,47 @@ async function prepareTransferTransaction(request, reply) {
       
       if (!response.ok) {
         console.error(`[SERVER] HTTP error from Helius: ${response.status} ${response.statusText}`);
-        return reply.code(500).send({
-          success: false,
-          error: `Helius API error: ${response.status} ${response.statusText}`
-        });
+        
+        try {
+          // Try to get more detailed error from response
+          const errorResponseText = await response.text();
+          console.error(`[SERVER] Helius error details: ${errorResponseText}`);
+          
+          return reply.code(500).send({
+            success: false,
+            error: `Helius API error: ${response.status} ${response.statusText}`,
+            details: errorResponseText
+          });
+        } catch (parseError) {
+          return reply.code(500).send({
+            success: false,
+            error: `Helius API error: ${response.status} ${response.statusText}`
+          });
+        }
       }
       
       const responseData = await response.json();
+      console.log(`[SERVER] Helius response:`, JSON.stringify(responseData));
       
-      if (!responseData.transaction) {
+      // Handle different API response formats (v0 vs v1)
+      let transactionBase64 = null;
+      
+      if (responseData.transaction) {
+        // v0 API response format
+        transactionBase64 = responseData.transaction;
+      } else if (responseData.txs && responseData.txs.length > 0) {
+        // v1 API response format
+        transactionBase64 = responseData.txs[0].signedTransaction;
+      } else if (responseData.signedTransaction) {
+        // Alternative response format
+        transactionBase64 = responseData.signedTransaction;
+      }
+      
+      if (!transactionBase64) {
         console.error(`[SERVER] Error creating transaction:`, responseData);
         return reply.code(500).send({
           success: false,
-          error: 'Failed to create transfer transaction',
+          error: 'Failed to create transfer transaction - no transaction data in response',
           details: responseData
         });
       }
@@ -122,7 +161,7 @@ async function prepareTransferTransaction(request, reply) {
       // Return the transaction for the client to sign
       return {
         success: true,
-        transaction: responseData.transaction,
+        transaction: transactionBase64,
         assetId,
         message: 'Transaction prepared successfully'
       };
