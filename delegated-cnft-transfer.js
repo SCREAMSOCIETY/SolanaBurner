@@ -455,6 +455,9 @@ function verifySignedMessage(publicKey, message, signatureBase64) {
  */
 async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegateAuthority = null, proofData = null) {
   try {
+    console.log(`[TransferViaHelius] Starting transfer for asset ${assetId}`);
+    console.log(`[TransferViaHelius] Original proof data:`, JSON.stringify(proofData, null, 2));
+    
     // Prepare the request parameters
     const params = {
       id: assetId,
@@ -470,25 +473,148 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
     
     // Add proof data if provided (important for cNFTs)
     if (proofData) {
-      // Add proof data as PoA (Proof of Authority)
-      params.proof = proofData.proof;
-      
-      // Add additional required parameters from proof data
-      if (proofData.root) params.root = proofData.root;
-      if (proofData.tree_id) params.tree_id = proofData.tree_id;
-      if (proofData.node_index !== undefined) params.leaf_id = proofData.node_index;
+      try {
+        // Extract and normalize proof data to handle different API response formats
+        let normalizedProof = null;
+        let rootValue = null;
+        let treeId = null;
+        let leafId = null;
+        
+        // Handle different proof formats
+        if (Array.isArray(proofData.proof)) {
+          // Direct proof array
+          normalizedProof = proofData.proof;
+          console.log(`[TransferViaHelius] Found direct proof array with ${normalizedProof.length} elements`);
+        } else if (proofData.compression && Array.isArray(proofData.compression.proof)) {
+          // Proof in compression object
+          normalizedProof = proofData.compression.proof;
+          console.log(`[TransferViaHelius] Found proof array in compression object with ${normalizedProof.length} elements`);
+        } else if (typeof proofData.proof === 'string') {
+          // Sometimes proof data might be a string that needs parsing
+          try {
+            const parsedProof = JSON.parse(proofData.proof);
+            if (Array.isArray(parsedProof)) {
+              normalizedProof = parsedProof;
+              console.log(`[TransferViaHelius] Parsed proof string into array with ${normalizedProof.length} elements`);
+            }
+          } catch (e) {
+            console.error(`[TransferViaHelius] Failed to parse proof string: ${e.message}`);
+          }
+        }
+        
+        // If we still don't have a valid proof array, create an empty one
+        // This is a last resort as some operations might work with just the tree ID and leaf ID
+        if (!normalizedProof) {
+          normalizedProof = [];
+          console.warn(`[TransferViaHelius] Could not extract valid proof array, using empty array as fallback`);
+        }
+        
+        // Extract root value - critical for proof validation
+        if (proofData.root) {
+          rootValue = proofData.root;
+        } else if (proofData.compression && proofData.compression.root) {
+          rootValue = proofData.compression.root;
+        } else if (proofData.compression && proofData.compression.tree_root) {
+          rootValue = proofData.compression.tree_root;
+        }
+        
+        if (!rootValue) {
+          console.warn(`[TransferViaHelius] Could not find root value, this might cause validation issues`);
+        }
+        
+        // Extract tree ID - required for transaction
+        if (proofData.tree_id) {
+          treeId = proofData.tree_id;
+        } else if (proofData.compression && proofData.compression.tree) {
+          treeId = proofData.compression.tree;
+        }
+        
+        if (!treeId) {
+          console.warn(`[TransferViaHelius] Could not find tree ID, this might cause validation issues`);
+        }
+        
+        // Extract leaf ID or node index - required for transaction
+        if (proofData.node_index !== undefined) {
+          leafId = proofData.node_index;
+        } else if (proofData.leaf_id !== undefined) {
+          leafId = proofData.leaf_id;
+        } else if (proofData.compression && proofData.compression.leaf_id !== undefined) {
+          leafId = proofData.compression.leaf_id;
+        } else if (proofData.compression && proofData.compression.leaf_index !== undefined) {
+          leafId = proofData.compression.leaf_index;
+        }
+        
+        if (leafId === undefined || leafId === null) {
+          console.warn(`[TransferViaHelius] Could not find leaf ID or node index, this might cause validation issues`);
+        }
+        
+        // Add normalized data to parameters
+        params.proof = normalizedProof;
+        if (rootValue) params.root = rootValue;
+        if (treeId) params.tree_id = treeId;
+        if (leafId !== undefined) params.leaf_id = leafId;
+        
+        console.log(`[TransferViaHelius] Normalized proof data:`, JSON.stringify({
+          proof_length: normalizedProof ? normalizedProof.length : 0,
+          root: rootValue,
+          tree_id: treeId,
+          leaf_id: leafId
+        }, null, 2));
+      } catch (proofError) {
+        console.error(`[TransferViaHelius] Error normalizing proof data: ${proofError.message}`);
+        // Continue with original proofData as fallback
+        params.proof = proofData.proof;
+        if (proofData.root) params.root = proofData.root;
+        if (proofData.tree_id) params.tree_id = proofData.tree_id;
+        if (proofData.node_index !== undefined) params.leaf_id = proofData.node_index;
+      }
     }
     
     console.log('[Delegated Transfer] Submitting transfer via Helius:', JSON.stringify(params, null, 2));
     
-    // Make the API call
-    const response = await axios.post(HELIUS_RPC_URL, {
-      jsonrpc: '2.0',
-      id: 'helius-delegated-transfer',
-      method: 'transferAsset',
-      params
-    });
+    // Unique request ID to help with debugging
+    const requestId = `helius-transfer-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
+    // Make the API call with retry logic
+    let response;
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        // Add no-cache headers to prevent stale data
+        response = await axios.post(HELIUS_RPC_URL, {
+          jsonrpc: '2.0',
+          id: requestId,
+          method: 'transferAsset',
+          params
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        // If successful, break out of retry loop
+        break;
+      } catch (retryError) {
+        retryCount++;
+        console.warn(`[Delegated Transfer] API call attempt ${retryCount} failed: ${retryError.message}`);
+        
+        if (retryCount <= maxRetries) {
+          // Exponential backoff: wait longer between each retry
+          const delay = 1000 * Math.pow(2, retryCount);
+          console.log(`[Delegated Transfer] Retrying after ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw retryError; // After max retries, propagate the error
+        }
+      }
+    }
+    
+    // Process response (outside the retry loop)
     console.log('[Delegated Transfer] Helius transfer response:', JSON.stringify(response.data, null, 2));
     
     if (response.data && response.data.result) {
@@ -498,23 +624,54 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
         details: response.data
       };
     } else if (response.data && response.data.error) {
+      // Extract detailed error information
+      const errorMessage = response.data.error.message || 'Transfer failed with Helius API error';
+      let friendlyError = errorMessage;
+      
+      // Make error messages more user-friendly based on common error patterns
+      if (errorMessage.includes('proof data couldn') || errorMessage.includes('merkle proof')) {
+        friendlyError = 'The proof data couldn\'t be properly validated. This can happen when blockchain data is inconsistent or not fully synced. Please try again in a few minutes.';
+      } else if (errorMessage.includes('ownership') || errorMessage.includes('owner')) {
+        friendlyError = 'Ownership verification failed. This could happen if the NFT was recently transferred.';
+      } else if (errorMessage.includes('rate limit')) {
+        friendlyError = 'Rate limit exceeded. Please wait a moment and try again.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        friendlyError = 'The operation timed out. The Solana network might be experiencing high traffic.';
+      }
+      
       return {
         success: false,
-        error: response.data.error.message || 'Transfer failed with Helius API error',
+        error: friendlyError,
+        technicalError: errorMessage,
         details: response.data.error
       };
     }
     
     return {
       success: false,
-      error: 'Unknown error during Helius transfer',
+      error: 'Unknown error during transfer. This might be temporary - please try again.',
       details: response.data
     };
   } catch (error) {
     console.error('[Delegated Transfer] Error in Helius transfer:', error);
+    
+    // Provide better error messaging based on error type
+    let friendlyError = 'Could not process the cNFT transaction';
+    
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      friendlyError = 'The request timed out. The Solana network might be experiencing high traffic.';
+    } else if (error.response && error.response.status === 429) {
+      friendlyError = 'Rate limit exceeded. Please wait a moment and try again.';
+    } else if (error.response && error.response.status === 400) {
+      friendlyError = 'The transfer request was invalid. This might be due to incorrect proof data.';
+    } else if (error.message.includes('proof') || error.message.includes('merkle')) {
+      friendlyError = 'The proof data couldn\'t be properly validated. This can happen when blockchain data is inconsistent. Please try again in a few minutes.';
+    }
+    
     return {
       success: false,
-      error: error.message || 'Transfer request to Helius failed',
+      error: friendlyError,
+      technicalError: error.message || 'Transfer request to Helius failed',
       details: { stack: error.stack }
     };
   }
