@@ -217,7 +217,7 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
       console.log(`[DelegatedTransferModal] Submitting transfer request with${proofData ? '' : 'out'} proof data`);
       
       // Implement retry logic for the transfer request
-      let response;
+      let response = null;
       let retryCount = 0;
       const maxRetries = 2;
       
@@ -255,7 +255,8 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
         }
       }
 
-      if (response.data && response.data.success) {
+      // Make sure we have a valid response
+      if (response && response.data && response.data.success) {
         setStatus('success');
         setExplorerUrl(response.data.explorerUrl || null);
         
@@ -267,7 +268,12 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
         setStatus('error');
         
         // Prepare a more helpful error message
-        let errorMessage = response.data && response.data.error ? response.data.error : 'Transfer failed';
+        let errorMessage = 'Transfer failed';
+        
+        // Extract error message from response if available
+        if (response && response.data && response.data.error) {
+          errorMessage = response.data.error;
+        }
         
         // Add more context if we know there was a proof data issue
         if (!fetchSuccess && (!proofData || Object.keys(proofData).length === 0)) {
@@ -275,7 +281,7 @@ const DelegatedTransferModal: React.FC<DelegatedTransferModalProps> = ({
         }
         
         setError(errorMessage);
-        console.error('[DelegatedTransferModal] Transfer failed:', response.data);
+        console.error('[DelegatedTransferModal] Transfer failed:', response ? response.data : 'No response');
       }
     } catch (err) {
       console.error('[DelegatedTransferModal] Error during delegated transfer:', err);

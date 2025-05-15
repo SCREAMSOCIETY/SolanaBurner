@@ -1,8 +1,10 @@
 /**
  * Helius API Integration for NFT and cNFT data fetching
  * This file provides helper functions to fetch NFT data using the Helius API
+ * with built-in rate limiting to avoid 429 errors
  */
 const axios = require('axios');
+const { rateLimit, getBucketState } = require('./rate-limiter');
 
 // Configuration for Helius API
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
@@ -15,6 +17,16 @@ if (!HELIUS_API_KEY) {
 // Use more consistent URLs that will work on both dev and production
 const HELIUS_RPC_URL = 'https://mainnet.helius-rpc.com';
 const HELIUS_REST_URL = 'https://api.helius.xyz/v0';
+
+// Helper function to create a rate-limited axios request
+const rateLimitedAxios = {
+  get: (url, config = {}) => {
+    return rateLimit(() => axios.get(url, config));
+  },
+  post: (url, data, config = {}) => {
+    return rateLimit(() => axios.post(url, data, config));
+  }
+};
 
 /**
  * Fetches all NFTs (both regular and compressed) for a wallet address using Helius API's v0 endpoint
@@ -244,16 +256,17 @@ function formatHeliusV0NFTData(nft) {
  * @param {string} assetId - The NFT/asset ID
  * @returns {Promise<Object>} - Asset proof data for the cNFT
  */
-async function fetchAssetProof(assetId) {
+async function fetchAssetProof(assetId, highPriority = false) {
   try {
-    console.log(`[Helius API] Fetching proof data for asset: ${assetId}`);
+    console.log(`[Helius API] Fetching proof data for asset: ${assetId} (Priority: ${highPriority ? 'High' : 'Normal'})`);
+    console.log(`[Helius API] Rate limiter state:`, getBucketState());
     
-    // Direct API call to Helius RPC endpoint to avoid circular references
-    const rpcResponse = await axios.post(
+    // Create a rate-limited request function
+    const requestFn = () => axios.post(
       HELIUS_RPC_URL,
       {
         jsonrpc: '2.0',
-        id: 'helius-asset-proof',
+        id: `helius-asset-proof-${Date.now()}`, // Unique ID to avoid any caching
         method: 'getAssetProof',
         params: {
           id: assetId
@@ -262,10 +275,16 @@ async function fetchAssetProof(assetId) {
       {
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': HELIUS_API_KEY
-        }
+          'x-api-key': HELIUS_API_KEY,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        timeout: 30000 // 30 second timeout
       }
     );
+    
+    // Execute the request through our rate limiter
+    const rpcResponse = await rateLimit(requestFn, highPriority);
     
     // Safety check to make sure we have a valid response
     if (rpcResponse?.data?.result) {
