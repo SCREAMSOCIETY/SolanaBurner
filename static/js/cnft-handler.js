@@ -2684,11 +2684,32 @@ export class CNFTHandler {
         } catch (error) {
             console.error("Error in transferCNFTWithProof:", error);
             
+            // Convert empty error objects to more useful messages
+            let errorMessage = "Unknown error";
+            if (error && typeof error === 'object') {
+                if (error.message) {
+                    errorMessage = error.message;
+                } else if (Object.keys(error).length === 0) {
+                    console.warn("Empty error object received - likely API connection issue");
+                    errorMessage = "API connection issue - please try again";
+                } else {
+                    // Try to stringify the error for more context
+                    try {
+                        const errorStr = JSON.stringify(error);
+                        console.warn("Error object contents:", errorStr);
+                        errorMessage = `Error object: ${errorStr}`;
+                    } catch (e) {
+                        console.warn("Could not stringify error:", e);
+                        errorMessage = "Unserializable error object";
+                    }
+                }
+            }
+            
             // Check if user cancelled
-            if (error.message && (
-                error.message.includes("User rejected") || 
-                error.message.includes("cancelled") || 
-                error.message.includes("declined")
+            if (errorMessage && (
+                errorMessage.includes("User rejected") || 
+                errorMessage.includes("cancelled") || 
+                errorMessage.includes("declined")
             )) {
                 return {
                     success: false,
@@ -2697,17 +2718,17 @@ export class CNFTHandler {
                 };
             }
             
-            // Show error notification
+            // Show error notification with more helpful message
             if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
                 window.BurnAnimations.showNotification(
                     "cNFT Trash Request Failed", 
-                    `Error: ${error.message}`
+                    `Error: ${errorMessage}`
                 );
             }
             
             return {
                 success: false,
-                error: error.message || "Unknown error in transferCNFTWithProof",
+                error: errorMessage,
                 cancelled: false
             };
         }

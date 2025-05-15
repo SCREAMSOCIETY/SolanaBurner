@@ -335,10 +335,29 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
   const { assetId } = request.params;
   
   if (!assetId) {
-    return reply.code(400).send({ error: 'Asset ID is required' });
+    return reply.code(400).send({ 
+      success: false,
+      error: 'Asset ID is required' 
+    });
+  }
+  
+  // Add caching wrapper to avoid multiple requests for the same asset
+  const cacheKey = `asset-proof-${assetId}`;
+  const assetCache = require('./asset-cache'); // Import the cache module
+  
+  // Try to get from cache first
+  const cachedProofData = assetCache.getProofData(assetId);
+  if (cachedProofData) {
+    console.log(`[Asset Cache] Hit for proof data: ${assetId}`);
+    console.log(`[Delegated Transfer] Using cached proof data for: ${assetId}`);
+    return {
+      success: true,
+      data: cachedProofData
+    };
   }
   
   try {
+    console.log(`[Delegated Transfer] Fetching proof data for asset: ${assetId}`);
     fastify.log.info(`[Helius API] Fetching proof data for asset: ${assetId}`);
     
     // Method 1: Try the enhanced implementation first
@@ -348,8 +367,15 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
       
       if (proofData && proofData.proof && Array.isArray(proofData.proof)) {
         fastify.log.info(`[Helius API] Successfully fetched proof using delegatedTransfer`);
-        // Return the raw proof data
-        return proofData;
+        
+        // Cache the proof data
+        assetCache.cacheProofData(assetId, proofData);
+        
+        // Return the proof data wrapped in a success response
+        return {
+          success: true,
+          data: proofData
+        };
       } else {
         fastify.log.warn(`[Helius API] delegatedTransfer failed to provide valid proof data`);
         throw new Error('Invalid proof data from delegatedTransfer');
@@ -365,7 +391,15 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
       
       if (proofData && proofData.proof && Array.isArray(proofData.proof)) {
         fastify.log.info(`[Helius API] Successfully fetched proof using heliusApi`);
-        return proofData;
+        
+        // Cache the proof data
+        assetCache.cacheProofData(assetId, proofData);
+        
+        // Return the proof data wrapped in a success response
+        return {
+          success: true,
+          data: proofData
+        };
       } else {
         fastify.log.warn(`[Helius API] heliusApi failed to provide valid proof data`);
         throw new Error('Invalid proof data from heliusApi');
@@ -378,6 +412,8 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
     try {
       fastify.log.info(`[Helius API] Attempt 3: Using direct RPC call`);
       
+      const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+      
       const response = await axios.post(HELIUS_RPC_URL, {
         jsonrpc: '2.0',
         id: 'helius-js',
@@ -389,7 +425,15 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
       
       if (response.data && response.data.result && response.data.result.proof) {
         fastify.log.info(`[Helius API] Successfully fetched proof using direct RPC call`);
-        return response.data.result;
+        
+        // Cache the proof data
+        assetCache.cacheProofData(assetId, response.data.result);
+        
+        // Return the proof data wrapped in a success response
+        return {
+          success: true,
+          data: response.data.result
+        };
       } else {
         fastify.log.warn(`[Helius API] Direct RPC call failed to provide valid proof data`);
         throw new Error('Invalid proof data from direct RPC call');
@@ -398,20 +442,26 @@ fastify.get('/api/helius/asset-proof/:assetId', async (request, reply) => {
       fastify.log.warn(`[Helius API] Method 3 failed: ${method3Error.message}`);
     }
     
-    // If all methods fail, return an error
+    // If all methods fail, return a more detailed error
     fastify.log.error(`[Helius API] All proof fetching methods failed for asset: ${assetId}`);
     return reply.code(404).send({
       success: false,
       error: 'Asset proof not found after multiple attempts',
-      assetId
+      message: 'All three proof fetching methods failed',
+      assetId,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
+    // Enhanced error response with more diagnostic information
     fastify.log.error(`[Helius API] Fatal error fetching asset proof: ${error.message}`);
+    
     return reply.code(500).send({
       success: false,
       error: 'Failed to fetch asset proof',
       message: error.message,
-      assetId
+      details: `General error in asset proof endpoint. This could be due to rate limiting, network issues, or invalid asset ID.`,
+      assetId,
+      timestamp: new Date().toISOString()
     });
   }
 });
