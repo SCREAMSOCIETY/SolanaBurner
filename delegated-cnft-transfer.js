@@ -233,12 +233,20 @@ async function fetchAssetProof(assetId) {
       console.log(`[Delegated Transfer] Attempt 1: Using standard Helius RPC API with getAssetProof`);
       attempts.push('Standard Helius RPC API');
       
+      // Generate a unique request ID to avoid caching issues
+      const requestId = `helius-proof-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
       const response = await axios.post(HELIUS_RPC_URL, {
         jsonrpc: '2.0',
-        id: 'helius-js',
+        id: requestId,
         method: 'getAssetProof',
         params: {
           id: assetId
+        }
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         }
       });
       
