@@ -74,42 +74,45 @@ async function processDelegatedTransfer(
       }
       
       // Try fetching with our enhanced multi-method approach
-      proofData = await fetchAssetProof(assetId);
+      // Attempt to fetch proof data with high priority
+      proofData = await fetchAssetProof(assetId, true);
       
-      // If still no valid proof data, try more methods with exponential backoff
-      if (!proofData || !proofData.proof || !Array.isArray(proofData.proof) || proofData.proof.length === 0) {
-        console.log(`[Delegated Transfer] Standard methods failed, trying emergency DAS v1 API call`);
+      // If we get an error object back, we need to handle it
+      if (proofData && proofData.error === true) {
+        console.warn(`[Delegated Transfer] Received error in proof data: ${proofData.errorMessage}`);
+      }
+      
+      // Check if the structure is valid for transfer operations
+      const isProofValid = proofData && 
+                           proofData.tree_id && 
+                           (proofData.proof !== undefined) && 
+                           !proofData.error;
+      
+      if (!isProofValid) {
+        console.log(`[Delegated Transfer] Proof data is incomplete or invalid, attempting additional sources`);
         
         try {
-          // First attempt with DAS v1 API 
-          const dasV1Response = await axios.get(`https://api.helius.xyz/v1/assets?api-key=${HELIUS_API_KEY}&assetId=${assetId}`);
+          // Try the asset API directly
+          const assetDetailsResponse = await axios.get(`/api/helius/asset/${assetId}?t=${Date.now()}`);
           
-          // Check if we got a valid response with compression data
-          if (dasV1Response.data && 
-              dasV1Response.data.items && 
-              dasV1Response.data.items.length > 0 && 
-              dasV1Response.data.items[0].compression) {
-                
-            const assetData = dasV1Response.data.items[0];
-            console.log(`[Delegated Transfer] Got asset data from DAS v1 API, constructing proof data`);
+          if (assetDetailsResponse.data && assetDetailsResponse.data.compression) {
+            const compression = assetDetailsResponse.data.compression;
             
-            // Construct a minimal valid proof structure
-            const treeId = assetData.compression.tree;
-            const leafId = assetData.compression.leaf_id || assetData.compression.leafId || 0;
+            console.log(`[Delegated Transfer] Constructing proof data from asset details`);
             
+            // Create a basic valid structure from compression data
             proofData = {
               asset_id: assetId,
-              tree_id: treeId,
-              leaf_id: leafId,
-              node_index: leafId, // Use leaf_id as node_index for compatibility
-              proof: [], // Empty proof array as last resort
-              root: assetData.compression.tree_root || assetData.compression.root || "11111111111111111111111111111111"
+              tree_id: compression.tree,
+              leaf_id: compression.leaf_id || 0,
+              proof: [], // Empty proof array
+              root: compression.root || "11111111111111111111111111111111"
             };
             
-            console.log(`[Delegated Transfer] Created emergency proof data structure`);
+            console.log(`[Delegated Transfer] Alternative method constructed proof data: ${JSON.stringify(proofData)}`);
           }
-        } catch (emergencyError) {
-          console.error(`[Delegated Transfer] Emergency DAS v1 API method failed: ${emergencyError.message}`);
+        } catch (altError) {
+          console.error(`[Delegated Transfer] Alternative method failed: ${altError.message}`);
         }
       }
       
@@ -479,6 +482,7 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
         let rootValue = null;
         let treeId = null;
         let leafId = null;
+        let hasMinimalRequiredFields = false;
         
         // Handle different proof formats
         if (Array.isArray(proofData.proof)) {
@@ -519,7 +523,9 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
         }
         
         if (!rootValue) {
-          console.warn(`[TransferViaHelius] Could not find root value, this might cause validation issues`);
+          console.warn(`[TransferViaHelius] Could not find root value, using default placeholder`);
+          // Use a default Solana "all ones" public key as last resort
+          rootValue = "11111111111111111111111111111111";
         }
         
         // Extract tree ID - required for transaction
@@ -530,7 +536,7 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
         }
         
         if (!treeId) {
-          console.warn(`[TransferViaHelius] Could not find tree ID, this might cause validation issues`);
+          console.error(`[TransferViaHelius] Could not find tree ID, transaction will likely fail`);
         }
         
         // Extract leaf ID or node index - required for transaction
@@ -545,14 +551,21 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
         }
         
         if (leafId === undefined || leafId === null) {
-          console.warn(`[TransferViaHelius] Could not find leaf ID or node index, this might cause validation issues`);
+          console.error(`[TransferViaHelius] Could not find leaf ID or node index, transaction will likely fail`);
+        }
+        
+        // Check if we have the minimal required fields for transfer
+        hasMinimalRequiredFields = treeId && (leafId !== undefined);
+        
+        if (!hasMinimalRequiredFields) {
+          throw new Error('Missing required fields for transfer: need at least tree_id and leaf_id');
         }
         
         // Add normalized data to parameters
         params.proof = normalizedProof;
-        if (rootValue) params.root = rootValue;
-        if (treeId) params.tree_id = treeId;
-        if (leafId !== undefined) params.leaf_id = leafId;
+        params.root = rootValue;
+        params.tree_id = treeId;
+        params.leaf_id = leafId;
         
         console.log(`[TransferViaHelius] Normalized proof data:`, JSON.stringify({
           proof_length: normalizedProof ? normalizedProof.length : 0,
@@ -562,12 +575,36 @@ async function transferViaHelius(assetId, sourceOwner, destinationOwner, delegat
         }, null, 2));
       } catch (proofError) {
         console.error(`[TransferViaHelius] Error normalizing proof data: ${proofError.message}`);
-        // Continue with original proofData as fallback
-        params.proof = proofData.proof;
+        
+        // If proper normalization fails, add what we have directly
+        // These direct fields will only be used as a last resort
+        if (proofData.proof) params.proof = proofData.proof;
         if (proofData.root) params.root = proofData.root;
         if (proofData.tree_id) params.tree_id = proofData.tree_id;
-        if (proofData.node_index !== undefined) params.leaf_id = proofData.node_index;
+        if (proofData.leaf_id !== undefined) params.leaf_id = proofData.leaf_id;
+        if (proofData.node_index !== undefined && params.leaf_id === undefined) params.leaf_id = proofData.node_index;
+        
+        // Check if we have essential fields, if not, this will likely fail
+        if (!params.tree_id || params.leaf_id === undefined) {
+          return {
+            success: false,
+            error: 'Failed to get required proof data for the cNFT. Cannot complete transfer.',
+            details: {
+              reason: 'missing_essential_fields',
+              message: proofError.message
+            }
+          };
+        }
       }
+    } else {
+      // If no proof data was provided at all, we can't proceed
+      return {
+        success: false,
+        error: 'No proof data provided for the cNFT. Cannot complete transfer.',
+        details: {
+          reason: 'no_proof_data'
+        }
+      };
     }
     
     console.log('[Delegated Transfer] Submitting transfer via Helius:', JSON.stringify(params, null, 2));
