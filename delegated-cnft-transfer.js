@@ -181,6 +181,15 @@ async function fetchAssetDetails(assetId) {
   try {
     console.log(`[Delegated Transfer] Fetching asset details for: ${assetId}`);
     
+    // Check cache first
+    const assetCache = require('./asset-cache');
+    const cachedData = assetCache.getAssetData(assetId);
+    
+    if (cachedData) {
+      console.log(`[Delegated Transfer] Using cached asset data for: ${assetId}`);
+      return cachedData;
+    }
+    
     // Import rate limiter
     const { rateLimit } = require('./rate-limiter');
     
@@ -197,6 +206,8 @@ async function fetchAssetDetails(assetId) {
     const response = await rateLimit(requestFn);
     
     if (response.data) {
+      // Cache the result
+      assetCache.cacheAssetData(assetId, response.data);
       return response.data;
     } else {
       console.warn(`[Delegated Transfer] No asset data found for: ${assetId}`);
@@ -204,6 +215,13 @@ async function fetchAssetDetails(assetId) {
     }
   } catch (error) {
     console.error(`[Delegated Transfer] Error fetching asset details: ${error.message}`);
+    
+    // If we get a rate limit error, wait longer before returning
+    if (error.response && error.response.status === 429) {
+      console.log(`[Delegated Transfer] Rate limited, waiting 3 seconds`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+    
     return null;
   }
 }
@@ -220,6 +238,15 @@ async function fetchAssetProof(assetId) {
   
   try {
     console.log(`[Delegated Transfer] Fetching proof data for asset: ${assetId}`);
+    
+    // Check cache first
+    const assetCache = require('./asset-cache');
+    const cachedProofData = assetCache.getProofData(assetId);
+    
+    if (cachedProofData) {
+      console.log(`[Delegated Transfer] Using cached proof data for: ${assetId}`);
+      return cachedProofData;
+    }
     
     // Method 1: Standard Helius RPC API call with getAssetProof (rate limited)
     try {
@@ -259,6 +286,8 @@ async function fetchAssetProof(assetId) {
           console.log(`[Delegated Transfer] Found node_index, using as leaf_id: ${response.data.result.node_index}`);
         }
         
+        // Cache the proof data
+        assetCache.cacheProofData(assetId, response.data.result);
         return response.data.result;
       } else {
         console.warn(`[Delegated Transfer] No valid proof data in standard response`);
@@ -270,6 +299,12 @@ async function fetchAssetProof(assetId) {
       errors.push(`Method 1: ${method1Error.message}`);
       // Wait for a bit before trying the next method
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // If we got rate limited, wait longer
+      if (method1Error.response && method1Error.response.status === 429) {
+        console.log(`[Delegated Transfer] Rate limited, waiting 5 seconds before next attempt`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     }
     
     // Method 2: Try the v0 DAS API endpoint through rate limiter
@@ -277,20 +312,65 @@ async function fetchAssetProof(assetId) {
       console.log(`[Delegated Transfer] Attempt 2: Using Helius v0 DAS API with rate limiting`);
       attempts.push('Rate-limited Helius v0 DAS API');
       
+      // First, check if we already have asset details cached
+      const assetDetails = await fetchAssetDetails(assetId);
+      
+      if (assetDetails && assetDetails.compression && assetDetails.compression.tree) {
+        console.log(`[Delegated Transfer] Using asset details for minimal proof data`);
+        
+        // Create a minimal proof structure from the asset details
+        const minimalProof = {
+          asset_id: assetId,
+          tree_id: assetDetails.compression.tree,
+          leaf_id: assetDetails.compression.leaf_id || 0,
+          node_index: assetDetails.compression.leaf_id || 0,
+          proof: [], // Empty proof array as fallback
+          root: assetDetails.compression.root || assetDetails.compression.tree_root || "11111111111111111111111111111111"
+        };
+        
+        console.log(`[Delegated Transfer] Created minimal proof data from cached asset details`);
+        
+        // Cache this proof
+        const assetCache = require('./asset-cache');
+        assetCache.cacheProofData(assetId, minimalProof);
+        
+        return minimalProof;
+      }
+      
+      // If we don't have cached asset details, make a fresh request
       // Get the rate limiter function
       const { rateLimit } = require('./rate-limiter');
       
-      // Create a request function
-      const requestFn = () => axios.get(`https://api.helius.xyz/v0/assets/${assetId}?api-key=${HELIUS_API_KEY}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        },
-        timeout: 30000 // 30 second timeout
-      });
+      // Create a request function with exponential backoff retry logic
+      const requestWithRetry = async () => {
+        let attempt = 1;
+        let maxAttempts = 3;
+        let delay = 1000;
+        
+        while (attempt <= maxAttempts) {
+          try {
+            return await axios.get(`https://api.helius.xyz/v0/assets/${assetId}?api-key=${HELIUS_API_KEY}`, {
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              },
+              timeout: 30000 // 30 second timeout
+            });
+          } catch (error) {
+            if (error.response && error.response.status === 429 && attempt < maxAttempts) {
+              console.log(`[Delegated Transfer] Rate limited on attempt ${attempt}, waiting ${delay}ms`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2; // Exponential backoff
+              attempt++;
+            } else {
+              throw error; // Re-throw the error if we've exceeded max attempts or it's not a rate-limit error
+            }
+          }
+        }
+      };
       
       // Execute the request through the rate limiter
-      const dasResponse = await rateLimit(requestFn, true); // High priority
+      const dasResponse = await rateLimit(() => requestWithRetry(), true); // High priority
       
       if (dasResponse.data && dasResponse.data.compression && dasResponse.data.compression.tree) {
         console.log(`[Delegated Transfer] Got asset data from DAS API, creating minimal proof`);
@@ -307,6 +387,11 @@ async function fetchAssetProof(assetId) {
           root: dasResponse.data.compression.root || dasResponse.data.compression.tree_root || "11111111111111111111111111111111"
         };
         
+        // Cache the asset details for future use
+        const assetCache = require('./asset-cache');
+        assetCache.cacheAssetData(assetId, dasResponse.data);
+        assetCache.cacheProofData(assetId, minimalProof);
+        
         console.log(`[Delegated Transfer] Created minimal proof data:`, JSON.stringify(minimalProof, null, 2));
         return minimalProof;
       } else {
@@ -318,7 +403,7 @@ async function fetchAssetProof(assetId) {
       console.warn(`[Delegated Transfer] Method 2 failed: ${method2Error.message}`);
       errors.push(`Method 2: ${method2Error.message}`);
       // Wait for a bit before trying the next method
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Increased delay
     }
     
     // Method 3: Try QuickNode as a completely separate RPC provider
@@ -331,34 +416,58 @@ async function fetchAssetProof(assetId) {
         console.log(`[Delegated Transfer] Attempt 3: Using QuickNode alternative RPC`);
         attempts.push('QuickNode RPC');
         
-        // Wait 2 seconds before trying another RPC provider
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait before trying another RPC provider
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         // Get the rate limiter function
         const { rateLimit } = require('./rate-limiter');
         
-        // Create a request function for QuickNode
-        const requestFn = () => axios.post(quicknodeRpcUrl, {
-          jsonrpc: '2.0',
-          id: `quicknode-${Date.now()}`,
-          method: 'getAssetProof',
-          params: {
-            id: assetId
+        // Create a request function with retry logic for QuickNode
+        const requestWithRetry = async () => {
+          let attempt = 1;
+          let maxAttempts = 3;
+          let delay = 2000;
+          
+          while (attempt <= maxAttempts) {
+            try {
+              return await axios.post(quicknodeRpcUrl, {
+                jsonrpc: '2.0',
+                id: `quicknode-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                method: 'getAssetProof',
+                params: {
+                  id: assetId
+                }
+              }, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  'Pragma': 'no-cache'
+                },
+                timeout: 30000
+              });
+            } catch (error) {
+              if ((error.response && error.response.status === 429) && attempt < maxAttempts) {
+                console.log(`[Delegated Transfer] QuickNode rate limited on attempt ${attempt}, waiting ${delay}ms`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+                attempt++;
+              } else {
+                throw error;
+              }
+            }
           }
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          },
-          timeout: 30000
-        });
+        };
         
         // Execute through rate limiter
-        const response = await rateLimit(requestFn, true); // High priority
+        const response = await rateLimit(() => requestWithRetry(), true); // High priority
         
         if (response.data && response.data.result && response.data.result.proof) {
           console.log(`[Delegated Transfer] Successfully fetched proof from QuickNode alternative RPC!`);
+          
+          // Cache the result
+          const assetCache = require('./asset-cache');
+          assetCache.cacheProofData(assetId, response.data.result);
+          
           return response.data.result;
         } else {
           throw new Error('Invalid proof data from QuickNode');
@@ -371,12 +480,18 @@ async function fetchAssetProof(assetId) {
     } catch (method3Error) {
       console.warn(`[Delegated Transfer] Method 3 failed: ${method3Error.message}`);
       errors.push(`Method 3: ${method3Error.message}`);
+      
+      // Wait longer before moving to next method
+      await new Promise(resolve => setTimeout(resolve, 2500));
     }
     
     // Method 4: Try direct Metaplex bubblegum RPC calls (fallback)
     try {
       console.log(`[Delegated Transfer] Attempt 4: Using Metaplex bubblegum direct calls`);
       attempts.push('Metaplex bubblegum direct calls');
+      
+      // Wait a bit before last attempt
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // First get asset details to get tree information
       const assetDetails = await fetchAssetDetails(assetId);
@@ -385,8 +500,8 @@ async function fetchAssetProof(assetId) {
         // Create a minimal proof structure with what we have
         console.log(`[Delegated Transfer] Creating minimal proof structure from asset details`);
         
-        // Return a minimal structure that should be enough for transfers
-        return {
+        // Create a minimal structure that should be enough for transfers
+        const lastResortProof = {
           root: assetDetails.compression.root || "11111111111111111111111111111111",
           proof: [], // Empty proof array as fallback
           node_index: assetDetails.compression.leaf_id || 0,
@@ -394,6 +509,13 @@ async function fetchAssetProof(assetId) {
           tree_id: assetDetails.compression.tree,
           asset_id: assetId
         };
+        
+        // Cache this as a last resort
+        const assetCache = require('./asset-cache');
+        assetCache.cacheProofData(assetId, lastResortProof);
+        
+        console.log(`[Delegated Transfer] Created last-resort proof data for fallback usage`);
+        return lastResortProof;
       } else {
         console.warn(`[Delegated Transfer] Could not extract required compression data from asset details`);
         errors.push('Could not extract required compression data from asset details');
