@@ -1,171 +1,258 @@
 /**
- * Server-side Transfer Handler for cNFTs
+ * Server-side Transfer Implementation
  * 
- * This module provides server-side transfer functionality used by the queue transfer manager.
- * It handles the low-level operations of preparing, signing, and sending transfer transactions
- * using proof data from Helius API.
+ * This module provides server-side functions for creating and submitting
+ * cNFT transfer transactions. It works with the improved client-side
+ * transfer implementation to avoid TransactionInstruction dependencies
+ * in the browser context.
  */
 
-const { 
-  Connection, 
-  PublicKey, 
-  Transaction, 
-  sendAndConfirmTransaction, 
-  Keypair 
-} = require('@solana/web3.js');
-const {
-  createTransferInstruction,
-  PROGRAM_ID: BUBBLEGUM_PROGRAM_ID,
-} = require('@metaplex-foundation/mpl-bubblegum');
-const bs58 = require('bs58');
-const crypto = require('crypto');
+const { Connection, PublicKey, Transaction, ComputeBudgetProgram, TransactionInstruction } = require('@solana/web3.js');
 const heliusApi = require('./helius-api');
+const assetCache = require('./asset-cache');
 const config = require('./config');
 
-// Default project wallet for transfers
-const PROJECT_WALLET = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+// Project wallet for receiving trasferred cNFTs
+const PROJECT_WALLET = 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK';
 
-// RPC connection
-const connection = new Connection(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com');
+// Get QuickNode RPC URL from environment
+const QUICKNODE_RPC_URL = config.QUICKNODE_RPC_URL;
+
+// Bubblegum program ID (constant on all networks)
+const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
 
 /**
- * Perform a server-side transfer of a cNFT without requiring a signed message
- * This is used by the queue transfer manager and other server-side processes
+ * Prepares a cNFT transfer transaction for a client to sign
  * 
- * @param {string} ownerAddress - The owner's public key as a string
- * @param {string} assetId - The asset ID (mint address) of the cNFT
- * @param {string} signedMessage - Optional signed message for verification (not used in server mode)
- * @param {object} proofData - The proof data for the cNFT
- * @param {object} assetData - The asset data for the cNFT
- * @param {string} destinationAddress - Optional destination address (defaults to project wallet)
- * @returns {Promise<object>} - The result of the transfer operation
+ * @param {object} request - The API request object
+ * @param {object} reply - The API reply object
+ * @returns {object} - The prepared transaction data
  */
-async function performServerTransfer(
-  ownerAddress,
-  assetId,
-  signedMessage,
-  proofData,
-  assetData,
-  destinationAddress = null
-) {
+async function prepareTransferTransaction(request, reply) {
   try {
-    console.log(`[Server Transfer] Starting server-side transfer for asset ${assetId}`);
+    const { ownerPublicKey, assetId } = request.body;
     
-    // Prepare the proof data
-    console.log(`[Server Transfer] Processing proof data...`);
-    
-    // Get merkle tree details
-    const treeAccount = proofData.tree_id || 
-                        (proofData.compression && proofData.compression.tree) || 
-                        assetData.compression?.tree;
-    
-    if (!treeAccount) {
-      throw new Error('Missing tree account in proof data');
+    if (!ownerPublicKey || !assetId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Missing required parameters: ownerPublicKey and assetId are required'
+      });
     }
     
-    const merkleTree = new PublicKey(treeAccount);
+    console.log(`[Server-Transfer] Preparing server-side transfer for asset: ${assetId} from owner: ${ownerPublicKey}`);
     
-    // Get owner and destination
-    const leafOwner = new PublicKey(ownerAddress);
-    const destinationPubkey = destinationAddress 
-      ? new PublicKey(destinationAddress) 
-      : PROJECT_WALLET;
+    // Get proof data - check cache first
+    let proofData = assetCache.getProofData(assetId);
     
-    // Check asset current ownership
-    if (assetData.ownership?.owner !== ownerAddress) {
-      throw new Error(`Asset is not owned by the provided address. Current owner: ${assetData.ownership?.owner}`);
-    }
-    
-    console.log(`[Server Transfer] Owner: ${leafOwner.toString()}`);
-    console.log(`[Server Transfer] Destination: ${destinationPubkey.toString()}`);
-    console.log(`[Server Transfer] Tree: ${merkleTree.toString()}`);
-    
-    // Get tree authority
-    const [treeAuthority] = PublicKey.findProgramAddressSync(
-      [merkleTree.toBuffer()],
-      BUBBLEGUM_PROGRAM_ID
-    );
-    
-    // Create the "leaf" (NFT) data structure for the instruction
-    const leafNonce = proofData.leaf_id || proofData.node_index || 0;
-    
-    // Create canopy data from the proof
-    if (!proofData.proof || !Array.isArray(proofData.proof)) {
-      throw new Error('Missing or invalid proof array in proof data');
-    }
-    
-    // Convert proof array to root
-    const proof = proofData.proof.map(p => new PublicKey(p));
-    
-    // Get the latest blockhash immediately before creating the transaction
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    
-    // Create the transfer instruction
-    console.log(`[Server Transfer] Creating transfer instruction...`);
-    const transferIx = createTransferInstruction(
-      {
-        merkleTree,
-        treeAuthority,
-        leafOwner,
-        leafDelegate: leafOwner,
-        newLeafOwner: destinationPubkey,
-        logWrapper: PublicKey.findProgramAddressSync(
-          [Buffer.from('logging')],
-          BUBBLEGUM_PROGRAM_ID
-        )[0],
-        compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-        anchorRemainingAccounts: proof.map(pubKey => ({
-          pubkey: pubKey,
-          isWritable: false,
-          isSigner: false,
-        })),
-      },
-      {
-        root: proofData.root ? new PublicKey(proofData.root) : undefined,
-        dataHash: new PublicKey(assetData.compression?.data_hash || assetData.data_hash),
-        creatorHash: new PublicKey(assetData.compression?.creator_hash || assetData.creator_hash),
-        nonce: leafNonce,
-        index: leafNonce,
+    if (!proofData) {
+      console.log(`[Server-Transfer] Fetching proof data for asset: ${assetId}`);
+      
+      try {
+        // Use heliusApi to fetch proof
+        proofData = await heliusApi.fetchAssetProof(assetId, true);
+        
+        if (!proofData) {
+          return reply.code(404).send({
+            success: false,
+            error: 'Asset proof not found'
+          });
+        }
+        
+        // Cache the proof data
+        assetCache.cacheProofData(assetId, proofData);
+      } catch (proofError) {
+        console.error(`[Server-Transfer] Error fetching proof data: ${proofError.message}`);
+        return reply.code(500).send({
+          success: false,
+          error: `Error fetching proof data: ${proofError.message}`
+        });
       }
-    );
+    } else {
+      console.log(`[Server-Transfer] Using cached proof data for asset: ${assetId}`);
+    }
     
-    // Create a transaction with the transfer instruction
-    const transaction = new Transaction()
-      .add(transferIx)
-      .recentBlockhash(blockhash)
-      .setSigners(leafOwner);
+    // Get asset details
+    let assetData;
+    try {
+      assetData = await heliusApi.fetchAssetDetails(assetId);
+      
+      if (!assetData) {
+        return reply.code(404).send({
+          success: false,
+          error: 'Asset details not found'
+        });
+      }
+    } catch (assetError) {
+      console.error(`[Server-Transfer] Error fetching asset details: ${assetError.message}`);
+      return reply.code(500).send({
+        success: false,
+        error: `Error fetching asset details: ${assetError.message}`
+      });
+    }
     
-    // Set transfer options with higher compute limits and priority fees
-    const transferOptions = {
-      maxRetries: 3,
+    try {
+      // Setup connection
+      const connection = new Connection(QUICKNODE_RPC_URL, 'confirmed');
+      
+      // Create transaction
+      const transaction = new Transaction();
+      
+      // Add compute budget instruction for complex operations
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({ 
+          units: 400000 // Higher compute units for cNFT operations
+        })
+      );
+      
+      // Create leaf owner and destination addresses
+      const leafOwner = new PublicKey(ownerPublicKey);
+      const destination = new PublicKey(PROJECT_WALLET);
+      
+      // Create tree from proof data
+      const merkleTree = new PublicKey(proofData.tree_id || proofData.tree);
+      
+      // Create a manual transfer instruction
+      // This is the simplest version of the instruction, using buffers directly
+      const instructionData = Buffer.from([0x08]); // 8 = Transfer instruction discriminator
+      
+      // The required accounts
+      const keys = [
+        // tree authority
+        { pubkey: new PublicKey(proofData.tree_authority), isSigner: false, isWritable: true },
+        // leaf owner
+        { pubkey: leafOwner, isSigner: true, isWritable: false },
+        // leaf delegate (owner if no delegation)
+        { pubkey: leafOwner, isSigner: true, isWritable: false },
+        // new leaf owner
+        { pubkey: destination, isSigner: false, isWritable: false },
+        // merkle tree
+        { pubkey: merkleTree, isSigner: false, isWritable: true },
+        // log wrapper
+        { pubkey: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'), isSigner: false, isWritable: false },
+        // compression program
+        { pubkey: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'), isSigner: false, isWritable: false },
+        // system program
+        { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false },
+      ];
+      
+      // Create the instruction
+      const transferInstruction = new TransactionInstruction({
+        keys,
+        programId: BUBBLEGUM_PROGRAM_ID,
+        data: instructionData,
+      });
+      
+      // Add the instruction to the transaction
+      transaction.add(transferInstruction);
+      
+      // Get recent blockhash and set fee payer
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = leafOwner;
+      
+      // Serialize the transaction to send back to the client
+      const serializedTransaction = transaction.serialize({
+        requireAllSignatures: false, // Don't require signatures yet
+        verifySignatures: false
+      }).toString('base64');
+      
+      // Return the serialized transaction for the client to sign
+      return {
+        success: true,
+        transaction: serializedTransaction,
+        message: 'Transaction prepared successfully. Please sign and submit.',
+        assetId,
+        ownerPublicKey,
+        destination: PROJECT_WALLET
+      };
+    } catch (error) {
+      console.error(`[Server-Transfer] Error preparing transaction: ${error.message}`);
+      
+      if (error.stack) {
+        console.error(`[Server-Transfer] Stack trace: ${error.stack}`);
+      }
+      
+      return reply.code(500).send({
+        success: false,
+        error: `Error preparing transaction: ${error.message}`
+      });
+    }
+  } catch (error) {
+    console.error(`[Server-Transfer] Unexpected error: ${error.message}`);
+    
+    if (error.stack) {
+      console.error(`[Server-Transfer] Stack trace: ${error.stack}`);
+    }
+    
+    return reply.code(500).send({
+      success: false,
+      error: `Unexpected error: ${error.message}`
+    });
+  }
+}
+
+/**
+ * Submits a signed cNFT transfer transaction to the network
+ * 
+ * @param {object} request - The API request object
+ * @param {object} reply - The API reply object
+ * @returns {object} - The transaction result
+ */
+async function submitSignedTransaction(request, reply) {
+  try {
+    const { signedTransaction, assetId } = request.body;
+    
+    if (!signedTransaction) {
+      return reply.code(400).send({
+        success: false,
+        error: "Missing signed transaction"
+      });
+    }
+    
+    console.log(`[Server-Transfer] Submitting transfer for asset ${assetId}`);
+    
+    // Setup connection
+    const connection = new Connection(QUICKNODE_RPC_URL, 'confirmed');
+    
+    // Convert the base64 transaction back to a buffer
+    const transactionBuffer = Buffer.from(signedTransaction, 'base64');
+    
+    // Send the raw transaction
+    const signature = await connection.sendRawTransaction(transactionBuffer, {
       skipPreflight: false,
-      commitment: 'confirmed',
-      preflightCommitment: 'processed',
-      lastValidBlockHeight,
-    };
+      maxRetries: 3,
+      preflightCommitment: 'confirmed'
+    });
     
-    // Sign and send the transaction
-    console.log(`[Server Transfer] Simulating transaction...`);
+    console.log(`[Server-Transfer] Transaction submitted with signature: ${signature}`);
     
-    // Return the successful result
+    // Construct Solana Explorer URL
+    const network = 'mainnet-beta'; // Change to 'devnet' if using devnet
+    const explorerUrl = `https://explorer.solana.com/tx/${signature}?cluster=${network}`;
+    
+    // Return the success response
     return {
       success: true,
-      message: 'Transfer queued successfully',
-      assetId,
-      owner: ownerAddress,
-      destination: destinationPubkey.toString(),
-      tree: merkleTree.toString(),
+      signature,
+      message: 'Transaction submitted successfully',
+      explorerUrl,
+      assetId
     };
   } catch (error) {
-    console.error(`[Server Transfer] Error in server transfer:`, error);
-    return {
+    console.error(`[Server-Transfer] Error submitting transaction: ${error.message}`);
+    
+    if (error.stack) {
+      console.error(`[Server-Transfer] Stack trace: ${error.stack}`);
+    }
+    
+    return reply.code(500).send({
       success: false,
-      error: error.message,
-      assetId,
-    };
+      error: `Error submitting transaction: ${error.message}`
+    });
   }
 }
 
 module.exports = {
-  performServerTransfer
+  prepareTransferTransaction,
+  submitSignedTransaction
 };

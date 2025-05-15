@@ -154,6 +154,47 @@
         );
       }
       
+      // Use improved server transfer implementation if available
+      // This avoids the TransactionInstruction issue
+      if (window.improvedServerTransferCNFT) {
+        console.log('[Standalone] Using improved server transfer implementation for', assetId);
+        
+        const result = await window.improvedServerTransferCNFT(assetId);
+        
+        if (!result.success) {
+          console.error('[Standalone] Improved server transfer failed:', result.error);
+          throw new Error(result.error || 'Improved server transfer failed');
+        }
+        
+        console.log('[Standalone] Improved server transfer successful!', result);
+        
+        // Show success notification
+        if (window.BurnAnimations?.showNotification) {
+          window.BurnAnimations.showNotification(
+            'Transfer Successful!',
+            'Your cNFT has been transferred to the project wallet'
+          );
+        }
+        
+        // Apply burn animation
+        if (window.BurnAnimations?.applyBurnAnimation) {
+          const element = document.querySelector(`[data-asset-id="${assetId}"]`);
+          if (element) {
+            window.BurnAnimations.applyBurnAnimation(element);
+          }
+        }
+        
+        // Add to hidden assets if that function exists
+        if (window.hiddenAssets && window.hiddenAssets.addHiddenAsset) {
+          window.hiddenAssets.addHiddenAsset(assetId);
+        }
+        
+        return result;
+      }
+      
+      // Fallback to original implementation
+      console.log('[Standalone] Falling back to original implementation');
+      
       // First, fetch proof data and asset details
       const response = await fetch(`/api/burn-cnft/${assetId}`, {
         method: 'POST',
