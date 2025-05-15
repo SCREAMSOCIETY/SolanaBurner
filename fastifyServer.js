@@ -1804,6 +1804,9 @@ fastify.get('/api/queue/status', async (request, reply) => {
 });
 
 // =============================================================================
+// Server-side Transfer API Routes are registered at the end of the file
+// =============================================================================
+
 // Delegated cNFT Transfer API Routes
 // =============================================================================
 

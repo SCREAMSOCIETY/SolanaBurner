@@ -40,71 +40,91 @@ var __webpack_exports__ = {};
       // Get the owner address
       const ownerAddress = wallet.publicKey.toString();
       
+      console.log('[ImprovedServer] Using wallet address:', ownerAddress);
+      
       // 1. Prepare the transaction on the server
       console.log('[ImprovedServer] Preparing transaction on server');
-      const prepareResponse = await fetch('/api/server-transfer/prepare', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      
+      try {
+        const prepareResponse = await fetch('/api/server-transfer/prepare', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            assetId,
+            ownerAddress
+          })
+        });
+        
+        if (!prepareResponse.ok) {
+          const errorText = await prepareResponse.text();
+          console.error('[ImprovedServer] Error response from server:', errorText);
+          throw new Error(`Server returned ${prepareResponse.status}: ${errorText}`);
+        }
+        
+        const prepareData = await prepareResponse.json();
+        
+        if (!prepareData.success) {
+          throw new Error(`Server failed to prepare transaction: ${prepareData.error}`);
+        }
+        
+        console.log('[ImprovedServer] Transaction prepared successfully', prepareData);
+        
+        // 2. Sign the transaction using the wallet
+        console.log('[ImprovedServer] Requesting signature from wallet');
+        
+        // Convert base64 transaction to Uint8Array
+        const transaction = _base64ToUint8Array(prepareData.transaction);
+        
+        // Request signing
+        const signedTransaction = await wallet.signTransaction(transaction);
+        
+        // Wait for the prompt to be dismissed
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Convert the signed transaction to base64
+        const signedBase64 = _uint8ArrayToBase64(signedTransaction);
+        
+        console.log('[ImprovedServer] Transaction signed successfully');
+        
+        // 3. Submit the signed transaction to the server
+        console.log('[ImprovedServer] Submitting signed transaction to server');
+        const submitResponse = await fetch('/api/server-transfer/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            signedTransaction: signedBase64,
+            assetId
+          })
+        });
+        
+        if (!submitResponse.ok) {
+          const errorText = await submitResponse.text();
+          console.error('[ImprovedServer] Error response from server when submitting:', errorText);
+          throw new Error(`Server returned ${submitResponse.status} when submitting: ${errorText}`);
+        }
+        
+        const submitData = await submitResponse.json();
+        
+        if (!submitData.success) {
+          throw new Error(`Server failed to submit transaction: ${submitData.error}`);
+        }
+        
+        console.log('[ImprovedServer] Transaction submitted successfully', submitData);
+        
+        return {
+          success: true,
+          signature: submitData.signature,
           assetId,
-          ownerAddress
-        })
-      });
-      
-      const prepareData = await prepareResponse.json();
-      
-      if (!prepareData.success) {
-        throw new Error(`Server failed to prepare transaction: ${prepareData.error}`);
+          message: 'cNFT transferred successfully'
+        };
+      } catch (innerError) {
+        console.error('[ImprovedServer] Inner error in cNFT transfer:', innerError);
+        throw innerError;
       }
-      
-      console.log('[ImprovedServer] Transaction prepared successfully', prepareData);
-      
-      // 2. Sign the transaction using the wallet
-      console.log('[ImprovedServer] Requesting signature from wallet');
-      
-      // Convert base64 transaction to Uint8Array
-      const transaction = _base64ToUint8Array(prepareData.transaction);
-      
-      // Request signing
-      const signedTransaction = await wallet.signTransaction(transaction);
-      
-      // Wait for the prompt to be dismissed
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Convert the signed transaction to base64
-      const signedBase64 = _uint8ArrayToBase64(signedTransaction);
-      
-      console.log('[ImprovedServer] Transaction signed successfully');
-      
-      // 3. Submit the signed transaction to the server
-      console.log('[ImprovedServer] Submitting signed transaction to server');
-      const submitResponse = await fetch('/api/server-transfer/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          signedTransaction: signedBase64,
-          assetId
-        })
-      });
-      
-      const submitData = await submitResponse.json();
-      
-      if (!submitData.success) {
-        throw new Error(`Server failed to submit transaction: ${submitData.error}`);
-      }
-      
-      console.log('[ImprovedServer] Transaction submitted successfully', submitData);
-      
-      return {
-        success: true,
-        signature: submitData.signature,
-        assetId,
-        message: 'cNFT transferred successfully'
-      };
     } catch (error) {
       console.error('[ImprovedServer] Error in cNFT transfer:', error);
       return {
