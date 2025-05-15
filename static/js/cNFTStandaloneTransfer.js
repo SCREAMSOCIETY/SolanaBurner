@@ -5,6 +5,8 @@
  */
 
 (function() {
+  // Import Solana Web3.js objects if needed later
+  // These will be accessed via the global solanaWeb3 object when needed
   // Check if we're running in the browser
   if (typeof window === 'undefined') {
     console.log('This script is meant to run in a browser environment');
