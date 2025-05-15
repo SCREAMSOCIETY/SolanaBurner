@@ -1144,9 +1144,33 @@ const WalletAssets: React.FC = () => {
     }
     
     try {
+      console.log("[WalletAssets] Processing cNFT:", cnft.mint);
+      
+      // IMPORTANT: Directly fetch proof data first because this is a common failure point
+      try {
+        setError(`Fetching proof data for ${cnft.name || 'cNFT'}...`);
+        // Fetch proof data directly from API
+        const proofResponse = await fetch(`/api/helius/asset-proof/${cnft.mint}`);
+        const proofResult = await proofResponse.json();
+        
+        if (proofResult.success && proofResult.data) {
+          console.log("Successfully pre-fetched proof data for cNFT:", cnft.mint);
+          console.log("Proof data:", proofResult.data);
+          
+          // Cache the proof data in window for later use
+          if (typeof window !== 'undefined') {
+            window.cachedProofData = window.cachedProofData || {};
+            window.cachedProofData[cnft.mint] = proofResult.data;
+          }
+        } else {
+          console.warn("Pre-fetch of proof data returned unsuccessful result:", proofResult);
+        }
+      } catch (proofError) {
+        console.error("Error pre-fetching proof data:", proofError);
+        // Continue anyway - don't throw here, we'll handle this in the actual transfer flow
+      }
+      
       // Check if the asset has delegation set
-      // If yes, we can use the delegated transfer which is more reliable
-      // If no, we fall back to the direct trash modal
       console.log("[WalletAssets] Checking delegation support for cNFT:", cnft.mint);
       
       axios.get(`/api/delegate/info/${cnft.mint}`)

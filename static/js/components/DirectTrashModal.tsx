@@ -53,20 +53,44 @@ const DirectTrashModal: React.FC<DirectTrashModalProps> = ({
       setIsLoading(true);
       setProcessingStatus('Preparing transfer...');
       
+      // Log the start of the operation for debugging
+      console.log("[DirectTrashModal] Starting standard trash operation for", assetId);
+      
       // Check if wallet is connected
       if (!publicKey || !signTransaction) {
         throw new Error('Wallet not connected or does not support signing');
       }
       
+      // First check if we have cached proof data
+      let cachedProofData = null;
+      if (typeof window !== 'undefined' && window.cachedProofData && window.cachedProofData[assetId]) {
+        console.log("[DirectTrashModal] Using pre-fetched proof data from cache");
+        cachedProofData = window.cachedProofData[assetId];
+      }
+      
       setProcessingStatus('Fetching asset details...');
       
+      // Create a payload with any cached data we might have
+      const payload = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cachedProofData: cachedProofData
+        })
+      };
+      
       // Get asset details and proof
-      const response = await fetch(`/api/burn-cnft/${assetId}`);
+      const response = await fetch(`/api/burn-cnft/${assetId}`, payload);
       const data = await response.json();
       
       if (!data.success) {
+        console.error("[DirectTrashModal] API error:", data);
         throw new Error(data.error || 'Failed to fetch asset details');
       }
+      
+      console.log("[DirectTrashModal] Successfully received response:", data);
       
       setProcessingStatus('Creating transfer transaction...');
       

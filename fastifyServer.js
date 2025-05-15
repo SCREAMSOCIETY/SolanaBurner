@@ -1502,6 +1502,14 @@ fastify.post('/api/helius/submit-transaction', async (request, reply) => {
 fastify.post('/api/burn-cnft/:assetId', async (request, reply) => {
   try {
     const { assetId } = request.params;
+    let cachedProofData = null;
+    
+    // Check if the request has body data with cached proof data
+    if (request.body && request.body.cachedProofData) {
+      cachedProofData = request.body.cachedProofData;
+      fastify.log.info(`Received cached proof data for ${assetId} in request`);
+      console.log('Using provided cached proof data');
+    }
     
     if (!assetId) {
       return reply.code(400).send({
@@ -1524,30 +1532,57 @@ fastify.post('/api/burn-cnft/:assetId', async (request, reply) => {
         });
       }
       
-      // Now get the proof data
-      const heliusApiKey = process.env.HELIUS_API_KEY;
-      if (!heliusApiKey) {
-        throw new Error('HELIUS_API_KEY environment variable is not set');
-      }
+      // Use cached proof data if available
+      let proofData = null;
       
-      // Make the request to Helius RPC API for proof data
-      const proofResponse = await axios.post(
-        `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
-        {
-          jsonrpc: '2.0',
-          id: 'helius-proof',
-          method: 'getAssetProof',
-          params: { id: assetId }
+      if (cachedProofData) {
+        fastify.log.info(`Using cached proof data for cNFT ${assetId}`);
+        proofData = cachedProofData;
+      } else {
+        // Now get the proof data from Helius API
+        const heliusApiKey = process.env.HELIUS_API_KEY;
+        if (!heliusApiKey) {
+          throw new Error('HELIUS_API_KEY environment variable is not set');
         }
-      );
-      
-      if (!proofResponse.data || !proofResponse.data.result) {
-        throw new Error('Invalid response from Helius API when fetching proof');
+        
+        // Try to get proof from our asset-proof endpoint first (which has caching)
+        try {
+          fastify.log.info(`Trying to fetch proof from asset-proof endpoint for ${assetId}`);
+          const proofEndpointResponse = await axios.get(
+            `http://localhost:5001/api/helius/asset-proof/${assetId}`
+          );
+          
+          if (proofEndpointResponse.data && proofEndpointResponse.data.success && proofEndpointResponse.data.data) {
+            fastify.log.info(`Successfully fetched proof from asset-proof endpoint for ${assetId}`);
+            proofData = proofEndpointResponse.data.data;
+          }
+        } catch (proofEndpointError) {
+          fastify.log.warn(`Failed to fetch from asset-proof endpoint: ${proofEndpointError.message}`);
+        }
+        
+        // Fallback to direct RPC call if endpoint approach failed
+        if (!proofData) {
+          // Make the request to Helius RPC API for proof data
+          fastify.log.info(`Falling back to direct RPC call for proof data for ${assetId}`);
+          const proofResponse = await axios.post(
+            `https://rpc.helius.xyz/?api-key=${heliusApiKey}`,
+            {
+              jsonrpc: '2.0',
+              id: 'helius-proof',
+              method: 'getAssetProof',
+              params: { id: assetId }
+            }
+          );
+          
+          if (!proofResponse.data || !proofResponse.data.result) {
+            throw new Error('Invalid response from Helius API when fetching proof');
+          }
+          
+          proofData = proofResponse.data.result;
+        }
       }
       
-      const proofData = proofResponse.data.result;
-      
-      fastify.log.info(`Successfully fetched proof data for cNFT ${assetId}`);
+      fastify.log.info(`Successfully fetched/retrieved proof data for cNFT ${assetId}`);
       
       // Return everything the client needs to complete the burn
       return {
