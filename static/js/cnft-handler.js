@@ -1131,10 +1131,25 @@ export class CNFTHandler {
                     // Fetch asset proof data directly - crucial for reliable transfer
                     console.log("Fetching proof data for single cNFT:", assetIds[0]);
                     const proofResponse = await fetch(`/api/helius/asset-proof/${assetIds[0]}`);
+                    
+                    if (!proofResponse.ok) {
+                        console.warn(`Failed to fetch proof data: ${proofResponse.status} ${proofResponse.statusText}`);
+                        throw new Error(`Server returned ${proofResponse.status}: ${proofResponse.statusText}`);
+                    }
+                    
                     const proofResult = await proofResponse.json();
+                    console.log("Proof API Response:", JSON.stringify(proofResult));
                     
                     if (proofResult.success && proofResult.data) {
                         console.log("Successfully fetched proof data for single cNFT transfer");
+                        
+                        // Log the actual proof data 
+                        console.log("Proof data details:", {
+                            proof: proofResult.data.proof ? `Array with ${proofResult.data.proof.length} items` : "Missing",
+                            root: proofResult.data.root || "Missing",
+                            tree_id: proofResult.data.tree_id || "Missing",
+                            leaf_id: proofResult.data.node_index || "Missing"
+                        });
                         
                         // Use our new specialized method with explicit proof data
                         const result = await this.transferCNFTWithProof(
@@ -1186,11 +1201,21 @@ export class CNFTHandler {
                                 failedAssets: []
                             };
                         } else {
+                            console.error("Fallback transfer failed:", fallbackResult.error);
                             throw new Error(fallbackResult.error || "Single transfer failed");
                         }
                     }
                 } catch (singleTransferError) {
                     console.error("Error in single cNFT transfer with proof:", singleTransferError);
+                    
+                    // Show detailed error notification to user
+                    if (typeof window !== "undefined" && window.BurnAnimations?.showNotification) {
+                        window.BurnAnimations.showNotification(
+                            "Transfer Error", 
+                            `Failed to transfer cNFT: ${singleTransferError.message}`
+                        );
+                    }
+                    
                     throw new Error(`Single transfer failed: ${singleTransferError.message}`);
                 }
             }
