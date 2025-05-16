@@ -1,12 +1,11 @@
 /**
- * Helius Send API Integration for cNFT Transfers
+ * Helius Send API Integration
  * 
- * This module provides a direct implementation for transferring cNFTs using
- * Helius' /v0/send endpoint, which is the recommended way to transfer cNFTs.
+ * Simplified implementation for transferring cNFTs using Helius' /v0/send endpoint.
  */
 
-// Use global fetch instead of node-fetch
-const fetch = global.fetch || require('node-fetch');
+// Use axios instead of node-fetch to avoid ESM issues
+const axios = require('axios');
 const heliusApi = require('./helius-api');
 
 /**
@@ -21,60 +20,37 @@ async function transferCompressedNFT(assetId, sourceOwner, destinationOwner) {
   try {
     console.log(`[HELIUS-SEND] Preparing to transfer cNFT ${assetId}`);
     
-    // Fetch asset details to verify it's a compressed NFT
+    // Verify asset details
     const assetDetails = await heliusApi.fetchAssetDetails(assetId);
-    
     if (!assetDetails) {
       throw new Error('Asset not found');
     }
-    
-    if (!assetDetails.compression || !assetDetails.compression.compressed) {
-      throw new Error('Asset is not a compressed NFT');
-    }
-    
-    console.log(`[HELIUS-SEND] Asset verified as compressed NFT`);
     
     // Prepare the payload for the Helius Send API
     const payload = {
       assetId,
       sources: [sourceOwner],
-      destination: destinationOwner, 
-      rpcUrl: process.env.QUICKNODE_RPC_URL || null
+      destination: destinationOwner
     };
     
-    console.log(`[HELIUS-SEND] Sending request to Helius API`, JSON.stringify(payload));
+    console.log(`[HELIUS-SEND] Sending request to Helius API`);
     
     // Call the Helius Send API
-    const response = await fetch(
+    const response = await axios.post(
       `https://api.helius.xyz/v0/send?api-key=${process.env.HELIUS_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      }
+      payload
     );
     
-    // Check if the request was successful
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[HELIUS-SEND] Error response: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Helius Send API error: ${response.status} ${response.statusText}`);
-    }
-    
-    // Parse the response
-    const responseData = await response.json();
-    console.log(`[HELIUS-SEND] Response:`, JSON.stringify(responseData));
+    console.log(`[HELIUS-SEND] Response:`, JSON.stringify(response.data));
     
     // Check if the transaction was successful
-    if (!responseData.signature) {
+    if (!response.data.signature) {
       throw new Error('No transaction signature in response');
     }
     
     return {
       success: true,
-      signature: responseData.signature,
+      signature: response.data.signature,
       assetId,
       message: 'Transaction submitted successfully'
     };
@@ -100,61 +76,32 @@ async function prepareTransferTransaction(assetId, sourceOwner, destinationOwner
   try {
     console.log(`[HELIUS-SEND] Preparing transaction for cNFT ${assetId}`);
     
-    // Fetch asset details to verify it's a compressed NFT
-    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
-    
-    if (!assetDetails) {
-      throw new Error('Asset not found');
-    }
-    
-    if (!assetDetails.compression || !assetDetails.compression.compressed) {
-      throw new Error('Asset is not a compressed NFT');
-    }
-    
-    console.log(`[HELIUS-SEND] Asset verified as compressed NFT`);
-    
-    // Prepare the payload for the Helius Send API (prepareTransaction mode)
+    // Prepare the payload for the Helius Send API
     const payload = {
       assetId,
       sources: [sourceOwner],
       destination: destinationOwner,
-      prepareTransaction: true,  // This tells Helius to return an unsigned transaction
-      rpcUrl: process.env.QUICKNODE_RPC_URL || null
+      prepareTransaction: true
     };
     
     console.log(`[HELIUS-SEND] Requesting transaction preparation from Helius API`);
     
     // Call the Helius Send API
-    const response = await fetch(
+    const response = await axios.post(
       `https://api.helius.xyz/v0/send?api-key=${process.env.HELIUS_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      }
+      payload
     );
     
-    // Check if the request was successful
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[HELIUS-SEND] Error response: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Helius Send API error: ${response.status} ${response.statusText}`);
-    }
-    
-    // Parse the response
-    const responseData = await response.json();
     console.log(`[HELIUS-SEND] Preparation response received`);
     
     // Check if the transaction was prepared successfully
-    if (!responseData.transaction) {
+    if (!response.data.transaction) {
       throw new Error('No transaction data in response');
     }
     
     return {
       success: true,
-      transaction: responseData.transaction,
+      transaction: response.data.transaction,
       assetId,
       message: 'Transaction prepared successfully'
     };
@@ -179,45 +126,29 @@ async function submitSignedTransaction(signedTransaction, assetId) {
   try {
     console.log(`[HELIUS-SEND] Submitting signed transaction for cNFT ${assetId}`);
     
-    // Prepare the payload for the Helius Send API (submit transaction mode)
+    // Prepare the payload for the Helius Send API
     const payload = {
-      signedTransaction,
-      rpcUrl: process.env.QUICKNODE_RPC_URL || null
+      signedTransaction
     };
     
     console.log(`[HELIUS-SEND] Sending transaction to Helius API`);
     
     // Call the Helius Send API
-    const response = await fetch(
+    const response = await axios.post(
       `https://api.helius.xyz/v0/send?api-key=${process.env.HELIUS_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      }
+      payload
     );
     
-    // Check if the request was successful
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[HELIUS-SEND] Error response: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Helius Send API error: ${response.status} ${response.statusText}`);
-    }
-    
-    // Parse the response
-    const responseData = await response.json();
-    console.log(`[HELIUS-SEND] Response:`, JSON.stringify(responseData));
+    console.log(`[HELIUS-SEND] Response:`, JSON.stringify(response.data));
     
     // Check if the transaction was successful
-    if (!responseData.signature) {
+    if (!response.data.signature) {
       throw new Error('No transaction signature in response');
     }
     
     return {
       success: true,
-      signature: responseData.signature,
+      signature: response.data.signature,
       assetId,
       message: 'Transaction submitted successfully'
     };
