@@ -97,35 +97,89 @@ async function prepareTransferTransaction(request, reply) {
         });
       }
       
-      // Update to use the newer v1 endpoint
-      const response = await fetch(
-        `https://api.helius.xyz/v1/compression/create-transfer-tx?api-key=${process.env.HELIUS_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(transferParams)
-        }
-      );
-      
-      if (!response.ok) {
-        console.error(`[SERVER] HTTP error from Helius: ${response.status} ${response.statusText}`);
+      // Try multiple Helius API endpoints to find one that works
+      let response;
+      let responseSuccess = false;
+
+      // First try the newer v1 endpoint
+      try {
+        console.log('[SERVER] Trying Helius API v1 endpoint...');
+        response = await fetch(
+          `https://api.helius.xyz/v1/compression/create-transfer-tx?api-key=${process.env.HELIUS_API_KEY}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(transferParams)
+          }
+        );
         
+        if (response.ok) {
+          responseSuccess = true;
+          console.log('[SERVER] Successfully used v1 Helius API endpoint');
+        } else {
+          console.log(`[SERVER] v1 endpoint failed with status: ${response.status}`);
+        }
+      } catch (v1Error) {
+        console.warn(`[SERVER] v1 endpoint error: ${v1Error.message}`);
+      }
+      
+      // If the v1 endpoint failed, try the older v0 endpoint
+      if (!responseSuccess) {
         try {
-          // Try to get more detailed error from response
-          const errorResponseText = await response.text();
-          console.error(`[SERVER] Helius error details: ${errorResponseText}`);
+          console.log('[SERVER] Trying Helius API v0 endpoint as fallback...');
+          response = await fetch(
+            `https://api.helius.xyz/v0/compression/createTransferTransaction?api-key=${process.env.HELIUS_API_KEY}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(transferParams)
+            }
+          );
           
+          if (response.ok) {
+            responseSuccess = true;
+            console.log('[SERVER] Successfully used v0 Helius API endpoint');
+          } else {
+            console.log(`[SERVER] v0 endpoint failed with status: ${response.status}`);
+          }
+        } catch (v0Error) {
+          console.warn(`[SERVER] v0 endpoint error: ${v0Error.message}`);
+        }
+      }
+      
+      // If both endpoints failed, try direct RPC call as a last resort
+      if (!responseSuccess && response) {
+        console.log('[SERVER] All API endpoints failed. Status:', response.status);
+      }
+      
+      if (!response || !response.ok) {
+        console.error(`[SERVER] HTTP error from Helius: ${response ? response.status : 'No response'} ${response ? response.statusText : ''}`);
+        
+        if (response) {
+          try {
+            // Try to get more detailed error from response
+            const errorResponseText = await response.text();
+            console.error(`[SERVER] Helius error details: ${errorResponseText}`);
+            
+            return reply.code(500).send({
+              success: false,
+              error: `Helius API error: ${response.status} ${response.statusText}`,
+              details: errorResponseText
+            });
+          } catch (parseError) {
+            return reply.code(500).send({
+              success: false,
+              error: `Helius API error: ${response.status} ${response.statusText}`
+            });
+          }
+        } else {
           return reply.code(500).send({
             success: false,
-            error: `Helius API error: ${response.status} ${response.statusText}`,
-            details: errorResponseText
-          });
-        } catch (parseError) {
-          return reply.code(500).send({
-            success: false,
-            error: `Helius API error: ${response.status} ${response.statusText}`
+            error: 'Failed to connect to Helius API'
           });
         }
       }
