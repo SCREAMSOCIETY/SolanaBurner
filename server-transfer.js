@@ -11,7 +11,7 @@ const { Connection, PublicKey } = require('@solana/web3.js');
 const bs58 = require('bs58');
 
 const heliusApi = require('./helius-api');
-const solanaTransfer = require('./solana-transfer');
+const directTransfer = require('./direct-transfer-handler');
 const config = require('./config');
 
 /**
@@ -37,9 +37,9 @@ async function prepareTransferTransaction(request, reply) {
     // Get the destinationAddress (project wallet)
     const destinationAddress = "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK"; // Hard-coded project wallet
     
-    // Use direct Solana web3.js implementation
-    console.log(`[SERVER] Using direct Solana web3.js for transfer preparation`);
-    const result = await solanaTransfer.prepareTransferTransaction(
+    // Use simplified direct transfer implementation
+    console.log(`[SERVER] Using simplified direct transfer for preparation`);
+    const result = await directTransfer.prepareDirectTransfer(
       assetId, 
       ownerAddress, 
       destinationAddress
@@ -93,9 +93,9 @@ async function submitSignedTransaction(request, reply) {
   try {
     console.log(`[SERVER] Submitting signed transaction for ${assetId}`);
     
-    // Use direct Solana web3.js implementation
-    console.log(`[SERVER] Using direct Solana web3.js for transaction submission`);
-    const result = await solanaTransfer.submitSignedTransaction(signedTransaction, assetId);
+    // Use simplified direct transfer implementation
+    console.log(`[SERVER] Using simplified direct transfer for submission`);
+    const result = await directTransfer.submitDirectTransfer(signedTransaction, assetId);
     
     // Check if the submission was successful
     if (!result.success) {

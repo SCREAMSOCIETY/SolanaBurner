@@ -7,8 +7,13 @@
  */
 
 const { Connection, PublicKey, TransactionMessage, VersionedTransaction } = require('@solana/web3.js');
-const { createTransferInstruction } = require('@metaplex-foundation/mpl-bubblegum');
-const { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, SPL_NOOP_PROGRAM_ID } = require('@solana/spl-account-compression');
+// Fix imports for the bubblegum and compression libraries
+const BubblegumProgram = require('@metaplex-foundation/mpl-bubblegum');
+const { createTransferInstruction } = BubblegumProgram;
+
+// Constants for required program IDs
+const SPL_NOOP_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
+const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
 
 // Import required API functions
 const heliusApi = require('./helius-api');
@@ -62,9 +67,25 @@ async function prepareTransferTransaction(assetId, sourceAddress, destinationAdd
     // 3. Create transfer instruction
     console.log(`[SOLANA-TRANSFER] Creating transfer instruction`);
     
+    // Debug proof data structure
+    console.log(`[SOLANA-TRANSFER] Proof data:`, JSON.stringify(proofData, null, 2));
+    
     // Extract required data
     const treeId = new PublicKey(assetDetails.compression.tree);
-    const treeAuthority = new PublicKey(proofData.treeAuthority || proofData.treeId);
+    
+    // Handle different proof data formats from Helius API
+    if (!proofData.treeAuthority && !proofData.treeId) {
+      console.log(`[SOLANA-TRANSFER] No treeAuthority or treeId in proof data, deriving from tree ID`);
+      // Derive tree authority from tree ID (this is a common pattern)
+      const [treeAuthorityPda] = PublicKey.findProgramAddressSync(
+        [treeId.toBuffer()],
+        new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY') // Bubblegum program
+      );
+      var treeAuthority = treeAuthorityPda;
+    } else {
+      var treeAuthority = new PublicKey(proofData.treeAuthority || proofData.treeId);
+    }
+    
     const root = new PublicKey(proofData.root);
     const dataHash = Buffer.from(proofData.dataHash, 'hex');
     const creatorHash = Buffer.from(proofData.creatorHash, 'hex');
