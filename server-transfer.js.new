@@ -7,12 +7,7 @@
  * in the browser context.
  */
 
-const { Connection, PublicKey, Transaction, VersionedTransaction } = require('@solana/web3.js');
-const { TreeConfig } = require('@solana/spl-account-compression');
-const { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, SPL_NOOP_PROGRAM_ID } = require('@solana/spl-account-compression');
-const { deserializeChangeLogEvent } = require('@solana/spl-account-compression');
-const { BorshAccountsCoder, BorshInstructionCoder } = require('@project-serum/anchor');
-const { ConcurrentMerkleTreeAccount } = require('@solana/spl-account-compression');
+const { Connection, PublicKey } = require('@solana/web3.js');
 const bs58 = require('bs58');
 
 const heliusApi = require('./helius-api');
@@ -69,13 +64,6 @@ async function prepareTransferTransaction(request, reply) {
       assetId,
       message: 'Transaction prepared successfully'
     };
-  } catch (error) {
-    console.error(`[SERVER] Error calling Helius API: ${error.message}`);
-    return reply.code(500).send({
-      success: false,
-      error: `Error calling Helius API: ${error.message}`
-    });
-  }
   } catch (error) {
     console.error(`[SERVER] Error preparing transaction: ${error.message}`);
     return reply.code(500).send({
