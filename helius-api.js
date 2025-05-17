@@ -29,7 +29,7 @@ const rateLimitedAxios = {
 };
 
 /**
- * Fetches all NFTs (both regular and compressed) for a wallet address using Helius API's v0 endpoint
+ * Fetches all NFTs (both regular and compressed) for a wallet address
  * @param {string} walletAddress - The Solana wallet address
  * @returns {Promise<Array>} - Array of NFT data objects
  */
@@ -37,27 +37,26 @@ async function fetchAllWalletNFTs(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs (regular + compressed) for wallet: ${walletAddress}`);
     
-    // Use the proxy API endpoint instead of direct Helius API access
-    const url = `/api/helius/wallet/nfts/${walletAddress}`;
-    const response = await axios.get(url);
+    // Use the RPC endpoint directly instead of the v0 REST API
+    const allNFTs = await fetchAllNFTsByOwner(walletAddress);
     
-    if (response.data && response.data.success) {
-      const { regularNfts, compressedNfts } = response.data.data;
+    // Filter assets by compression
+    const regularNfts = allNFTs.filter(nft => !nft.compression?.compressed)
+      .map(formatHeliusNFTData);
+    const compressedNfts = allNFTs.filter(nft => nft.compression?.compressed)
+      .map(formatHeliusNFTData);
       
-      console.log(`[Helius API] Found ${regularNfts.length + compressedNfts.length} total NFTs (${regularNfts.length} regular, ${compressedNfts.length} compressed)`);
-      
-      return {
-        allNfts: [...regularNfts, ...compressedNfts],
-        regularNfts: regularNfts,
-        compressedNfts: compressedNfts
-      };
-    } else {
-      console.warn('[Helius API] Invalid response format:', response.data);
-      return { allNfts: [], regularNfts: [], compressedNfts: [] };
-    }
+    console.log(`[Helius API] Found ${regularNfts.length + compressedNfts.length} total NFTs (${regularNfts.length} regular, ${compressedNfts.length} compressed)`);
+    
+    return {
+      allNfts: [...regularNfts, ...compressedNfts],
+      regularNfts: regularNfts,
+      compressedNfts: compressedNfts
+    };
   } catch (error) {
     console.error('[Helius API] Error fetching wallet NFTs:', error.message);
-    throw error;
+    // Return empty arrays rather than throwing
+    return { allNfts: [], regularNfts: [], compressedNfts: [] };
   }
 }
 
