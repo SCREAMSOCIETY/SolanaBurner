@@ -90,14 +90,6 @@ async function transferCompressedNFT(params) {
             lastValidBlockHeight,
         });
         
-        // Add compute budget instruction to ensure consistent transaction fees with batch transfers
-        const ComputeBudgetProgram = require('@solana/web3.js').ComputeBudgetProgram;
-        transaction.add(
-            ComputeBudgetProgram.setComputeUnitLimit({ 
-                units: 1000000 // Same as batch operations to keep fees consistent
-            })
-        );
-        
         // Convert tree ID to PublicKey
         const merkleTree = new PublicKey(proofData.tree);
         const newLeafOwner = new PublicKey(destinationAddress);

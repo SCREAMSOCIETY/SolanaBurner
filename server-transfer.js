@@ -7,15 +7,11 @@
  * in the browser context.
  */
 
-const { Connection, PublicKey, Transaction, VersionedTransaction } = require('@solana/web3.js');
-const { TreeConfig } = require('@solana/spl-account-compression');
-const { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, SPL_NOOP_PROGRAM_ID } = require('@solana/spl-account-compression');
-const { deserializeChangeLogEvent } = require('@solana/spl-account-compression');
-const { BorshAccountsCoder, BorshInstructionCoder } = require('@project-serum/anchor');
-const { ConcurrentMerkleTreeAccount } = require('@solana/spl-account-compression');
+const { Connection, PublicKey } = require('@solana/web3.js');
 const bs58 = require('bs58');
 
 const heliusApi = require('./helius-api');
+const directTransfer = require('./direct-transfer-handler');
 const config = require('./config');
 
 /**
@@ -41,98 +37,33 @@ async function prepareTransferTransaction(request, reply) {
     // Get the destinationAddress (project wallet)
     const destinationAddress = "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK"; // Hard-coded project wallet
     
-    // 1. Fetch asset details and proof data
-    console.log(`[SERVER] Fetching asset details for ${assetId}`);
-    const assetDetails = await heliusApi.fetchAssetDetails(assetId);
+    // Use simplified direct transfer implementation
+    console.log(`[SERVER] Using simplified direct transfer for preparation`);
+    const result = await directTransfer.prepareDirectTransfer(
+      assetId, 
+      ownerAddress, 
+      destinationAddress
+    );
     
-    if (!assetDetails) {
-      return reply.code(404).send({
-        success: false,
-        error: 'Asset not found'
-      });
-    }
-    
-    // Skip ownership verification during development/testing
-    // In production, uncomment this check
-    /*
-    if (assetDetails.ownership.owner !== ownerAddress) {
-      return reply.code(403).send({
-        success: false,
-        error: 'You do not own this asset'
-      });
-    }
-    */
-    
-    console.log(`[SERVER] Fetching proof data for ${assetId}`);
-    const proofData = await heliusApi.fetchAssetProof(assetId);
-    
-    if (!proofData || !proofData.proof) {
-      return reply.code(404).send({
-        success: false,
-        error: 'Proof data not available'
-      });
-    }
-    
-    // 2. Create the transfer transaction using Helius DAS API
-    const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY);
-    
-    // Use Helius DAS API to create the serialized transaction
-    const transferParams = {
-      assetId,
-      sourceOwner: ownerAddress,
-      destinationOwner: destinationAddress,
-      proof: proofData.proof,
-    };
-    
-    try {
-      console.log('[SERVER] Calling Helius DAS API to create transfer transaction');
-      
-      const response = await fetch(
-        `https://api.helius.xyz/v0/compression/createTransferTransaction?api-key=${process.env.HELIUS_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(transferParams)
-        }
-      );
-      
-      if (!response.ok) {
-        console.error(`[SERVER] HTTP error from Helius: ${response.status} ${response.statusText}`);
-        return reply.code(500).send({
-          success: false,
-          error: `Helius API error: ${response.status} ${response.statusText}`
-        });
-      }
-      
-      const responseData = await response.json();
-      
-      if (!responseData.transaction) {
-        console.error(`[SERVER] Error creating transaction:`, responseData);
-        return reply.code(500).send({
-          success: false,
-          error: 'Failed to create transfer transaction',
-          details: responseData
-        });
-      }
-      
-      console.log(`[SERVER] Successfully created transfer transaction for ${assetId}`);
-      
-      // Return the transaction for the client to sign
-      return {
-        success: true,
-        transaction: responseData.transaction,
-        assetId,
-        message: 'Transaction prepared successfully'
-      };
-    } catch (error) {
-      console.error(`[SERVER] Error calling Helius API: ${error.message}`);
+    // Check if the preparation was successful
+    if (!result.success) {
+      console.error(`[SERVER] Error preparing transaction:`, result.error);
       return reply.code(500).send({
         success: false,
-        error: `Error calling Helius API: ${error.message}`
+        error: result.error,
+        details: result.details
       });
     }
+    
+    console.log(`[SERVER] Successfully prepared transaction for ${assetId}`);
+    
+    // Return the transaction data
+    return {
+      success: true,
+      transaction: result.transaction,
+      assetId,
+      message: 'Transaction prepared successfully'
+    };
   } catch (error) {
     console.error(`[SERVER] Error preparing transaction: ${error.message}`);
     return reply.code(500).send({
@@ -162,45 +93,29 @@ async function submitSignedTransaction(request, reply) {
   try {
     console.log(`[SERVER] Submitting signed transaction for ${assetId}`);
     
-    // Create connection with explicit API key
-    const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY);
+    // Use simplified direct transfer implementation
+    console.log(`[SERVER] Using simplified direct transfer for submission`);
+    const result = await directTransfer.submitDirectTransfer(signedTransaction, assetId);
     
-    try {
-      // Decode the base64 transaction
-      const transaction = Buffer.from(signedTransaction, 'base64');
-      
-      console.log(`[SERVER] Decoded transaction, sending to network`);
-      
-      // Submit the transaction
-      const txid = await connection.sendRawTransaction(transaction, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed'
-      });
-      
-      console.log(`[SERVER] Transaction submitted with txid: ${txid}`);
-      
-      try {
-        // Wait for confirmation
-        const confirmation = await connection.confirmTransaction(txid, 'processed');
-        console.log(`[SERVER] Transaction confirmed for ${assetId}: ${txid}`);
-      } catch (confirmError) {
-        console.warn(`[SERVER] Confirmation check failed but transaction was submitted: ${confirmError.message}`);
-        // Continue anyway since the transaction was submitted
-      }
-      
-      return {
-        success: true,
-        signature: txid,
-        assetId: assetId,
-        message: 'Transaction submitted successfully'
-      };
-    } catch (sendError) {
-      console.error(`[SERVER] Error sending transaction: ${sendError.message}`);
+    // Check if the submission was successful
+    if (!result.success) {
+      console.error(`[SERVER] Error submitting transaction:`, result.error);
       return reply.code(500).send({
         success: false,
-        error: `Error sending transaction: ${sendError.message}`
+        error: result.error,
+        details: result.details
       });
     }
+    
+    console.log(`[SERVER] Transaction submitted successfully with signature: ${result.signature}`);
+    
+    // Return the transaction result
+    return {
+      success: true,
+      signature: result.signature,
+      assetId: assetId,
+      message: 'Transaction submitted successfully'
+    };
   } catch (error) {
     console.error(`[SERVER] Error submitting transaction: ${error.message}`);
     return reply.code(500).send({
