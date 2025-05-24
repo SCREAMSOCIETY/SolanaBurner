@@ -62,7 +62,7 @@ const NFTsTab: React.FC = () => {
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
-  // Fetch real NFTs from the wallet
+  // Fetch real NFTs from the wallet using Helius API
   const fetchNFTs = async () => {
     if (!publicKey) return;
     
@@ -72,128 +72,40 @@ const NFTsTab: React.FC = () => {
       
       console.log('[NFTsTab] Fetching NFTs for wallet:', publicKey.toString());
       
-      // Using connection.getParsedTokenAccountsByOwner to get token accounts
-      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-        publicKey,
-        { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
-      );
+      // Use the same Helius API endpoint that works correctly in the tokens tab
+      const response = await axios.get(`/api/helius/wallet/nfts/${publicKey.toString()}`);
       
-      console.log('[NFTsTab] Found token accounts:', tokenAccounts.value.length);
-      
-      // Filter for NFTs (tokens with amount 1 and decimals 0)
-      const nftAccounts = tokenAccounts.value.filter(account => {
-        const parsedInfo = account.account.data.parsed.info;
-        const amount = parsedInfo.tokenAmount.amount;
-        const decimals = parsedInfo.tokenAmount.decimals;
-        // NFTs have amount 1 and 0 decimals
-        return amount === "1" && decimals === 0;
-      });
-      
-      console.log('[NFTsTab] Found NFT accounts:', nftAccounts.length);
-      
-      if (nftAccounts.length > 0) {
-        // Show special achievement for discovering NFTs
-        if (window.BurnAnimations) {
-          window.BurnAnimations.showAchievement(
-            "NFT Explorer", 
-            "You've discovered your NFT collection!"
-          );
+      if (response.data && response.data.success) {
+        const { regularNfts } = response.data.data;
+        
+        console.log('[NFTsTab] Found NFTs via Helius API:', regularNfts.length);
+        
+        if (regularNfts.length > 0) {
+          // Show special achievement for discovering NFTs
+          if (window.BurnAnimations) {
+            window.BurnAnimations.showAchievement(
+              "NFT Explorer", 
+              "You've discovered your NFT collection!"
+            );
+          }
+          
+          // Convert to our NFTData format
+          const nftData: NFTData[] = regularNfts.map((nft: any) => ({
+            mint: nft.mint,
+            name: nft.name || `NFT ${nft.mint.slice(0, 4)}...${nft.mint.slice(-4)}`,
+            image: nft.image || "/default-nft-image.svg",
+            collection: nft.collection || "Unknown Collection",
+            tokenAddress: nft.tokenAddress,
+            metadataAddress: nft.metadataAddress
+          }));
+          
+          console.log('[NFTsTab] Processed NFTs:', nftData.length);
+          setNfts(nftData);
+        } else {
+          setNfts([]);
         }
-        
-        // Process NFT accounts and fetch metadata
-        const nftData = await Promise.all(
-          nftAccounts.map(async (nftAccount) => {
-            const tokenAddress = nftAccount.pubkey.toString();
-            const mint = nftAccount.account.data.parsed.info.mint;
-            
-            try {
-              // Try to fetch the metadata PDA for this NFT
-              const mintPubkey = new PublicKey(mint);
-              const metadataPDA = await findMetadataPda(mintPubkey);
-              
-              // Basic NFT info with default values
-              let nft: NFTData = {
-                mint,
-                name: `NFT ${mint.slice(0, 4)}...${mint.slice(-4)}`,
-                image: "/default-nft-image.svg",
-                collection: "Unknown Collection",
-                tokenAddress,
-                metadataAddress: metadataPDA.toString()
-              };
-              
-              try {
-                // Fetch the on-chain metadata
-                const metadataAccount = await connection.getAccountInfo(metadataPDA);
-                
-                if (metadataAccount) {
-                  console.log(`[NFTsTab] Found metadata for NFT ${mint.slice(0, 8)}...`);
-                  
-                  // Use the first 4 bytes to check if it's a valid metadata account
-                  // Instead of parsing the metadata fully, we'll just check for an external URI
-                  // This is a simpler approach for the demo
-                  try {
-                    // Try to extract the external URI from metadata
-                    // This is a simplified approach - normally we'd properly deserialize
-                    const metadataString = Buffer.from(metadataAccount.data).toString();
-                    const uriMatch = metadataString.match(/https?:\/\/\S+/g);
-                    
-                    if (uriMatch && uriMatch.length > 0) {
-                      const possibleUri = uriMatch[0].split('\0')[0]; // Remove null terminators
-                      
-                      if (possibleUri) {
-                        console.log(`[NFTsTab] Found possible metadata URI: ${possibleUri}`);
-                        
-                        try {
-                          // Fetch the external metadata
-                          const response = await fetch(possibleUri);
-                          if (response.ok) {
-                            const json = await response.json();
-                            
-                            console.log(`[NFTsTab] Successfully fetched metadata for ${mint.slice(0, 8)}`);
-                            
-                            // Update NFT with external metadata
-                            if (json.name) nft.name = json.name;
-                            if (json.image) nft.image = json.image;
-                            if (json.collection?.name) {
-                              nft.collection = json.collection.name;
-                            } else if (json.collection?.family) {
-                              nft.collection = json.collection.family;
-                            } else if (json.symbol) {
-                              // Use symbol as a fallback collection name
-                              nft.collection = json.symbol;
-                            }
-                          }
-                        } catch (fetchErr) {
-                          console.error(`[NFTsTab] Error fetching external metadata: ${possibleUri}`, fetchErr);
-                        }
-                      }
-                    }
-                  } catch (parseErr) {
-                    console.error(`[NFTsTab] Error parsing metadata for ${mint}:`, parseErr);
-                  }
-                }
-              } catch (metadataErr) {
-                console.error(`[NFTsTab] Error fetching metadata for NFT ${mint}:`, metadataErr);
-              }
-              
-              return nft;
-            } catch (err) {
-              console.error(`[NFTsTab] Error processing NFT ${mint}:`, err);
-              // Return basic NFT info with default image if metadata fetch fails
-              return {
-                mint,
-                name: `NFT ${mint.slice(0, 4)}...${mint.slice(-4)}`,
-                image: "/default-nft-image.svg",
-                collection: "Unknown Collection",
-                tokenAddress
-              };
-            }
-          })
-        );
-        
-        console.log('[NFTsTab] Processed NFTs:', nftData.length);
-        setNfts(nftData);
       } else {
+        console.warn('[NFTsTab] Invalid response from Helius API:', response.data);
         setNfts([]);
       }
     } catch (err: any) {
