@@ -437,26 +437,38 @@ async function fetchAssetProof(assetId, highPriority = false) {
  */
 function formatHeliusNFTData(heliusNFT) {
   try {
-    // Extract basic info
+    // Extract basic info - handle multiple possible data structures from Helius
     const content = heliusNFT.content || {};
-    const metadata = heliusNFT.metadata || {};
+    const metadata = content.metadata || heliusNFT.metadata || {};
     const compression = heliusNFT.compression || {};
     
+    // Get name from multiple possible locations
+    let nftName = metadata.name || content.json_uri?.name || heliusNFT.name;
+    if (!nftName && heliusNFT.id) {
+      nftName = `NFT ${heliusNFT.id.slice(0, 8)}...`;
+    }
+    
+    // Get image from multiple possible locations
+    let nftImage = metadata.image || 
+                   content.json_uri?.image || 
+                   content.links?.image || 
+                   content.files?.[0]?.uri ||
+                   content.files?.[0]?.cdn_uri ||
+                   '/default-nft-image.svg';
+    
     // Determine if this NFT can recover rent
-    // Standard NFTs can recover rent from token accounts when burned
-    // Compressed NFTs don't have token accounts, but use less storage
     const isCompressed = compression.compressed || false;
     const canRecoverRent = !isCompressed;
-    const estimatedRentLamports = canRecoverRent ? 2039280 : 0; // Approximate rent for a token account in lamports
+    const estimatedRentLamports = canRecoverRent ? 2039280 : 0;
     
-    return {
+    const formattedNFT = {
       mint: heliusNFT.id,
-      name: metadata.name || `NFT ${heliusNFT.id.slice(0, 8)}...`,
+      name: nftName,
       symbol: metadata.symbol || '',
-      image: content.links?.image || content.json?.image || content.files?.[0]?.uri || '/default-nft-image.svg',
-      collection: metadata.collection?.name || '',
-      description: content.metadata?.description || metadata.description || '',
-      attributes: content.metadata?.attributes || [],
+      image: nftImage,
+      collection: metadata.collection?.name || heliusNFT.grouping?.[0]?.group_value || '',
+      description: metadata.description || '',
+      attributes: metadata.attributes || [],
       compressed: isCompressed,
       tokenAddress: heliusNFT.token_info?.token_account || '',
       explorer_url: `https://solscan.io/token/${heliusNFT.id}`,
@@ -465,7 +477,7 @@ function formatHeliusNFTData(heliusNFT) {
       rentRecovery: {
         canRecoverRent,
         estimatedRentLamports,
-        estimatedRentSol: estimatedRentLamports / 1000000000 // Convert lamports to SOL
+        estimatedRentSol: estimatedRentLamports / 1000000000
       },
       // Include compression details for cNFTs
       ...(isCompressed && {
@@ -477,8 +489,13 @@ function formatHeliusNFTData(heliusNFT) {
         creator_hash: compression.creator_hash
       })
     };
+    
+    console.log(`[Helius API] Formatted NFT: ${formattedNFT.name} (${formattedNFT.mint.slice(0, 8)}...)`);
+    return formattedNFT;
+    
   } catch (error) {
     console.error('[Helius API] Error formatting NFT data:', error.message);
+    console.error('[Helius API] Raw NFT data:', JSON.stringify(heliusNFT, null, 2));
     // Return basic fallback data
     return {
       mint: heliusNFT.id || 'unknown',
