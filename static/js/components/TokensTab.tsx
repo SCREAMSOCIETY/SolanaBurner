@@ -88,11 +88,15 @@ const TokensTab: React.FC = () => {
         const tokenData: TokenData[] = [];
         for (const account of tokenAccounts.value) {
           const parsedInfo = account.account.data.parsed.info;
-          if (Number(parsedInfo.tokenAmount.amount) > 0) {
+          const amount = Number(parsedInfo.tokenAmount.amount);
+          const decimals = parsedInfo.tokenAmount.decimals;
+          
+          // Filter out NFTs (amount=1, decimals=0) and only include actual tokens
+          if (amount > 0 && !(amount === 1 && decimals === 0)) {
             tokenData.push({
               mint: parsedInfo.mint,
-              balance: Number(parsedInfo.tokenAmount.amount),
-              decimals: parsedInfo.tokenAmount.decimals,
+              balance: amount,
+              decimals: decimals,
               account: account.pubkey.toBase58()
             });
           }

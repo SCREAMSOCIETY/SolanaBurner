@@ -238,6 +238,70 @@ fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => 
   }
 });
 
+// Rent estimate endpoint for token accounts
+fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  if (!walletAddress) {
+    return reply.code(400).send({ error: 'Wallet address is required' });
+  }
+  
+  try {
+    fastify.log.info(`Calculating rent estimate for wallet: ${walletAddress}`);
+    
+    const ownerPubkey = new PublicKey(walletAddress);
+    
+    // Get all token accounts for this wallet
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      ownerPubkey,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+    
+    // Calculate rent for each token account
+    const rentPerAccount = await connection.getMinimumBalanceForRentExemption(165); // Token account size
+    const totalAccounts = tokenAccounts.value.length;
+    const totalRentEstimate = rentPerAccount * totalAccounts;
+    
+    // Separate NFTs and tokens for detailed breakdown
+    let nftAccounts = 0;
+    let tokenAccounts_count = 0;
+    
+    for (const account of tokenAccounts.value) {
+      const parsedInfo = account.account.data.parsed.info;
+      const amount = Number(parsedInfo.tokenAmount.amount);
+      const decimals = parsedInfo.tokenAmount.decimals;
+      
+      if (amount === 1 && decimals === 0) {
+        nftAccounts++;
+      } else if (amount > 0) {
+        tokenAccounts_count++;
+      }
+    }
+    
+    return {
+      success: true,
+      data: {
+        totalAccounts,
+        nftAccounts,
+        tokenAccounts: tokenAccounts_count,
+        rentPerAccount: rentPerAccount / 1e9, // Convert to SOL
+        totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
+        breakdown: {
+          nftRent: (nftAccounts * rentPerAccount) / 1e9,
+          tokenRent: (tokenAccounts_count * rentPerAccount) / 1e9
+        }
+      }
+    };
+  } catch (error) {
+    fastify.log.error(`Error calculating rent estimate: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to calculate rent estimate',
+      message: error.message
+    });
+  }
+});
+
 // Legacy endpoints - keeping for backward compatibility
 fastify.get('/api/helius/assets/:walletAddress', async (request, reply) => {
   const { walletAddress } = request.params;
