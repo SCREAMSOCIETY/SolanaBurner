@@ -442,8 +442,24 @@ function formatHeliusNFTData(heliusNFT) {
     const metadata = content.metadata || heliusNFT.metadata || {};
     const compression = heliusNFT.compression || {};
     
-    // Get name from multiple possible locations
-    let nftName = metadata.name || content.json_uri?.name || heliusNFT.name;
+    // Get name from multiple possible locations - check all metadata structures
+    let nftName = metadata.name || 
+                  content.json_uri?.name || 
+                  heliusNFT.content?.metadata?.name ||
+                  heliusNFT.content?.json_uri?.name ||
+                  heliusNFT.name;
+    
+    // If still no name found, try to get it from the JSON metadata
+    if (!nftName && content.json_uri) {
+      try {
+        // Sometimes the metadata is nested deeper
+        nftName = content.json_uri.name || content.json_uri.metadata?.name;
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+    
+    // Last resort - use shortened ID
     if (!nftName && heliusNFT.id) {
       nftName = `NFT ${heliusNFT.id.slice(0, 8)}...`;
     }
@@ -451,6 +467,8 @@ function formatHeliusNFTData(heliusNFT) {
     // Get image from multiple possible locations
     let nftImage = metadata.image || 
                    content.json_uri?.image || 
+                   heliusNFT.content?.metadata?.image ||
+                   heliusNFT.content?.json_uri?.image ||
                    content.links?.image || 
                    content.files?.[0]?.uri ||
                    content.files?.[0]?.cdn_uri ||
@@ -490,7 +508,17 @@ function formatHeliusNFTData(heliusNFT) {
       })
     };
     
-    console.log(`[Helius API] Formatted NFT: ${formattedNFT.name} (${formattedNFT.mint.slice(0, 8)}...)`);
+    // Add debugging to see the raw data structure
+    if (!nftName || nftName.includes('NFT ')) {
+      console.log(`[Helius API] Debug - Raw NFT data for ${heliusNFT.id}:`, {
+        content: content,
+        metadata: metadata,
+        compression: compression,
+        rawNFT: heliusNFT
+      });
+    }
+    
+    console.log(`[Helius API] Formatted NFT: ${formattedNFT.name} (${formattedNFT.mint.slice(0, 8)}...) - Compressed: ${formattedNFT.compressed}`);
     return formattedNFT;
     
   } catch (error) {
