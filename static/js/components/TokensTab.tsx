@@ -92,7 +92,10 @@ const TokensTab: React.FC = () => {
           const decimals = parsedInfo.tokenAmount.decimals;
           
           // Filter out NFTs (amount=1, decimals=0) and only include actual tokens
-          if (amount > 0 && !(amount === 1 && decimals === 0)) {
+          const isNFT = amount === 1 && decimals === 0;
+          console.log(`[TokensTab] Token ${parsedInfo.mint.slice(0, 8)}: amount=${amount}, decimals=${decimals}, isNFT=${isNFT}`);
+          
+          if (amount > 0 && !isNFT) {
             tokenData.push({
               mint: parsedInfo.mint,
               balance: amount,
