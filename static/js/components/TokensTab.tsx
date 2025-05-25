@@ -91,21 +91,25 @@ const TokensTab: React.FC = () => {
           const amount = Number(parsedInfo.tokenAmount.amount);
           const decimals = parsedInfo.tokenAmount.decimals;
           
-          // Filter out NFTs (amount=1, decimals=0) and only include actual tokens
-          const isNFT = amount === 1 && decimals === 0;
-          console.log(`[TokensTab] Token ${parsedInfo.mint.slice(0, 8)}: amount=${amount}, decimals=${decimals}, isNFT=${isNFT}`);
+          // Filter out NFTs - exclude anything with amount=1 and decimals=0 as these are NFTs
+          const isLikelyNFT = amount === 1 && decimals === 0;
+          console.log(`[TokensTab] Token ${parsedInfo.mint.slice(0, 8)}: amount=${amount}, decimals=${decimals}, isLikelyNFT=${isLikelyNFT}`);
           
-          if (amount > 0 && !isNFT) {
+          // Only include tokens that are NOT NFTs (skip amount=1 decimals=0 combinations)
+          if (amount > 0 && !isLikelyNFT) {
             tokenData.push({
               mint: parsedInfo.mint,
               balance: amount,
               decimals: decimals,
               account: account.pubkey.toBase58()
             });
+          } else if (isLikelyNFT) {
+            console.log(`[TokensTab] Skipping NFT: ${parsedInfo.mint.slice(0, 8)}`);
           }
         }
 
         console.log('[TokensTab] Filtered token data:', tokenData.length);
+        console.log('[TokensTab] Found', tokenData.length, 'actual tokens after filtering out NFTs');
         setTokens(tokenData);
 
         // Helper function for rate-limited API calls
