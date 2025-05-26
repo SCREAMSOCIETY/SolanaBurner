@@ -32,10 +32,28 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processId, setProcessId] = useState(0);
+
+  // Reset processing state when wallet changes
+  React.useEffect(() => {
+    setIsProcessing(false);
+    setProcessId(prev => prev + 1);
+  }, [publicKey]);
+
+  // Emergency reset function
+  const resetProcessingState = React.useCallback(() => {
+    setIsProcessing(false);
+    setProcessId(prev => prev + 1);
+  }, []);
 
   const handleBurnVacantAccounts = async () => {
     if (!publicKey || !signTransaction) {
       alert('Please connect your wallet first');
+      return;
+    }
+    
+    // Prevent double-clicking
+    if (isProcessing) {
       return;
     }
     
@@ -105,7 +123,17 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       const transaction = Transaction.from(Buffer.from(burnResult.transaction, 'base64'));
       
       // Sign the transaction with the user's wallet
-      const signedTransaction = await signTransaction(transaction);
+      let signedTransaction;
+      try {
+        signedTransaction = await signTransaction(transaction);
+      } catch (signError: any) {
+        // User cancelled the transaction
+        if (signError?.message?.includes('User rejected') || signError?.code === 4001) {
+          alert('Transaction was cancelled by user.');
+          return;
+        }
+        throw signError;
+      }
       
       // Submit the signed transaction
       const submitResponse = await fetch('/api/submit-burn-transaction', {
@@ -134,10 +162,21 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         alert(`Transaction failed: ${submitResult.error || 'Unknown error occurred'}`);
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error burning vacant accounts:', error);
-      alert(`Failed to burn vacant accounts: ${error.message || 'Please try again.'}`);
+      
+      // Handle different types of errors
+      if (error?.message?.includes('User rejected') || error?.code === 4001) {
+        alert('Transaction was cancelled by user.');
+      } else if (error?.message?.includes('insufficient funds')) {
+        alert('Insufficient SOL to pay for transaction fees.');
+      } else if (error?.message?.includes('blockhash')) {
+        alert('Transaction expired. Please try again.');
+      } else {
+        alert(`Failed to burn vacant accounts: ${error?.message || 'Please try again.'}`);
+      }
     } finally {
+      // Always reset the processing state
       setIsProcessing(false);
     }
   };
@@ -280,23 +319,43 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
             <div style={{ marginBottom: '10px', fontSize: '14px', color: '#ccc' }}>
               Found {rentData.vacantAccounts} empty token accounts that can be closed to recover {rentData.breakdown.vacantRent.toFixed(4)} SOL
             </div>
-            <button 
-              className="vacant-burn-button"
-              onClick={handleBurnVacantAccounts}
-              disabled={isProcessing}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: isProcessing ? '#666' : '#ff6b35',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: isProcessing ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              {isProcessing ? 'Processing...' : `Burn ${rentData.vacantAccounts} Vacant Accounts`}
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button 
+                key={`vacant-burn-${processId}`}
+                className="vacant-burn-button"
+                onClick={handleBurnVacantAccounts}
+                disabled={isProcessing}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: isProcessing ? '#666' : '#ff6b35',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isProcessing ? 'Processing...' : `Burn ${rentData.vacantAccounts} Vacant Accounts`}
+              </button>
+              {isProcessing && (
+                <button
+                  onClick={resetProcessingState}
+                  style={{
+                    padding: '5px 10px',
+                    backgroundColor: '#666',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                  title="Reset if button gets stuck"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
