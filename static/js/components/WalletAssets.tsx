@@ -2149,7 +2149,11 @@ const WalletAssets: React.FC = () => {
             </button>
           </div>
           
-          <RentEstimate />
+          <RentEstimate 
+            selectedTokens={selectedTokens}
+            selectedNFTs={selectedNFTs}
+            selectedCNFTs={selectedCNFTs}
+          />
           
           {/* Bulk Burn Selection Panel - Always Visible */}
           {publicKey && (

@@ -14,7 +14,17 @@ interface RentEstimateData {
   };
 }
 
-const RentEstimate: React.FC = () => {
+interface RentEstimateProps {
+  selectedTokens?: any[];
+  selectedNFTs?: any[];
+  selectedCNFTs?: any[];
+}
+
+const RentEstimate: React.FC<RentEstimateProps> = ({ 
+  selectedTokens = [], 
+  selectedNFTs = [], 
+  selectedCNFTs = [] 
+}) => {
   const { publicKey } = useWallet();
   const [rentData, setRentData] = useState<RentEstimateData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,6 +56,28 @@ const RentEstimate: React.FC = () => {
     fetchRentEstimate();
   }, [publicKey]);
 
+  // Calculate live rent estimate based on selected assets
+  const calculateSelectedRent = () => {
+    if (!rentData) return null;
+    
+    const selectedTokenCount = selectedTokens.length;
+    const selectedNFTCount = selectedNFTs.length;
+    const selectedCNFTCount = selectedCNFTs.length;
+    const totalSelected = selectedTokenCount + selectedNFTCount + selectedCNFTCount;
+    
+    const selectedRent = totalSelected * rentData.rentPerAccount;
+    
+    return {
+      totalSelected,
+      selectedTokenCount,
+      selectedNFTCount,
+      selectedCNFTCount,
+      selectedRent
+    };
+  };
+
+  const selectedRentData = calculateSelectedRent();
+
   if (!publicKey) {
     return null;
   }
@@ -72,10 +104,28 @@ const RentEstimate: React.FC = () => {
     <div className="rent-estimate-card">
       <h3>💰 Rent Return Estimate</h3>
       <div className="rent-summary">
-        <div className="total-estimate">
-          <span className="estimate-label">Total Potential Return:</span>
-          <span className="estimate-value">{rentData.totalRentEstimate.toFixed(4)} SOL</span>
-        </div>
+        {selectedRentData && selectedRentData.totalSelected > 0 ? (
+          <div className="selected-estimate">
+            <div className="current-selection">
+              <span className="estimate-label">Selected for Burning:</span>
+              <span className="estimate-value selected">{selectedRentData.selectedRent.toFixed(4)} SOL</span>
+            </div>
+            <div className="selection-breakdown">
+              <small>
+                {selectedRentData.selectedTokenCount > 0 && `${selectedRentData.selectedTokenCount} tokens `}
+                {selectedRentData.selectedNFTCount > 0 && `${selectedRentData.selectedNFTCount} NFTs `}
+                {selectedRentData.selectedCNFTCount > 0 && `${selectedRentData.selectedCNFTCount} cNFTs `}
+                selected ({selectedRentData.totalSelected} total)
+              </small>
+            </div>
+          </div>
+        ) : (
+          <div className="total-estimate">
+            <span className="estimate-label">Total Potential Return:</span>
+            <span className="estimate-value">{rentData.totalRentEstimate.toFixed(4)} SOL</span>
+          </div>
+        )}
+        
         <div className="estimate-breakdown">
           <div className="breakdown-item">
             <span>From {rentData.nftAccounts} NFT accounts:</span>
@@ -88,7 +138,10 @@ const RentEstimate: React.FC = () => {
         </div>
         <div className="rent-details">
           <small>
-            Each token account returns {rentData.rentPerAccount.toFixed(4)} SOL when closed
+            Each account returns {rentData.rentPerAccount.toFixed(4)} SOL when closed
+            {selectedRentData && selectedRentData.totalSelected > 0 && (
+              <span className="selection-note"> • Select assets to see live estimate</span>
+            )}
           </small>
         </div>
       </div>
