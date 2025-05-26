@@ -33,6 +33,53 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const handleBurnVacantAccounts = async () => {
+    if (!publicKey || !signMessage) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      // Sign a message to authorize the vacant account burning
+      const message = "Burn vacant accounts to recover rent";
+      const messageBytes = new TextEncoder().encode(message);
+      const signature = await signMessage(messageBytes);
+      const signedMessage = Buffer.from(signature).toString('base64');
+      
+      // Call the server endpoint to identify vacant accounts
+      const response = await fetch('/api/burn-vacant-accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerAddress: publicKey.toString(),
+          signedMessage: signedMessage
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        if (result.accountCount > 0) {
+          alert(`Found ${result.accountCount} vacant accounts that can recover ${result.potentialRentRecovery.toFixed(4)} SOL.\n\nNote: You'll need to use your wallet (like Phantom or Solflare) to close these empty token accounts to actually recover the rent.`);
+          // Optionally refresh the rent data after processing
+          window.location.reload();
+        } else {
+          alert('No vacant accounts found to burn.');
+        }
+      } else {
+        alert(`Error: ${result.error || 'Failed to process vacant accounts'}`);
+      }
+    } catch (error) {
+      console.error('Error processing vacant accounts:', error);
+      alert('Failed to process vacant accounts. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   useEffect(() => {
     const fetchRentEstimate = async () => {
       if (!publicKey) return;
@@ -193,53 +240,6 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       </div>
     </div>
   );
-  
-  const handleBurnVacantAccounts = async () => {
-    if (!publicKey || !signMessage) {
-      alert('Please connect your wallet first');
-      return;
-    }
-    
-    setIsProcessing(true);
-    try {
-      // Sign a message to authorize the vacant account burning
-      const message = "Burn vacant accounts to recover rent";
-      const messageBytes = new TextEncoder().encode(message);
-      const signature = await signMessage(messageBytes);
-      const signedMessage = Buffer.from(signature).toString('base64');
-      
-      // Call the server endpoint to identify vacant accounts
-      const response = await fetch('/api/burn-vacant-accounts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ownerAddress: publicKey.toString(),
-          signedMessage: signedMessage
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        if (result.accountCount > 0) {
-          alert(`Found ${result.accountCount} vacant accounts that can recover ${result.potentialRentRecovery.toFixed(4)} SOL.\n\nNote: You'll need to use your wallet (like Phantom or Solflare) to close these empty token accounts to actually recover the rent.`);
-          // Optionally refresh the rent data after processing
-          window.location.reload();
-        } else {
-          alert('No vacant accounts found to burn.');
-        }
-      } else {
-        alert(`Error: ${result.error || 'Failed to process vacant accounts'}`);
-      }
-    } catch (error) {
-      console.error('Error processing vacant accounts:', error);
-      alert('Failed to process vacant accounts. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 };
 
 export default RentEstimate;
