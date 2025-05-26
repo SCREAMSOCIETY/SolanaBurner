@@ -242,6 +242,8 @@ fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => 
 fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
   const { walletAddress } = request.params;
   
+  fastify.log.info(`Rent estimate endpoint hit for wallet: ${walletAddress}`);
+  
   if (!walletAddress) {
     return reply.code(400).send({ error: 'Wallet address is required' });
   }
