@@ -15,6 +15,11 @@ const serverTransfer = require('./server-transfer');
 const queueTransferManager = require('./queue-transfer-manager');
 const delegatedTransfer = require('./delegated-cnft-transfer');
 
+// Solana imports for vacant account burning
+const { Connection, PublicKey, Transaction, clusterApiUrl } = require('@solana/web3.js');
+const { createCloseAccountInstruction, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+const nacl = require('tweetnacl');
+
 // Log startup info
 console.log('[FASTIFY SERVER] Starting with environment:', {
   env: process.env.NODE_ENV,
@@ -137,9 +142,7 @@ fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
   }
 });
 
-// Import the Solana web3.js library
-const { Connection, PublicKey } = require('@solana/web3.js');
-const { TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+// Connection and other imports already defined above
 
 // Create a Solana connection
 const solanaRpcUrl = process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com';
@@ -309,33 +312,20 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
   }
 });
 
-// Endpoint to burn vacant token accounts and recover rent
+// Endpoint to identify vacant token accounts
 fastify.post('/api/burn-vacant-accounts', async (request, reply) => {
   const { ownerAddress, signedMessage } = request.body;
   
-  if (!ownerAddress || !signedMessage) {
+  if (!ownerAddress) {
     return reply.code(400).send({ 
-      error: 'Owner address and signed message are required' 
+      error: 'Owner address is required' 
     });
   }
   
   try {
-    fastify.log.info(`Processing vacant account burn for wallet: ${ownerAddress}`);
+    fastify.log.info(`Identifying vacant accounts for wallet: ${ownerAddress}`);
     
-    // Verify the signed message
-    const message = "Burn vacant accounts to recover rent";
     const ownerPubkey = new PublicKey(ownerAddress);
-    const signatureBytes = Buffer.from(signedMessage, 'base64');
-    
-    const isValid = nacl.sign.detached.verify(
-      Buffer.from(message),
-      signatureBytes,
-      ownerPubkey.toBytes()
-    );
-    
-    if (!isValid) {
-      return reply.code(400).send({ error: 'Invalid signature' });
-    }
     
     // Get all token accounts for this wallet
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
@@ -361,8 +351,8 @@ fastify.post('/api/burn-vacant-accounts', async (request, reply) => {
       return {
         success: true,
         message: 'No vacant accounts found',
-        burnedAccounts: 0,
-        totalRentRecovered: 0
+        accountCount: 0,
+        potentialRentRecovery: 0
       };
     }
     
@@ -370,22 +360,120 @@ fastify.post('/api/burn-vacant-accounts', async (request, reply) => {
     const rentPerAccount = await connection.getMinimumBalanceForRentExemption(165);
     const totalRentRecovery = vacantAccounts.length * rentPerAccount;
     
-    // Return the vacant accounts that can be burned
-    // Note: Actual burning requires wallet signature and would be done client-side
     return {
       success: true,
       message: `Found ${vacantAccounts.length} vacant accounts ready for burning`,
       vacantAccounts: vacantAccounts,
       accountCount: vacantAccounts.length,
-      potentialRentRecovery: totalRentRecovery / 1e9, // Convert to SOL
-      instructions: 'These empty token accounts can be closed to recover rent. Use your wallet to sign the closing transactions.'
+      potentialRentRecovery: totalRentRecovery / 1e9 // Convert to SOL
     };
     
   } catch (error) {
-    fastify.log.error(`Error processing vacant account burn: ${error.message}`);
+    fastify.log.error(`Error identifying vacant accounts: ${error.message}`);
     return reply.code(500).send({
       success: false,
-      error: 'Failed to process vacant account burn',
+      error: 'Failed to identify vacant accounts',
+      message: error.message
+    });
+  }
+});
+
+// Endpoint to prepare burn transactions
+fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
+  const { ownerAddress, vacantAccounts } = request.body;
+  
+  if (!ownerAddress || !vacantAccounts || !Array.isArray(vacantAccounts)) {
+    return reply.code(400).send({ 
+      error: 'Owner address and vacant accounts array are required' 
+    });
+  }
+  
+  try {
+    fastify.log.info(`Preparing burn transactions for ${vacantAccounts.length} vacant accounts`);
+    
+    const ownerPubkey = new PublicKey(ownerAddress);
+    const transaction = new Transaction();
+    
+    // Create close account instructions for each vacant account
+    for (const account of vacantAccounts) {
+      const accountPubkey = new PublicKey(account.address);
+      
+      const closeInstruction = createCloseAccountInstruction(
+        accountPubkey,  // Account to close
+        ownerPubkey,    // Destination for rent SOL
+        ownerPubkey     // Owner of the account
+      );
+      
+      transaction.add(closeInstruction);
+    }
+    
+    // Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = ownerPubkey;
+    
+    // Serialize the transaction for client signing
+    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
+    
+    return {
+      success: true,
+      transaction: serializedTransaction.toString('base64'),
+      accountCount: vacantAccounts.length,
+      message: 'Transaction prepared successfully'
+    };
+    
+  } catch (error) {
+    fastify.log.error(`Error preparing burn transactions: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to prepare burn transactions',
+      message: error.message
+    });
+  }
+});
+
+// Endpoint to submit signed burn transaction
+fastify.post('/api/submit-burn-transaction', async (request, reply) => {
+  const { signedTransaction, accountCount } = request.body;
+  
+  if (!signedTransaction) {
+    return reply.code(400).send({ 
+      error: 'Signed transaction is required' 
+    });
+  }
+  
+  try {
+    fastify.log.info(`Submitting burn transaction for ${accountCount || 'unknown'} accounts`);
+    
+    // Deserialize the signed transaction
+    const transactionBuffer = Buffer.from(signedTransaction, 'base64');
+    const transaction = Transaction.from(transactionBuffer);
+    
+    // Submit the transaction to the network
+    const signature = await connection.sendRawTransaction(transaction.serialize());
+    
+    // Confirm the transaction
+    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+    
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+    
+    fastify.log.info(`Burn transaction successful: ${signature}`);
+    
+    return {
+      success: true,
+      signature: signature,
+      explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+      accountCount: accountCount || 0,
+      message: 'Vacant accounts burned successfully'
+    };
+    
+  } catch (error) {
+    fastify.log.error(`Error submitting burn transaction: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to submit burn transaction',
       message: error.message
     });
   }

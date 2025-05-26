@@ -27,27 +27,21 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   selectedNFTs = [], 
   selectedCNFTs = [] 
 }) => {
-  const { publicKey, signMessage } = useWallet();
+  const { publicKey, signMessage, signTransaction } = useWallet();
   const [rentData, setRentData] = useState<RentEstimateData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleBurnVacantAccounts = async () => {
-    if (!publicKey || !signMessage) {
+    if (!publicKey || !signTransaction) {
       alert('Please connect your wallet first');
       return;
     }
     
     setIsProcessing(true);
     try {
-      // Sign a message to authorize the vacant account burning
-      const message = "Burn vacant accounts to recover rent";
-      const messageBytes = new TextEncoder().encode(message);
-      const signature = await signMessage(messageBytes);
-      const signedMessage = Buffer.from(signature).toString('base64');
-      
-      // Call the server endpoint to identify vacant accounts
+      // First, get the list of vacant accounts from the server
       const response = await fetch('/api/burn-vacant-accounts', {
         method: 'POST',
         headers: {
@@ -55,26 +49,94 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         },
         body: JSON.stringify({
           ownerAddress: publicKey.toString(),
-          signedMessage: signedMessage
+          signedMessage: 'identify' // Just to identify accounts
         })
       });
       
       const result = await response.json();
       
-      if (result.success) {
-        if (result.accountCount > 0) {
-          alert(`Found ${result.accountCount} vacant accounts that can recover ${result.potentialRentRecovery.toFixed(4)} SOL.\n\nNote: You'll need to use your wallet (like Phantom or Solflare) to close these empty token accounts to actually recover the rent.`);
-          // Optionally refresh the rent data after processing
-          window.location.reload();
-        } else {
-          alert('No vacant accounts found to burn.');
-        }
-      } else {
-        alert(`Error: ${result.error || 'Failed to process vacant accounts'}`);
+      if (!result.success) {
+        alert(`Error: ${result.error || 'Failed to fetch vacant accounts'}`);
+        return;
       }
+      
+      if (result.accountCount === 0) {
+        alert('No vacant accounts found to burn.');
+        return;
+      }
+      
+      // Ask user for confirmation before proceeding
+      const confirmed = confirm(
+        `Found ${result.accountCount} vacant accounts that can recover ${result.potentialRentRecovery.toFixed(4)} SOL.\n\n` +
+        `Do you want to proceed with burning these accounts? This will:\n` +
+        `- Close ${result.accountCount} empty token accounts\n` +
+        `- Recover approximately ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
+        `- Require wallet signature for the transaction\n\n` +
+        `Click OK to proceed or Cancel to abort.`
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      // Prepare burn transactions on the server
+      const burnResponse = await fetch('/api/prepare-burn-transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerAddress: publicKey.toString(),
+          vacantAccounts: result.vacantAccounts
+        })
+      });
+      
+      const burnResult = await burnResponse.json();
+      
+      if (!burnResult.success) {
+        alert(`Error preparing transactions: ${burnResult.error || 'Failed to prepare burn transactions'}`);
+        return;
+      }
+      
+      // Import necessary Solana web3 components
+      const { Transaction } = await import('@solana/web3.js');
+      
+      // Deserialize the transaction from the server
+      const transaction = Transaction.from(Buffer.from(burnResult.transaction, 'base64'));
+      
+      // Sign the transaction with the user's wallet
+      const signedTransaction = await signTransaction(transaction);
+      
+      // Submit the signed transaction
+      const submitResponse = await fetch('/api/submit-burn-transaction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          signedTransaction: signedTransaction.serialize().toString('base64'),
+          accountCount: result.accountCount
+        })
+      });
+      
+      const submitResult = await submitResponse.json();
+      
+      if (submitResult.success) {
+        alert(
+          `🎉 Successfully burned ${result.accountCount} vacant accounts!\n\n` +
+          `💰 Recovered ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
+          `📊 Transaction: ${submitResult.signature}\n\n` +
+          `The rent has been returned to your wallet. Refreshing your balance...`
+        );
+        // Refresh the page to show updated balances
+        window.location.reload();
+      } else {
+        alert(`Transaction failed: ${submitResult.error || 'Unknown error occurred'}`);
+      }
+      
     } catch (error) {
-      console.error('Error processing vacant accounts:', error);
-      alert('Failed to process vacant accounts. Please try again.');
+      console.error('Error burning vacant accounts:', error);
+      alert(`Failed to burn vacant accounts: ${error.message || 'Please try again.'}`);
     } finally {
       setIsProcessing(false);
     }
