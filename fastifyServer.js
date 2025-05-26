@@ -307,6 +307,88 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
   }
 });
 
+// Endpoint to burn vacant token accounts and recover rent
+fastify.post('/api/burn-vacant-accounts', async (request, reply) => {
+  const { ownerAddress, signedMessage } = request.body;
+  
+  if (!ownerAddress || !signedMessage) {
+    return reply.code(400).send({ 
+      error: 'Owner address and signed message are required' 
+    });
+  }
+  
+  try {
+    fastify.log.info(`Processing vacant account burn for wallet: ${ownerAddress}`);
+    
+    // Verify the signed message
+    const message = "Burn vacant accounts to recover rent";
+    const ownerPubkey = new PublicKey(ownerAddress);
+    const signatureBytes = Buffer.from(signedMessage, 'base64');
+    
+    const isValid = nacl.sign.detached.verify(
+      Buffer.from(message),
+      signatureBytes,
+      ownerPubkey.toBytes()
+    );
+    
+    if (!isValid) {
+      return reply.code(400).send({ error: 'Invalid signature' });
+    }
+    
+    // Get all token accounts for this wallet
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      ownerPubkey,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+    
+    // Find vacant accounts (amount = 0)
+    const vacantAccounts = [];
+    for (const account of tokenAccounts.value) {
+      const parsedInfo = account.account.data.parsed.info;
+      const amount = Number(parsedInfo.tokenAmount.amount);
+      
+      if (amount === 0) {
+        vacantAccounts.push({
+          address: account.pubkey.toString(),
+          mint: parsedInfo.mint
+        });
+      }
+    }
+    
+    if (vacantAccounts.length === 0) {
+      return {
+        success: true,
+        message: 'No vacant accounts found',
+        burnedAccounts: 0,
+        totalRentRecovered: 0
+      };
+    }
+    
+    // Calculate potential rent recovery
+    const rentPerAccount = await connection.getMinimumBalanceForRentExemption(165);
+    const totalRentRecovery = vacantAccounts.length * rentPerAccount;
+    
+    // Return the vacant accounts that can be burned
+    // Note: Actual burning requires wallet signature and would be done client-side
+    return {
+      success: true,
+      message: `Found ${vacantAccounts.length} vacant accounts ready for burning`,
+      vacantAccounts: vacantAccounts,
+      accountCount: vacantAccounts.length,
+      potentialRentRecovery: totalRentRecovery / 1e9, // Convert to SOL
+      instructions: 'These empty token accounts can be closed to recover rent. Use your wallet to sign the closing transactions.'
+    };
+    
+  } catch (error) {
+    fastify.log.error(`Error processing vacant account burn: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to process vacant account burn',
+      message: error.message
+    });
+  }
+});
+
 // Legacy endpoints - keeping for backward compatibility
 fastify.get('/api/helius/assets/:walletAddress', async (request, reply) => {
   const { walletAddress } = request.params;
