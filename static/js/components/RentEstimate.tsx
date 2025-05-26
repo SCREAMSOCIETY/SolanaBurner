@@ -57,22 +57,27 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   }, [publicKey]);
 
   // Calculate live rent estimate based on selected assets
+  // Note: cNFTs don't return rent because they don't have individual token accounts
   const calculateSelectedRent = () => {
     if (!rentData) return null;
     
     const selectedTokenCount = selectedTokens.length;
     const selectedNFTCount = selectedNFTs.length;
     const selectedCNFTCount = selectedCNFTs.length;
+    
+    // Only tokens and NFTs return rent, not cNFTs (they don't have token accounts)
+    const rentReturningAssets = selectedTokenCount + selectedNFTCount;
     const totalSelected = selectedTokenCount + selectedNFTCount + selectedCNFTCount;
     
-    const selectedRent = totalSelected * rentData.rentPerAccount;
+    const selectedRent = rentReturningAssets * rentData.rentPerAccount;
     
     return {
       totalSelected,
       selectedTokenCount,
       selectedNFTCount,
       selectedCNFTCount,
-      selectedRent
+      selectedRent,
+      rentReturningAssets
     };
   };
 
@@ -116,6 +121,9 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
                 {selectedRentData.selectedNFTCount > 0 && `${selectedRentData.selectedNFTCount} NFTs `}
                 {selectedRentData.selectedCNFTCount > 0 && `${selectedRentData.selectedCNFTCount} cNFTs `}
                 selected ({selectedRentData.totalSelected} total)
+                {selectedRentData.selectedCNFTCount > 0 && (
+                  <span className="cnft-note"> • cNFTs don't return rent</span>
+                )}
               </small>
             </div>
           </div>
