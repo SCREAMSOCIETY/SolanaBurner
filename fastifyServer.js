@@ -262,9 +262,10 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     const totalAccounts = tokenAccounts.value.length;
     const totalRentEstimate = rentPerAccount * totalAccounts;
     
-    // Separate NFTs and tokens for detailed breakdown
+    // Separate NFTs, tokens, and vacant accounts for detailed breakdown
     let nftAccounts = 0;
     let tokenAccounts_count = 0;
+    let vacantAccounts = 0;
     
     for (const account of tokenAccounts.value) {
       const parsedInfo = account.account.data.parsed.info;
@@ -275,6 +276,8 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         nftAccounts++;
       } else if (amount > 0) {
         tokenAccounts_count++;
+      } else if (amount === 0) {
+        vacantAccounts++;
       }
     }
     
@@ -284,11 +287,13 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         totalAccounts,
         nftAccounts,
         tokenAccounts: tokenAccounts_count,
+        vacantAccounts,
         rentPerAccount: rentPerAccount / 1e9, // Convert to SOL
         totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
         breakdown: {
           nftRent: (nftAccounts * rentPerAccount) / 1e9,
-          tokenRent: (tokenAccounts_count * rentPerAccount) / 1e9
+          tokenRent: (tokenAccounts_count * rentPerAccount) / 1e9,
+          vacantRent: (vacantAccounts * rentPerAccount) / 1e9
         }
       }
     };

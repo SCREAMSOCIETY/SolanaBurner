@@ -6,11 +6,13 @@ interface RentEstimateData {
   totalAccounts: number;
   nftAccounts: number;
   tokenAccounts: number;
+  vacantAccounts: number;
   rentPerAccount: number;
   totalRentEstimate: number;
   breakdown: {
     nftRent: number;
     tokenRent: number;
+    vacantRent: number;
   };
 }
 
@@ -143,6 +145,12 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
             <span>From {rentData.tokenAccounts} token accounts:</span>
             <span>{rentData.breakdown.tokenRent.toFixed(4)} SOL</span>
           </div>
+          {rentData.vacantAccounts > 0 && (
+            <div className="breakdown-item">
+              <span>From {rentData.vacantAccounts} vacant accounts:</span>
+              <span>{rentData.breakdown.vacantRent.toFixed(4)} SOL</span>
+            </div>
+          )}
         </div>
         <div className="rent-details">
           <small>
