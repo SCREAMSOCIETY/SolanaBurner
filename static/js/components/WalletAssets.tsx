@@ -2194,24 +2194,7 @@ const WalletAssets: React.FC = () => {
                 
                 {selectedCNFTs.length > 0 && (
                   <div className="selection-group cnft-selection-group">
-                    <span>{selectedCNFTs.length} cNFTs selected</span>
-                    <div className="button-group">
-                      <button 
-                        className="bulk-burn-button"
-                        disabled={isBurning}
-                        onClick={handleBulkBurnCNFTs}
-                      >
-                        Trash Selected
-                      </button>
-                      <button 
-                        className="queue-transfer-button"
-                        disabled={isBurning}
-                        onClick={openQueueTransferModal}
-                        title="Use the queue-based approach for better reliability"
-                      >
-                        Queue Trash
-                      </button>
-                    </div>
+                    <span>{selectedCNFTs.length} cNFTs selected - View Only (Transfer disabled)</span>
                   </div>
                 )}
                 
