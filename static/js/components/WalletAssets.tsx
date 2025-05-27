@@ -2359,15 +2359,29 @@ const WalletAssets: React.FC = () => {
                   </div>
                   {!bulkBurnMode && (
                     <button 
-                      className="burn-button cnft-transfer-button"
+                      className="burn-button cnft-transfer-button view-only-button"
                       data-asset-id={cnft.mint}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleBurnCNFT(cnft);
+                        if (window.BurnAnimations?.showNotification) {
+                          window.BurnAnimations.showNotification(
+                            "View Only",
+                            "Compressed NFTs are currently view-only to prevent transfer issues.",
+                            "info"
+                          );
+                        } else {
+                          alert('Compressed NFTs are view-only in this application. Transfer functionality is disabled to prevent transaction issues.');
+                        }
                       }}
-                      title="Moves this cNFT to trash"
+                      title="Compressed NFTs are view-only to prevent transfer issues"
+                      disabled
+                      style={{
+                        backgroundColor: '#666',
+                        cursor: 'not-allowed',
+                        opacity: '0.7'
+                      }}
                     >
-                      Trash
+                      👁️ View Only
                     </button>
                   )}
                   {bulkBurnMode && (
