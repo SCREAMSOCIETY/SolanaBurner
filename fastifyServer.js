@@ -262,10 +262,12 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       { programId: TOKEN_PROGRAM_ID }
     );
     
-    // Calculate rent for each token account
-    const rentPerAccount = await connection.getMinimumBalanceForRentExemption(165); // Token account size
+    // Calculate rent for different account types
+    const tokenAccountRent = await connection.getMinimumBalanceForRentExemption(165); // Token account size
+    const metadataAccountRent = await connection.getMinimumBalanceForRentExemption(679); // Metadata account size
+    const editionAccountRent = await connection.getMinimumBalanceForRentExemption(282); // Edition account size
+    
     const totalAccounts = tokenAccounts.value.length;
-    const totalRentEstimate = rentPerAccount * totalAccounts;
     
     // Separate NFTs, tokens, and vacant accounts for detailed breakdown
     let nftAccounts = 0;
@@ -286,6 +288,14 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       }
     }
     
+    // Calculate total rent estimate with enhanced NFT calculations
+    // NFTs can close token + metadata + edition accounts
+    // Regular tokens and vacant accounts only close token accounts
+    const nftRentTotal = nftAccounts * (tokenAccountRent + metadataAccountRent + editionAccountRent);
+    const tokenRentTotal = tokenAccounts_count * tokenAccountRent;
+    const vacantRentTotal = vacantAccounts * tokenAccountRent;
+    const totalRentEstimate = nftRentTotal + tokenRentTotal + vacantRentTotal;
+    
     return {
       success: true,
       data: {
@@ -293,12 +303,19 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         nftAccounts,
         tokenAccounts: tokenAccounts_count,
         vacantAccounts,
-        rentPerAccount: rentPerAccount / 1e9, // Convert to SOL
+        rentPerAccount: tokenAccountRent / 1e9, // Convert to SOL (basic token account)
         totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
         breakdown: {
-          nftRent: (nftAccounts * rentPerAccount) / 1e9,
-          tokenRent: (tokenAccounts_count * rentPerAccount) / 1e9,
-          vacantRent: (vacantAccounts * rentPerAccount) / 1e9
+          nftRent: nftRentTotal / 1e9, // Enhanced NFT rent (token + metadata + edition)
+          tokenRent: tokenRentTotal / 1e9,
+          vacantRent: vacantRentTotal / 1e9
+        },
+        // Additional details for transparency
+        rentDetails: {
+          tokenAccountRent: tokenAccountRent / 1e9,
+          metadataAccountRent: metadataAccountRent / 1e9,
+          editionAccountRent: editionAccountRent / 1e9,
+          nftRentPerAsset: (tokenAccountRent + metadataAccountRent + editionAccountRent) / 1e9
         }
       }
     };
