@@ -189,7 +189,15 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         setLoading(true);
         setError(null);
 
-        const response = await axios.get(`/api/rent-estimate/${publicKey.toString()}`);
+        // Add timeout to prevent long waits
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        const response = await axios.get(`/api/rent-estimate/${publicKey.toString()}`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
         
         if (response.data && response.data.success) {
           setRentData(response.data.data);
@@ -198,13 +206,20 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         }
       } catch (err: any) {
         console.error('Error fetching rent estimate:', err);
-        setError('Unable to fetch rent estimate');
+        if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
+          setError('Request timed out - try connecting your wallet again');
+        } else {
+          setError('Unable to fetch rent estimate');
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRentEstimate();
+    // Add a small delay to prevent rapid-fire requests when switching wallets
+    const timeoutId = setTimeout(fetchRentEstimate, 500);
+    
+    return () => clearTimeout(timeoutId);
   }, [publicKey]);
 
   // Calculate live rent estimate based on selected assets
