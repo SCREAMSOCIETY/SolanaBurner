@@ -262,10 +262,8 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       { programId: TOKEN_PROGRAM_ID }
     );
     
-    // Calculate rent for different account types
+    // Calculate rent for token account (the actual rent users get back)
     const tokenAccountRent = await connection.getMinimumBalanceForRentExemption(165); // Token account size
-    const metadataAccountRent = await connection.getMinimumBalanceForRentExemption(679); // Metadata account size
-    const editionAccountRent = await connection.getMinimumBalanceForRentExemption(282); // Edition account size
     
     const totalAccounts = tokenAccounts.value.length;
     
