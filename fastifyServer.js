@@ -288,10 +288,9 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       }
     }
     
-    // Calculate total rent estimate with enhanced NFT calculations
-    // NFTs can close token + metadata + edition accounts
-    // Regular tokens and vacant accounts only close token accounts
-    const nftRentTotal = nftAccounts * (tokenAccountRent + metadataAccountRent + editionAccountRent);
+    // Calculate rent estimate - only count actual token account rent that users get back
+    // NFTs, tokens, and vacant accounts all return only token account rent when burned
+    const nftRentTotal = nftAccounts * tokenAccountRent;
     const tokenRentTotal = tokenAccounts_count * tokenAccountRent;
     const vacantRentTotal = vacantAccounts * tokenAccountRent;
     const totalRentEstimate = nftRentTotal + tokenRentTotal + vacantRentTotal;
@@ -306,16 +305,9 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         rentPerAccount: tokenAccountRent / 1e9, // Convert to SOL (basic token account)
         totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
         breakdown: {
-          nftRent: nftRentTotal / 1e9, // Enhanced NFT rent (token + metadata + edition)
+          nftRent: nftRentTotal / 1e9, // Actual token account rent returned
           tokenRent: tokenRentTotal / 1e9,
           vacantRent: vacantRentTotal / 1e9
-        },
-        // Additional details for transparency
-        rentDetails: {
-          tokenAccountRent: tokenAccountRent / 1e9,
-          metadataAccountRent: metadataAccountRent / 1e9,
-          editionAccountRent: editionAccountRent / 1e9,
-          nftRentPerAsset: (tokenAccountRent + metadataAccountRent + editionAccountRent) / 1e9
         }
       }
     };

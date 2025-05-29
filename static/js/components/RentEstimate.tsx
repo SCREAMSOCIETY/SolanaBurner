@@ -34,10 +34,13 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processId, setProcessId] = useState(0);
 
-  // Reset processing state when wallet changes
+  // Reset processing state and data when wallet changes
   React.useEffect(() => {
     setIsProcessing(false);
     setProcessId(prev => prev + 1);
+    setRentData(null);
+    setError(null);
+    setLoading(false);
   }, [publicKey]);
 
   // Emergency reset function
@@ -183,7 +186,12 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
 
   useEffect(() => {
     const fetchRentEstimate = async () => {
-      if (!publicKey) return;
+      if (!publicKey) {
+        setRentData(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
@@ -207,9 +215,11 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       } catch (err: any) {
         console.error('Error fetching rent estimate:', err);
         if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
-          setError('Request timed out - try connecting your wallet again');
+          setError('Request timed out - please reconnect your wallet and try again');
+        } else if (err.response?.status === 404) {
+          setError('Wallet address not found - please reconnect your wallet');
         } else {
-          setError('Unable to fetch rent estimate');
+          setError('Unable to fetch rent estimate - please reconnect your wallet');
         }
       } finally {
         setLoading(false);
