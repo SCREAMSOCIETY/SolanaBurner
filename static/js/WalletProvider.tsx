@@ -99,7 +99,7 @@ export const WalletProvider: FC<Props> = ({ children }) => {
                     <div className="wallet-container">
                         <div className="wallet-buttons">
                             <WalletMultiButton />
-                            <WalletDisconnectButton />
+                            <WalletDisconnectButton style={{ marginLeft: '10px' }} />
                         </div>
                         {children}
                     </div>

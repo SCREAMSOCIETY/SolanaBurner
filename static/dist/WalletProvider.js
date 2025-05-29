@@ -46619,7 +46619,11 @@ var WalletProvider = function WalletProvider(_ref) {
     className: "wallet-container"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "wallet-buttons"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_9__.WalletMultiButton, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__.WalletDisconnectButton, null)), children))));
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_9__.WalletMultiButton, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_solana_wallet_adapter_react_ui__WEBPACK_IMPORTED_MODULE_10__.WalletDisconnectButton, {
+    style: {
+      marginLeft: '10px'
+    }
+  })), children))));
 };
 
 // Component to log wallet state changes and capture them for debugging
