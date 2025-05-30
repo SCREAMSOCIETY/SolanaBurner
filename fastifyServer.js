@@ -360,12 +360,19 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       }
     }
     
-    // Calculate rent estimate - only count actual token account rent that users get back
-    // NFTs, tokens, and vacant accounts all return only token account rent when burned
+    // Calculate rent estimate with burning fees
+    // Set burning fee for vacant accounts (in lamports)
+    const vacantAccountBurningFee = 5000000; // 0.005 SOL fee per vacant account
+    
+    // NFTs and tokens return full rent, vacant accounts have rent minus burning fee
     const nftRentTotal = nftAccounts * tokenAccountRent;
     const tokenRentTotal = tokenAccounts_count * tokenAccountRent;
-    const vacantRentTotal = vacantAccounts * tokenAccountRent;
+    const vacantRentAfterFee = Math.max(0, tokenAccountRent - vacantAccountBurningFee);
+    const vacantRentTotal = vacantAccounts * vacantRentAfterFee;
     const totalRentEstimate = nftRentTotal + tokenRentTotal + vacantRentTotal;
+    
+    // Calculate total fees collected
+    const totalBurningFees = vacantAccounts * vacantAccountBurningFee;
     
     return {
       success: true,
@@ -377,9 +384,13 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         rentPerAccount: tokenAccountRent / 1e9, // Convert to SOL (basic token account)
         totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
         breakdown: {
-          nftRent: nftRentTotal / 1e9, // Actual token account rent returned
+          nftRent: nftRentTotal / 1e9, // Full token account rent returned
           tokenRent: tokenRentTotal / 1e9,
-          vacantRent: vacantRentTotal / 1e9
+          vacantRent: vacantRentTotal / 1e9 // Rent minus burning fee
+        },
+        fees: {
+          vacantAccountBurningFee: vacantAccountBurningFee / 1e9, // Fee per vacant account
+          totalBurningFees: totalBurningFees / 1e9 // Total fees for all vacant accounts
         }
       }
     };
