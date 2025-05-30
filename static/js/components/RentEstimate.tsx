@@ -196,6 +196,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       try {
         setLoading(true);
         setError(null);
+        setRentData(null); // Clear previous data immediately
 
         // Add timeout to prevent long waits
         const controller = new AbortController();
@@ -215,11 +216,11 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       } catch (err: any) {
         console.error('Error fetching rent estimate:', err);
         if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
-          setError('Request timed out - please reconnect your wallet and try again');
+          setError('Request timed out - please try again');
         } else if (err.response?.status === 404) {
-          setError('Wallet address not found - please reconnect your wallet');
+          setError('Wallet address not found');
         } else {
-          setError('Unable to fetch rent estimate - please reconnect your wallet');
+          setError('Unable to fetch rent estimate');
         }
       } finally {
         setLoading(false);
