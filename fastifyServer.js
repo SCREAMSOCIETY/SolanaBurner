@@ -362,7 +362,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     
     // Calculate rent estimate with burning fees
     // Set burning fee for vacant accounts (in lamports)
-    const vacantAccountBurningFee = 5000000; // 0.005 SOL fee per vacant account
+    const vacantAccountBurningFee = 40000; // 0.00004 SOL fee per vacant account
     
     // NFTs and tokens return full rent, vacant accounts have rent minus burning fee
     const nftRentTotal = nftAccounts * tokenAccountRent;
