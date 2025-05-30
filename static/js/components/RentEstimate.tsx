@@ -330,12 +330,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
               <span>{rentData.breakdown.vacantRent.toFixed(4)} SOL</span>
             </div>
           )}
-          {rentData.fees && rentData.vacantAccounts > 0 && (
-            <div className="breakdown-item fee-item" style={{ fontSize: '12px', color: '#888' }}>
-              <span>Service fee for vacant accounts:</span>
-              <span>-{rentData.fees.totalBurningFees.toFixed(4)} SOL</span>
-            </div>
-          )}
+
         </div>
         <div className="rent-details">
           <small>
@@ -354,11 +349,6 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
             </div>
             <div style={{ marginBottom: '10px', fontSize: '14px', color: '#ccc' }}>
               Found {rentData.vacantAccounts} empty token accounts that can be closed to recover {rentData.breakdown.vacantRent.toFixed(4)} SOL
-              {rentData.fees && (
-                <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                  Service fee: {rentData.fees.vacantAccountBurningFee.toFixed(4)} SOL per account
-                </div>
-              )}
             </div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button 
