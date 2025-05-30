@@ -214,23 +214,28 @@ const WalletAssets: React.FC = () => {
         setTokensLoading(true);
         setError(null);
         
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          publicKey,
-          { programId: TOKEN_PROGRAM_ID }
-        );
+        // Use Helius API to get token accounts instead of direct RPC
+        console.log('[WalletAssets] Fetching token accounts via Helius API');
+        const heliusResponse = await fetch(`/api/wallet-tokens/${publicKey.toString()}`);
         
-        console.log('[WalletAssets] Found token accounts:', tokenAccounts.value.length);
+        if (!heliusResponse.ok) {
+          throw new Error(`Failed to fetch tokens: ${heliusResponse.status}`);
+        }
+        
+        const heliusData = await heliusResponse.json();
+        console.log('[WalletAssets] Helius token response:', heliusData);
         
         const tokenData: TokenData[] = [];
-        for (const account of tokenAccounts.value) {
-          const parsedInfo = account.account.data.parsed.info;
-          if (Number(parsedInfo.tokenAmount.amount) > 0) {
-            tokenData.push({
-              mint: parsedInfo.mint,
-              balance: Number(parsedInfo.tokenAmount.amount),
-              decimals: parsedInfo.tokenAmount.decimals,
-              account: account.pubkey.toBase58()
-            });
+        if (heliusData.success && heliusData.tokens) {
+          for (const token of heliusData.tokens) {
+            if (token.amount > 0) {
+              tokenData.push({
+                mint: token.mint,
+                balance: token.amount,
+                decimals: token.decimals,
+                account: token.tokenAccount
+              });
+            }
           }
         }
         

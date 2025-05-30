@@ -106,6 +106,80 @@ fastify.get('/api/config', async (request, reply) => {
 // Import local token metadata
 const tokenMetadata = require('./token-metadata');
 
+// Endpoint to get wallet tokens via Helius API
+fastify.get('/api/wallet-tokens/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  if (!walletAddress) {
+    return reply.code(400).send({ error: 'Wallet address is required' });
+  }
+
+  try {
+    const heliusApiKey = process.env.HELIUS_API_KEY;
+    if (!heliusApiKey) {
+      throw new Error('Helius API key not configured');
+    }
+
+    const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+    
+    const requestBody = {
+      jsonrpc: '2.0',
+      id: 'wallet-tokens',
+      method: 'getTokenAccountsByOwner',
+      params: [
+        walletAddress,
+        { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+        { encoding: 'jsonParsed' }
+      ]
+    };
+
+    const response = await fetch(heliusUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message || 'Helius API error');
+    }
+
+    const tokens = [];
+    if (data.result && data.result.value) {
+      for (const account of data.result.value) {
+        const parsedInfo = account.account.data.parsed.info;
+        const tokenAmount = parsedInfo.tokenAmount;
+        
+        if (Number(tokenAmount.amount) > 0) {
+          tokens.push({
+            mint: parsedInfo.mint,
+            amount: Number(tokenAmount.amount),
+            decimals: tokenAmount.decimals,
+            tokenAccount: account.pubkey
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      tokens: tokens,
+      count: tokens.length
+    };
+
+  } catch (error) {
+    fastify.log.error(`Error fetching wallet tokens: ${error.message}`);
+    return reply.code(500).send({
+      success: false,
+      error: 'Failed to fetch wallet tokens',
+      message: error.message
+    });
+  }
+});
+
 // Endpoint for token metadata that uses local data instead of external API
 fastify.get('/api/token-metadata/:tokenAddress', async (request, reply) => {
   const { tokenAddress } = request.params;
