@@ -187,17 +187,13 @@ const WalletAssets: React.FC = () => {
   // Handle wallet connection/disconnection
   useEffect(() => {
     if (publicKey) {
-      console.log('[WalletAssets] Wallet connected, loading data');
+      console.log('[WalletAssets] Wallet connected, storing debug info');
       if (typeof window !== 'undefined' && window.debugInfo) {
         window.debugInfo.walletInfo = {
           publicKey: publicKey.toString(),
           hasSignTransaction: !!signTransaction
         };
       }
-      // Load wallet data
-      fetchTokensData();
-      fetchNFTsData();
-      fetchCNFTsData();
     } else {
       // Clear all data when wallet disconnects
       console.log('[WalletAssets] Wallet disconnected, clearing data');
