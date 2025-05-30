@@ -134,7 +134,6 @@ const WalletAssets: React.FC = () => {
   // State variables for assets
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [nfts, setNfts] = useState<NFTData[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [cnfts, setCnfts] = useState<CNFTData[]>([]);
   
   // State variables for loading and errors
@@ -185,14 +184,30 @@ const WalletAssets: React.FC = () => {
     fetchApiKey();
   }, []);
 
-  // Store wallet information in debug object when wallet connects
+  // Handle wallet connection/disconnection
   useEffect(() => {
-    if (publicKey && typeof window !== 'undefined' && window.debugInfo) {
-      window.debugInfo.walletInfo = {
-        publicKey: publicKey.toString(),
-        hasSignTransaction: !!signTransaction
-      };
-      console.log('[WalletAssets] Updated wallet debug info:', window.debugInfo.walletInfo);
+    if (publicKey) {
+      console.log('[WalletAssets] Wallet connected, loading data');
+      if (typeof window !== 'undefined' && window.debugInfo) {
+        window.debugInfo.walletInfo = {
+          publicKey: publicKey.toString(),
+          hasSignTransaction: !!signTransaction
+        };
+      }
+      // Load wallet data
+      fetchTokensData();
+      fetchNFTsData();
+      fetchCNFTsData();
+    } else {
+      // Clear all data when wallet disconnects
+      console.log('[WalletAssets] Wallet disconnected, clearing data');
+      setTokens([]);
+      setNfts([]);
+      setCnfts([]);
+      setSelectedTokens([]);
+      setSelectedNFTs([]);
+      setSelectedCNFTs([]);
+      setError(null);
     }
   }, [publicKey, signTransaction]);
 
@@ -2133,55 +2148,18 @@ const WalletAssets: React.FC = () => {
 
   return (
     <div className="wallet-assets-container">
-      <div className="wallet-connect-section">
-        <h2>Connect Wallet to View Assets</h2>
-        <WalletMultiButton />
-      </div>
+      {!publicKey && (
+        <div className="wallet-connect-section">
+          <h2>Connect Wallet to View Assets</h2>
+          <WalletMultiButton />
+        </div>
+      )}
 
       {publicKey && (
         <div className="assets-section">
           <div className="wallet-header">
             <h2>Your Wallet Assets</h2>
-            <button 
-              className="refresh-button" 
-              onClick={() => {
-                console.log("Manual refresh triggered");
-                // Create a timestamp to force cache-busting
-                const timestamp = Date.now();
-                if (publicKey) {
-                  // Add loading indicator
-                  setIsRefreshing(true);
-                  // Call the wallet-related APIs with the timestamp to bust cache
-                  axios.get(`/api/helius/wallet/nfts/${publicKey.toBase58()}?t=${timestamp}`)
-                    .then(response => {
-                      if (response.data && response.data.success) {
-                        const { regularNfts, compressedNfts } = response.data.data;
-                        setNfts(regularNfts);
-                        
-                        // Filter out hidden compressed NFTs if the HiddenAssets functionality is available
-                        let visibleCompressedNfts = compressedNfts;
-                        if (typeof window !== "undefined" && window.HiddenAssets) {
-                          visibleCompressedNfts = compressedNfts.filter((cnft) => 
-                            !window.HiddenAssets?.isAssetHidden(cnft.mint));
-                        }
-                        
-                        setCnfts(visibleCompressedNfts);
-                        console.log(`Refreshed: Found ${regularNfts.length} NFTs and ${visibleCompressedNfts.length} cNFTs`);
-                      }
-                    })
-                    .catch(error => {
-                      console.error("Error refreshing NFTs:", error);
-                      setError("Failed to refresh NFTs. Please try again.");
-                    })
-                    .finally(() => {
-                      setIsRefreshing(false);
-                    });
-                }
-              }}
-              disabled={isRefreshing}
-            >
-              {isRefreshing ? "Refreshing..." : "Refresh Assets"}
-            </button>
+            <WalletMultiButton />
           </div>
           
           <RentEstimate 
