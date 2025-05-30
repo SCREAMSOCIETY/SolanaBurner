@@ -214,28 +214,58 @@ const WalletAssets: React.FC = () => {
         setTokensLoading(true);
         setError(null);
         
-        // Use Helius API to get token accounts instead of direct RPC
+        // Try Helius API first, fallback to direct RPC if needed
         console.log('[WalletAssets] Fetching token accounts via Helius API');
-        const heliusResponse = await fetch(`/api/wallet-tokens/${publicKey.toString()}`);
+        let tokenData: TokenData[] = [];
         
-        if (!heliusResponse.ok) {
-          throw new Error(`Failed to fetch tokens: ${heliusResponse.status}`);
-        }
-        
-        const heliusData = await heliusResponse.json();
-        console.log('[WalletAssets] Helius token response:', heliusData);
-        
-        const tokenData: TokenData[] = [];
-        if (heliusData.success && heliusData.tokens) {
-          for (const token of heliusData.tokens) {
-            if (token.amount > 0) {
-              tokenData.push({
-                mint: token.mint,
-                balance: token.amount,
-                decimals: token.decimals,
-                account: token.tokenAccount
-              });
+        try {
+          const heliusResponse = await fetch(`/api/wallet-tokens/${publicKey.toString()}`);
+          
+          if (heliusResponse.ok) {
+            const heliusData = await heliusResponse.json();
+            console.log('[WalletAssets] Helius token response:', heliusData);
+            
+            if (heliusData.success && heliusData.tokens) {
+              for (const token of heliusData.tokens) {
+                if (token.amount > 0) {
+                  tokenData.push({
+                    mint: token.mint,
+                    balance: token.amount,
+                    decimals: token.decimals,
+                    account: token.tokenAccount
+                  });
+                }
+              }
             }
+          } else {
+            throw new Error(`Helius API returned ${heliusResponse.status}`);
+          }
+        } catch (heliusError) {
+          console.warn('[WalletAssets] Helius API failed, trying direct RPC:', heliusError);
+          
+          // Fallback to direct RPC for rent estimates
+          try {
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+              publicKey,
+              { programId: TOKEN_PROGRAM_ID }
+            );
+            
+            console.log('[WalletAssets] Fallback RPC found token accounts:', tokenAccounts.value.length);
+            
+            for (const account of tokenAccounts.value) {
+              const parsedInfo = account.account.data.parsed.info;
+              if (Number(parsedInfo.tokenAmount.amount) > 0) {
+                tokenData.push({
+                  mint: parsedInfo.mint,
+                  balance: Number(parsedInfo.tokenAmount.amount),
+                  decimals: parsedInfo.tokenAmount.decimals,
+                  account: account.pubkey.toBase58()
+                });
+              }
+            }
+          } catch (rpcError) {
+            console.warn('[WalletAssets] Both Helius and RPC failed:', rpcError);
+            // Still continue - rent estimates will be based on NFTs only
           }
         }
         
