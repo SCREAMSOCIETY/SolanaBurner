@@ -129,7 +129,7 @@ interface CNFTData {
 
 const WalletAssets: React.FC = () => {
   const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, signTransaction, connected } = useWallet();
   
   // State variables for assets
   const [tokens, setTokens] = useState<TokenData[]>([]);
@@ -186,7 +186,7 @@ const WalletAssets: React.FC = () => {
 
   // Handle wallet connection/disconnection
   useEffect(() => {
-    if (publicKey) {
+    if (publicKey && connected) {
       console.log('[WalletAssets] Wallet connected, storing debug info');
       if (typeof window !== 'undefined' && window.debugInfo) {
         window.debugInfo.walletInfo = {
@@ -194,7 +194,7 @@ const WalletAssets: React.FC = () => {
           hasSignTransaction: !!signTransaction
         };
       }
-    } else {
+    } else if (!connected) {
       // Clear all data when wallet disconnects
       console.log('[WalletAssets] Wallet disconnected, clearing data');
       setTokens([]);
@@ -204,8 +204,11 @@ const WalletAssets: React.FC = () => {
       setSelectedNFTs([]);
       setSelectedCNFTs([]);
       setError(null);
+      setTokensLoading(false);
+      setNftsLoading(false);
+      setCnftsLoading(false);
     }
-  }, [publicKey, signTransaction]);
+  }, [publicKey, connected, signTransaction]);
 
   // Fetch tokens when wallet connects
   useEffect(() => {
@@ -218,7 +221,7 @@ const WalletAssets: React.FC = () => {
         hasSolscanKey
       });
       
-      if (!publicKey) return;
+      if (!publicKey || !connected) return;
       
       try {
         console.log('[WalletAssets] Starting token fetch');
@@ -387,7 +390,7 @@ const WalletAssets: React.FC = () => {
     };
     
     fetchTokens();
-  }, [publicKey, connection, solscanApiKey]);
+  }, [publicKey, connected, connection, solscanApiKey]);
 
   // Fetch all NFTs (regular + compressed) when wallet connects using Helius v0 API
   useEffect(() => {
