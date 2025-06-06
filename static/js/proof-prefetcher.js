@@ -27,8 +27,8 @@
         const timeNow = Date.now();
         const cacheTime = window.cachedProofData[assetId]._cacheTime || 0;
         
-        // Cache is valid for 5 minutes
-        if ((timeNow - cacheTime) < 5 * 60 * 1000) {
+        // Cache is valid for 30 minutes
+        if ((timeNow - cacheTime) < 30 * 60 * 1000) {
           console.log(`[ProofPrefetcher] Using cached proof data for ${assetId}`);
           return true;
         }
@@ -74,8 +74,8 @@
       failures: 0
     };
     
-    // Process in batches of 5 to avoid overloading the API
-    const batchSize = 5;
+    // Process in smaller batches to avoid API rate limits
+    const batchSize = 2;
     for (let i = 0; i < assetIds.length; i += batchSize) {
       const batch = assetIds.slice(i, i + batchSize);
       
@@ -93,9 +93,9 @@
         }
       });
       
-      // Small delay between batches to avoid rate limiting
+      // Longer delay between batches to avoid rate limiting
       if (i + batchSize < assetIds.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
     
@@ -161,7 +161,8 @@
     });
     
     // Also periodically check, in case mutation observer misses something
-    setInterval(processCurrent, 5000);
+    // Reduced frequency to avoid API rate limiting
+    setInterval(processCurrent, 60000); // Every minute instead of every 5 seconds
     
     console.log('[ProofPrefetcher] Started watching for cNFTs to prefetch proof data');
   }
@@ -173,10 +174,7 @@
     watchForCNFTsAndPrefetch
   };
   
-  // Auto-start watching for cNFTs when the DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', watchForCNFTsAndPrefetch);
-  } else {
-    watchForCNFTsAndPrefetch();
-  }
+  // Temporarily disable auto-start to improve performance
+  // Users can manually trigger prefetching when needed
+  console.log('[ProofPrefetcher] Proof prefetching disabled for better performance. Use window.ProofPrefetcher.watchForCNFTsAndPrefetch() to enable.');
 })();
