@@ -336,8 +336,10 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       { programId: TOKEN_PROGRAM_ID }
     );
     
-    // Calculate rent for token account (the actual rent users get back)
+    // Calculate rent for different account types
     const tokenAccountRent = await connection.getMinimumBalanceForRentExemption(165); // Token account size
+    const metadataAccountRent = await connection.getMinimumBalanceForRentExemption(679); // Metadata account size
+    const editionAccountRent = await connection.getMinimumBalanceForRentExemption(282); // Edition account size
     
     const totalAccounts = tokenAccounts.value.length;
     
@@ -364,11 +366,18 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     // Set burning fee for vacant accounts (in lamports)
     const vacantAccountBurningFee = 40000; // 0.00004 SOL fee per vacant account
     
-    // NFTs and tokens return full rent, vacant accounts have rent minus burning fee
-    const nftRentTotal = nftAccounts * tokenAccountRent;
+    // NFTs return rent from multiple accounts: token account + metadata account + edition account
+    // This matches what other burn sites calculate (total ~0.0077 SOL per NFT vs our previous ~0.002 SOL)
+    const nftRentPerAsset = tokenAccountRent + metadataAccountRent + editionAccountRent;
+    const nftRentTotal = nftAccounts * nftRentPerAsset;
+    
+    // Tokens only have token account rent
     const tokenRentTotal = tokenAccounts_count * tokenAccountRent;
+    
+    // Vacant accounts have rent minus burning fee
     const vacantRentAfterFee = Math.max(0, tokenAccountRent - vacantAccountBurningFee);
     const vacantRentTotal = vacantAccounts * vacantRentAfterFee;
+    
     const totalRentEstimate = nftRentTotal + tokenRentTotal + vacantRentTotal;
     
     // Calculate total fees collected
@@ -382,9 +391,10 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         tokenAccounts: tokenAccounts_count,
         vacantAccounts,
         rentPerAccount: tokenAccountRent / 1e9, // Convert to SOL (basic token account)
+        nftRentPerAsset: nftRentPerAsset / 1e9, // Convert to SOL (NFT with all accounts)
         totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
         breakdown: {
-          nftRent: nftRentTotal / 1e9, // Full token account rent returned
+          nftRent: nftRentTotal / 1e9, // Full NFT rent (token + metadata + edition accounts)
           tokenRent: tokenRentTotal / 1e9,
           vacantRent: vacantRentTotal / 1e9 // Rent minus burning fee
         },

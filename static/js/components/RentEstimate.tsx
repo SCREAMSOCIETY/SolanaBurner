@@ -8,6 +8,7 @@ interface RentEstimateData {
   tokenAccounts: number;
   vacantAccounts: number;
   rentPerAccount: number;
+  nftRentPerAsset: number;
   totalRentEstimate: number;
   breakdown: {
     nftRent: number;
@@ -247,18 +248,19 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     const selectedCNFTCount = selectedCNFTs.length;
     
     // Only tokens and NFTs return rent, not cNFTs (they don't have token accounts)
-    const rentReturningAssets = selectedTokenCount + selectedNFTCount;
     const totalSelected = selectedTokenCount + selectedNFTCount + selectedCNFTCount;
     
-    const selectedRent = rentReturningAssets * rentData.rentPerAccount;
+    // Calculate rent based on asset type - NFTs return more rent due to multiple accounts
+    const tokenRent = selectedTokenCount * rentData.rentPerAccount;
+    const nftRent = selectedNFTCount * (rentData.nftRentPerAsset || rentData.rentPerAccount);
+    const selectedRent = tokenRent + nftRent;
     
     return {
       totalSelected,
       selectedTokenCount,
       selectedNFTCount,
       selectedCNFTCount,
-      selectedRent,
-      rentReturningAssets
+      selectedRent
     };
   };
 
@@ -334,7 +336,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         </div>
         <div className="rent-details">
           <small>
-            Each account returns {rentData.rentPerAccount.toFixed(4)} SOL when closed
+            Tokens: {rentData.rentPerAccount.toFixed(4)} SOL • NFTs: {(rentData.nftRentPerAsset || rentData.rentPerAccount).toFixed(4)} SOL each
             {selectedRentData && selectedRentData.totalSelected > 0 && (
               <span className="selection-note"> • Select assets to see live estimate</span>
             )}
