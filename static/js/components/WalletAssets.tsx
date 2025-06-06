@@ -241,7 +241,8 @@ const WalletAssets: React.FC = () => {
             
             if (heliusData.success && heliusData.tokens) {
               for (const token of heliusData.tokens) {
-                if (token.amount > 0) {
+                // Only include fungible tokens, exclude NFTs (amount=1, decimals=0)
+                if (token.amount > 0 && !(token.amount === 1 && token.decimals === 0)) {
                   tokenData.push({
                     mint: token.mint,
                     balance: token.amount,
@@ -268,11 +269,15 @@ const WalletAssets: React.FC = () => {
             
             for (const account of tokenAccounts.value) {
               const parsedInfo = account.account.data.parsed.info;
-              if (Number(parsedInfo.tokenAmount.amount) > 0) {
+              const amount = Number(parsedInfo.tokenAmount.amount);
+              const decimals = parsedInfo.tokenAmount.decimals;
+              
+              // Only include fungible tokens, exclude NFTs (amount=1, decimals=0)
+              if (amount > 0 && !(amount === 1 && decimals === 0)) {
                 tokenData.push({
                   mint: parsedInfo.mint,
-                  balance: Number(parsedInfo.tokenAmount.amount),
-                  decimals: parsedInfo.tokenAmount.decimals,
+                  balance: amount,
+                  decimals: decimals,
                   account: account.pubkey.toBase58()
                 });
               }
@@ -1608,11 +1613,15 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Show success message with transaction link
+          // Calculate rent returned from burned tokens
+          const tokenRentPerAccount = 0.00204; // SOL per token account
+          const totalRentReturned = (processedTokens.length * tokenRentPerAccount).toFixed(4);
+          
+          // Show success message with transaction link and rent details
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
           
-          setError(`Successfully burned ${processedTokens.length} tokens in a single transaction! Signature: ${shortSig}`);
+          setError(`Successfully burned ${processedTokens.length} tokens! Rent returned: ${totalRentReturned} SOL | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
@@ -1824,11 +1833,15 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Show success message with transaction link
+          // Calculate rent returned from burned NFTs (includes token + metadata + edition accounts)
+          const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
+          const totalRentReturned = (processedNFTs.length * nftRentPerAsset).toFixed(4);
+          
+          // Show success message with transaction link and rent details
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
           
-          setError(`Successfully burned ${processedNFTs.length} NFTs in a single transaction! Signature: ${shortSig}`);
+          setError(`Successfully burned ${processedNFTs.length} NFTs! Rent returned: ${totalRentReturned} SOL | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
