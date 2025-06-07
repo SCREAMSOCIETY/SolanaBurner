@@ -725,8 +725,17 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // Add an instruction to transfer a 1% fee based on rent returned
+      // Add a memo instruction to show rent recovery amount in wallet confirmation
       const tokenRentPerAccount = 0.00204; // SOL per token account
+      const tokenMemoData = Buffer.from(`Token Burn: Recovering ${tokenRentPerAccount.toFixed(4)} SOL rent`, 'utf8');
+      const tokenMemoInstruction = new TransactionInstruction({
+        keys: [],
+        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+        data: tokenMemoData,
+      });
+      transaction.add(tokenMemoInstruction);
+      
+      // Add an instruction to transfer a 1% fee based on rent returned
       const feePercentage = 0.01; // 1% fee
       const feeAmount = Math.floor(tokenRentPerAccount * feePercentage * 1e9); // Convert to lamports
       const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
