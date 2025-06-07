@@ -154,9 +154,87 @@ const NFTsTab: React.FC = () => {
       
       console.log('[NFTsTab] Burning NFT:', mint);
       
-      // In a real implementation, we would create and send a burn transaction here
-      // For now, we'll just simulate it with a timeout for the demo
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Import required modules for real NFT burning
+      const { ComputeBudgetProgram, SystemProgram } = await import('@solana/web3.js');
+      const { createBurnCheckedInstruction, createCloseAccountInstruction } = await import('@solana/spl-token');
+      
+      // Create a transaction to burn the NFT
+      const transaction = new Transaction();
+      
+      // Add compute budget instructions
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 200000
+      });
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1
+      });
+      transaction.add(modifyComputeUnits, addPriorityFee);
+      
+      // 1. Burn the NFT token
+      transaction.add(
+        createBurnCheckedInstruction(
+          new PublicKey(nft.tokenAddress), // token account
+          new PublicKey(nft.mint), // mint
+          publicKey, // owner
+          1, // amount (NFTs have amount = 1)
+          0 // decimals (NFTs have decimals = 0)
+        )
+      );
+      
+      // 2. Close the token account to recover rent
+      transaction.add(
+        createCloseAccountInstruction(
+          new PublicKey(nft.tokenAddress), // token account to close
+          publicKey, // destination for recovered SOL
+          publicKey, // owner
+          [] // multisig signers
+        )
+      );
+      
+      // 3. Add 1% fee transfer
+      const nftRentPerAsset = 0.0077; // SOL per NFT
+      const feePercentage = 0.01;
+      const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9);
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
+      
+      // Get recent blockhash and sign transaction
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed'
+      });
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Request signature from wallet
+      const signedTx = await sendTransaction(transaction, connection, {
+        skipPreflight: true,
+        maxRetries: 3,
+        preflightCommitment: 'processed'
+      });
+      
+      console.log('[NFTsTab] Transaction sent, waiting for confirmation...');
+      
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction({
+        signature: signedTx,
+        blockhash: blockhash,
+        lastValidBlockHeight: lastValidBlockHeight
+      }, 'processed');
+      
+      if (confirmation.value.err) {
+        console.error('[NFTsTab] Error confirming NFT burn transaction:', confirmation.value.err);
+        setError(`Error burning NFT: ${confirmation.value.err}`);
+        return;
+      }
+      
+      console.log('[NFTsTab] NFT burn successful with signature:', signedTx);
       
       // Apply burn animation if element exists
       if (nftElement && window.BurnAnimations) {
@@ -166,16 +244,24 @@ const NFTsTab: React.FC = () => {
       // Show confetti for successful burn
       if (window.BurnAnimations) {
         window.BurnAnimations.createConfetti();
-        
-        // Track achievement progress
         window.BurnAnimations.checkAchievements('nft', 1);
       }
       
+      // Show success message with rent amount
+      const txUrl = `https://solscan.io/tx/${signedTx}`;
+      const shortSig = signedTx.substring(0, 8) + '...';
+      setError(`Successfully burned NFT "${nft.name}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
+      
       // Remove the burned NFT from the list
       setNfts(nfts.filter(n => n.mint !== mint));
-    } catch (err) {
+      
+    } catch (err: any) {
       console.error('[NFTsTab] Error burning NFT:', err);
-      setError('Failed to burn NFT. Please try again.');
+      if (err.message?.includes('User rejected')) {
+        setError('Transaction was cancelled by the user');
+      } else {
+        setError(`Failed to burn NFT: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setBurning(false);
     }
@@ -200,9 +286,105 @@ const NFTsTab: React.FC = () => {
       
       console.log(`[NFTsTab] Burning ${selectedNftData.length} NFTs in bulk`);
       
-      // In a real implementation, we would create and send a burn transaction for each NFT here
-      // For now, we'll just simulate it with a timeout for the demo
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Import required modules for real NFT burning
+      const { ComputeBudgetProgram, SystemProgram } = await import('@solana/web3.js');
+      const { createBurnCheckedInstruction, createCloseAccountInstruction } = await import('@solana/spl-token');
+      
+      // Create a single transaction for all NFT burns
+      const transaction = new Transaction();
+      
+      // Add compute budget instructions (scaled for multiple NFTs)
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 200000 * Math.min(5, selectedNftData.length)
+      });
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1
+      });
+      transaction.add(modifyComputeUnits, addPriorityFee);
+      
+      // Process each selected NFT
+      const nftRentPerAsset = 0.0077;
+      const feePercentage = 0.01;
+      let totalFeeAmount = 0;
+      
+      for (const nft of selectedNftData) {
+        if (!nft.tokenAddress) {
+          console.warn(`[NFTsTab] Skipping NFT ${nft.mint} - missing token address`);
+          continue;
+        }
+        
+        // Add burn instruction
+        transaction.add(
+          createBurnCheckedInstruction(
+            new PublicKey(nft.tokenAddress),
+            new PublicKey(nft.mint),
+            publicKey,
+            1,
+            0
+          )
+        );
+        
+        // Add close account instruction
+        transaction.add(
+          createCloseAccountInstruction(
+            new PublicKey(nft.tokenAddress),
+            publicKey,
+            publicKey,
+            []
+          )
+        );
+        
+        // Calculate fee for this NFT
+        totalFeeAmount += Math.floor(nftRentPerAsset * feePercentage * 1e9);
+      }
+      
+      // Add single fee transfer for all NFTs
+      if (totalFeeAmount > 0) {
+        const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: feeRecipient,
+            lamports: totalFeeAmount,
+          })
+        );
+      }
+      
+      // Get recent blockhash and sign transaction
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed'
+      });
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Request signature from wallet
+      const signedTx = await sendTransaction(transaction, connection, {
+        skipPreflight: true,
+        maxRetries: 3,
+        preflightCommitment: 'processed'
+      });
+      
+      console.log(`[NFTsTab] Bulk burn transaction sent, waiting for confirmation...`);
+      
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction({
+        signature: signedTx,
+        blockhash: blockhash,
+        lastValidBlockHeight: lastValidBlockHeight
+      }, 'processed');
+      
+      if (confirmation.value.err) {
+        console.error('[NFTsTab] Error confirming bulk NFT burn transaction:', confirmation.value.err);
+        setError(`Error burning NFTs: ${confirmation.value.err}`);
+        return;
+      }
+      
+      console.log('[NFTsTab] Bulk NFT burn successful with signature:', signedTx);
+      
+      // Show success message
+      const totalRent = selectedNftData.length * nftRentPerAsset;
+      const shortSig = signedTx.substring(0, 8) + '...';
+      setError(`Successfully burned ${selectedNftData.length} NFTs! Total rent returned: ${totalRent.toFixed(4)} SOL | Signature: ${shortSig}`);
       
       // Apply burn animations in sequence
       if (window.BurnAnimations && nftElements.length > 0) {
