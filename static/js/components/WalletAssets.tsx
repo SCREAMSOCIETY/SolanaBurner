@@ -787,12 +787,6 @@ const WalletAssets: React.FC = () => {
         } else {
           console.log('Token burn successful with signature:', signature);
           
-          // Get wallet balance after transaction to show actual rent received
-          const balanceAfter = await connection.getBalance(publicKey);
-          const netChange = (balanceAfter - (window.balanceBefore || 0)) / 1e9;
-          console.log(`Balance after burn: ${(balanceAfter / 1e9).toFixed(6)} SOL`);
-          console.log(`Net SOL change: ${netChange.toFixed(6)} SOL`);
-          
           // Update the token list by removing the burnt token
           const updatedTokens = tokens.filter(t => t.mint !== token.mint);
           setTokens(updatedTokens);
@@ -808,14 +802,11 @@ const WalletAssets: React.FC = () => {
           
           // Calculate rent returned from burned token
           const tokenRentPerAccount = 0.00204; // SOL per token account
-          const networkFee = 0.000005; // Estimated network fee
-          const projectFee = 0.00004; // Project fee
-          const expectedNet = tokenRentPerAccount - networkFee - projectFee;
           
-          // Show message with specific rent amount and actual balance change
+          // Show message with specific rent amount
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
-          setError(`Successfully burned ${token.name || token.symbol || 'token'}! Rent: ${tokenRentPerAccount.toFixed(4)} SOL | Net received: ${expectedNet.toFixed(4)} SOL | ${shortSig}`);
+          setError(`Successfully burned ${token.name || token.symbol || 'token'}! Rent returned: ${tokenRentPerAccount.toFixed(4)} SOL | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
@@ -827,7 +818,7 @@ const WalletAssets: React.FC = () => {
             }
           }, 100);
           
-          setTimeout(() => setError(null), 10000); // Clear message after 10 seconds
+          setTimeout(() => setError(null), 8000); // Clear message after 8 seconds
         }
       } catch (signingError: any) {
         // Clear timeout
