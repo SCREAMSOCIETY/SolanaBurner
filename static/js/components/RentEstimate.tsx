@@ -255,12 +255,19 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     const nftRent = selectedNFTCount * (rentData.nftRentPerAsset || rentData.rentPerAccount);
     const selectedRent = tokenRent + nftRent;
     
+    // Calculate 1% fee and net amount
+    const feePercentage = 0.01; // 1% fee
+    const feeAmount = selectedRent * feePercentage;
+    const netSelectedRent = selectedRent - feeAmount;
+    
     return {
       totalSelected,
       selectedTokenCount,
       selectedNFTCount,
       selectedCNFTCount,
-      selectedRent
+      selectedRent,
+      feeAmount,
+      netSelectedRent
     };
   };
 
@@ -295,8 +302,13 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         {selectedRentData && selectedRentData.totalSelected > 0 ? (
           <div className="selected-estimate">
             <div className="current-selection">
-              <span className="estimate-label">Selected for Burning:</span>
-              <span className="estimate-value selected">{selectedRentData.selectedRent.toFixed(4)} SOL</span>
+              <span className="estimate-label">Net Rent (after 1% fee):</span>
+              <span className="estimate-value selected">{selectedRentData.netSelectedRent.toFixed(4)} SOL</span>
+            </div>
+            <div className="fee-breakdown">
+              <small>
+                Gross rent: {selectedRentData.selectedRent.toFixed(4)} SOL • Fee: {selectedRentData.feeAmount.toFixed(5)} SOL
+              </small>
             </div>
             <div className="selection-breakdown">
               <small>
