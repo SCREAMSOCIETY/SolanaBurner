@@ -800,9 +800,25 @@ const WalletAssets: React.FC = () => {
             window.BurnAnimations.checkAchievements('tokens', 1);
           }
           
-          // Show message about rent recovery and fee
-          setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet! A small donation has been sent to support the project.`);
-          setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+          // Calculate rent returned from burned token
+          const tokenRentPerAccount = 0.00204; // SOL per token account
+          
+          // Show message with specific rent amount
+          const txUrl = `https://solscan.io/tx/${signature}`;
+          const shortSig = signature.substring(0, 8) + '...';
+          setError(`Successfully burned ${token.name || token.symbol || 'token'}! Rent returned: ${tokenRentPerAccount.toFixed(4)} SOL | Signature: ${shortSig}`);
+          
+          // Add link to transaction
+          setTimeout(() => {
+            const txElem = document.createElement('div');
+            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+            
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+          
+          setTimeout(() => setError(null), 8000); // Clear message after 8 seconds
         }
       } catch (signingError: any) {
         // Clear timeout
@@ -1007,9 +1023,25 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Show message about rent recovery and donation
-          setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet! A small donation has been sent to support the project.`);
-          setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
+          // Calculate rent returned from burned NFT (includes token + metadata + edition accounts)
+          const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
+          
+          // Show message with specific rent amount
+          const txUrl = `https://solscan.io/tx/${signature}`;
+          const shortSig = signature.substring(0, 8) + '...';
+          setError(`Successfully burned NFT "${nft.name || 'NFT'}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
+          
+          // Add link to transaction
+          setTimeout(() => {
+            const txElem = document.createElement('div');
+            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+            
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+          
+          setTimeout(() => setError(null), 8000); // Clear message after 8 seconds
         }
       } catch (signingError: any) {
         // Clear timeout
