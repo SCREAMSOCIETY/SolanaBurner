@@ -257,10 +257,15 @@ const NFTsTab: React.FC = () => {
       
     } catch (err: any) {
       console.error('[NFTsTab] Error burning NFT:', err);
-      if (err.message?.includes('User rejected')) {
+      console.error('[NFTsTab] Error details:', JSON.stringify(err, null, 2));
+      
+      if (err.message?.includes('User rejected') || err.message?.includes('cancelled')) {
         setError('Transaction was cancelled by the user');
+      } else if (err.message?.includes('insufficient')) {
+        setError('Insufficient SOL for transaction fees. Please add more SOL to your wallet.');
       } else {
-        setError(`Failed to burn NFT: ${err.message || 'Unknown error'}`);
+        const errorMsg = err.message || err.toString() || 'Unknown error occurred';
+        setError(`Failed to burn NFT: ${errorMsg}`);
       }
     } finally {
       setBurning(false);
