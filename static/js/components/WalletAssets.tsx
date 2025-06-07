@@ -725,15 +725,8 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // Add a memo instruction to show rent recovery amount in wallet confirmation
+      // The rent return happens automatically when closing the token account
       const tokenRentPerAccount = 0.00204; // SOL per token account
-      const tokenMemoData = Buffer.from(`Token Burn: Recovering ${tokenRentPerAccount.toFixed(4)} SOL rent`, 'utf8');
-      const tokenMemoInstruction = new TransactionInstruction({
-        keys: [],
-        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-        data: tokenMemoData,
-      });
-      transaction.add(tokenMemoInstruction);
       
       // Add an instruction to transfer a 1% fee based on rent returned
       const feePercentage = 0.01; // 1% fee
@@ -948,15 +941,8 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // 4. Add a memo instruction to show rent recovery amount in wallet confirmation
+      // The rent return happens automatically when closing the NFT accounts
       const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
-      const memoData = Buffer.from(`NFT Burn: Recovering ${nftRentPerAsset.toFixed(4)} SOL rent`, 'utf8');
-      const memoInstruction = new TransactionInstruction({
-        keys: [],
-        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-        data: memoData,
-      });
-      transaction.add(memoInstruction);
       
       // 5. Add an instruction to transfer a 1% fee based on rent returned
       const feePercentage = 0.01; // 1% fee
