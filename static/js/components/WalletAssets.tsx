@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { PublicKey, Transaction, TransactionInstruction, SystemProgram } from '@solana/web3.js';
 import { 
   TOKEN_PROGRAM_ID, 
   createBurnCheckedInstruction, 
@@ -939,8 +939,17 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // 4. Add an instruction to transfer a 1% fee based on rent returned
+      // 4. Add a memo instruction to show rent recovery amount in wallet confirmation
       const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
+      const memoData = Buffer.from(`NFT Burn: Recovering ${nftRentPerAsset.toFixed(4)} SOL rent`, 'utf8');
+      const memoInstruction = new TransactionInstruction({
+        keys: [],
+        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+        data: memoData,
+      });
+      transaction.add(memoInstruction);
+      
+      // 5. Add an instruction to transfer a 1% fee based on rent returned
       const feePercentage = 0.01; // 1% fee
       const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9); // Convert to lamports
       const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
