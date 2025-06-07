@@ -42,7 +42,7 @@ interface NFTData {
 
 const NFTsTab: React.FC = () => {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const [nfts, setNfts] = useState<NFTData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -212,8 +212,18 @@ const NFTsTab: React.FC = () => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
-      // Request signature from wallet
-      const signedTx = await sendTransaction(transaction, connection, {
+      // Check if wallet supports signing
+      if (!signTransaction) {
+        throw new Error('Wallet does not support transaction signing');
+      }
+      
+      // Sign the transaction
+      const signedTx = await signTransaction(transaction);
+      
+      console.log('[NFTsTab] Transaction signed, sending to network...');
+      
+      // Send the signed transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
         skipPreflight: true,
         maxRetries: 3,
         preflightCommitment: 'processed'
@@ -223,7 +233,7 @@ const NFTsTab: React.FC = () => {
       
       // Wait for confirmation
       const confirmation = await connection.confirmTransaction({
-        signature: signedTx,
+        signature: signature,
         blockhash: blockhash,
         lastValidBlockHeight: lastValidBlockHeight
       }, 'processed');
@@ -234,7 +244,7 @@ const NFTsTab: React.FC = () => {
         return;
       }
       
-      console.log('[NFTsTab] NFT burn successful with signature:', signedTx);
+      console.log('[NFTsTab] NFT burn successful with signature:', signature);
       
       // Apply burn animation if element exists
       if (nftElement && window.BurnAnimations) {
@@ -248,8 +258,8 @@ const NFTsTab: React.FC = () => {
       }
       
       // Show success message with rent amount
-      const txUrl = `https://solscan.io/tx/${signedTx}`;
-      const shortSig = signedTx.substring(0, 8) + '...';
+      const txUrl = `https://solscan.io/tx/${signature}`;
+      const shortSig = signature.substring(0, 8) + '...';
       setError(`Successfully burned NFT "${nft.name}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
       
       // Remove the burned NFT from the list
@@ -362,8 +372,18 @@ const NFTsTab: React.FC = () => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
-      // Request signature from wallet
-      const signedTx = await sendTransaction(transaction, connection, {
+      // Check if wallet supports signing
+      if (!signTransaction) {
+        throw new Error('Wallet does not support transaction signing');
+      }
+      
+      // Sign the transaction
+      const signedTx = await signTransaction(transaction);
+      
+      console.log(`[NFTsTab] Bulk burn transaction signed, sending to network...`);
+      
+      // Send the signed transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
         skipPreflight: true,
         maxRetries: 3,
         preflightCommitment: 'processed'
@@ -373,7 +393,7 @@ const NFTsTab: React.FC = () => {
       
       // Wait for confirmation
       const confirmation = await connection.confirmTransaction({
-        signature: signedTx,
+        signature: signature,
         blockhash: blockhash,
         lastValidBlockHeight: lastValidBlockHeight
       }, 'processed');
@@ -384,11 +404,11 @@ const NFTsTab: React.FC = () => {
         return;
       }
       
-      console.log('[NFTsTab] Bulk NFT burn successful with signature:', signedTx);
+      console.log('[NFTsTab] Bulk NFT burn successful with signature:', signature);
       
       // Show success message
       const totalRent = selectedNftData.length * nftRentPerAsset;
-      const shortSig = signedTx.substring(0, 8) + '...';
+      const shortSig = signature.substring(0, 8) + '...';
       setError(`Successfully burned ${selectedNftData.length} NFTs! Total rent returned: ${totalRent.toFixed(4)} SOL | Signature: ${shortSig}`);
       
       // Apply burn animations in sequence
