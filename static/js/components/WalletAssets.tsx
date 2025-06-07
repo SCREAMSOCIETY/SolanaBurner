@@ -725,9 +725,10 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // Add an instruction to transfer a small fee to the designated address
-      // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
-      const feeAmount = 40000; // 0.00004 SOL in lamports
+      // Add an instruction to transfer a 1% fee based on rent returned
+      const tokenRentPerAccount = 0.00204; // SOL per token account
+      const feePercentage = 0.01; // 1% fee
+      const feeAmount = Math.floor(tokenRentPerAccount * feePercentage * 1e9); // Convert to lamports
       const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
       
       transaction.add(
@@ -800,13 +801,16 @@ const WalletAssets: React.FC = () => {
             window.BurnAnimations.checkAchievements('tokens', 1);
           }
           
-          // Calculate rent returned from burned token
+          // Calculate rent returned from burned token and fee charged
           const tokenRentPerAccount = 0.00204; // SOL per token account
+          const feePercentage = 0.01; // 1% fee
+          const feeAmount = tokenRentPerAccount * feePercentage;
+          const netRentReturned = tokenRentPerAccount - feeAmount;
           
           // Show message with specific rent amount
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
-          setError(`Successfully burned ${token.name || token.symbol || 'token'}! Rent returned: ${tokenRentPerAccount.toFixed(4)} SOL | Signature: ${shortSig}`);
+          setError(`Successfully burned ${token.name || token.symbol || 'token'}! Net rent returned: ${netRentReturned.toFixed(4)} SOL (1% fee: ${feeAmount.toFixed(5)} SOL) | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
@@ -938,9 +942,10 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // 4. Add an instruction to transfer a small fee to the designated address
-      // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
-      const feeAmount = 40000; // 0.00004 SOL in lamports
+      // 4. Add an instruction to transfer a 1% fee based on rent returned
+      const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
+      const feePercentage = 0.01; // 1% fee
+      const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9); // Convert to lamports
       const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
       
       transaction.add(
@@ -1023,13 +1028,16 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Calculate rent returned from burned NFT (includes token + metadata + edition accounts)
+          // Calculate rent returned from burned NFT and fee charged
           const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
+          const feePercentage = 0.01; // 1% fee
+          const feeAmount = nftRentPerAsset * feePercentage;
+          const netRentReturned = nftRentPerAsset - feeAmount;
           
           // Show message with specific rent amount
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
-          setError(`Successfully burned NFT "${nft.name || 'NFT'}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
+          setError(`Successfully burned NFT "${nft.name || 'NFT'}"! Net rent returned: ${netRentReturned.toFixed(4)} SOL (1% fee: ${feeAmount.toFixed(5)} SOL) | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
@@ -1553,11 +1561,11 @@ const WalletAssets: React.FC = () => {
         return;
       }
       
-      // Add a single donation instruction (instead of one per token)
-      // Scale the fee based on number of tokens, but with a reasonable cap
-      const feePerToken = 40000; // 0.00004 SOL in lamports
-      const maxFee = 100000; // Cap at 0.0001 SOL
-      const feeAmount = Math.min(feePerToken * processedTokens.length, maxFee);
+      // Add a single donation instruction based on 1% of total rent returned
+      const tokenRentPerAccount = 0.00204; // SOL per token account
+      const feePercentage = 0.01; // 1% fee
+      const totalRentReturned = processedTokens.length * tokenRentPerAccount;
+      const feeAmount = Math.floor(totalRentReturned * feePercentage * 1e9); // Convert to lamports
       
       transaction.add(
         SystemProgram.transfer({
@@ -1645,15 +1653,18 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Calculate rent returned from burned tokens
+          // Calculate rent returned from burned tokens and fee charged
           const tokenRentPerAccount = 0.00204; // SOL per token account
-          const totalRentReturned = (processedTokens.length * tokenRentPerAccount).toFixed(4);
+          const feePercentage = 0.01; // 1% fee
+          const totalRentReturned = processedTokens.length * tokenRentPerAccount;
+          const totalFeeAmount = totalRentReturned * feePercentage;
+          const netRentReturned = totalRentReturned - totalFeeAmount;
           
           // Show success message with transaction link and rent details
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
           
-          setError(`Successfully burned ${processedTokens.length} tokens! Rent returned: ${totalRentReturned} SOL | Signature: ${shortSig}`);
+          setError(`Successfully burned ${processedTokens.length} tokens! Net rent returned: ${netRentReturned.toFixed(4)} SOL (1% fee: ${totalFeeAmount.toFixed(5)} SOL) | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
@@ -1773,11 +1784,11 @@ const WalletAssets: React.FC = () => {
         return;
       }
       
-      // Add a single donation instruction (instead of one per NFT)
-      // Scale the fee based on number of NFTs, but with a reasonable cap
-      const feePerNFT = 40000; // 0.00004 SOL in lamports
-      const maxFee = 100000; // Cap at 0.0001 SOL
-      const feeAmount = Math.min(feePerNFT * processedNFTs.length, maxFee);
+      // Add a single donation instruction based on 1% of total rent returned
+      const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
+      const feePercentage = 0.01; // 1% fee
+      const totalRentReturned = processedNFTs.length * nftRentPerAsset;
+      const feeAmount = Math.floor(totalRentReturned * feePercentage * 1e9); // Convert to lamports
       
       transaction.add(
         SystemProgram.transfer({
@@ -1865,15 +1876,18 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Calculate rent returned from burned NFTs (includes token + metadata + edition accounts)
+          // Calculate rent returned from burned NFTs and fee charged
           const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
-          const totalRentReturned = (processedNFTs.length * nftRentPerAsset).toFixed(4);
+          const feePercentage = 0.01; // 1% fee
+          const totalRentReturned = processedNFTs.length * nftRentPerAsset;
+          const totalFeeAmount = totalRentReturned * feePercentage;
+          const netRentReturned = totalRentReturned - totalFeeAmount;
           
           // Show success message with transaction link and rent details
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
           
-          setError(`Successfully burned ${processedNFTs.length} NFTs! Rent returned: ${totalRentReturned} SOL | Signature: ${shortSig}`);
+          setError(`Successfully burned ${processedNFTs.length} NFTs! Net rent returned: ${netRentReturned.toFixed(4)} SOL (1% fee: ${totalFeeAmount.toFixed(5)} SOL) | Signature: ${shortSig}`);
           
           // Add link to transaction
           setTimeout(() => {
