@@ -1047,6 +1047,98 @@ fastify.post('/api/cnft/delegate', async (request, reply) => {
   }
 });
 
+// NFT Burn endpoint - Creates a transaction to burn an NFT and recover rent
+fastify.post('/api/burn-nft', async (request, reply) => {
+  try {
+    const { mint, tokenAccount, owner } = request.body;
+    
+    if (!mint || !tokenAccount || !owner) {
+      return reply.status(400).send({ 
+        success: false, 
+        error: 'Missing required parameters: mint, tokenAccount, owner' 
+      });
+    }
+    
+    const { Connection, PublicKey, Transaction, SystemProgram, ComputeBudgetProgram } = require('@solana/web3.js');
+    const { createBurnCheckedInstruction, createCloseAccountInstruction } = require('@solana/spl-token');
+    
+    // Create connection
+    const connection = new Connection(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com');
+    
+    // Create transaction
+    const transaction = new Transaction();
+    
+    // Add compute budget instructions
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+    );
+    
+    const ownerPubkey = new PublicKey(owner);
+    const mintPubkey = new PublicKey(mint);
+    const tokenAccountPubkey = new PublicKey(tokenAccount);
+    
+    // 1. Burn the NFT token
+    transaction.add(
+      createBurnCheckedInstruction(
+        tokenAccountPubkey, // token account
+        mintPubkey, // mint
+        ownerPubkey, // owner
+        1, // amount (NFTs have amount = 1)
+        0 // decimals (NFTs have decimals = 0)
+      )
+    );
+    
+    // 2. Close the token account to recover rent
+    transaction.add(
+      createCloseAccountInstruction(
+        tokenAccountPubkey, // token account to close
+        ownerPubkey, // destination for recovered SOL
+        ownerPubkey // owner
+      )
+    );
+    
+    // 3. Add 1% fee transfer (transparent background fee)
+    const nftRentPerAsset = 0.0077; // SOL per NFT
+    const feePercentage = 0.01;
+    const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9); // Convert to lamports
+    
+    if (feeAmount > 0) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: ownerPubkey,
+          toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
+          lamports: feeAmount
+        })
+      );
+    }
+    
+    // Set transaction properties
+    const { blockhash } = await connection.getLatestBlockhash('finalized');
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = ownerPubkey;
+    
+    // Serialize transaction for client signing
+    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
+    const base64Transaction = serializedTransaction.toString('base64');
+    
+    reply.send({
+      success: true,
+      transaction: base64Transaction,
+      message: `Prepared NFT burn transaction for ${mint}`,
+      rentRecovered: (nftRentPerAsset * 0.99).toFixed(4), // User receives 99% after 1% fee
+      fee: (nftRentPerAsset * 0.01).toFixed(4)
+    });
+    
+  } catch (error) {
+    console.error('Error preparing NFT burn transaction:', error);
+    reply.status(500).send({
+      success: false,
+      error: error.message || 'Failed to prepare burn transaction'
+    });
+  }
+});
+
 // Endpoint for processing cNFT burn requests
 fastify.post('/api/cnft/burn-request', async (request, reply) => {
   try {

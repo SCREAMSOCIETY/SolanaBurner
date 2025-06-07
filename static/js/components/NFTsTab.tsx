@@ -136,150 +136,113 @@ const NFTsTab: React.FC = () => {
   };
   
   const handleBurnNft = async (mint: string) => {
-    if (!publicKey) return;
+    if (!publicKey || !signTransaction || !connection) {
+      setError('Wallet not properly connected. Please reconnect your wallet.');
+      return;
+    }
     
     try {
       setBurning(true);
+      setError('Preparing burn transaction...');
       
-      // Find the NFT data and NFT element for animation
+      // Find the NFT data
       const nft = nfts.find(n => n.mint === mint);
-      const nftElement = document.querySelector(`.nft-card[data-mint="${mint}"]`) as HTMLElement;
-      
       if (!nft || !nft.tokenAddress) {
-        console.error('[NFTsTab] NFT data or token address not found for mint:', mint);
         setError('Failed to burn NFT: Missing token data');
         setBurning(false);
         return;
       }
       
-      console.log('[NFTsTab] Burning NFT:', mint);
-      console.log('[NFTsTab] NFT data:', nft);
-      console.log('[NFTsTab] Public key:', publicKey?.toString());
-      console.log('[NFTsTab] signTransaction available:', !!signTransaction);
+      console.log('[NFTsTab] Starting NFT burn for:', mint);
       
-      // Import required modules for real NFT burning
-      const { ComputeBudgetProgram, SystemProgram } = await import('@solana/web3.js');
-      const { createBurnCheckedInstruction, createCloseAccountInstruction } = await import('@solana/spl-token');
-      
-      // Create a transaction to burn the NFT
-      const transaction = new Transaction();
-      
-      // Add compute budget instructions
-      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-        units: 200000
-      });
-      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: 1
-      });
-      transaction.add(modifyComputeUnits, addPriorityFee);
-      
-      // 1. Burn the NFT token
-      transaction.add(
-        createBurnCheckedInstruction(
-          new PublicKey(nft.tokenAddress), // token account
-          new PublicKey(nft.mint), // mint
-          publicKey, // owner
-          1, // amount (NFTs have amount = 1)
-          0 // decimals (NFTs have decimals = 0)
-        )
-      );
-      
-      // 2. Close the token account to recover rent
-      transaction.add(
-        createCloseAccountInstruction(
-          new PublicKey(nft.tokenAddress), // token account to close
-          publicKey, // destination for recovered SOL
-          publicKey, // owner
-          [] // multisig signers
-        )
-      );
-      
-      // 3. Add 1% fee transfer
-      const nftRentPerAsset = 0.0077; // SOL per NFT
-      const feePercentage = 0.01;
-      const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9);
-      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-      
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: feeRecipient,
-          lamports: feeAmount,
+      // Use server-side burn endpoint for better reliability
+      const response = await fetch('/api/burn-nft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mint: mint,
+          tokenAccount: nft.tokenAddress,
+          owner: publicKey.toString()
         })
-      );
-      
-      // Get recent blockhash and sign transaction
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
-        commitment: 'processed'
       });
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
       
-      // Check if wallet supports signing
-      if (!signTransaction) {
-        throw new Error('Wallet does not support transaction signing');
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Server error: ${errorData}`);
       }
       
-      // Sign the transaction
-      const signedTx = await signTransaction(transaction);
+      const result = await response.json();
       
-      console.log('[NFTsTab] Transaction signed, sending to network...');
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown server error');
+      }
+      
+      console.log('[NFTsTab] Transaction prepared, requesting wallet signature...');
+      setError('Please sign the transaction in your wallet...');
+      
+      // Get the prepared transaction from server
+      const { transaction: transactionBase64, rentRecovered } = result;
+      
+      // Deserialize the transaction
+      const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
+      
+      // Sign the transaction with wallet
+      const signedTransaction = await signTransaction(transaction);
+      
+      console.log('[NFTsTab] Transaction signed, broadcasting to network...');
+      setError('Broadcasting transaction...');
       
       // Send the signed transaction
-      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: true,
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+        skipPreflight: false,
         maxRetries: 3,
         preflightCommitment: 'processed'
       });
       
-      console.log('[NFTsTab] Transaction sent, waiting for confirmation...');
+      console.log('[NFTsTab] Transaction sent with signature:', signature);
+      setError('Waiting for confirmation...');
       
       // Wait for confirmation
-      const confirmation = await connection.confirmTransaction({
-        signature: signature,
-        blockhash: blockhash,
-        lastValidBlockHeight: lastValidBlockHeight
-      }, 'processed');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       
       if (confirmation.value.err) {
-        console.error('[NFTsTab] Error confirming NFT burn transaction:', confirmation.value.err);
-        setError(`Error burning NFT: ${confirmation.value.err}`);
-        return;
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
       }
       
-      console.log('[NFTsTab] NFT burn successful with signature:', signature);
+      console.log('[NFTsTab] NFT burn confirmed successfully');
       
-      // Apply burn animation if element exists
-      if (nftElement && window.BurnAnimations) {
+      // Apply burn animation if available
+      const nftElement = document.querySelector(`.nft-card[data-mint="${mint}"]`) as HTMLElement;
+      if (window.BurnAnimations && nftElement) {
         window.BurnAnimations.applyBurnAnimation(nftElement);
-      }
-      
-      // Show confetti for successful burn
-      if (window.BurnAnimations) {
         window.BurnAnimations.createConfetti();
         window.BurnAnimations.checkAchievements('nft', 1);
       }
       
-      // Show success message with rent amount
-      const txUrl = `https://solscan.io/tx/${signature}`;
+      // Show success message with actual rent amount from server
       const shortSig = signature.substring(0, 8) + '...';
-      setError(`Successfully burned NFT "${nft.name}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
+      setError(`Successfully burned NFT "${nft.name}"! Rent returned: ${rentRecovered} SOL | Tx: ${shortSig}`);
       
       // Remove the burned NFT from the list
       setNfts(nfts.filter(n => n.mint !== mint));
       
     } catch (err: any) {
       console.error('[NFTsTab] Error burning NFT:', err);
-      console.error('[NFTsTab] Error details:', JSON.stringify(err, null, 2));
       
-      if (err.message?.includes('User rejected') || err.message?.includes('cancelled')) {
-        setError('Transaction was cancelled by the user');
-      } else if (err.message?.includes('insufficient')) {
-        setError('Insufficient SOL for transaction fees. Please add more SOL to your wallet.');
-      } else {
-        const errorMsg = err.message || err.toString() || 'Unknown error occurred';
-        setError(`Failed to burn NFT: ${errorMsg}`);
+      let errorMessage = 'Unknown error occurred';
+      if (err?.message) {
+        if (err.message.includes('User rejected') || err.message.includes('cancelled')) {
+          errorMessage = 'Transaction was cancelled by the user';
+        } else if (err.message.includes('insufficient')) {
+          errorMessage = 'Insufficient SOL for transaction fees. Please add more SOL to your wallet.';
+        } else {
+          errorMessage = err.message;
+        }
       }
+      
+      setError(`Failed to burn NFT: ${errorMessage}`);
     } finally {
       setBurning(false);
     }
