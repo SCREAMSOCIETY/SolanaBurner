@@ -153,6 +153,9 @@ const NFTsTab: React.FC = () => {
       }
       
       console.log('[NFTsTab] Burning NFT:', mint);
+      console.log('[NFTsTab] NFT data:', nft);
+      console.log('[NFTsTab] Public key:', publicKey?.toString());
+      console.log('[NFTsTab] signTransaction available:', !!signTransaction);
       
       // Import required modules for real NFT burning
       const { ComputeBudgetProgram, SystemProgram } = await import('@solana/web3.js');
