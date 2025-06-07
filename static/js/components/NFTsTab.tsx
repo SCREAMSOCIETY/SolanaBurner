@@ -249,170 +249,133 @@ const NFTsTab: React.FC = () => {
   };
   
   const handleBulkBurn = async () => {
-    if (!publicKey || selectedNfts.size === 0) return;
+    if (!publicKey || selectedNfts.size === 0 || !signTransaction || !connection) {
+      setError('Wallet not properly connected. Please reconnect your wallet.');
+      return;
+    }
     
     try {
       setBurning(true);
+      setError('Preparing bulk burn transaction...');
       
-      // Get all NFT elements for animation
-      const nftElements: HTMLElement[] = [];
       const selectedNftData = nfts.filter(nft => selectedNfts.has(nft.mint));
+      console.log(`[NFTsTab] Starting bulk burn for ${selectedNftData.length} NFTs`);
       
-      document.querySelectorAll('.nft-card').forEach(element => {
-        const mintAttribute = (element as HTMLElement).dataset.mint;
-        if (mintAttribute && selectedNfts.has(mintAttribute)) {
-          nftElements.push(element as HTMLElement);
-        }
-      });
-      
-      console.log(`[NFTsTab] Burning ${selectedNftData.length} NFTs in bulk`);
-      
-      // Import required modules for real NFT burning
-      const { ComputeBudgetProgram, SystemProgram } = await import('@solana/web3.js');
-      const { createBurnCheckedInstruction, createCloseAccountInstruction } = await import('@solana/spl-token');
-      
-      // Create a single transaction for all NFT burns
-      const transaction = new Transaction();
-      
-      // Add compute budget instructions (scaled for multiple NFTs)
-      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-        units: 200000 * Math.min(5, selectedNftData.length)
-      });
-      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: 1
-      });
-      transaction.add(modifyComputeUnits, addPriorityFee);
-      
-      // Process each selected NFT
-      const nftRentPerAsset = 0.0077;
-      const feePercentage = 0.01;
-      let totalFeeAmount = 0;
+      // Process NFTs individually using the server endpoint for reliability
+      let successCount = 0;
+      let totalRentRecovered = 0;
+      const errors: string[] = [];
       
       for (const nft of selectedNftData) {
         if (!nft.tokenAddress) {
-          console.warn(`[NFTsTab] Skipping NFT ${nft.mint} - missing token address`);
+          errors.push(`${nft.name}: Missing token data`);
           continue;
         }
         
-        // Add burn instruction
-        transaction.add(
-          createBurnCheckedInstruction(
-            new PublicKey(nft.tokenAddress),
-            new PublicKey(nft.mint),
-            publicKey,
-            1,
-            0
-          )
-        );
+        try {
+          setError(`Burning ${successCount + 1}/${selectedNftData.length}: ${nft.name}...`);
+          
+          // Use server-side burn endpoint
+          const response = await fetch('/api/burn-nft', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              mint: nft.mint,
+              tokenAccount: nft.tokenAddress,
+              owner: publicKey.toString()
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Unknown server error');
+          }
+          
+          // Get the prepared transaction
+          const { transaction: transactionBase64, rentRecovered } = result;
+          const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
+          
+          // Sign and send the transaction
+          const signedTransaction = await signTransaction(transaction);
+          
+          const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+            skipPreflight: false,
+            maxRetries: 2,
+            preflightCommitment: 'processed'
+          });
+          
+          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+          
+          if (confirmation.value.err) {
+            throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+          }
+          
+          successCount++;
+          totalRentRecovered += parseFloat(rentRecovered);
+          
+          console.log(`[NFTsTab] Successfully burned NFT ${nft.mint}`);
+          
+        } catch (err: any) {
+          console.error(`[NFTsTab] Error burning NFT ${nft.mint}:`, err);
+          errors.push(`${nft.name}: ${err.message || 'Unknown error'}`);
+        }
+      }
+      
+      // Display final results
+      const successMessage = successCount > 0 ? 
+        `Successfully burned ${successCount}/${selectedNftData.length} NFTs! Total rent recovered: ${totalRentRecovered.toFixed(4)} SOL` :
+        'No NFTs were successfully burned';
+      
+      if (errors.length > 0) {
+        console.warn('[NFTsTab] Bulk burn errors:', errors);
+        setError(`${successMessage}. Errors: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
+      } else {
+        setError(successMessage);
+      }
+      
+      // Apply burn animations for successful burns
+      if (successCount > 0 && window.BurnAnimations) {
+        // Animate NFT elements that were successfully burned
+        const burnedMints = selectedNftData.slice(0, successCount).map(nft => nft.mint);
+        const nftElements = Array.from(document.querySelectorAll('.nft-card')).filter(element => {
+          const mintAttribute = (element as HTMLElement).dataset.mint;
+          return mintAttribute && burnedMints.includes(mintAttribute);
+        }) as HTMLElement[];
         
-        // Add close account instruction
-        transaction.add(
-          createCloseAccountInstruction(
-            new PublicKey(nft.tokenAddress),
-            publicKey,
-            publicKey,
-            []
-          )
-        );
-        
-        // Calculate fee for this NFT
-        totalFeeAmount += Math.floor(nftRentPerAsset * feePercentage * 1e9);
-      }
-      
-      // Add single fee transfer for all NFTs
-      if (totalFeeAmount > 0) {
-        const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: feeRecipient,
-            lamports: totalFeeAmount,
-          })
-        );
-      }
-      
-      // Get recent blockhash and sign transaction
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
-        commitment: 'processed'
-      });
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-      
-      // Check if wallet supports signing
-      if (!signTransaction) {
-        throw new Error('Wallet does not support transaction signing');
-      }
-      
-      // Sign the transaction
-      const signedTx = await signTransaction(transaction);
-      
-      console.log(`[NFTsTab] Bulk burn transaction signed, sending to network...`);
-      
-      // Send the signed transaction
-      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: true,
-        maxRetries: 3,
-        preflightCommitment: 'processed'
-      });
-      
-      console.log(`[NFTsTab] Bulk burn transaction sent, waiting for confirmation...`);
-      
-      // Wait for confirmation
-      const confirmation = await connection.confirmTransaction({
-        signature: signature,
-        blockhash: blockhash,
-        lastValidBlockHeight: lastValidBlockHeight
-      }, 'processed');
-      
-      if (confirmation.value.err) {
-        console.error('[NFTsTab] Error confirming bulk NFT burn transaction:', confirmation.value.err);
-        setError(`Error burning NFTs: ${confirmation.value.err}`);
-        return;
-      }
-      
-      console.log('[NFTsTab] Bulk NFT burn successful with signature:', signature);
-      
-      // Show success message
-      const totalRent = selectedNftData.length * nftRentPerAsset;
-      const shortSig = signature.substring(0, 8) + '...';
-      setError(`Successfully burned ${selectedNftData.length} NFTs! Total rent returned: ${totalRent.toFixed(4)} SOL | Signature: ${shortSig}`);
-      
-      // Apply burn animations in sequence
-      if (window.BurnAnimations && nftElements.length > 0) {
-        // Animate each NFT with a slight delay between them
+        // Animate each NFT with a slight delay
         nftElements.forEach((element, index) => {
           setTimeout(() => {
             window.BurnAnimations?.applyBurnAnimation(element);
-          }, index * 300);
+          }, index * 200);
         });
-      }
-      
-      // Show mega confetti for bulk burn
-      if (window.BurnAnimations) {
-        // Create double confetti for bulk burn
+        
+        // Show confetti for successful bulk burn
         window.BurnAnimations.createConfetti();
-        setTimeout(() => {
-          window.BurnAnimations?.createConfetti();
-        }, 300);
+        window.BurnAnimations.checkAchievements('nft', successCount);
         
-        // Track achievement progress for all NFTs
-        window.BurnAnimations.checkAchievements('nft', selectedNftData.length);
-        
-        // Show special achievement for bulk burning
-        if (selectedNftData.length >= 2) {
+        if (successCount >= 2) {
           window.BurnAnimations.showAchievement(
-            "NFT Purge Master!", 
-            `You've burned ${selectedNftData.length} NFTs at once. Making history!`
+            "Bulk Burn Master!", 
+            `Successfully burned ${successCount} NFTs! Rent recovered: ${totalRentRecovered.toFixed(4)} SOL`
           );
         }
       }
       
-      // Remove all burned NFTs from the list
-      setNfts(nfts.filter(nft => !selectedNfts.has(nft.mint)));
+      // Remove successfully burned NFTs from the list
+      const burnedMints = selectedNftData.slice(0, successCount).map(nft => nft.mint);
+      setNfts(nfts.filter(nft => !burnedMints.includes(nft.mint)));
       setSelectedNfts(new Set());
-    } catch (err) {
-      console.error('[NFTsTab] Error bulk burning NFTs:', err);
-      setError('Failed to burn NFTs. Please try again.');
+      
+    } catch (err: any) {
+      console.error('[NFTsTab] Error in bulk burn process:', err);
+      setError(`Bulk burn failed: ${err.message || 'Unknown error'}`);
     } finally {
       setBurning(false);
     }
