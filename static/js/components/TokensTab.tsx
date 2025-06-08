@@ -308,12 +308,19 @@ const TokensTab: React.FC = () => {
         }
         
         // First burn the token balance
+        // Apply final decimal validation at instruction level
+        let instructionDecimals = actualDecimals;
+        if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+          instructionDecimals = 0;
+          console.log(`Final decimal override at instruction level: using 0 for DwLw token`);
+        }
+        
         const burnInstruction = createBurnCheckedInstruction(
           new PublicKey(token.account), // Token account
           new PublicKey(token.mint),    // Mint
           publicKey,                    // Owner
           token.balance,                // Amount
-          actualDecimals                // Correct decimals from mint
+          instructionDecimals           // Final validated decimals
         );
         
         transaction.add(burnInstruction);
@@ -456,12 +463,19 @@ const TokensTab: React.FC = () => {
             }
             
             // First burn the token balance
+            // Apply final decimal validation at instruction level
+            let instructionDecimals = actualDecimals;
+            if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+              instructionDecimals = 0;
+              console.log(`Final decimal override at bulk instruction level: using 0 for DwLw token`);
+            }
+            
             const burnInstruction = createBurnCheckedInstruction(
               new PublicKey(token.account), // Token account
               new PublicKey(token.mint),    // Mint
               publicKey,                    // Owner
               token.balance,                // Amount
-              actualDecimals                // Correct decimals from mint
+              instructionDecimals           // Final validated decimals
             );
             
             transaction.add(burnInstruction);
