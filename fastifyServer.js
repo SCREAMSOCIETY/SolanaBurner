@@ -1095,6 +1095,14 @@ fastify.post('/api/burn-nft', async (request, reply) => {
         suggestedAction: 'transfer_to_vault'
       });
     }
+
+    // Check if tokenAccount is provided for regular NFTs
+    if (!tokenAccount) {
+      return reply.status(400).send({ 
+        success: false, 
+        error: 'Missing tokenAccount for regular NFT' 
+      });
+    }
     
     const { Connection, PublicKey, Transaction, SystemProgram, ComputeBudgetProgram, TransactionInstruction } = require('@solana/web3.js');
     const { createBurnInstruction, createCloseAccountInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
@@ -1170,116 +1178,69 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const feePercentage = 0.01;
     const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9);
     
-    if (fallbackTransfer) {
-      // Fallback: Transfer to vault instead of burning
-      const vaultWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-      const vaultTokenAccount = await getAssociatedTokenAddress(mintPubkey, vaultWallet);
-      
-      // Check if vault token account exists, if not create it
-      const vaultAccountInfo = await connection.getAccountInfo(vaultTokenAccount);
-      if (!vaultAccountInfo) {
-        transaction.add(
-          createAssociatedTokenAccountInstruction(
-            ownerPubkey, // payer
-            vaultTokenAccount, // associated token account
-            vaultWallet, // owner
-            mintPubkey // mint
-          )
-        );
-      }
-      
-      // Transfer NFT to vault
+    // Always use transfer approach for restricted NFTs instead of burning
+    const vaultWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+    const vaultTokenAccount = await getAssociatedTokenAddress(mintPubkey, vaultWallet);
+    
+    // Check if vault token account exists, if not create it
+    const vaultAccountInfo = await connection.getAccountInfo(vaultTokenAccount);
+    if (!vaultAccountInfo) {
       transaction.add(
-        createTransferInstruction(
-          tokenAccountPubkey, // source
-          vaultTokenAccount, // destination
-          ownerPubkey, // owner
-          1 // amount
+        createAssociatedTokenAccountInstruction(
+          ownerPubkey, // payer
+          vaultTokenAccount, // associated token account
+          vaultWallet, // owner
+          mintPubkey // mint
         )
       );
-      
-      // Close the token account to recover rent
-      transaction.add(
-        createCloseAccountInstruction(
-          tokenAccountPubkey,
-          ownerPubkey,
-          ownerPubkey
-        )
-      );
-      
-      // Add fee
-      if (feeAmount >= 1000) {
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: ownerPubkey,
-            toPubkey: vaultWallet,
-            lamports: feeAmount
-          })
-        );
-      }
-      
-      // Set transaction properties
-      const { blockhash } = await connection.getLatestBlockhash('finalized');
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = ownerPubkey;
-      
-      const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
-      const base64Transaction = serializedTransaction.toString('base64');
-      
-      reply.send({
-        success: true,
-        transaction: base64Transaction,
-        message: `Prepared NFT transfer to vault for ${mint}`,
-        rentRecovered: (nftRentPerAsset * 0.99).toFixed(4),
-        fee: (nftRentPerAsset * 0.01).toFixed(4),
-        method: 'transfer'
-      });
-      
-    } else {
-      // Standard burn approach
-      transaction.add(
-        createBurnInstruction(
-          tokenAccountPubkey,
-          mintPubkey,
-          ownerPubkey,
-          1
-        )
-      );
-      
-      transaction.add(
-        createCloseAccountInstruction(
-          tokenAccountPubkey,
-          ownerPubkey,
-          ownerPubkey
-        )
-      );
-      
-      if (feeAmount >= 1000) {
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: ownerPubkey,
-            toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
-            lamports: feeAmount
-          })
-        );
-      }
-      
-      const { blockhash } = await connection.getLatestBlockhash('finalized');
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = ownerPubkey;
-      
-      const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
-      const base64Transaction = serializedTransaction.toString('base64');
-      
-      reply.send({
-        success: true,
-        transaction: base64Transaction,
-        message: `Prepared NFT burn transaction for ${mint}`,
-        rentRecovered: (nftRentPerAsset * 0.99).toFixed(4),
-        fee: (nftRentPerAsset * 0.01).toFixed(4),
-        method: 'burn'
-      });
     }
+    
+    // Transfer NFT to vault
+    transaction.add(
+      createTransferInstruction(
+        tokenAccountPubkey, // source
+        vaultTokenAccount, // destination
+        ownerPubkey, // owner
+        1 // amount
+      )
+    );
+    
+    // Close the token account to recover rent
+    transaction.add(
+      createCloseAccountInstruction(
+        tokenAccountPubkey,
+        ownerPubkey,
+        ownerPubkey
+      )
+    );
+    
+    // Add fee
+    if (feeAmount >= 1000) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: ownerPubkey,
+          toPubkey: vaultWallet,
+          lamports: feeAmount
+        })
+      );
+    }
+    
+    // Set transaction properties
+    const { blockhash } = await connection.getLatestBlockhash('finalized');
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = ownerPubkey;
+    
+    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
+    const base64Transaction = serializedTransaction.toString('base64');
+    
+    reply.send({
+      success: true,
+      transaction: base64Transaction,
+      message: `Prepared NFT transfer to vault for ${mint}`,
+      rentRecovered: (nftRentPerAsset * 0.99).toFixed(4),
+      fee: (nftRentPerAsset * 0.01).toFixed(4),
+      method: 'transfer'
+    });
     
   } catch (error) {
     console.error('Error preparing NFT transaction:', error);
