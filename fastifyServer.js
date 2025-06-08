@@ -1239,10 +1239,10 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       success: true,
       transaction: base64Transaction,
       message: `Prepared NFT disposal transaction for ${mint} - transferring to vault and recovering rent`,
-      rentRecovered: (nftRentPerAsset * 0.99).toFixed(4),
-      fee: (nftRentPerAsset * 0.01).toFixed(4),
+      rentRecovered: (rentPerAsset * 0.99).toFixed(4),
+      fee: (rentPerAsset * 0.01).toFixed(4),
       method: 'disposal_transfer',
-      burnMethod: burnMethod
+      burnMethod: 'disposal_transfer'
     });
     
   } catch (error) {
