@@ -17,7 +17,7 @@ const delegatedTransfer = require('./delegated-cnft-transfer');
 
 // Solana imports for vacant account burning
 const { Connection, PublicKey, Transaction, clusterApiUrl } = require('@solana/web3.js');
-const { createCloseAccountInstruction, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+const { createCloseAccountInstruction, createBurnInstruction, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
 const nacl = require('tweetnacl');
 
 // Log startup info
@@ -1153,8 +1153,8 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const feePercentage = 0.01;
     const feeAmount = Math.floor(rentPerAsset * feePercentage * 1e9);
 
-    // Add memo instruction to show disposal details in wallet
-    const memoText = `🔄 Transfer "${nftName}" to Vault | Rent Recovery: ${(rentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(rentPerAsset * 0.01).toFixed(4)} SOL`;
+    // Add memo instruction to show burn details in wallet
+    const memoText = `🔥 Burn "${nftName}" | Rent Recovery: ${(rentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(rentPerAsset * 0.01).toFixed(4)} SOL`;
     
     const memoInstruction = new TransactionInstruction({
       keys: [],
@@ -1186,29 +1186,16 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       });
     }
 
-    console.log(`Processing restricted NFT ${mint} - using disposal transfer to recover rent`);
+    console.log(`Processing restricted NFT ${mint} - using direct rent recovery method`);
     
-    const vaultWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-    const vaultTokenAccount = await getAssociatedTokenAddress(mintPubkey, vaultWallet);
+    // Use burn instruction followed by close account to properly dispose of NFT and recover rent
+    // This approach burns the NFT completely and recovers the account rent
     
-    // Check if vault token account exists, if not create it
-    const vaultAccountInfo = await connection.getAccountInfo(vaultTokenAccount);
-    if (!vaultAccountInfo) {
-      transaction.add(
-        createAssociatedTokenAccountInstruction(
-          ownerPubkey, // payer
-          vaultTokenAccount, // associated token account
-          vaultWallet, // owner
-          mintPubkey // mint
-        )
-      );
-    }
-    
-    // First: Transfer NFT to disposal vault (must complete before closing)
+    // First: Burn the NFT (sets balance to 0)
     transaction.add(
-      createTransferInstruction(
-        tokenAccountPubkey, // source
-        vaultTokenAccount, // destination
+      createBurnInstruction(
+        tokenAccountPubkey, // account to burn from
+        mintPubkey, // mint
         ownerPubkey, // owner
         1, // amount
         [], // multisigners
@@ -1227,7 +1214,7 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       )
     );
     
-    const burnMethod = 'disposal_transfer';
+    const burnMethod = 'direct_burn';
     
     // Add fee
     if (feeAmount >= 1000) {
@@ -1276,11 +1263,11 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     reply.send({
       success: true,
       transaction: base64Transaction,
-      message: `Prepared NFT disposal transaction for ${mint} - transferring to vault and recovering rent`,
+      message: `Prepared NFT burn transaction for ${mint} - burning NFT and recovering rent`,
       rentRecovered: (rentPerAsset * 0.99).toFixed(4),
       fee: (rentPerAsset * 0.01).toFixed(4),
-      method: 'disposal_transfer',
-      burnMethod: 'disposal_transfer'
+      method: 'direct_burn',
+      burnMethod: 'direct_burn'
     });
     
   } catch (error) {
