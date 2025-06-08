@@ -1354,8 +1354,8 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     const processedNFTs = [];
     
     // Maximum NFTs per batch transaction (limited by transaction size ~1232 bytes)
-    // Testing shows 11 NFTs = 1329 bytes > 1232 limit, so max is 10
-    const MAX_NFTS_PER_BATCH = 10;
+    // Testing: 11 NFTs = 1329 bytes, 10 NFTs = 1243 bytes, both > 1232 limit
+    const MAX_NFTS_PER_BATCH = 9;
     
     if (nfts.length > MAX_NFTS_PER_BATCH) {
       console.log(`Too many NFTs requested: ${nfts.length}, maximum is ${MAX_NFTS_PER_BATCH}`);
