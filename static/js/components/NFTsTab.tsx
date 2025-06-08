@@ -373,6 +373,10 @@ const NFTsTab: React.FC = () => {
       const result = await response.json();
       
       if (!result.success) {
+        // Check if it's a batch size limit error
+        if (result.maxBatchSize) {
+          throw new Error(`${result.error} Please select ${result.maxBatchSize} or fewer NFTs.`);
+        }
         throw new Error(result.error || 'Failed to prepare batch transaction');
       }
       

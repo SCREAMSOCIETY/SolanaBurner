@@ -247,6 +247,14 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     const selectedNFTCount = selectedNFTs.length;
     const selectedCNFTCount = selectedCNFTs.length;
     
+    // Maximum batch size limits
+    const MAX_NFTS_PER_BATCH = 15;
+    const MAX_TOKENS_PER_BATCH = 15;
+    
+    // Check for batch size limits
+    const nftBatchWarning = selectedNFTCount > MAX_NFTS_PER_BATCH;
+    const tokenBatchWarning = selectedTokenCount > MAX_TOKENS_PER_BATCH;
+    
     // Only tokens and NFTs return rent, not cNFTs (they don't have token accounts)
     const totalSelected = selectedTokenCount + selectedNFTCount + selectedCNFTCount;
     
@@ -267,7 +275,11 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       selectedCNFTCount,
       selectedRent,
       feeAmount,
-      netSelectedRent
+      netSelectedRent,
+      nftBatchWarning,
+      tokenBatchWarning,
+      maxNftsPerBatch: MAX_NFTS_PER_BATCH,
+      maxTokensPerBatch: MAX_TOKENS_PER_BATCH
     };
   };
 
@@ -316,6 +328,28 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
                 )}
               </small>
             </div>
+            
+            {/* Batch Size Warnings */}
+            {(selectedRentData.nftBatchWarning || selectedRentData.tokenBatchWarning) && (
+              <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#4a1a1a', border: '1px solid #ff6b6b', borderRadius: '6px' }}>
+                <div style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>
+                  ⚠️ Batch Size Limit Exceeded
+                </div>
+                {selectedRentData.nftBatchWarning && (
+                  <div style={{ color: '#ffb3b3', fontSize: '12px' }}>
+                    NFTs: {selectedRentData.selectedNFTCount}/{selectedRentData.maxNftsPerBatch} (max {selectedRentData.maxNftsPerBatch} per transaction)
+                  </div>
+                )}
+                {selectedRentData.tokenBatchWarning && (
+                  <div style={{ color: '#ffb3b3', fontSize: '12px' }}>
+                    Tokens: {selectedRentData.selectedTokenCount}/{selectedRentData.maxTokensPerBatch} (max {selectedRentData.maxTokensPerBatch} per transaction)
+                  </div>
+                )}
+                <div style={{ color: '#ffcccc', fontSize: '11px', marginTop: '5px' }}>
+                  Please select fewer assets to burn them in a single transaction.
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="total-estimate">
