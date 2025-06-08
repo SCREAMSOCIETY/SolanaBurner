@@ -1052,10 +1052,47 @@ fastify.post('/api/burn-nft', async (request, reply) => {
   try {
     const { mint, tokenAccount, owner, fallbackTransfer = false } = request.body;
     
-    if (!mint || !tokenAccount || !owner) {
+    if (!mint || !owner) {
       return reply.status(400).send({ 
         success: false, 
-        error: 'Missing required parameters: mint, tokenAccount, owner' 
+        error: 'Missing required parameters: mint, owner' 
+      });
+    }
+
+    // First, check if this is a compressed NFT using Helius API
+    let isCompressedNFT = false;
+    let assetData = null;
+    
+    try {
+      const assetResponse = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'get-asset',
+          method: 'getAsset',
+          params: { id: mint }
+        })
+      });
+      
+      if (assetResponse.ok) {
+        const result = await assetResponse.json();
+        if (result.result && result.result.compression && result.result.compression.compressed) {
+          isCompressedNFT = true;
+          assetData = result.result;
+        }
+      }
+    } catch (e) {
+      console.log('Could not check if NFT is compressed, assuming regular NFT');
+    }
+
+    // If it's a compressed NFT, we need to redirect to cNFT burning/transfer
+    if (isCompressedNFT) {
+      return reply.status(200).send({
+        success: false,
+        error: 'This is a compressed NFT (cNFT). Compressed NFTs require special handling and cannot be burned with regular token burn instructions. Please use the cNFT transfer functionality instead.',
+        isCompressedNFT: true,
+        suggestedAction: 'transfer_to_vault'
       });
     }
     
