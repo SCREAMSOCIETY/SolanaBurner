@@ -1059,7 +1059,7 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       });
     }
     
-    const { Connection, PublicKey, Transaction, SystemProgram, ComputeBudgetProgram } = require('@solana/web3.js');
+    const { Connection, PublicKey, Transaction, SystemProgram, ComputeBudgetProgram, TransactionInstruction } = require('@solana/web3.js');
     const { createBurnInstruction, createCloseAccountInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
     
     // Create connection
@@ -1073,6 +1073,48 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
     );
+    
+    // Get NFT name for memo (try to fetch from Helius API for better display)
+    let nftName = 'NFT';
+    try {
+      const assetResponse = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'get-asset',
+          method: 'getAsset',
+          params: { id: mint }
+        })
+      });
+      
+      if (assetResponse.ok) {
+        const assetData = await assetResponse.json();
+        if (assetData.result?.content?.metadata?.name) {
+          nftName = assetData.result.content.metadata.name;
+          // Truncate long names
+          if (nftName.length > 30) {
+            nftName = nftName.substring(0, 27) + '...';
+          }
+        }
+      }
+    } catch (e) {
+      // If we can't get the name, use mint address
+      nftName = `${mint.substring(0, 8)}...`;
+    }
+
+    // Add memo instruction to show burn details in wallet
+    const memoText = fallbackTransfer 
+      ? `🔄 Transfer "${nftName}" to Vault | Rent Recovery: ${(nftRentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(nftRentPerAsset * 0.01).toFixed(4)} SOL`
+      : `🔥 Burn "${nftName}" | Rent Recovery: ${(nftRentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(nftRentPerAsset * 0.01).toFixed(4)} SOL`;
+    
+    const memoInstruction = new TransactionInstruction({
+      keys: [],
+      programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+      data: Buffer.from(memoText, 'utf8')
+    });
+    
+    transaction.add(memoInstruction);
     
     const ownerPubkey = new PublicKey(owner);
     const mintPubkey = new PublicKey(mint);
