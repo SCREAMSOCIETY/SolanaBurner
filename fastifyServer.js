@@ -1468,6 +1468,12 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
       console.log('Added fee transfer instruction to transaction');
     }
     
+    // Get recent blockhash for the transaction
+    console.log('Fetching recent blockhash...');
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    console.log('Set recent blockhash:', blockhash);
+    
     console.log('Starting transaction simulation...');
     // Simulate transaction
     try {
@@ -1492,8 +1498,10 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     }
     
     // Serialize transaction
+    console.log('Serializing transaction...');
     const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
     const base64Transaction = serializedTransaction.toString('base64');
+    console.log('Transaction serialized successfully');
     
     reply.send({
       success: true,
