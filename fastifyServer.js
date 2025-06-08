@@ -435,17 +435,35 @@ fastify.post('/api/burn-vacant-accounts', async (request, reply) => {
       { programId: TOKEN_PROGRAM_ID }
     );
     
-    // Find vacant accounts (amount = 0)
+    // Find vacant accounts (amount = 0) with additional validation
     const vacantAccounts = [];
     for (const account of tokenAccounts.value) {
-      const parsedInfo = account.account.data.parsed.info;
-      const amount = Number(parsedInfo.tokenAmount.amount);
-      
-      if (amount === 0) {
-        vacantAccounts.push({
-          address: account.pubkey.toString(),
-          mint: parsedInfo.mint
-        });
+      try {
+        const parsedInfo = account.account.data.parsed.info;
+        const amount = Number(parsedInfo.tokenAmount.amount);
+        const owner = parsedInfo.owner;
+        
+        // Only include accounts that are:
+        // 1. Truly empty (amount = 0)
+        // 2. Owned by the requesting wallet
+        // 3. Have a valid mint address
+        if (amount === 0 && owner === ownerAddress && parsedInfo.mint) {
+          // Double-check the account still exists and is closeable
+          const accountInfo = await connection.getAccountInfo(account.pubkey);
+          
+          if (accountInfo && accountInfo.lamports > 0) {
+            vacantAccounts.push({
+              address: account.pubkey.toString(),
+              mint: parsedInfo.mint,
+              owner: owner,
+              rentLamports: accountInfo.lamports
+            });
+            
+            fastify.log.info(`Found valid vacant account: ${account.pubkey.toString()}, rent: ${accountInfo.lamports} lamports`);
+          }
+        }
+      } catch (accountError) {
+        fastify.log.warn(`Skipping problematic account: ${accountError.message}`);
       }
     }
     
@@ -458,9 +476,10 @@ fastify.post('/api/burn-vacant-accounts', async (request, reply) => {
       };
     }
     
-    // Calculate potential rent recovery
-    const rentPerAccount = await connection.getMinimumBalanceForRentExemption(165);
-    const totalRentRecovery = vacantAccounts.length * rentPerAccount;
+    // Calculate actual rent recovery based on account balances
+    const totalRentRecovery = vacantAccounts.reduce((sum, account) => sum + account.rentLamports, 0);
+    
+    fastify.log.info(`Found ${vacantAccounts.length} valid vacant accounts with total rent: ${totalRentRecovery} lamports`);
     
     return {
       success: true,
@@ -496,17 +515,63 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     const ownerPubkey = new PublicKey(ownerAddress);
     const transaction = new Transaction();
     
-    // Create close account instructions for each vacant account
+    // Add compute budget to ensure sufficient compute units
+    const { ComputeBudgetProgram } = require('@solana/web3.js');
+    
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 300000 // Sufficient compute units for multiple close operations
+      })
+    );
+    
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimal priority fee
+      })
+    );
+    
+    // Validate and create close account instructions for each vacant account
+    const validAccounts = [];
+    
     for (const account of vacantAccounts) {
-      const accountPubkey = new PublicKey(account.address);
-      
-      const closeInstruction = createCloseAccountInstruction(
-        accountPubkey,  // Account to close
-        ownerPubkey,    // Destination for rent SOL
-        ownerPubkey     // Owner of the account
-      );
-      
-      transaction.add(closeInstruction);
+      try {
+        const accountPubkey = new PublicKey(account.address);
+        
+        // Double-check that the account still exists and is empty
+        const accountInfo = await connection.getParsedAccountInfo(accountPubkey);
+        
+        if (accountInfo.value && accountInfo.value.data && 
+            typeof accountInfo.value.data === 'object' && 
+            'parsed' in accountInfo.value.data) {
+          
+          const parsedInfo = accountInfo.value.data.parsed.info;
+          const amount = Number(parsedInfo.tokenAmount.amount);
+          
+          // Only process accounts that are truly empty (amount = 0)
+          if (amount === 0 && parsedInfo.owner === ownerAddress) {
+            const closeInstruction = createCloseAccountInstruction(
+              accountPubkey,  // Account to close
+              ownerPubkey,    // Destination for rent SOL
+              ownerPubkey     // Owner of the account
+            );
+            
+            transaction.add(closeInstruction);
+            validAccounts.push(account);
+            fastify.log.info(`Added close instruction for account ${account.address}`);
+          } else {
+            fastify.log.warn(`Skipping account ${account.address}: amount=${amount}, owner=${parsedInfo.owner}`);
+          }
+        }
+      } catch (accountError) {
+        fastify.log.warn(`Skipping invalid account ${account.address}: ${accountError.message}`);
+      }
+    }
+    
+    if (validAccounts.length === 0) {
+      return reply.code(400).send({
+        success: false,
+        error: 'No valid vacant accounts found to burn'
+      });
     }
     
     // Get recent blockhash
@@ -520,7 +585,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     return {
       success: true,
       transaction: serializedTransaction.toString('base64'),
-      accountCount: vacantAccounts.length,
+      accountCount: validAccounts.length,
       message: 'Transaction prepared successfully'
     };
     
@@ -551,14 +616,50 @@ fastify.post('/api/submit-burn-transaction', async (request, reply) => {
     const transactionBuffer = Buffer.from(signedTransaction, 'base64');
     const transaction = Transaction.from(transactionBuffer);
     
-    // Submit the transaction to the network
-    const signature = await connection.sendRawTransaction(transaction.serialize());
+    // Submit the transaction to the network with better error handling
+    let signature;
+    try {
+      signature = await connection.sendRawTransaction(transaction.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'processed',
+        maxRetries: 3
+      });
+      fastify.log.info(`Transaction submitted with signature: ${signature}`);
+    } catch (sendError) {
+      fastify.log.error(`Error sending transaction: ${sendError.message}`);
+      
+      // Provide specific error messages for common issues
+      if (sendError.message.includes('insufficient')) {
+        throw new Error('Insufficient SOL balance to pay for transaction fees');
+      } else if (sendError.message.includes('Invalid')) {
+        throw new Error('Invalid transaction or account state');
+      } else if (sendError.message.includes('Custom(18)')) {
+        throw new Error('Account not found or already closed - accounts may have been processed already');
+      }
+      
+      throw sendError;
+    }
     
-    // Confirm the transaction
+    // Confirm the transaction with better error handling
     const confirmation = await connection.confirmTransaction(signature, 'confirmed');
     
     if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      const error = confirmation.value.err;
+      fastify.log.error(`Transaction confirmed but failed: ${JSON.stringify(error)}`);
+      
+      // Parse specific error types
+      if (error.InstructionError) {
+        const [instructionIndex, instructionError] = error.InstructionError;
+        if (instructionError.Custom === 18) {
+          throw new Error(`Instruction ${instructionIndex} failed: Account not found or already closed`);
+        } else if (instructionError.Custom === 1) {
+          throw new Error(`Instruction ${instructionIndex} failed: Insufficient funds`);
+        } else {
+          throw new Error(`Instruction ${instructionIndex} failed with error: ${JSON.stringify(instructionError)}`);
+        }
+      }
+      
+      throw new Error(`Transaction failed: ${JSON.stringify(error)}`);
     }
     
     fastify.log.info(`Burn transaction successful: ${signature}`);
@@ -566,7 +667,7 @@ fastify.post('/api/submit-burn-transaction', async (request, reply) => {
     return {
       success: true,
       signature: signature,
-      explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+      explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=mainnet-beta`,
       accountCount: accountCount || 0,
       message: 'Vacant accounts burned successfully'
     };
