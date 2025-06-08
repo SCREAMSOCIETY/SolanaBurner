@@ -277,13 +277,25 @@ const TokensTab: React.FC = () => {
       } else {
         console.log(`Token ${token.mint} has balance ${token.balance}, using burn + close instructions`);
         
+        // Get the actual mint info to ensure we have the correct decimals
+        let actualDecimals = token.decimals;
+        try {
+          const mintInfo = await connection.getParsedAccountInfo(new PublicKey(token.mint));
+          if (mintInfo.value?.data && 'parsed' in mintInfo.value.data) {
+            actualDecimals = mintInfo.value.data.parsed.info.decimals;
+            console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}`);
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch mint info for ${token.mint}, using stored decimals: ${token.decimals}`);
+        }
+        
         // First burn the token balance
         const burnInstruction = createBurnCheckedInstruction(
           new PublicKey(token.account), // Token account
           new PublicKey(token.mint),    // Mint
           publicKey,                    // Owner
           token.balance,                // Amount
-          token.decimals                // Decimals
+          actualDecimals                // Correct decimals from mint
         );
         
         transaction.add(burnInstruction);
@@ -402,13 +414,25 @@ const TokensTab: React.FC = () => {
           } else {
             console.log(`Token ${token.mint} has balance ${token.balance}, using burn + close instructions`);
             
+            // Get the actual mint info to ensure we have the correct decimals
+            let actualDecimals = token.decimals;
+            try {
+              const mintInfo = await connection.getParsedAccountInfo(new PublicKey(token.mint));
+              if (mintInfo.value?.data && 'parsed' in mintInfo.value.data) {
+                actualDecimals = mintInfo.value.data.parsed.info.decimals;
+                console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}`);
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch mint info for ${token.mint}, using stored decimals: ${token.decimals}`);
+            }
+            
             // First burn the token balance
             const burnInstruction = createBurnCheckedInstruction(
               new PublicKey(token.account), // Token account
               new PublicKey(token.mint),    // Mint
               publicKey,                    // Owner
               token.balance,                // Amount
-              token.decimals                // Decimals
+              actualDecimals                // Correct decimals from mint
             );
             
             transaction.add(burnInstruction);
