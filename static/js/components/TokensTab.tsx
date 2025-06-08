@@ -279,14 +279,25 @@ const TokensTab: React.FC = () => {
         
         // Get the actual mint info to ensure we have the correct decimals
         let actualDecimals = token.decimals;
+        console.log(`Token ${token.mint} stored decimals: ${token.decimals}`);
+        
         try {
           const mintInfo = await connection.getParsedAccountInfo(new PublicKey(token.mint));
           if (mintInfo.value?.data && 'parsed' in mintInfo.value.data) {
             actualDecimals = mintInfo.value.data.parsed.info.decimals;
-            console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}`);
+            console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}, was stored as: ${token.decimals}`);
+          } else {
+            console.warn(`No mint data found for ${token.mint}, using stored decimals`);
           }
         } catch (error) {
-          console.warn(`Failed to fetch mint info for ${token.mint}, using stored decimals: ${token.decimals}`);
+          console.error(`Failed to fetch mint info for ${token.mint}:`, error);
+          console.warn(`Using stored decimals: ${token.decimals}`);
+        }
+        
+        // Force correct decimals for known problematic token
+        if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+          actualDecimals = 0;
+          console.log(`Forcing decimals to 0 for DwLw token`);
         }
         
         // First burn the token balance
@@ -416,14 +427,25 @@ const TokensTab: React.FC = () => {
             
             // Get the actual mint info to ensure we have the correct decimals
             let actualDecimals = token.decimals;
+            console.log(`Token ${token.mint} stored decimals: ${token.decimals}`);
+            
             try {
               const mintInfo = await connection.getParsedAccountInfo(new PublicKey(token.mint));
               if (mintInfo.value?.data && 'parsed' in mintInfo.value.data) {
                 actualDecimals = mintInfo.value.data.parsed.info.decimals;
-                console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}`);
+                console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}, was stored as: ${token.decimals}`);
+              } else {
+                console.warn(`No mint data found for ${token.mint}, using stored decimals`);
               }
             } catch (error) {
-              console.warn(`Failed to fetch mint info for ${token.mint}, using stored decimals: ${token.decimals}`);
+              console.error(`Failed to fetch mint info for ${token.mint}:`, error);
+              console.warn(`Using stored decimals: ${token.decimals}`);
+            }
+            
+            // Force correct decimals for known problematic token
+            if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+              actualDecimals = 0;
+              console.log(`Forcing decimals to 0 for DwLw token`);
             }
             
             // First burn the token balance
