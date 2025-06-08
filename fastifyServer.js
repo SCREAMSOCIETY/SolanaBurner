@@ -1148,13 +1148,28 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       nftName = `${mint.substring(0, 8)}...`;
     }
 
-    // Calculate rent and fees first
-    const rentPerAsset = 0.0077; // SOL per NFT
+    // Get actual account info to calculate real rent amount
+    const tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
+    if (!tokenAccountInfo) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Token account not found'
+      });
+    }
+    
+    // Calculate actual rent based on account size and current rent rate
+    const actualRentLamports = tokenAccountInfo.lamports;
+    const actualRentSOL = actualRentLamports / 1e9;
+    
+    console.log(`Actual rent for token account: ${actualRentSOL} SOL (${actualRentLamports} lamports)`);
+    
     const feePercentage = 0.01;
-    const feeAmount = Math.floor(rentPerAsset * feePercentage * 1e9);
+    const feeAmount = Math.floor(actualRentLamports * feePercentage);
 
     // Add memo instruction to show burn details in wallet
-    const memoText = `🔥 Burn "${nftName}" | Rent Recovery: ${(rentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(rentPerAsset * 0.01).toFixed(4)} SOL`;
+    const userReceivesSOL = (actualRentSOL * 0.99);
+    const feeSOL = (actualRentSOL * 0.01);
+    const memoText = `🔥 Burn "${nftName}" | Rent Recovery: ${userReceivesSOL.toFixed(4)} SOL | Fee: ${feeSOL.toFixed(4)} SOL`;
     
     const memoInstruction = new TransactionInstruction({
       keys: [],
@@ -1169,8 +1184,8 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const tokenAccountPubkey = new PublicKey(tokenAccount);
     
     // Verify token account exists and get its balance
-    const tokenAccountInfo = await connection.getTokenAccountBalance(tokenAccountPubkey);
-    if (!tokenAccountInfo || !tokenAccountInfo.value) {
+    const tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
+    if (!tokenBalance || !tokenBalance.value) {
       return reply.status(400).send({
         success: false,
         error: 'Token account does not exist or is already closed'
@@ -1178,11 +1193,11 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     }
     
     // Verify the account has exactly 1 NFT
-    const tokenBalance = parseInt(tokenAccountInfo.value.amount);
-    if (tokenBalance !== 1) {
+    const nftBalance = parseInt(tokenBalance.value.amount);
+    if (nftBalance !== 1) {
       return reply.status(400).send({
         success: false,
-        error: `Token account balance is ${tokenBalance}, expected 1`
+        error: `Token account balance is ${nftBalance}, expected 1`
       });
     }
 
@@ -1264,8 +1279,8 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       success: true,
       transaction: base64Transaction,
       message: `Prepared NFT burn transaction for ${mint} - burning NFT and recovering rent`,
-      rentRecovered: (rentPerAsset * 0.99).toFixed(4),
-      fee: (rentPerAsset * 0.01).toFixed(4),
+      rentRecovered: userReceivesSOL.toFixed(4),
+      fee: feeSOL.toFixed(4),
       method: 'direct_burn',
       burnMethod: 'direct_burn'
     });
