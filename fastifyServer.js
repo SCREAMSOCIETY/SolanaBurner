@@ -1310,9 +1310,13 @@ fastify.post('/api/burn-nft', async (request, reply) => {
 // Batch burn endpoint for multiple NFTs in a single transaction
 fastify.post('/api/batch-burn-nft', async (request, reply) => {
   try {
+    console.log('Batch burn request received:', JSON.stringify(request.body, null, 2));
     const { nfts, owner } = request.body;
     
+    console.log('Parsed request - NFTs:', nfts, 'Owner:', owner);
+    
     if (!nfts || !Array.isArray(nfts) || nfts.length === 0) {
+      console.log('Error: Invalid NFTs array:', nfts);
       return reply.status(400).send({
         success: false,
         error: 'NFTs array is required and must not be empty'
@@ -1320,6 +1324,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     }
     
     if (!owner) {
+      console.log('Error: Missing owner address');
       return reply.status(400).send({
         success: false,
         error: 'Owner address is required'
@@ -1346,29 +1351,40 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     let totalFee = 0;
     const processedNFTs = [];
     
+    console.log(`Processing ${nfts.length} NFTs for batch burn`);
+    
     // Process each NFT and add instructions to the batch transaction
     for (const nft of nfts) {
       const { mint, tokenAccount } = nft;
+      console.log(`Processing NFT: ${mint}, Token Account: ${tokenAccount}`);
       
       if (!mint || !tokenAccount) {
+        console.log(`Skipping NFT - missing data: mint=${mint}, tokenAccount=${tokenAccount}`);
         continue; // Skip invalid NFTs
       }
       
       try {
         const mintPubkey = new PublicKey(mint);
         const tokenAccountPubkey = new PublicKey(tokenAccount);
+        console.log(`Created PublicKeys for ${mint}`);
         
         // Get account info for rent calculation
         const tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
         if (!tokenAccountInfo) {
+          console.log(`Token account not found for ${mint}, skipping`);
           continue; // Skip if account doesn't exist
         }
+        console.log(`Got account info for ${mint}, size: ${tokenAccountInfo.data.length} bytes`);
         
         // Verify token balance
         const tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
         if (!tokenBalance || !tokenBalance.value || parseInt(tokenBalance.value.amount) !== 1) {
+          console.log(`Invalid token balance for ${mint}:`, tokenBalance?.value);
           continue; // Skip if not exactly 1 NFT
         }
+        console.log(`Verified token balance for ${mint}: ${tokenBalance.value.amount}`);
+        
+        // If we reach here without errors, process this NFT
         
         // Calculate rent for this NFT
         const accountDataSize = tokenAccountInfo.data.length;
@@ -1477,6 +1493,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     
   } catch (error) {
     console.error('Error preparing batch NFT transaction:', error);
+    console.error('Error stack:', error.stack);
     reply.status(500).send({
       success: false,
       error: error.message || 'Failed to prepare batch transaction'
