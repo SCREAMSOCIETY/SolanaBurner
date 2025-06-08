@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, createBurnInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
+import { 
+  TOKEN_PROGRAM_ID, 
+  createBurnInstruction, 
+  createBurnCheckedInstruction,
+  createCloseAccountInstruction,
+  getAssociatedTokenAddress 
+} from '@solana/spl-token';
 import axios from 'axios';
 
 // Define the window interface with our BurnAnimations object
@@ -242,23 +248,70 @@ const TokensTab: React.FC = () => {
       
       const transaction = new Transaction();
 
-      const burnInstruction = createBurnInstruction(
-        new PublicKey(token.account),
-        new PublicKey(token.mint),
-        publicKey,
-        token.balance
+      // Add compute budget instructions to avoid compute limit issues
+      const { ComputeBudgetProgram } = await import('@solana/web3.js');
+      
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: 200000 // Sufficient compute units for token operations
+        })
+      );
+      
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 1 // Minimal priority fee
+        })
       );
 
-      transaction.add(burnInstruction);
+      // Check if token balance is 0 - use close account instead of burn
+      if (token.balance === 0) {
+        console.log(`Token ${token.mint} has zero balance, using close account instruction`);
+        
+        const closeInstruction = createCloseAccountInstruction(
+          new PublicKey(token.account),
+          publicKey, // Destination for rent recovery
+          publicKey  // Owner
+        );
+        
+        transaction.add(closeInstruction);
+      } else {
+        console.log(`Token ${token.mint} has balance ${token.balance}, using burn + close instructions`);
+        
+        // First burn the token balance
+        const burnInstruction = createBurnCheckedInstruction(
+          new PublicKey(token.account), // Token account
+          new PublicKey(token.mint),    // Mint
+          publicKey,                    // Owner
+          token.balance,                // Amount
+          token.decimals                // Decimals
+        );
+        
+        transaction.add(burnInstruction);
+        
+        // Then close the account to recover rent
+        const closeInstruction = createCloseAccountInstruction(
+          new PublicKey(token.account),
+          publicKey, // Destination for rent recovery
+          publicKey  // Owner
+        );
+        
+        transaction.add(closeInstruction);
+      }
 
       const signature = await sendTransaction(transaction, connection);
+      console.log(`Token burn transaction sent with signature:`, signature);
       
       // Apply burn animation if element exists
       if (tokenElement && window.BurnAnimations) {
         window.BurnAnimations.applyBurnAnimation(tokenElement);
       }
       
-      await connection.confirmTransaction(signature, 'confirmed');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log(`Token burn confirmation result:`, confirmation);
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
 
       // Show confetti and trigger achievements if window.BurnAnimations is available
       if (window.BurnAnimations) {
@@ -274,9 +327,17 @@ const TokensTab: React.FC = () => {
 
       // Remove the burned token from the list
       setTokens(tokens.filter(t => t.mint !== token.mint));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error burning token:', err);
-      setError('Failed to burn token. Please try again.');
+      
+      // Provide specific error messages
+      if (err?.message?.includes('InstructionError')) {
+        setError('Token burning failed - the token may have already been processed or the account state has changed.');
+      } else if (err?.message?.includes('insufficient')) {
+        setError('Insufficient SOL balance to pay for transaction fees.');
+      } else {
+        setError('Failed to burn token. Please try again.');
+      }
     } finally {
       setBurning(false);
     }
@@ -288,6 +349,21 @@ const TokensTab: React.FC = () => {
     try {
       setBurning(true);
       const transaction = new Transaction();
+
+      // Add compute budget instructions for bulk operations
+      const { ComputeBudgetProgram } = await import('@solana/web3.js');
+      
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: 400000 // Higher compute limit for bulk operations
+        })
+      );
+      
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 1 // Minimal priority fee
+        })
+      );
 
       // Get all token elements for animation
       const tokenElements: HTMLElement[] = [];
@@ -307,20 +383,50 @@ const TokensTab: React.FC = () => {
         }
       });
 
-      // Add burn instructions for all selected tokens
+      // Add burn/close instructions for all selected tokens
       for (const token of tokens) {
         if (selectedTokens.has(token.mint) && token.account) {
-          const burnInstruction = createBurnInstruction(
-            new PublicKey(token.account),
-            new PublicKey(token.mint),
-            publicKey,
-            token.balance
-          );
-          transaction.add(burnInstruction);
+          console.log(`Processing token ${token.mint} with balance ${token.balance}`);
+          
+          // Check if token balance is 0 - use close account instead of burn
+          if (token.balance === 0) {
+            console.log(`Token ${token.mint} has zero balance, using close account instruction`);
+            
+            const closeInstruction = createCloseAccountInstruction(
+              new PublicKey(token.account),
+              publicKey, // Destination for rent recovery
+              publicKey  // Owner
+            );
+            
+            transaction.add(closeInstruction);
+          } else {
+            console.log(`Token ${token.mint} has balance ${token.balance}, using burn + close instructions`);
+            
+            // First burn the token balance
+            const burnInstruction = createBurnCheckedInstruction(
+              new PublicKey(token.account), // Token account
+              new PublicKey(token.mint),    // Mint
+              publicKey,                    // Owner
+              token.balance,                // Amount
+              token.decimals                // Decimals
+            );
+            
+            transaction.add(burnInstruction);
+            
+            // Then close the account to recover rent
+            const closeInstruction = createCloseAccountInstruction(
+              new PublicKey(token.account),
+              publicKey, // Destination for rent recovery
+              publicKey  // Owner
+            );
+            
+            transaction.add(closeInstruction);
+          }
         }
       }
 
       const signature = await sendTransaction(transaction, connection);
+      console.log(`Bulk token burn transaction sent with signature:`, signature);
       
       // Apply burn animations in sequence
       if (window.BurnAnimations && tokenElements.length > 0) {
@@ -332,7 +438,12 @@ const TokensTab: React.FC = () => {
         });
       }
       
-      await connection.confirmTransaction(signature, 'confirmed');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log(`Bulk burn confirmation result:`, confirmation);
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
 
       // Show mega confetti for bulk burn!
       if (window.BurnAnimations) {
@@ -360,9 +471,17 @@ const TokensTab: React.FC = () => {
       // Remove all burned tokens from the list
       setTokens(tokens.filter(token => !selectedTokens.has(token.mint)));
       setSelectedTokens(new Set());
-    } catch (err) {
-      console.error('Error burning tokens:', err);
-      setError('Failed to burn tokens. Please try again.');
+    } catch (err: any) {
+      console.error('Error confirming bulk burn transaction:', err);
+      
+      // Provide specific error messages
+      if (err?.message?.includes('InstructionError')) {
+        setError('Bulk token burning failed - one or more tokens may have already been processed or their account states have changed.');
+      } else if (err?.message?.includes('insufficient')) {
+        setError('Insufficient SOL balance to pay for transaction fees.');
+      } else {
+        setError('Failed to burn tokens. Please try again.');
+      }
     } finally {
       setBurning(false);
     }
