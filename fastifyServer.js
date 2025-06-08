@@ -1148,10 +1148,13 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       nftName = `${mint.substring(0, 8)}...`;
     }
 
-    // Add memo instruction to show burn details in wallet
-    const memoText = fallbackTransfer 
-      ? `🔄 Transfer "${nftName}" to Vault | Rent Recovery: ${(nftRentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(nftRentPerAsset * 0.01).toFixed(4)} SOL`
-      : `🔥 Burn "${nftName}" | Rent Recovery: ${(nftRentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(nftRentPerAsset * 0.01).toFixed(4)} SOL`;
+    // Calculate rent and fees first
+    const rentPerAsset = 0.0077; // SOL per NFT
+    const feePercentage = 0.01;
+    const feeAmount = Math.floor(rentPerAsset * feePercentage * 1e9);
+
+    // Add memo instruction to show disposal details in wallet
+    const memoText = `🔄 Transfer "${nftName}" to Vault | Rent Recovery: ${(rentPerAsset * 0.99).toFixed(4)} SOL | Fee: ${(rentPerAsset * 0.01).toFixed(4)} SOL`;
     
     const memoInstruction = new TransactionInstruction({
       keys: [],
@@ -1174,11 +1177,6 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       });
     }
 
-    const nftRentPerAsset = 0.0077; // SOL per NFT
-    const feePercentage = 0.01;
-    const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9);
-    
-    // For NFTs that consistently fail to burn, use disposal transfer instead
     console.log(`Processing restricted NFT ${mint} - using disposal transfer to recover rent`);
     
     const vaultWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
