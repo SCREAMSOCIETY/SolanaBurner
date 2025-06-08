@@ -1432,11 +1432,14 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     }
     
     if (processedNFTs.length === 0) {
+      console.log('No processed NFTs found, returning error');
       return reply.status(400).send({
         success: false,
         error: 'No valid NFTs found to burn'
       });
     }
+    
+    console.log(`Successfully processed ${processedNFTs.length} NFTs, adding instructions to transaction`);
     
     // Add batch memo instruction
     const batchMemoText = `🔥 Batch Burn ${processedNFTs.length} NFTs | Total Rent Recovery: ${totalRentRecovered.toFixed(4)} SOL | Total Fee: ${totalFee.toFixed(4)} SOL`;
@@ -1446,9 +1449,11 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
       data: Buffer.from(batchMemoText, 'utf8')
     });
     transaction.add(memoInstruction);
+    console.log('Added memo instruction to transaction');
     
     // Add fee transfer if applicable
     const totalFeeLamports = Math.floor(totalFee * 1e9);
+    console.log(`Total fee in lamports: ${totalFeeLamports}`);
     if (totalFeeLamports >= 1000) {
       const { SystemProgram } = require('@solana/web3.js');
       transaction.add(
@@ -1458,19 +1463,26 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           lamports: totalFeeLamports
         })
       );
+      console.log('Added fee transfer instruction to transaction');
     }
     
+    console.log('Starting transaction simulation...');
     // Simulate transaction
     try {
       const simulationResult = await connection.simulateTransaction(transaction);
+      console.log('Simulation result:', simulationResult.value);
       if (simulationResult.value.err) {
+        console.log('Simulation failed with error:', simulationResult.value.err);
+        console.log('Simulation logs:', simulationResult.value.logs);
         return reply.status(400).send({
           success: false,
           error: `Batch transaction simulation failed: ${JSON.stringify(simulationResult.value.err)}`,
           logs: simulationResult.value.logs
         });
       }
+      console.log('Transaction simulation successful');
     } catch (simError) {
+      console.log('Simulation threw error:', simError);
       return reply.status(400).send({
         success: false,
         error: `Batch transaction simulation error: ${simError.message}`
