@@ -1344,18 +1344,17 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     // Set the fee payer for the transaction
     transaction.feePayer = ownerPubkey;
     
-    // Add compute budget instructions with higher limits for batch operations
+    // Add minimal compute budget instruction for batch operations
     transaction.add(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 })
     );
     let totalRentRecovered = 0;
     let totalFee = 0;
     const processedNFTs = [];
     
     // Maximum NFTs per batch transaction (limited by transaction size ~1232 bytes)
-    // Testing: 11 NFTs = 1329 bytes, 10 NFTs = 1243 bytes, both > 1232 limit
-    const MAX_NFTS_PER_BATCH = 9;
+    // After optimization: reduced compute budget and memo instructions
+    const MAX_NFTS_PER_BATCH = 10;
     
     if (nfts.length > MAX_NFTS_PER_BATCH) {
       console.log(`Too many NFTs requested: ${nfts.length}, maximum is ${MAX_NFTS_PER_BATCH}`);
@@ -1456,8 +1455,8 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     
     console.log(`Successfully processed ${processedNFTs.length} NFTs, adding instructions to transaction`);
     
-    // Add batch memo instruction
-    const batchMemoText = `🔥 Batch Burn ${processedNFTs.length} NFTs | Total Rent Recovery: ${totalRentRecovered.toFixed(4)} SOL | Total Fee: ${totalFee.toFixed(4)} SOL`;
+    // Add optimized memo instruction (shorter to save bytes)
+    const batchMemoText = `Burn ${processedNFTs.length} NFTs`;
     const memoInstruction = new TransactionInstruction({
       keys: [],
       programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
