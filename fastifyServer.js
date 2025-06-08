@@ -1307,6 +1307,183 @@ fastify.post('/api/burn-nft', async (request, reply) => {
   }
 });
 
+// Batch burn endpoint for multiple NFTs in a single transaction
+fastify.post('/api/batch-burn-nft', async (request, reply) => {
+  try {
+    const { nfts, owner } = request.body;
+    
+    if (!nfts || !Array.isArray(nfts) || nfts.length === 0) {
+      return reply.status(400).send({
+        success: false,
+        error: 'NFTs array is required and must not be empty'
+      });
+    }
+    
+    if (!owner) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Owner address is required'
+      });
+    }
+    
+    const { Connection, PublicKey, Transaction, ComputeBudgetProgram, TransactionInstruction } = require('@solana/web3.js');
+    const { createBurnInstruction, createCloseAccountInstruction, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+    
+    // Create connection
+    const connection = new Connection(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com');
+    
+    // Create transaction
+    const transaction = new Transaction();
+    
+    // Add compute budget instructions with higher limits for batch operations
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+    );
+    
+    const ownerPubkey = new PublicKey(owner);
+    let totalRentRecovered = 0;
+    let totalFee = 0;
+    const processedNFTs = [];
+    
+    // Process each NFT and add instructions to the batch transaction
+    for (const nft of nfts) {
+      const { mint, tokenAccount } = nft;
+      
+      if (!mint || !tokenAccount) {
+        continue; // Skip invalid NFTs
+      }
+      
+      try {
+        const mintPubkey = new PublicKey(mint);
+        const tokenAccountPubkey = new PublicKey(tokenAccount);
+        
+        // Get account info for rent calculation
+        const tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
+        if (!tokenAccountInfo) {
+          continue; // Skip if account doesn't exist
+        }
+        
+        // Verify token balance
+        const tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
+        if (!tokenBalance || !tokenBalance.value || parseInt(tokenBalance.value.amount) !== 1) {
+          continue; // Skip if not exactly 1 NFT
+        }
+        
+        // Calculate rent for this NFT
+        const accountDataSize = tokenAccountInfo.data.length;
+        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        const rentSOL = minimumBalance / 1e9;
+        const feeSOL = rentSOL * 0.01;
+        
+        totalRentRecovered += rentSOL * 0.99;
+        totalFee += feeSOL;
+        
+        // Add burn instruction
+        transaction.add(
+          createBurnInstruction(
+            tokenAccountPubkey,
+            mintPubkey,
+            ownerPubkey,
+            1,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        // Add close account instruction
+        transaction.add(
+          createCloseAccountInstruction(
+            tokenAccountPubkey,
+            ownerPubkey,
+            ownerPubkey,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        processedNFTs.push({
+          mint,
+          tokenAccount,
+          rentRecovered: (rentSOL * 0.99).toFixed(4),
+          fee: feeSOL.toFixed(4)
+        });
+        
+      } catch (error) {
+        console.error(`Error processing NFT ${mint}:`, error);
+        continue; // Skip problematic NFTs
+      }
+    }
+    
+    if (processedNFTs.length === 0) {
+      return reply.status(400).send({
+        success: false,
+        error: 'No valid NFTs found to burn'
+      });
+    }
+    
+    // Add batch memo instruction
+    const batchMemoText = `🔥 Batch Burn ${processedNFTs.length} NFTs | Total Rent Recovery: ${totalRentRecovered.toFixed(4)} SOL | Total Fee: ${totalFee.toFixed(4)} SOL`;
+    const memoInstruction = new TransactionInstruction({
+      keys: [],
+      programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+      data: Buffer.from(batchMemoText, 'utf8')
+    });
+    transaction.add(memoInstruction);
+    
+    // Add fee transfer if applicable
+    const totalFeeLamports = Math.floor(totalFee * 1e9);
+    if (totalFeeLamports >= 1000) {
+      const { SystemProgram } = require('@solana/web3.js');
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: ownerPubkey,
+          toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
+          lamports: totalFeeLamports
+        })
+      );
+    }
+    
+    // Simulate transaction
+    try {
+      const simulationResult = await connection.simulateTransaction(transaction);
+      if (simulationResult.value.err) {
+        return reply.status(400).send({
+          success: false,
+          error: `Batch transaction simulation failed: ${JSON.stringify(simulationResult.value.err)}`,
+          logs: simulationResult.value.logs
+        });
+      }
+    } catch (simError) {
+      return reply.status(400).send({
+        success: false,
+        error: `Batch transaction simulation error: ${simError.message}`
+      });
+    }
+    
+    // Serialize transaction
+    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
+    const base64Transaction = serializedTransaction.toString('base64');
+    
+    reply.send({
+      success: true,
+      transaction: base64Transaction,
+      message: `Prepared batch burn transaction for ${processedNFTs.length} NFTs`,
+      totalRentRecovered: totalRentRecovered.toFixed(4),
+      totalFee: totalFee.toFixed(4),
+      processedNFTs: processedNFTs,
+      method: 'batch_burn'
+    });
+    
+  } catch (error) {
+    console.error('Error preparing batch NFT transaction:', error);
+    reply.status(500).send({
+      success: false,
+      error: error.message || 'Failed to prepare batch transaction'
+    });
+  }
+});
+
 // Endpoint for processing cNFT burn requests
 fastify.post('/api/cnft/burn-request', async (request, reply) => {
   try {
