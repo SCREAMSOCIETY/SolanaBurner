@@ -394,6 +394,72 @@ const NFTsTab: React.FC = () => {
           const confirmation = await connection.confirmTransaction(signature, 'confirmed');
           
           if (confirmation.value.err) {
+            console.error(`[NFTsTab] Bulk burn transaction error for ${nft.mint}:`, confirmation.value.err);
+            
+            // Check if this is a burn restriction error (Custom error 11)
+            const errorMsg = confirmation.value.err;
+            let isRestrictedNFT = false;
+            
+            if (errorMsg && (errorMsg as any).InstructionError) {
+              const instructionError = (errorMsg as any).InstructionError;
+              if (Array.isArray(instructionError) && instructionError.length >= 2) {
+                const [instructionIndex, error] = instructionError;
+                if (error && error.Custom === 11) {
+                  isRestrictedNFT = true;
+                  console.log(`[NFTsTab] Detected restricted NFT in bulk burn: ${nft.mint}`);
+                }
+              }
+            }
+            
+            // If it's a restricted NFT, try fallback transfer
+            if (isRestrictedNFT) {
+              console.log(`[NFTsTab] Attempting fallback transfer for bulk burn NFT: ${nft.mint}`);
+              
+              // Retry with fallback transfer
+              const fallbackResponse = await fetch('/api/burn-nft', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  mint: nft.mint,
+                  tokenAccount: nft.tokenAddress,
+                  owner: publicKey.toString(),
+                  fallbackTransfer: true
+                })
+              });
+              
+              if (!fallbackResponse.ok) {
+                throw new Error('Failed to prepare fallback transfer');
+              }
+              
+              const fallbackResult = await fallbackResponse.json();
+              if (!fallbackResult.success) {
+                throw new Error(fallbackResult.error || 'Fallback transfer failed');
+              }
+              
+              // Execute fallback transfer
+              const fallbackTransaction = Transaction.from(Buffer.from(fallbackResult.transaction, 'base64'));
+              const fallbackSignedTx = await signTransaction(fallbackTransaction);
+              const fallbackSignature = await connection.sendRawTransaction(fallbackSignedTx.serialize(), {
+                skipPreflight: false,
+                maxRetries: 2,
+                preflightCommitment: 'processed'
+              });
+              
+              const fallbackConfirmation = await connection.confirmTransaction(fallbackSignature, 'confirmed');
+              if (fallbackConfirmation.value.err) {
+                throw new Error(`Fallback transfer failed: ${JSON.stringify(fallbackConfirmation.value.err)}`);
+              }
+              
+              // Success - update totals with fallback result
+              successCount++;
+              totalRentRecovered += parseFloat(fallbackResult.rentRecovered);
+              console.log(`[NFTsTab] Successfully transferred NFT ${nft.mint} to vault (fallback)`);
+              continue; // Move to next NFT
+            }
+            
+            // Not a restricted NFT or fallback failed
             throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
           }
           
