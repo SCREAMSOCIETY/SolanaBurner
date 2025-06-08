@@ -1148,6 +1148,11 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       nftName = `${mint.substring(0, 8)}...`;
     }
 
+    // Create public key objects first
+    const ownerPubkey = new PublicKey(owner);
+    const mintPubkey = new PublicKey(mint);
+    const tokenAccountPubkey = new PublicKey(tokenAccount);
+
     // Get actual account info to calculate real rent amount
     const tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
     if (!tokenAccountInfo) {
@@ -1178,10 +1183,6 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     });
     
     transaction.add(memoInstruction);
-    
-    const ownerPubkey = new PublicKey(owner);
-    const mintPubkey = new PublicKey(mint);
-    const tokenAccountPubkey = new PublicKey(tokenAccount);
     
     // Verify token account exists and get its balance
     const tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
