@@ -1339,14 +1339,16 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     
     // Create transaction
     const transaction = new Transaction();
+    const ownerPubkey = new PublicKey(owner);
+    
+    // Set the fee payer for the transaction
+    transaction.feePayer = ownerPubkey;
     
     // Add compute budget instructions with higher limits for batch operations
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
     );
-    
-    const ownerPubkey = new PublicKey(owner);
     let totalRentRecovered = 0;
     let totalFee = 0;
     const processedNFTs = [];
