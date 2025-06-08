@@ -352,46 +352,53 @@ const NFTsTab: React.FC = () => {
           continue;
         }
         
-        try {
-          setError(`Burning ${successCount + 1}/${selectedNftData.length}: ${nft.name}...`);
-          
-          // Use server-side burn endpoint
-          const response = await fetch('/api/burn-nft', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              mint: nft.mint,
-              tokenAccount: nft.tokenAddress,
-              owner: publicKey.toString()
-            })
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.statusText}`);
-          }
-          
-          const result = await response.json();
-          
-          if (!result.success) {
-            throw new Error(result.error || 'Unknown server error');
-          }
-          
-          // Get the prepared transaction
-          const { transaction: transactionBase64, rentRecovered } = result;
-          const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
-          
-          // Sign and send the transaction
-          const signedTransaction = await signTransaction(transaction);
-          
-          const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-            skipPreflight: false,
-            maxRetries: 2,
-            preflightCommitment: 'processed'
-          });
-          
-          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+        // Try burn first, then fallback transfer if it fails with restriction error
+        let useFallbackTransfer = false;
+        let attempts = 0;
+        const maxAttempts = 2;
+        
+        while (attempts < maxAttempts) {
+          try {
+            setError(`${useFallbackTransfer ? 'Transferring' : 'Burning'} ${successCount + 1}/${selectedNftData.length}: ${nft.name}...`);
+            
+            // Use server-side burn endpoint with fallback option
+            const response = await fetch('/api/burn-nft', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                mint: nft.mint,
+                tokenAccount: nft.tokenAddress,
+                owner: publicKey.toString(),
+                fallbackTransfer: useFallbackTransfer
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+              throw new Error(result.error || 'Unknown server error');
+            }
+            
+            // Get the prepared transaction
+            const { transaction: transactionBase64, rentRecovered } = result;
+            const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
+            
+            // Sign and send the transaction
+            const signedTransaction = await signTransaction(transaction);
+            
+            const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+              skipPreflight: false,
+              maxRetries: 2,
+              preflightCommitment: 'processed'
+            });
+            
+            const confirmation = await connection.confirmTransaction(signature, 'confirmed');
           
           if (confirmation.value.err) {
             console.error(`[NFTsTab] Bulk burn transaction error for ${nft.mint}:`, confirmation.value.err);
@@ -427,68 +434,43 @@ const NFTsTab: React.FC = () => {
               }
             }
             
-            // If it's a restricted NFT, try fallback transfer
-            if (isRestrictedNFT) {
-              console.log(`[NFTsTab] Attempting fallback transfer for bulk burn NFT: ${nft.mint}`);
-              
-              // Retry with fallback transfer
-              const fallbackResponse = await fetch('/api/burn-nft', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  mint: nft.mint,
-                  tokenAccount: nft.tokenAddress,
-                  owner: publicKey.toString(),
-                  fallbackTransfer: true
-                })
-              });
-              
-              if (!fallbackResponse.ok) {
-                throw new Error('Failed to prepare fallback transfer');
-              }
-              
-              const fallbackResult = await fallbackResponse.json();
-              if (!fallbackResult.success) {
-                throw new Error(fallbackResult.error || 'Fallback transfer failed');
-              }
-              
-              // Execute fallback transfer
-              const fallbackTransaction = Transaction.from(Buffer.from(fallbackResult.transaction, 'base64'));
-              const fallbackSignedTx = await signTransaction(fallbackTransaction);
-              const fallbackSignature = await connection.sendRawTransaction(fallbackSignedTx.serialize(), {
-                skipPreflight: false,
-                maxRetries: 2,
-                preflightCommitment: 'processed'
-              });
-              
-              const fallbackConfirmation = await connection.confirmTransaction(fallbackSignature, 'confirmed');
-              if (fallbackConfirmation.value.err) {
-                throw new Error(`Fallback transfer failed: ${JSON.stringify(fallbackConfirmation.value.err)}`);
-              }
-              
-              // Success - update totals with fallback result
-              successCount++;
-              totalRentRecovered += parseFloat(fallbackResult.rentRecovered);
-              console.log(`[NFTsTab] Successfully transferred NFT ${nft.mint} to vault (fallback)`);
-              continue; // Move to next NFT
+            // If it's a restricted NFT and we haven't tried fallback yet, retry with fallback
+            if (isRestrictedNFT && !useFallbackTransfer) {
+              console.log(`[NFTsTab] NFT ${nft.mint} is restricted, retrying with fallback transfer...`);
+              useFallbackTransfer = true;
+              attempts++;
+              continue; // Retry with fallback transfer
             }
             
-            // Not a restricted NFT or fallback failed
+            // Not a restricted NFT or fallback already tried - this is a real failure
             throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
           }
           
+          // Transaction succeeded
           successCount++;
           totalRentRecovered += parseFloat(rentRecovered);
-          
-          console.log(`[NFTsTab] Successfully burned NFT ${nft.mint}`);
+          console.log(`[NFTsTab] Successfully ${useFallbackTransfer ? 'transferred' : 'burned'} NFT ${nft.mint}`);
+          break; // Break out of retry loop on success
           
         } catch (err: any) {
-          console.error(`[NFTsTab] Error burning NFT ${nft.mint}:`, err);
-          errors.push(`${nft.name}: ${err.message || 'Unknown error'}`);
+          console.error(`[NFTsTab] Error processing NFT ${nft.mint} (attempt ${attempts + 1}):`, err);
+          
+          // If this was not a transaction confirmation error, or we've exhausted attempts, fail
+          if (!err.message?.includes('Transaction failed') || attempts >= maxAttempts - 1) {
+            errors.push(`${nft.name}: ${err.message || 'Unknown error'}`);
+            break; // Break out of retry loop on non-retryable error
+          }
+          
+          // For transaction failures on first attempt, try fallback transfer
+          if (attempts === 0) {
+            console.log(`[NFTsTab] Retrying NFT ${nft.mint} with fallback transfer...`);
+            useFallbackTransfer = true;
+          }
+          
+          attempts++;
         }
-      }
+      } // End of retry while loop
+      } // End of NFT processing loop
       
       // Display final results
       const successMessage = successCount > 0 ? 
