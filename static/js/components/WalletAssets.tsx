@@ -1704,218 +1704,101 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk burn of NFTs - with batching in a single transaction
+  // Handle bulk burn of NFTs - using individual disposal transfers
   const handleBulkBurnNFTs = async () => {
     if (selectedNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Starting bulk burn operation for NFTs in a single transaction...");
+    setError("Starting bulk disposal operation for NFTs...");
     
     try {
-      // Import necessary web3 modules
-      const { ComputeBudgetProgram } = require('@solana/web3.js');
+      let successCount = 0;
+      let totalRentRecovered = 0;
+      const errors: string[] = [];
       
-      // Create a single transaction for all NFT burns
-      const transaction = new Transaction();
-      
-      // Add compute budget instructions to avoid insufficient SOL errors
-      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-        units: 200000 * Math.min(5, selectedNFTs.length || 1) // Scale compute units proportionally with a cap
-      });
-      
-      // Add a compute budget instruction to set a very low prioritization fee 
-      // Using same fee as single burns to keep costs consistent
-      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: 1 // Minimum possible fee (consistent with single burn)
-      });
-      
-      // Add compute budget instructions to transaction
-      transaction.add(modifyComputeUnits, addPriorityFee);
-      
-      // Define fee recipient for donation
-      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-      
-      // Keep track of which NFTs were successfully added to the transaction
-      const processedNFTs = [];
-      const failedNFTs = [];
-      
-      // Maximum number of NFTs to process in a single transaction (to avoid size limits)
-      const MAX_NFTS_PER_BATCH = 5; // NFTs require more instructions than tokens
-      const nftsToProcess = selectedNFTs.slice(0, MAX_NFTS_PER_BATCH);
-      
-      if (nftsToProcess.length < selectedNFTs.length) {
-        setError(`Processing first ${MAX_NFTS_PER_BATCH} NFTs in this batch. Remaining NFTs will need a separate transaction.`);
-      }
-      
-      // Add burn and close instructions for each NFT
-      for (const mint of nftsToProcess) {
+      for (let i = 0; i < selectedNFTs.length; i++) {
+        const mint = selectedNFTs[i];
         const nft = nfts.find(n => n.mint === mint);
-        if (nft && nft.tokenAddress) {
-          try {
-            // Add close token account instruction (effectively burns the NFT)
-            transaction.add(
-              createCloseAccountInstruction(
-                new PublicKey(nft.tokenAddress),  // token account to close
-                publicKey,                        // destination for recovered SOL
-                publicKey,                        // authority
-                []                                // multisig signers (empty in our case)
-              )
-            );
-            
-            processedNFTs.push(nft);
-          } catch (error) {
-            console.error(`Error adding NFT ${mint} to transaction:`, error);
-            failedNFTs.push(nft);
+        
+        if (!nft || !nft.tokenAddress) {
+          errors.push(`${nft?.name || mint}: Missing token data`);
+          continue;
+        }
+        
+        try {
+          setError(`Processing ${i + 1}/${selectedNFTs.length}: ${nft.name}...`);
+          
+          // Use individual disposal transfer endpoint
+          const response = await fetch('/api/burn-nft', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              mint: nft.mint,
+              tokenAccount: nft.tokenAddress,
+              owner: publicKey.toString()
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.statusText}`);
           }
-        } else {
-          failedNFTs.push({mint});
+          
+          const result = await response.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Unknown server error');
+          }
+          
+          // Get the prepared transaction
+          const { transaction: transactionBase64, rentRecovered } = result;
+          const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
+          
+          // Sign and send the transaction
+          const signedTransaction = await signTransaction(transaction);
+          
+          const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+            skipPreflight: false,
+            maxRetries: 2,
+            preflightCommitment: 'processed'
+          });
+          
+          // Wait for confirmation
+          await connection.confirmTransaction(signature, 'processed');
+          
+          successCount++;
+          totalRentRecovered += parseFloat(rentRecovered || '0');
+          
+        } catch (error: any) {
+          console.error(`Error processing NFT ${nft.name}:`, error);
+          errors.push(`${nft.name}: ${error.message}`);
         }
       }
       
-      // If no NFTs were successfully added, exit
-      if (processedNFTs.length === 0) {
-        setError("Could not add any NFTs to the transaction. Please try again or burn individually.");
-        setIsBurning(false);
-        return;
-      }
-      
-      // Add a single donation instruction based on 1% of total rent returned
-      const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
-      const feePercentage = 0.01; // 1% fee
-      const totalRentReturned = processedNFTs.length * nftRentPerAsset;
-      const feeAmount = Math.floor(totalRentReturned * feePercentage * 1e9); // Convert to lamports
-      
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: feeRecipient,
-          lamports: feeAmount,
-        })
-      );
-      
-      // Get recent blockhash with lower fee priority
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
-        commitment: 'processed' // Lower commitment level to reduce fees
-      });
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-      
-      // Create a timeoutPromise that rejects after 2 minutes
-      let timeoutId: NodeJS.Timeout;
-      const timeoutPromise = new Promise<Transaction>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error('Transaction signing timed out or was cancelled'));
-        }, 120000); // 2 minute timeout
-      });
-      
-      // Update UI to show we're waiting for signature
-      setError(`Please approve the transaction in your wallet to burn ${processedNFTs.length} NFTs at once...`);
-      
-      try {
-        // Race between the signTransaction and the timeout
-        const signedTx = await Promise.race([
-          signTransaction(transaction),
-          timeoutPromise
-        ]);
+      // Show final results
+      if (successCount > 0) {
+        setError(`Successfully processed ${successCount} NFTs! Total rent recovered: ${totalRentRecovered.toFixed(4)} SOL`);
         
-        // Clear the timeout since we got a response
-        clearTimeout(timeoutId);
+        // Remove processed NFTs from the list
+        const processedMints = selectedNFTs.slice(0, successCount);
+        setNfts(nfts.filter(n => !processedMints.includes(n.mint)));
+        setSelectedNFTs([]);
         
-        // Update UI to show transaction is being processed
-        setError(`Sending transaction to burn ${processedNFTs.length} NFTs at once...`);
-        
-        // Send the transaction with skipPreflight to avoid client-side checks
-        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-          skipPreflight: true, // Skip preflight checks
-          maxRetries: 3, // Retry a few times if needed
-          preflightCommitment: 'processed' // Lower commitment level
-        });
-        
-        console.log('Bulk NFT burn transaction sent with signature:', signature);
-        
-        // Wait for confirmation with a custom strategy to avoid timeouts
-        const confirmation = await connection.confirmTransaction({
-          signature: signature,
-          blockhash: blockhash,
-          lastValidBlockHeight: lastValidBlockHeight
-        }, 'processed'); // Use processed commitment level
-        
-        console.log('Bulk burn confirmation result:', confirmation);
-        
-        if (confirmation.value.err) {
-          console.error('Error confirming bulk burn transaction:', confirmation.value.err);
-          setError(`Error burning NFTs: ${confirmation.value.err}`);
-        } else {
-          console.log('Bulk NFT burn successful with signature:', signature);
-          
-          // Update the NFTs list by removing all burned NFTs
-          const updatedNFTs = nfts.filter(n => !processedNFTs.some(p => p.mint === n.mint));
-          setNfts(updatedNFTs);
-          
-          // Remove processed NFTs from selected NFTs
-          const remainingSelected = selectedNFTs.filter(
-            mint => !processedNFTs.some(p => p.mint === mint)
-          );
-          setSelectedNFTs(remainingSelected);
-          
-          // Show animations and achievements
-          if (window.BurnAnimations) {
-            // Show confetti animation
-            if (window.BurnAnimations.createConfetti) {
-              window.BurnAnimations.createConfetti();
-            }
-            
-            // Track achievements - count multiple burns
-            if (window.BurnAnimations.checkAchievements) {
-              window.BurnAnimations.checkAchievements('nfts', processedNFTs.length);
-            }
-          }
-          
-          // Calculate rent returned from burned NFTs (includes token + metadata + edition accounts)
-          const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
-          const totalRentReturned = (processedNFTs.length * nftRentPerAsset).toFixed(4);
-          
-          // Show success message with transaction link and rent details
-          const txUrl = `https://solscan.io/tx/${signature}`;
-          const shortSig = signature.substring(0, 8) + '...';
-          
-          setError(`Successfully burned ${processedNFTs.length} NFTs! Rent returned: ${totalRentReturned} SOL | Signature: ${shortSig}`);
-          
-          // Add link to transaction
-          setTimeout(() => {
-            const txElem = document.createElement('div');
-            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
-            
-            if (document.querySelector('.error-message')) {
-              document.querySelector('.error-message')?.appendChild(txElem);
-            }
-          }, 100);
-          
-          // If there are remaining NFTs, show a message
-          if (remainingSelected.length > 0) {
-            setTimeout(() => {
-              setError(`${remainingSelected.length} NFTs remain selected. Click "Burn Selected" again to process them.`);
-            }, 5000);
-          } else {
-            setTimeout(() => setError(null), 8000);
-          }
-        }
-      } catch (signingError: any) {
-        // Clear timeout
-        clearTimeout(timeoutId);
-        
-        // Check if the error is related to user cancellation
-        if (signingError.message.includes('timed out') || 
-            signingError.message.includes('cancelled') ||
-            signingError.message.includes('rejected') ||
-            signingError.message.includes('User rejected')) {
-          console.log('Transaction was cancelled by the user or timed out');
-          setError('Transaction was cancelled. No NFTs were burned.');
-        } else {
-          // For other signing errors
-          setError(`Error in transaction signing: ${signingError.message}`);
+        if (window.BurnAnimations) {
+          window.BurnAnimations.createConfetti();
+          window.BurnAnimations.checkAchievements('nft', successCount);
         }
       }
+      
+      if (errors.length > 0) {
+        console.warn('Some NFTs failed to process:', errors);
+        setTimeout(() => {
+          setError(`Completed with ${errors.length} errors. Check console for details.`);
+        }, 3000);
+      }
+
+
     } catch (error: any) {
       console.error('Error in bulk burn operation:', error);
       setError(`Error in bulk burn operation: ${error.message}`);
