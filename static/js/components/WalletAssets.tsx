@@ -356,23 +356,39 @@ const WalletAssets: React.FC = () => {
                   const metadata = metadataResponse.data || {};
                   console.log(`[WalletAssets] Successfully enriched token ${token.mint} with metadata:`, metadata);
                   
+                  // Force correct decimals for known problematic tokens
+                  let correctedDecimals = token.decimals || metadata.decimals || 9;
+                  if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+                    correctedDecimals = 0;
+                    console.log(`Forcing decimals to 0 for DwLw token at WalletAssets enrichment stage`);
+                  }
+
                   return {
                     ...token,
                     symbol: metadata.symbol || token.mint.slice(0, 4),
                     name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
                     logoURI: metadata.icon || '/default-token-icon.svg',
-                    // Ensure we have decimals for display
-                    decimals: token.decimals || metadata.decimals || 9,
+                    // Use corrected decimals
+                    decimals: correctedDecimals,
                     // Store the metadata URI for potential future use
                     metadataUri: metadata.uri || null
                   };
                 } catch (error) {
                   console.warn(`[WalletAssets] Failed to fetch metadata for token ${token.mint}, using fallback data`);
+                  
+                  // Force correct decimals for known problematic tokens even in fallback
+                  let correctedDecimals = token.decimals;
+                  if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+                    correctedDecimals = 0;
+                    console.log(`Forcing decimals to 0 for DwLw token at WalletAssets fallback stage`);
+                  }
+                  
                   return {
                     ...token,
                     symbol: 'Unknown',
                     name: 'Unknown Token',
-                    logoURI: '/default-token-icon.svg'
+                    logoURI: '/default-token-icon.svg',
+                    decimals: correctedDecimals
                   };
                 }
               })

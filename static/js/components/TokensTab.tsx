@@ -184,13 +184,20 @@ const TokensTab: React.FC = () => {
                   const metadata = metadataResponse.data || {};
                   console.log(`[TokensTab] Successfully enriched token ${token.mint} with metadata:`, metadata);
 
+                  // Force correct decimals for known problematic tokens
+                  let correctedDecimals = token.decimals || metadata.decimals || 9;
+                  if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
+                    correctedDecimals = 0;
+                    console.log(`Forcing decimals to 0 for DwLw token at data enrichment stage`);
+                  }
+
                   return {
                     ...token,
                     symbol: metadata.symbol || token.mint.slice(0, 4),
                     name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
                     logoURI: metadata.icon || '/default-token-icon.svg',
-                    // Ensure we have decimals for display
-                    decimals: token.decimals || metadata.decimals || 9,
+                    // Use corrected decimals
+                    decimals: correctedDecimals,
                     // Store the metadata URI for potential future use
                     metadataUri: metadata.uri || null
                   };
