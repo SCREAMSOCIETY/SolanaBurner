@@ -209,16 +209,23 @@ const NFTsTab: React.FC = () => {
       
       if (confirmation.value.err) {
         console.error('[NFTsTab] Transaction confirmation error:', confirmation.value.err);
+        console.error('[NFTsTab] Full error object:', JSON.stringify(confirmation.value.err, null, 2));
         
         // Check if this is a burn restriction error (Custom error 11)
         const errorMsg = confirmation.value.err;
         let isRestrictedNFT = false;
         
-        if (errorMsg && typeof errorMsg === 'object' && 'InstructionError' in errorMsg) {
-          const instructionError = errorMsg.InstructionError as [number, any];
-          const [instructionIndex, error] = instructionError;
-          if (error && typeof error === 'object' && 'Custom' in error && error.Custom === 11) {
-            isRestrictedNFT = true;
+        // Check for instruction error with custom code 11 (burn restriction)
+        if (errorMsg && (errorMsg as any).InstructionError) {
+          const instructionError = (errorMsg as any).InstructionError;
+          console.log('[NFTsTab] Found InstructionError:', instructionError);
+          if (Array.isArray(instructionError) && instructionError.length >= 2) {
+            const [instructionIndex, error] = instructionError;
+            console.log('[NFTsTab] Error details:', { instructionIndex, error });
+            if (error && error.Custom === 11) {
+              isRestrictedNFT = true;
+              console.log('[NFTsTab] Detected restricted NFT (Custom error 11)');
+            }
           }
         }
         
