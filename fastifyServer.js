@@ -1165,15 +1165,27 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     // Calculate actual rent based on account size and current rent rate
     const actualRentLamports = tokenAccountInfo.lamports;
     const actualRentSOL = actualRentLamports / 1e9;
+    const accountDataSize = tokenAccountInfo.data.length;
     
-    console.log(`Actual rent for token account: ${actualRentSOL} SOL (${actualRentLamports} lamports)`);
+    // Get minimum balance for rent exemption based on account size
+    const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+    const minimumBalanceSOL = minimumBalance / 1e9;
+    
+    console.log(`Token account details:`);
+    console.log(`  Current balance: ${actualRentSOL} SOL (${actualRentLamports} lamports)`);
+    console.log(`  Account data size: ${accountDataSize} bytes`);
+    console.log(`  Minimum rent exemption: ${minimumBalanceSOL} SOL (${minimumBalance} lamports)`);
+    
+    // Use the minimum balance for rent exemption as the recoverable amount
+    const recoverableRentLamports = minimumBalance;
+    const recoverableRentSOL = minimumBalanceSOL;
     
     const feePercentage = 0.01;
-    const feeAmount = Math.floor(actualRentLamports * feePercentage);
+    const feeAmount = Math.floor(recoverableRentLamports * feePercentage);
 
     // Add memo instruction to show burn details in wallet
-    const userReceivesSOL = (actualRentSOL * 0.99);
-    const feeSOL = (actualRentSOL * 0.01);
+    const userReceivesSOL = (recoverableRentSOL * 0.99);
+    const feeSOL = (recoverableRentSOL * 0.01);
     const memoText = `🔥 Burn "${nftName}" | Rent Recovery: ${userReceivesSOL.toFixed(4)} SOL | Fee: ${feeSOL.toFixed(4)} SOL`;
     
     const memoInstruction = new TransactionInstruction({
