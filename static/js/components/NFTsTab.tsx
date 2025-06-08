@@ -336,158 +336,75 @@ const NFTsTab: React.FC = () => {
     
     try {
       setBurning(true);
-      setError('Preparing bulk burn transaction...');
+      setError('Preparing batch burn transaction...');
       
       const selectedNftData = nfts.filter(nft => selectedNfts.has(nft.mint));
-      console.log(`[NFTsTab] Starting bulk burn for ${selectedNftData.length} NFTs`);
+      console.log(`[NFTsTab] Starting batch burn for ${selectedNftData.length} NFTs`);
       
-      // Process NFTs individually using the server endpoint for reliability
-      let successCount = 0;
-      let totalRentRecovered = 0;
-      const errors: string[] = [];
+      // Prepare NFT data for batch burn
+      const nftsToProcess = selectedNftData.map(nft => ({
+        mint: nft.mint,
+        tokenAccount: nft.tokenAddress,
+        name: nft.name || 'Unknown NFT'
+      })).filter(nft => nft.tokenAccount); // Only include NFTs with valid token accounts
       
-      for (const nft of selectedNftData) {
-        if (!nft.tokenAddress) {
-          errors.push(`${nft.name}: Missing token data`);
-          continue;
-        }
-        
-        // Try burn first, then fallback transfer if it fails with restriction error
-        let useFallbackTransfer = false;
-        let attempts = 0;
-        const maxAttempts = 2;
-        
-        while (attempts < maxAttempts) {
-          try {
-            setError(`${useFallbackTransfer ? 'Transferring' : 'Burning'} ${successCount + 1}/${selectedNftData.length}: ${nft.name}...`);
-            
-            // Use server-side burn endpoint with fallback option
-            const response = await fetch('/api/burn-nft', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                mint: nft.mint,
-                tokenAccount: nft.tokenAddress,
-                owner: publicKey.toString(),
-                fallbackTransfer: useFallbackTransfer
-              })
-            });
-            
-            if (!response.ok) {
-              throw new Error(`Server error: ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            if (!result.success) {
-              throw new Error(result.error || 'Unknown server error');
-            }
-            
-            // Get the prepared transaction
-            const { transaction: transactionBase64, rentRecovered } = result;
-            const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
-            
-            // Sign and send the transaction
-            const signedTransaction = await signTransaction(transaction);
-            
-            const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-              skipPreflight: false,
-              maxRetries: 2,
-              preflightCommitment: 'processed'
-            });
-            
-            const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-          
-          if (confirmation.value.err) {
-            console.error(`[NFTsTab] Bulk burn transaction error for ${nft.mint}:`, confirmation.value.err);
-            console.error(`[NFTsTab] Full error details:`, JSON.stringify(confirmation.value.err, null, 2));
-            
-            // Check if this is a burn restriction error (Custom error 11)
-            const errorMsg = confirmation.value.err;
-            let isRestrictedNFT = false;
-            
-            // More comprehensive error checking
-            if (errorMsg) {
-              console.log(`[NFTsTab] Checking error structure:`, errorMsg);
-              
-              if ((errorMsg as any).InstructionError) {
-                const instructionError = (errorMsg as any).InstructionError;
-                console.log(`[NFTsTab] Found InstructionError:`, instructionError);
-                
-                if (Array.isArray(instructionError) && instructionError.length >= 2) {
-                  const [instructionIndex, error] = instructionError;
-                  console.log(`[NFTsTab] Error details - Index: ${instructionIndex}, Error:`, error);
-                  
-                  if (error && error.Custom === 11) {
-                    isRestrictedNFT = true;
-                    console.log(`[NFTsTab] ✓ Detected restricted NFT (Custom error 11) for: ${nft.mint}`);
-                  } else {
-                    console.log(`[NFTsTab] Error type not matching - Custom code:`, error?.Custom);
-                  }
-                } else {
-                  console.log(`[NFTsTab] InstructionError is not array or insufficient length:`, instructionError);
-                }
-              } else {
-                console.log(`[NFTsTab] No InstructionError found in error message`);
-              }
-            }
-            
-            // If it's a restricted NFT and we haven't tried fallback yet, retry with fallback
-            if (isRestrictedNFT && !useFallbackTransfer) {
-              console.log(`[NFTsTab] NFT ${nft.mint} is restricted, retrying with fallback transfer...`);
-              useFallbackTransfer = true;
-              attempts++;
-              continue; // Retry with fallback transfer
-            }
-            
-            // Not a restricted NFT or fallback already tried - this is a real failure
-            throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-          }
-          
-          // Transaction succeeded
-          successCount++;
-          totalRentRecovered += parseFloat(rentRecovered);
-          console.log(`[NFTsTab] Successfully ${useFallbackTransfer ? 'transferred' : 'burned'} NFT ${nft.mint}`);
-          break; // Break out of retry loop on success
-          
-        } catch (err: any) {
-          console.error(`[NFTsTab] Error processing NFT ${nft.mint} (attempt ${attempts + 1}):`, err);
-          
-          // If this was not a transaction confirmation error, or we've exhausted attempts, fail
-          if (!err.message?.includes('Transaction failed') || attempts >= maxAttempts - 1) {
-            errors.push(`${nft.name}: ${err.message || 'Unknown error'}`);
-            break; // Break out of retry loop on non-retryable error
-          }
-          
-          // For transaction failures on first attempt, try fallback transfer
-          if (attempts === 0) {
-            console.log(`[NFTsTab] Retrying NFT ${nft.mint} with fallback transfer...`);
-            useFallbackTransfer = true;
-          }
-          
-          attempts++;
-        }
-      } // End of retry while loop
-      } // End of NFT processing loop
-      
-      // Display final results
-      const successMessage = successCount > 0 ? 
-        `Successfully burned ${successCount}/${selectedNftData.length} NFTs! Total rent recovered: ${totalRentRecovered.toFixed(4)} SOL` :
-        'No NFTs were successfully burned';
-      
-      if (errors.length > 0) {
-        console.warn('[NFTsTab] Bulk burn errors:', errors);
-        setError(`${successMessage}. Errors: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
-      } else {
-        setError(successMessage);
+      if (nftsToProcess.length === 0) {
+        throw new Error("No valid NFTs found to burn");
       }
       
+      setError(`Creating batch transaction for ${nftsToProcess.length} NFTs...`);
+      
+      // Call batch burn endpoint
+      const response = await fetch('/api/batch-burn-nft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nfts: nftsToProcess,
+          owner: publicKey.toString()
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to prepare batch transaction');
+      }
+      
+      setError(`Please approve the batch transaction in your wallet (${result.processedNFTs.length} NFTs)...`);
+      
+      // Get the prepared batch transaction
+      const { transaction: transactionBase64, totalRentRecovered, totalFee, processedNFTs } = result;
+      const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
+      
+      // Sign the batch transaction (single wallet confirmation)
+      const signedTransaction = await signTransaction(transaction);
+      
+      setError("Sending batch transaction...");
+      
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+        preflightCommitment: 'processed'
+      });
+      
+      setError("Confirming batch transaction...");
+      
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'processed');
+      
+      // Success! Show results
+      setError(`Successfully burned ${processedNFTs.length} NFTs! Total rent recovered: ${totalRentRecovered} SOL (Fee: ${totalFee} SOL)`);
+      
       // Apply burn animations for successful burns
-      if (successCount > 0 && window.BurnAnimations) {
+      if (processedNFTs.length > 0 && window.BurnAnimations) {
         // Animate NFT elements that were successfully burned
-        const burnedMints = selectedNftData.slice(0, successCount).map(nft => nft.mint);
+        const burnedMints = processedNFTs.map(nft => nft.mint);
         const nftElements = Array.from(document.querySelectorAll('.nft-card')).filter(element => {
           const mintAttribute = (element as HTMLElement).dataset.mint;
           return mintAttribute && burnedMints.includes(mintAttribute);
@@ -502,24 +419,24 @@ const NFTsTab: React.FC = () => {
         
         // Show confetti for successful bulk burn
         window.BurnAnimations.createConfetti();
-        window.BurnAnimations.checkAchievements('nft', successCount);
+        window.BurnAnimations.checkAchievements('nft', processedNFTs.length);
         
-        if (successCount >= 2) {
+        if (processedNFTs.length >= 2) {
           window.BurnAnimations.showAchievement(
             "Bulk Burn Master!", 
-            `Successfully burned ${successCount} NFTs! Rent recovered: ${totalRentRecovered.toFixed(4)} SOL`
+            `Successfully burned ${processedNFTs.length} NFTs! Rent recovered: ${totalRentRecovered} SOL`
           );
         }
       }
       
       // Remove successfully burned NFTs from the list
-      const burnedMints = selectedNftData.slice(0, successCount).map(nft => nft.mint);
+      const burnedMints = processedNFTs.map(nft => nft.mint);
       setNfts(nfts.filter(nft => !burnedMints.includes(nft.mint)));
       setSelectedNfts(new Set());
       
     } catch (err: any) {
-      console.error('[NFTsTab] Error in bulk burn process:', err);
-      setError(`Bulk burn failed: ${err.message || 'Unknown error'}`);
+      console.error('[NFTsTab] Error in batch burn process:', err);
+      setError(`Batch burn failed: ${err.message || 'Unknown error'}`);
     } finally {
       setBurning(false);
     }
