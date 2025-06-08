@@ -395,19 +395,35 @@ const NFTsTab: React.FC = () => {
           
           if (confirmation.value.err) {
             console.error(`[NFTsTab] Bulk burn transaction error for ${nft.mint}:`, confirmation.value.err);
+            console.error(`[NFTsTab] Full error details:`, JSON.stringify(confirmation.value.err, null, 2));
             
             // Check if this is a burn restriction error (Custom error 11)
             const errorMsg = confirmation.value.err;
             let isRestrictedNFT = false;
             
-            if (errorMsg && (errorMsg as any).InstructionError) {
-              const instructionError = (errorMsg as any).InstructionError;
-              if (Array.isArray(instructionError) && instructionError.length >= 2) {
-                const [instructionIndex, error] = instructionError;
-                if (error && error.Custom === 11) {
-                  isRestrictedNFT = true;
-                  console.log(`[NFTsTab] Detected restricted NFT in bulk burn: ${nft.mint}`);
+            // More comprehensive error checking
+            if (errorMsg) {
+              console.log(`[NFTsTab] Checking error structure:`, errorMsg);
+              
+              if ((errorMsg as any).InstructionError) {
+                const instructionError = (errorMsg as any).InstructionError;
+                console.log(`[NFTsTab] Found InstructionError:`, instructionError);
+                
+                if (Array.isArray(instructionError) && instructionError.length >= 2) {
+                  const [instructionIndex, error] = instructionError;
+                  console.log(`[NFTsTab] Error details - Index: ${instructionIndex}, Error:`, error);
+                  
+                  if (error && error.Custom === 11) {
+                    isRestrictedNFT = true;
+                    console.log(`[NFTsTab] ✓ Detected restricted NFT (Custom error 11) for: ${nft.mint}`);
+                  } else {
+                    console.log(`[NFTsTab] Error type not matching - Custom code:`, error?.Custom);
+                  }
+                } else {
+                  console.log(`[NFTsTab] InstructionError is not array or insufficient length:`, instructionError);
                 }
+              } else {
+                console.log(`[NFTsTab] No InstructionError found in error message`);
               }
             }
             
