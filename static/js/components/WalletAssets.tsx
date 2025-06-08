@@ -1748,7 +1748,19 @@ const WalletAssets: React.FC = () => {
           const result = await response.json();
           
           if (!result.success) {
-            throw new Error(result.error || 'Unknown server error');
+            let errorMessage = result.error || 'Unknown server error';
+            
+            // If it's a simulation failure, provide more details
+            if (result.details && result.details.logs) {
+              const relevantLogs = result.details.logs.filter((log: string) => 
+                log.includes('Error:') || log.includes('failed')
+              );
+              if (relevantLogs.length > 0) {
+                errorMessage += '. ' + relevantLogs.join('. ');
+              }
+            }
+            
+            throw new Error(errorMessage);
           }
           
           // Get the prepared transaction

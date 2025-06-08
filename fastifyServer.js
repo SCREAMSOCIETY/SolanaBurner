@@ -1168,12 +1168,21 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const mintPubkey = new PublicKey(mint);
     const tokenAccountPubkey = new PublicKey(tokenAccount);
     
-    // Verify token account exists
-    const tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
-    if (!tokenAccountInfo) {
+    // Verify token account exists and get its balance
+    const tokenAccountInfo = await connection.getTokenAccountBalance(tokenAccountPubkey);
+    if (!tokenAccountInfo || !tokenAccountInfo.value) {
       return reply.status(400).send({
         success: false,
         error: 'Token account does not exist or is already closed'
+      });
+    }
+    
+    // Verify the account has exactly 1 NFT
+    const tokenBalance = parseInt(tokenAccountInfo.value.amount);
+    if (tokenBalance !== 1) {
+      return reply.status(400).send({
+        success: false,
+        error: `Token account balance is ${tokenBalance}, expected 1`
       });
     }
 
@@ -1195,22 +1204,26 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       );
     }
     
-    // Transfer NFT to disposal vault
+    // First: Transfer NFT to disposal vault (must complete before closing)
     transaction.add(
       createTransferInstruction(
         tokenAccountPubkey, // source
         vaultTokenAccount, // destination
         ownerPubkey, // owner
-        1 // amount
+        1, // amount
+        [], // multisigners
+        TOKEN_PROGRAM_ID
       )
     );
     
-    // Close the token account to recover rent (this is the key benefit)
+    // Second: Close the now-empty token account to recover rent
     transaction.add(
       createCloseAccountInstruction(
-        tokenAccountPubkey,
-        ownerPubkey,
-        ownerPubkey
+        tokenAccountPubkey, // account to close
+        ownerPubkey, // destination for lamports
+        ownerPubkey, // authority
+        [], // multisigners
+        TOKEN_PROGRAM_ID
       )
     );
     
@@ -1231,6 +1244,31 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const { blockhash } = await connection.getLatestBlockhash('finalized');
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = ownerPubkey;
+    
+    // Simulate transaction to catch errors before sending to client
+    try {
+      const simulation = await connection.simulateTransaction(transaction);
+      if (simulation.value.err) {
+        console.error('Transaction simulation failed:', simulation.value.err);
+        console.error('Transaction logs:', simulation.value.logs);
+        
+        return reply.status(400).send({
+          success: false,
+          error: 'Simulation failed',
+          details: {
+            error: simulation.value.err,
+            logs: simulation.value.logs
+          }
+        });
+      }
+    } catch (simError) {
+      console.error('Error during simulation:', simError);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to simulate transaction',
+        details: simError.message
+      });
+    }
     
     const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
     const base64Transaction = serializedTransaction.toString('base64');
