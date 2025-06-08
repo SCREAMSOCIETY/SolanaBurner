@@ -247,9 +247,9 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     const selectedNFTCount = selectedNFTs.length;
     const selectedCNFTCount = selectedCNFTs.length;
     
-    // Maximum batch size limits
-    const MAX_NFTS_PER_BATCH = 15;
-    const MAX_TOKENS_PER_BATCH = 15;
+    // Maximum batch size limits (based on transaction size testing)
+    const MAX_NFTS_PER_BATCH = 10;
+    const MAX_TOKENS_PER_BATCH = 10;
     
     // Check for batch size limits
     const nftBatchWarning = selectedNFTCount > MAX_NFTS_PER_BATCH;
