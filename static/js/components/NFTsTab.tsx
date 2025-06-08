@@ -382,40 +382,6 @@ const NFTsTab: React.FC = () => {
             const result = await response.json();
             
             if (!result.success) {
-              // Check if this is a compressed NFT that needs special handling
-              if (result.isCompressedNFT) {
-                console.log(`[NFTsTab] Detected compressed NFT: ${nft.mint}, routing to cNFT transfer`);
-                
-                // Use cNFT transfer endpoint instead
-                const cnftResponse = await fetch('/api/cnft/transfer-request', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    assetId: nft.mint,
-                    ownerAddress: publicKey.toString(),
-                    destinationAddress: 'EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK', // Project vault
-                    signedMessage: 'auto-transfer-for-rent-recovery'
-                  })
-                });
-                
-                if (!cnftResponse.ok) {
-                  throw new Error('Failed to transfer compressed NFT');
-                }
-                
-                const cnftResult = await cnftResponse.json();
-                if (!cnftResult.success) {
-                  throw new Error(cnftResult.error || 'Compressed NFT transfer failed');
-                }
-                
-                // Success - update totals
-                successCount++;
-                totalRentRecovered += 0.0076; // Standard rent amount for cNFTs
-                console.log(`[NFTsTab] Successfully transferred cNFT ${nft.mint} to vault`);
-                break; // Break out of retry loop on success
-              }
-              
               throw new Error(result.error || 'Unknown server error');
             }
             
