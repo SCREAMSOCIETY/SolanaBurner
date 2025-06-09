@@ -377,6 +377,12 @@ const NFTsTab: React.FC = () => {
         if (result.maxBatchSize) {
           throw new Error(`${result.error} Please select ${result.maxBatchSize} or fewer NFTs.`);
         }
+        
+        // Check if it's an account validation error - suggest refresh
+        if (result.error && result.error.includes('accounts no longer exist')) {
+          throw new Error(`${result.error}\n\nPlease refresh your wallet to see current assets and try again.`);
+        }
+        
         throw new Error(result.error || 'Failed to prepare batch transaction');
       }
       

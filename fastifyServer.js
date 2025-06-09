@@ -1511,8 +1511,15 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         }
         console.log(`Got account info for ${mint}, size: ${tokenAccountInfo.data.length} bytes`);
         
-        // Verify token balance
-        const tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
+        // Verify token balance and account existence
+        let tokenBalance;
+        try {
+          tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
+        } catch (balanceError) {
+          console.log(`Token account ${tokenAccount} not found or invalid for mint ${mint}:`, balanceError.message);
+          continue; // Skip if token account doesn't exist
+        }
+        
         if (!tokenBalance || !tokenBalance.value || parseInt(tokenBalance.value.amount) !== 1) {
           console.log(`Invalid token balance for ${mint}:`, tokenBalance?.value);
           continue; // Skip if not exactly 1 NFT
@@ -1520,6 +1527,23 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         console.log(`Verified token balance for ${mint}: ${tokenBalance.value.amount}`);
         
         // If we reach here without errors, process this NFT
+        
+        // Verify that required metadata accounts exist for proper NFT burning
+        const metaplexProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+        const [metadataPDA] = PublicKey.findProgramAddressSync(
+          [Buffer.from('metadata'), metaplexProgramId.toBuffer(), mintPubkey.toBuffer()],
+          metaplexProgramId
+        );
+        
+        // Check if metadata account exists
+        let metadataExists = false;
+        try {
+          const metadataAccount = await connection.getAccountInfo(metadataPDA);
+          metadataExists = metadataAccount !== null;
+          console.log(`Metadata account for ${mint} exists:`, metadataExists);
+        } catch (metadataError) {
+          console.log(`Could not check metadata account for ${mint}:`, metadataError.message);
+        }
         
         // Calculate rent for this NFT
         const accountDataSize = tokenAccountInfo.data.length;
@@ -1570,7 +1594,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
       console.log('No processed NFTs found, returning error');
       return reply.status(400).send({
         success: false,
-        error: 'No valid NFTs found to burn'
+        error: 'No valid NFTs found to burn. The selected NFTs may have already been burned, transferred, or their accounts no longer exist. Please refresh your wallet to see current assets.'
       });
     }
     
