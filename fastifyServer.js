@@ -532,6 +532,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     
     // Validate and create close account instructions for each vacant account
     const validAccounts = [];
+    let totalRentRecovered = 0;
     
     for (const account of vacantAccounts) {
       try {
@@ -551,11 +552,15 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
           if (amount === 0 && parsedInfo.owner === ownerAddress) {
             const closeInstruction = createCloseAccountInstruction(
               accountPubkey,  // Account to close
-              ownerPubkey,    // Destination for rent SOL
+              ownerPubkey,    // Destination for rent SOL (user gets it initially)
               ownerPubkey     // Owner of the account
             );
             
             transaction.add(closeInstruction);
+            
+            // Track total rent that will be recovered
+            totalRentRecovered += account.rentLamports || accountInfo.value.lamports;
+            
             validAccounts.push(account);
             fastify.log.info(`Added close instruction for account ${account.address}`);
           } else {
@@ -565,6 +570,23 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
       } catch (accountError) {
         fastify.log.warn(`Skipping invalid account ${account.address}: ${accountError.message}`);
       }
+    }
+    
+    // Add 1% project fee transfer if there's significant rent recovered
+    if (totalRentRecovered > 0) {
+      const projectFee = Math.max(1, Math.floor(totalRentRecovered * 0.01));
+      const projectWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      const { SystemProgram } = require('@solana/web3.js');
+      const feeTransferInstruction = SystemProgram.transfer({
+        fromPubkey: ownerPubkey,
+        toPubkey: projectWallet,
+        lamports: projectFee
+      });
+      
+      transaction.add(feeTransferInstruction);
+      
+      fastify.log.info(`Added 1% project fee transfer: ${projectFee} lamports to ${projectWallet.toString()}`);
     }
     
     if (validAccounts.length === 0) {

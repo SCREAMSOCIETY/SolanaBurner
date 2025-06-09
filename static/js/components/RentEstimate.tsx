@@ -91,12 +91,22 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         return;
       }
       
+      // Calculate fee breakdown
+      const grossRentRecovery = result.potentialRentRecovery;
+      const projectFee = grossRentRecovery * 0.01; // 1% fee
+      const netRentRecovery = grossRentRecovery - projectFee;
+
       // Ask user for confirmation before proceeding
       const confirmed = confirm(
-        `Found ${result.accountCount} vacant accounts that can recover ${result.potentialRentRecovery.toFixed(4)} SOL.\n\n` +
+        `Found ${result.accountCount} vacant accounts that can recover ${grossRentRecovery.toFixed(4)} SOL.\n\n` +
+        `Fee Structure (1% project fee):\n` +
+        `• Gross rent recovery: ${grossRentRecovery.toFixed(4)} SOL\n` +
+        `• Project fee (1%): ${projectFee.toFixed(4)} SOL\n` +
+        `• Net amount to you: ${netRentRecovery.toFixed(4)} SOL\n\n` +
         `Do you want to proceed with burning these accounts? This will:\n` +
         `- Close ${result.accountCount} empty token accounts\n` +
-        `- Recover approximately ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
+        `- Transfer 1% fee to project wallet\n` +
+        `- Return 99% of rent to your wallet\n` +
         `- Require wallet signature for the transaction\n\n` +
         `Click OK to proceed or Cancel to abort.`
       );
@@ -158,11 +168,18 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       const submitResult = await submitResponse.json();
       
       if (submitResult.success) {
+        const grossRent = result.potentialRentRecovery;
+        const projectFee = grossRent * 0.01;
+        const netRent = grossRent - projectFee;
+        
         alert(
           `🎉 Successfully burned ${result.accountCount} vacant accounts!\n\n` +
-          `💰 Recovered ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
+          `💰 Rent Recovery Summary:\n` +
+          `• Gross rent: ${grossRent.toFixed(4)} SOL\n` +
+          `• Project fee (1%): ${projectFee.toFixed(4)} SOL\n` +
+          `• Net to you: ${netRent.toFixed(4)} SOL\n\n` +
           `📊 Transaction: ${submitResult.signature}\n\n` +
-          `The rent has been returned to your wallet. Refreshing your balance...`
+          `The net rent has been returned to your wallet. Refreshing your balance...`
         );
         // Refresh the page to show updated balances
         window.location.reload();
@@ -393,6 +410,16 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
             <div style={{ marginBottom: '10px', fontSize: '14px', color: '#ccc' }}>
               Found {rentData.vacantAccounts} empty token accounts that can be closed to recover {rentData.breakdown.vacantRent.toFixed(4)} SOL
             </div>
+            
+            {/* Fee breakdown for vacant accounts */}
+            {rentData.fees && (
+              <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#0a0a0a', borderRadius: '4px', fontSize: '12px' }}>
+                <div style={{ color: '#ffd700', fontWeight: 'bold', marginBottom: '4px' }}>Fee Structure (1% project fee):</div>
+                <div style={{ color: '#ccc' }}>• Gross rent recovery: {rentData.breakdown.vacantRent.toFixed(4)} SOL</div>
+                <div style={{ color: '#ccc' }}>• Project fee (1%): {(rentData.breakdown.vacantRent * 0.01).toFixed(4)} SOL</div>
+                <div style={{ color: '#90EE90' }}>• Net to you: {(rentData.breakdown.vacantRent * 0.99).toFixed(4)} SOL</div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button 
                 key={`vacant-burn-${processId}`}
