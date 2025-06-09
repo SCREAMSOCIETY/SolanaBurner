@@ -362,9 +362,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       }
     }
     
-    // Calculate rent estimate with burning fees
-    // Set burning fee for vacant accounts (in lamports)
-    const vacantAccountBurningFee = 40000; // 0.00004 SOL fee per vacant account
+    // Calculate rent estimate with 1% project fee
     
     // NFTs return rent from multiple accounts: token account + metadata account + edition account
     // This matches what other burn sites calculate (total ~0.0077 SOL per NFT vs our previous ~0.002 SOL)
@@ -374,14 +372,14 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     // Tokens only have token account rent
     const tokenRentTotal = tokenAccounts_count * tokenAccountRent;
     
-    // Vacant accounts have rent minus burning fee
-    const vacantRentAfterFee = Math.max(0, tokenAccountRent - vacantAccountBurningFee);
-    const vacantRentTotal = vacantAccounts * vacantRentAfterFee;
+    // Vacant accounts have full rent recovery with 1% fee structure
+    const vacantRentTotal = vacantAccounts * tokenAccountRent;
+    const vacantAccountFee = vacantRentTotal * 0.01; // 1% fee on total recovery
     
     const totalRentEstimate = nftRentTotal + tokenRentTotal + vacantRentTotal;
     
-    // Calculate total fees collected
-    const totalBurningFees = vacantAccounts * vacantAccountBurningFee;
+    // Calculate total fees collected (1% of vacant account rent)
+    const totalBurningFees = vacantAccountFee;
     
     return {
       success: true,
@@ -399,7 +397,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
           vacantRent: vacantRentTotal / 1e9 // Rent minus burning fee
         },
         fees: {
-          vacantAccountBurningFee: vacantAccountBurningFee / 1e9, // Fee per vacant account
+          vacantAccountBurningFee: vacantAccountFee / 1e9, // 1% fee on vacant account rent
           totalBurningFees: totalBurningFees / 1e9 // Total fees for all vacant accounts
         }
       }

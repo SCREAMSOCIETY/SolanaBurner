@@ -411,8 +411,8 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
               Found {rentData.vacantAccounts} empty token accounts that can be closed to recover {rentData.breakdown.vacantRent.toFixed(4)} SOL
             </div>
             
-            {/* Fee breakdown for vacant accounts */}
-            {rentData.fees && (
+            {/* Fee breakdown for vacant accounts - always show when there are vacant accounts */}
+            {rentData.vacantAccounts > 0 && (
               <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#0a0a0a', borderRadius: '4px', fontSize: '12px' }}>
                 <div style={{ color: '#ffd700', fontWeight: 'bold', marginBottom: '4px' }}>Fee Structure (1% project fee):</div>
                 <div style={{ color: '#ccc' }}>• Gross rent recovery: {rentData.breakdown.vacantRent.toFixed(4)} SOL</div>
