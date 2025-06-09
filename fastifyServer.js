@@ -1513,8 +1513,10 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           }
           
           // Verify the account is actually a token account
-          if (tokenAccountInfo.data.length !== 165) {
-            console.log(`Token account ${tokenAccount} has invalid size ${tokenAccountInfo.data.length} for mint ${mint}, skipping`);
+          // Standard token accounts are 165 bytes, but Metaplex resized NFTs may have different sizes
+          const validTokenAccountSizes = [165, 182]; // Standard and resized token account sizes
+          if (!validTokenAccountSizes.includes(tokenAccountInfo.data.length)) {
+            console.log(`Token account ${tokenAccount} has unexpected size ${tokenAccountInfo.data.length} for mint ${mint}, skipping`);
             continue;
           }
           
@@ -1533,9 +1535,21 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           continue; // Skip if token account doesn't exist
         }
         
-        if (!tokenBalance || !tokenBalance.value || parseInt(tokenBalance.value.amount) !== 1) {
-          console.log(`Invalid token balance for ${mint}:`, tokenBalance?.value);
-          continue; // Skip if not exactly 1 NFT
+        // For Metaplex resized NFTs, be more flexible with balance validation
+        if (!tokenBalance || !tokenBalance.value) {
+          console.log(`Invalid token balance response for ${mint}:`, tokenBalance?.value);
+          continue; // Skip if no balance data
+        }
+        
+        const amount = parseInt(tokenBalance.value.amount);
+        if (amount !== 1) {
+          console.log(`Token ${mint} has balance ${amount}, expected 1 - checking if it's a valid NFT format`);
+          // For some resized NFTs, we'll be more lenient and check if it's a reasonable NFT amount
+          if (amount <= 0 || amount > 10) {
+            console.log(`Token ${mint} has invalid NFT balance: ${amount}, skipping`);
+            continue;
+          }
+          console.log(`Proceeding with ${mint} despite non-standard balance (${amount}) - may be resized NFT`);
         }
         console.log(`Verified token balance for ${mint}: ${tokenBalance.value.amount}`);
         
@@ -1567,13 +1581,18 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         totalRentRecovered += rentSOL * 0.99;
         totalFee += feeSOL;
         
-        // Add burn instruction
+        // Add burn instruction with proper amount and decimals for Metaplex resized NFTs
+        const actualAmount = parseInt(tokenBalance.value.amount);
+        const decimals = tokenBalance.value.decimals || 0;
+        
+        console.log(`Creating burn instruction for ${mint} with amount: ${actualAmount}, decimals: ${decimals}`);
+        
         transaction.add(
           createBurnInstruction(
             tokenAccountPubkey,
             mintPubkey,
             ownerPubkey,
-            1,
+            actualAmount,
             [],
             TOKEN_PROGRAM_ID
           )
