@@ -410,16 +410,6 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
             <div style={{ marginBottom: '10px', fontSize: '14px', color: '#ccc' }}>
               Found {rentData.vacantAccounts} empty token accounts that can be closed to recover {rentData.breakdown.vacantRent.toFixed(4)} SOL
             </div>
-            
-            {/* Fee breakdown for vacant accounts - always show when there are vacant accounts */}
-            {rentData.vacantAccounts > 0 && (
-              <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#0a0a0a', borderRadius: '4px', fontSize: '12px' }}>
-                <div style={{ color: '#ffd700', fontWeight: 'bold', marginBottom: '4px' }}>Fee Structure (1% project fee):</div>
-                <div style={{ color: '#ccc' }}>• Gross rent recovery: {rentData.breakdown.vacantRent.toFixed(4)} SOL</div>
-                <div style={{ color: '#ccc' }}>• Project fee (1%): {(rentData.breakdown.vacantRent * 0.01).toFixed(4)} SOL</div>
-                <div style={{ color: '#90EE90' }}>• Net to you: {(rentData.breakdown.vacantRent * 0.99).toFixed(4)} SOL</div>
-              </div>
-            )}
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button 
                 key={`vacant-burn-${processId}`}
