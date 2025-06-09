@@ -1503,13 +1503,26 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         const tokenAccountPubkey = new PublicKey(tokenAccount);
         console.log(`Created PublicKeys for ${mint}`);
         
-        // Get account info for rent calculation
-        const tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
-        if (!tokenAccountInfo) {
-          console.log(`Token account not found for ${mint}, skipping`);
-          continue; // Skip if account doesn't exist
+        // Get account info for rent calculation and validate existence
+        let tokenAccountInfo;
+        try {
+          tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
+          if (!tokenAccountInfo) {
+            console.log(`Token account ${tokenAccount} not found for mint ${mint}, skipping`);
+            continue; // Skip if account doesn't exist
+          }
+          
+          // Verify the account is actually a token account
+          if (tokenAccountInfo.data.length !== 165) {
+            console.log(`Token account ${tokenAccount} has invalid size ${tokenAccountInfo.data.length} for mint ${mint}, skipping`);
+            continue;
+          }
+          
+          console.log(`Got account info for ${mint}, size: ${tokenAccountInfo.data.length} bytes`);
+        } catch (accountError) {
+          console.log(`Failed to fetch account info for ${tokenAccount} (mint: ${mint}):`, accountError.message);
+          continue; // Skip if we can't fetch account info
         }
-        console.log(`Got account info for ${mint}, size: ${tokenAccountInfo.data.length} bytes`);
         
         // Verify token balance and account existence
         let tokenBalance;
