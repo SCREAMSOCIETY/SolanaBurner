@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import axios from 'axios';
 
 interface RentEstimateData {
@@ -32,7 +32,8 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   selectedNFTs = [], 
   selectedCNFTs = [] 
 }) => {
-  const { publicKey, signMessage, signTransaction } = useWallet();
+  const { publicKey, signMessage, signTransaction, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const [rentData, setRentData] = useState<RentEstimateData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,10 +131,41 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       // Deserialize the transaction from the server
       const transaction = Transaction.from(Buffer.from(burnResult.transaction, 'base64'));
       
-      // Sign the transaction with the user's wallet
+      // For mobile wallets, we need to handle transaction signing differently
       let signedTransaction;
       try {
-        signedTransaction = await signTransaction(transaction);
+        // Check if we're on mobile and use sendTransaction if available
+        const isMobile = window.navigator?.userAgent?.includes('Mobile');
+        
+        if (isMobile && sendTransaction && connection) {
+          // For mobile wallets, send the transaction directly instead of signing first
+          console.log('Using mobile wallet sendTransaction method');
+          
+          const signature = await sendTransaction(transaction, connection, {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed'
+          });
+          
+          // Wait for confirmation
+          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+          
+          if (confirmation.value.err) {
+            throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+          }
+          
+          // Show success and refresh
+          alert(
+            `Successfully burned ${result.accountCount} vacant accounts!\n\n` +
+            `Recovered ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
+            `Transaction: ${signature}\n\n` +
+            `The rent has been returned to your wallet. Refreshing your balance...`
+          );
+          window.location.reload();
+          return;
+        } else {
+          // Desktop wallet - use traditional signing
+          signedTransaction = await signTransaction(transaction);
+        }
       } catch (signError: any) {
         // User cancelled the transaction
         if (signError?.message?.includes('User rejected') || signError?.code === 4001) {
