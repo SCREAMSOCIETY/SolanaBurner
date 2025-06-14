@@ -151,9 +151,9 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       try {
         transaction = Transaction.from(Buffer.from(burnResult.transaction, 'base64'));
         console.log('[RentEstimate] Transaction deserialized successfully');
-      } catch (deserializeError) {
+      } catch (deserializeError: any) {
         console.error('[RentEstimate] Error deserializing transaction:', deserializeError);
-        throw new Error(`Failed to deserialize transaction: ${deserializeError.message}`);
+        throw new Error(`Failed to deserialize transaction: ${deserializeError?.message || 'Unknown error'}`);
       }
       
       // For mobile wallets, we need to handle transaction signing differently
@@ -198,9 +198,9 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
           })
         });
         console.log('[RentEstimate] Submit response status:', submitResponse.status);
-      } catch (fetchError) {
+      } catch (fetchError: any) {
         console.error('[RentEstimate] Error submitting transaction:', fetchError);
-        throw new Error(`Failed to submit transaction: ${fetchError.message}`);
+        throw new Error(`Failed to submit transaction: ${fetchError?.message || 'Unknown error'}`);
       }
       
       const submitResult = await submitResponse.json();
@@ -460,6 +460,17 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
                 key={`vacant-burn-${processId}`}
                 className="vacant-burn-button"
                 onClick={handleBurnVacantAccounts}
+                onTouchStart={(e) => {
+                  console.log('[RentEstimate] Touch start detected on vacant burn button');
+                  e.preventDefault();
+                }}
+                onTouchEnd={(e) => {
+                  console.log('[RentEstimate] Touch end detected, triggering burn');
+                  e.preventDefault();
+                  if (!isProcessing) {
+                    handleBurnVacantAccounts();
+                  }
+                }}
                 disabled={isProcessing}
                 style={{
                   padding: '10px 20px',
