@@ -67,8 +67,13 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     }
     
     setIsProcessing(true);
+    console.log('[RentEstimate] Starting vacant account burning process');
+    console.log('[RentEstimate] Wallet:', publicKey.toString());
+    console.log('[RentEstimate] Mobile device detected:', window.navigator?.userAgent?.includes('Mobile'));
+    
     try {
       // First, get the list of vacant accounts from the server
+      console.log('[RentEstimate] Fetching vacant accounts from server');
       const response = await fetch('/api/burn-vacant-accounts', {
         method: 'POST',
         headers: {
@@ -81,16 +86,21 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       });
       
       const result = await response.json();
+      console.log('[RentEstimate] Server response:', result);
       
       if (!result.success) {
+        console.error('[RentEstimate] Failed to fetch vacant accounts:', result.error);
         alert(`Error: ${result.error || 'Failed to fetch vacant accounts'}`);
         return;
       }
       
       if (result.accountCount === 0) {
+        console.log('[RentEstimate] No vacant accounts found');
         alert('No vacant accounts found to burn.');
         return;
       }
+      
+      console.log('[RentEstimate] Found vacant accounts:', result.accountCount);
       
       // Ask user for confirmation before proceeding
       const confirmed = confirm(
@@ -103,10 +113,12 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       );
       
       if (!confirmed) {
+        console.log('[RentEstimate] User cancelled the operation');
         return;
       }
       
       // Prepare burn transactions on the server
+      console.log('[RentEstimate] Preparing burn transactions on server');
       const burnResponse = await fetch('/api/prepare-burn-transactions', {
         method: 'POST',
         headers: {
@@ -139,15 +151,20 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         
         if (isMobile && sendTransaction && connection) {
           // For mobile wallets, send the transaction directly instead of signing first
-          console.log('Using mobile wallet sendTransaction method');
+          console.log('[RentEstimate] Using mobile wallet sendTransaction method');
+          console.log('[RentEstimate] Connection available:', !!connection);
+          console.log('[RentEstimate] SendTransaction function available:', !!sendTransaction);
           
           const signature = await sendTransaction(transaction, connection, {
             skipPreflight: false,
             preflightCommitment: 'confirmed'
           });
           
+          console.log('[RentEstimate] Transaction sent, signature:', signature);
+          
           // Wait for confirmation
           const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+          console.log('[RentEstimate] Transaction confirmation:', confirmation);
           
           if (confirmation.value.err) {
             throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
@@ -203,20 +220,31 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       }
       
     } catch (error: any) {
-      console.error('Error burning vacant accounts:', error);
+      console.error('[RentEstimate] Error during vacant account burning:', error);
+      console.error('[RentEstimate] Error details:', {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name,
+        stack: error?.stack
+      });
       
       // Handle different types of errors
       if (error?.message?.includes('User rejected') || error?.code === 4001) {
+        console.log('[RentEstimate] Transaction was cancelled by user');
         alert('Transaction was cancelled by user.');
       } else if (error?.message?.includes('insufficient funds')) {
+        console.error('[RentEstimate] Insufficient funds error');
         alert('Insufficient SOL to pay for transaction fees.');
       } else if (error?.message?.includes('blockhash')) {
+        console.error('[RentEstimate] Blockhash expired error');
         alert('Transaction expired. Please try again.');
       } else {
+        console.error('[RentEstimate] Unknown error:', error?.message || 'Unknown error');
         alert(`Failed to burn vacant accounts: ${error?.message || 'Please try again.'}`);
       }
     } finally {
       // Always reset the processing state
+      console.log('[RentEstimate] Resetting processing state');
       setIsProcessing(false);
     }
   };
