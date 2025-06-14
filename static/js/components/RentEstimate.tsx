@@ -216,10 +216,10 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       if (submitResult.success) {
         console.log('[RentEstimate] Transaction submitted successfully:', submitResult.signature);
         alert(
-          `Successfully burned ${result.accountCount} vacant accounts!\n\n` +
-          `Recovered ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
-          `Transaction: ${submitResult.signature}\n\n` +
-          `The rent has been returned to your wallet. Refreshing your balance...`
+          `🎉 Success! Burned ${submitResult.accountCount || result.accountCount} vacant accounts!\n\n` +
+          `💰 Recovered approximately ${(submitResult.accountCount || result.accountCount) * 0.00204} SOL in rent\n` +
+          `🔗 Transaction: ${submitResult.signature}\n\n` +
+          `The rent has been returned to your wallet. The page will refresh to show your updated balance.`
         );
         // Refresh the page to show updated balances
         window.location.reload();
@@ -453,8 +453,8 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
           </small>
         </div>
         
-        {/* Vacant Account Burning Section */}
-        {rentData && rentData.vacantAccounts > 0 && (
+        {/* Vacant Account Burning Section - only show if there are vacant accounts */}
+        {rentData && rentData.vacantAccounts > 0 && rentData.breakdown.vacantRent > 0 && (
           <div className="vacant-burn-section" style={{ marginTop: '15px', padding: '15px', border: '1px solid #444', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
             <div style={{ marginBottom: '10px' }}>
               <strong>🔥 Recover Rent from Vacant Accounts</strong>

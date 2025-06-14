@@ -95,7 +95,14 @@ SolBurn is a sophisticated Solana blockchain asset management web application th
 
 ## Changelog
 
-- June 14, 2025. Initial setup
+- June 14, 2025: Initial setup
+- June 14, 2025: Successfully resolved mobile Solflare vacant account burning compatibility issue and added user feedback improvements:
+  - Fixed mobile touch event handling with explicit onTouchStart/onTouchEnd handlers
+  - Simplified transaction structure to match working NFT/token burning pattern
+  - Removed confirmation dialog that was disrupting mobile wallet flow
+  - Added comprehensive success message with emojis and transaction details
+  - Fixed button visibility to only show when vacant accounts exist
+  - Improved rate limiting to resolve 503 errors during wallet switching
 
 ## User Preferences
 
