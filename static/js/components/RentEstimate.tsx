@@ -102,20 +102,8 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       
       console.log('[RentEstimate] Found vacant accounts:', result.accountCount);
       
-      // Ask user for confirmation before proceeding
-      const confirmed = confirm(
-        `Found ${result.accountCount} vacant accounts that can recover ${result.potentialRentRecovery.toFixed(4)} SOL.\n\n` +
-        `Do you want to proceed with burning these accounts? This will:\n` +
-        `- Close ${result.accountCount} empty token accounts\n` +
-        `- Recover approximately ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
-        `- Require wallet signature for the transaction\n\n` +
-        `Click OK to proceed or Cancel to abort.`
-      );
-      
-      if (!confirmed) {
-        console.log('[RentEstimate] User cancelled the operation');
-        return;
-      }
+      // Skip confirmation dialog for mobile compatibility - proceed directly to burning
+      console.log('[RentEstimate] Proceeding directly to burn without confirmation dialog for mobile compatibility');
       
       // Prepare burn transactions on the server
       console.log('[RentEstimate] Preparing burn transactions on server');
