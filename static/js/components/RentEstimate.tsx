@@ -131,28 +131,47 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       });
       
       const burnResult = await burnResponse.json();
+      console.log('[RentEstimate] Burn preparation response:', burnResult);
       
       if (!burnResult.success) {
+        console.error('[RentEstimate] Failed to prepare burn transactions:', burnResult.error);
         alert(`Error preparing transactions: ${burnResult.error || 'Failed to prepare burn transactions'}`);
         return;
       }
       
+      console.log('[RentEstimate] Transaction prepared successfully, account count:', burnResult.accountCount);
+      
       // Import necessary Solana web3 components
+      console.log('[RentEstimate] Importing Solana web3 Transaction');
       const { Transaction } = await import('@solana/web3.js');
       
       // Deserialize the transaction from the server
-      const transaction = Transaction.from(Buffer.from(burnResult.transaction, 'base64'));
+      console.log('[RentEstimate] Deserializing transaction from base64');
+      let transaction;
+      try {
+        transaction = Transaction.from(Buffer.from(burnResult.transaction, 'base64'));
+        console.log('[RentEstimate] Transaction deserialized successfully');
+      } catch (deserializeError) {
+        console.error('[RentEstimate] Error deserializing transaction:', deserializeError);
+        throw new Error(`Failed to deserialize transaction: ${deserializeError.message}`);
+      }
       
       // For mobile wallets, we need to handle transaction signing differently
       let signedTransaction;
       try {
         // Check if we're on mobile and use sendTransaction if available
         const isMobile = window.navigator?.userAgent?.includes('Mobile');
+        console.log('[RentEstimate] Mobile device:', isMobile);
         
         // Always use the traditional signing method for all wallets to ensure compatibility
         console.log('[RentEstimate] Using traditional wallet signing method for all devices');
         console.log('[RentEstimate] SignTransaction function available:', !!signTransaction);
         
+        if (!signTransaction) {
+          throw new Error('signTransaction function not available from wallet');
+        }
+        
+        console.log('[RentEstimate] Calling signTransaction...');
         signedTransaction = await signTransaction(transaction);
         console.log('[RentEstimate] Transaction signed successfully');
       } catch (signError: any) {
@@ -165,20 +184,30 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       }
       
       // Submit the signed transaction
-      const submitResponse = await fetch('/api/submit-burn-transaction', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          signedTransaction: signedTransaction.serialize().toString('base64'),
-          accountCount: result.accountCount
-        })
-      });
+      console.log('[RentEstimate] Submitting signed transaction to server');
+      let submitResponse;
+      try {
+        submitResponse = await fetch('/api/submit-burn-transaction', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            signedTransaction: signedTransaction.serialize().toString('base64'),
+            accountCount: result.accountCount
+          })
+        });
+        console.log('[RentEstimate] Submit response status:', submitResponse.status);
+      } catch (fetchError) {
+        console.error('[RentEstimate] Error submitting transaction:', fetchError);
+        throw new Error(`Failed to submit transaction: ${fetchError.message}`);
+      }
       
       const submitResult = await submitResponse.json();
+      console.log('[RentEstimate] Submit result:', submitResult);
       
       if (submitResult.success) {
+        console.log('[RentEstimate] Transaction submitted successfully:', submitResult.signature);
         alert(
           `Successfully burned ${result.accountCount} vacant accounts!\n\n` +
           `Recovered ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
@@ -188,6 +217,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         // Refresh the page to show updated balances
         window.location.reload();
       } else {
+        console.error('[RentEstimate] Transaction submission failed:', submitResult.error);
         alert(`Transaction failed: ${submitResult.error || 'Unknown error occurred'}`);
       }
       
