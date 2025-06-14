@@ -515,51 +515,35 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     
     // Simplified transaction without compute budget instructions for mobile compatibility
     
-    // Validate and create close account instructions for each vacant account
-    const validAccounts = [];
-    let totalRentRecovered = 0;
+    // Simplified approach - directly process accounts without complex validation
+    let validAccountCount = 0;
     
-    for (const account of vacantAccounts) {
+    // Process only first 3 accounts to avoid mobile wallet issues
+    const accountsToProcess = vacantAccounts.slice(0, 3);
+    
+    for (const account of accountsToProcess) {
       try {
         const accountPubkey = new PublicKey(account.address);
         
-        // Double-check that the account still exists and is empty
-        const accountInfo = await connection.getParsedAccountInfo(accountPubkey);
+        // Create close instruction directly (matches working NFT/token pattern)
+        const closeInstruction = createCloseAccountInstruction(
+          accountPubkey,  // Account to close
+          ownerPubkey,    // Destination for rent SOL
+          ownerPubkey     // Owner of the account
+        );
         
-        if (accountInfo.value && accountInfo.value.data && 
-            typeof accountInfo.value.data === 'object' && 
-            'parsed' in accountInfo.value.data) {
-          
-          const parsedInfo = accountInfo.value.data.parsed.info;
-          const amount = Number(parsedInfo.tokenAmount.amount);
-          
-          // Only process accounts that are truly empty (amount = 0)
-          if (amount === 0 && parsedInfo.owner === ownerAddress) {
-            const closeInstruction = createCloseAccountInstruction(
-              accountPubkey,  // Account to close
-              ownerPubkey,    // Destination for rent SOL (user gets it initially)
-              ownerPubkey     // Owner of the account
-            );
-            
-            transaction.add(closeInstruction);
-            
-            // Track total rent that will be recovered
-            totalRentRecovered += account.rentLamports || accountInfo.value.lamports;
-            
-            validAccounts.push(account);
-            fastify.log.info(`Added close instruction for account ${account.address}`);
-          } else {
-            fastify.log.warn(`Skipping account ${account.address}: amount=${amount}, owner=${parsedInfo.owner}`);
-          }
-        }
+        transaction.add(closeInstruction);
+        validAccountCount++;
+        
+        fastify.log.info(`Added close instruction for account ${account.address}`);
       } catch (accountError) {
-        fastify.log.warn(`Skipping invalid account ${account.address}: ${accountError.message}`);
+        fastify.log.warn(`Skipping account ${account.address}: ${accountError.message}`);
       }
     }
     
     // Simplified for mobile compatibility - removed fee transfer to match working NFT/token burning pattern
     
-    if (validAccounts.length === 0) {
+    if (validAccountCount === 0) {
       return reply.code(400).send({
         success: false,
         error: 'No valid vacant accounts found to burn'
@@ -577,8 +561,8 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     return {
       success: true,
       transaction: serializedTransaction.toString('base64'),
-      accountCount: validAccounts.length,
-      message: 'Transaction prepared successfully'
+      accountCount: validAccountCount,
+      message: 'Simplified transaction prepared successfully'
     };
     
   } catch (error) {
