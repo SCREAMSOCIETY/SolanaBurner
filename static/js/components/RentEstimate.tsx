@@ -149,40 +149,12 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         // Check if we're on mobile and use sendTransaction if available
         const isMobile = window.navigator?.userAgent?.includes('Mobile');
         
-        if (isMobile && sendTransaction && connection) {
-          // For mobile wallets, send the transaction directly instead of signing first
-          console.log('[RentEstimate] Using mobile wallet sendTransaction method');
-          console.log('[RentEstimate] Connection available:', !!connection);
-          console.log('[RentEstimate] SendTransaction function available:', !!sendTransaction);
-          
-          const signature = await sendTransaction(transaction, connection, {
-            skipPreflight: false,
-            preflightCommitment: 'confirmed'
-          });
-          
-          console.log('[RentEstimate] Transaction sent, signature:', signature);
-          
-          // Wait for confirmation
-          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-          console.log('[RentEstimate] Transaction confirmation:', confirmation);
-          
-          if (confirmation.value.err) {
-            throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-          }
-          
-          // Show success and refresh
-          alert(
-            `Successfully burned ${result.accountCount} vacant accounts!\n\n` +
-            `Recovered ${result.potentialRentRecovery.toFixed(4)} SOL in rent\n` +
-            `Transaction: ${signature}\n\n` +
-            `The rent has been returned to your wallet. Refreshing your balance...`
-          );
-          window.location.reload();
-          return;
-        } else {
-          // Desktop wallet - use traditional signing
-          signedTransaction = await signTransaction(transaction);
-        }
+        // Always use the traditional signing method for all wallets to ensure compatibility
+        console.log('[RentEstimate] Using traditional wallet signing method for all devices');
+        console.log('[RentEstimate] SignTransaction function available:', !!signTransaction);
+        
+        signedTransaction = await signTransaction(transaction);
+        console.log('[RentEstimate] Transaction signed successfully');
       } catch (signError: any) {
         // User cancelled the transaction
         if (signError?.message?.includes('User rejected') || signError?.code === 4001) {

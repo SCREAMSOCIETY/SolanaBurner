@@ -513,20 +513,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     const ownerPubkey = new PublicKey(ownerAddress);
     const transaction = new Transaction();
     
-    // Add compute budget to ensure sufficient compute units
-    const { ComputeBudgetProgram } = require('@solana/web3.js');
-    
-    transaction.add(
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units: 300000 // Sufficient compute units for multiple close operations
-      })
-    );
-    
-    transaction.add(
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: 1 // Minimal priority fee
-      })
-    );
+    // Simplified transaction without compute budget instructions for mobile compatibility
     
     // Validate and create close account instructions for each vacant account
     const validAccounts = [];
@@ -570,22 +557,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
       }
     }
     
-    // Add 1% project fee transfer if there's significant rent recovered
-    if (totalRentRecovered > 0) {
-      const projectFee = Math.max(1, Math.floor(totalRentRecovered * 0.01));
-      const projectWallet = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-      
-      const { SystemProgram } = require('@solana/web3.js');
-      const feeTransferInstruction = SystemProgram.transfer({
-        fromPubkey: ownerPubkey,
-        toPubkey: projectWallet,
-        lamports: projectFee
-      });
-      
-      transaction.add(feeTransferInstruction);
-      
-      fastify.log.info(`Added 1% project fee transfer: ${projectFee} lamports to ${projectWallet.toString()}`);
-    }
+    // Simplified for mobile compatibility - removed fee transfer to match working NFT/token burning pattern
     
     if (validAccounts.length === 0) {
       return reply.code(400).send({
