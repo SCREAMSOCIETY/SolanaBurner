@@ -160,8 +160,27 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         }
         
         console.log('[RentEstimate] Calling signTransaction...');
-        signedTransaction = await signTransaction(transaction);
-        console.log('[RentEstimate] Transaction signed successfully');
+        
+        // Use the same signing approach as successful NFT/token burning
+        try {
+          signedTransaction = await signTransaction(transaction);
+          console.log('[RentEstimate] Transaction signed successfully');
+        } catch (walletSignError: any) {
+          console.error('[RentEstimate] Wallet signing failed:', walletSignError);
+          
+          // Check if it's a user cancellation
+          if (walletSignError?.message?.includes('User rejected') || 
+              walletSignError?.message?.includes('cancelled') ||
+              walletSignError?.code === 4001) {
+            console.log('[RentEstimate] User cancelled transaction');
+            alert('Transaction was cancelled.');
+            return;
+          }
+          
+          // For other errors, try to provide more context
+          console.error('[RentEstimate] Unexpected wallet error:', walletSignError);
+          throw new Error(`Wallet signing failed: ${walletSignError?.message || 'Unknown wallet error'}`);
+        }
       } catch (signError: any) {
         // User cancelled the transaction
         if (signError?.message?.includes('User rejected') || signError?.code === 4001) {

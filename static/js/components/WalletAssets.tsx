@@ -252,6 +252,9 @@ const WalletAssets: React.FC = () => {
                 }
               }
             }
+          } else if (heliusResponse.status === 503) {
+            console.warn('[WalletAssets] Helius API temporarily unavailable (503), using fallback');
+            throw new Error('API temporarily unavailable');
           } else {
             throw new Error(`Helius API returned ${heliusResponse.status}`);
           }
