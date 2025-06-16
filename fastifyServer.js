@@ -347,7 +347,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     let tokenActualRent = 0;
     let vacantActualRent = 0;
     
-    // Process each account to get actual balance
+    // Process each account to get actual recoverable balance (matching burn transaction logic)
     for (const account of tokenAccounts.value) {
       const parsedInfo = account.account.data.parsed.info;
       const amount = Number(parsedInfo.tokenAmount.amount);
@@ -357,40 +357,44 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       if (amount === 1 && decimals === 0) {
         nftAccounts++;
         
-        // For NFTs, also check for metadata account rent
+        // For NFTs, calculate exactly like the burning transaction does
+        // This matches the logic in /api/batch-burn-nft endpoint
+        const accountDataSize = account.account.data.length;
+        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        
+        // Use minimum balance (what gets recovered) not actual balance
+        // This matches: "const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);"
+        // from the burning endpoint
+        nftActualRent += minimumBalance;
+        
+        // Check for metadata account (not included in burn recovery but good for transparency)
         try {
-          const mintPubkey = new PublicKey(parsedInfo.mint);
           const metadataPda = findMetadataPda(parsedInfo.mint);
-          
           if (metadataPda) {
             const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
-            if (metadataAccountInfo) {
-              nftActualRent += actualBalance + metadataAccountInfo.lamports;
-            } else {
-              nftActualRent += actualBalance; // Just token account if metadata not found
-            }
-          } else {
-            nftActualRent += actualBalance;
+            // Note: Metadata accounts are not recovered in current burn implementation
+            // Only token account rent is recovered
           }
         } catch (metadataError) {
-          // If metadata check fails, just use token account balance
-          nftActualRent += actualBalance;
+          // Metadata check is optional
         }
       } else if (amount > 0) {
         tokenAccounts_count++;
-        tokenActualRent += actualBalance;
+        const accountDataSize = account.account.data.length;
+        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        tokenActualRent += minimumBalance;
       } else if (amount === 0) {
         vacantAccounts++;
-        vacantActualRent += actualBalance;
+        const accountDataSize = account.account.data.length;
+        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        vacantActualRent += minimumBalance;
       }
-      
-      totalActualRent += actualBalance;
     }
     
-    // Calculate 1% fee on vacant accounts only
+    // Calculate 1% fee on vacant accounts only  
     const vacantAccountFee = vacantActualRent * 0.01;
     
-    // Total estimate combines all actual rents
+    // Total recoverable rent (matches actual burning transaction calculations)
     const totalRentEstimate = nftActualRent + tokenActualRent + vacantActualRent;
     
     // Calculate total fees collected (1% of vacant account rent)

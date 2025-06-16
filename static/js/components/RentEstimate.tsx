@@ -221,7 +221,8 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       
       if (submitResult.success) {
         console.log('[RentEstimate] Transaction submitted successfully:', submitResult.signature);
-        const actualRecoveredSOL = submitResult.recoveredRent || ((submitResult.accountCount || result.accountCount) * (rentData.actualBalances?.avgVacantRent || 0.00204));
+        const avgVacantRent = rentData?.actualBalances?.avgVacantRent || 0.00204;
+        const actualRecoveredSOL = submitResult.recoveredRent || ((submitResult.accountCount || result.accountCount) * avgVacantRent);
         alert(
           `🎉 Success! Burned ${submitResult.accountCount || result.accountCount} vacant accounts!\n\n` +
           `💰 Recovered ${actualRecoveredSOL.toFixed(6)} SOL in rent\n` +

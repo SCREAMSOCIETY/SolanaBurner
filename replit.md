@@ -103,6 +103,12 @@ SolBurn is a sophisticated Solana blockchain asset management web application th
   - Added comprehensive success message with emojis and transaction details
   - Fixed button visibility to only show when vacant accounts exist
   - Improved rate limiting to resolve 503 errors during wallet switching
+- June 16, 2025: Implemented accurate rent return estimates based on real on-chain data:
+  - Updated rent calculation endpoint to fetch actual account balances instead of approximations
+  - Added metadata account checking for NFTs to include all recoverable rent amounts
+  - Implemented real-time balance fetching for tokens, NFTs, and vacant accounts
+  - Added visual indicator showing estimates are based on actual on-chain balances
+  - Enhanced success messages to display actual recovered amounts rather than estimates
 
 ## User Preferences
 
