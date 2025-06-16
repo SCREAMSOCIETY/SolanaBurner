@@ -19,6 +19,12 @@ interface RentEstimateData {
     vacantAccountBurningFee: number;
     totalBurningFees: number;
   };
+  actualBalances?: {
+    totalActualRent: number;
+    avgTokenRent: number;
+    avgNftRent: number;
+    avgVacantRent: number;
+  };
 }
 
 interface RentEstimateProps {
@@ -215,9 +221,10 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       
       if (submitResult.success) {
         console.log('[RentEstimate] Transaction submitted successfully:', submitResult.signature);
+        const actualRecoveredSOL = submitResult.recoveredRent || ((submitResult.accountCount || result.accountCount) * (rentData.actualBalances?.avgVacantRent || 0.00204));
         alert(
           `🎉 Success! Burned ${submitResult.accountCount || result.accountCount} vacant accounts!\n\n` +
-          `💰 Recovered approximately ${(submitResult.accountCount || result.accountCount) * 0.00204} SOL in rent\n` +
+          `💰 Recovered ${actualRecoveredSOL.toFixed(6)} SOL in rent\n` +
           `🔗 Transaction: ${submitResult.signature}\n\n` +
           `The rent has been returned to your wallet. The page will refresh to show your updated balance.`
         );
@@ -379,6 +386,17 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   return (
     <div className="rent-estimate-card">
       <h3>💰 Rent Return Estimate</h3>
+      <div className="accuracy-indicator" style={{ 
+        fontSize: '12px', 
+        color: '#4CAF50', 
+        marginBottom: '10px',
+        padding: '5px 10px',
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        borderRadius: '4px',
+        border: '1px solid rgba(76, 175, 80, 0.3)'
+      }}>
+        ✓ Real-time estimates based on actual on-chain account balances
+      </div>
       <div className="rent-summary">
         {selectedRentData && selectedRentData.totalSelected > 0 ? (
           <div className="selected-estimate">

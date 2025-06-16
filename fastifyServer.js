@@ -336,50 +336,70 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       { programId: TOKEN_PROGRAM_ID }
     );
     
-    // Calculate rent for different account types
-    const tokenAccountRent = await connection.getMinimumBalanceForRentExemption(165); // Token account size
-    const metadataAccountRent = await connection.getMinimumBalanceForRentExemption(679); // Metadata account size
-    const editionAccountRent = await connection.getMinimumBalanceForRentExemption(282); // Edition account size
-    
     const totalAccounts = tokenAccounts.value.length;
     
-    // Separate NFTs, tokens, and vacant accounts for detailed breakdown
+    // Calculate actual rent based on real account data
     let nftAccounts = 0;
     let tokenAccounts_count = 0;
     let vacantAccounts = 0;
+    let totalActualRent = 0;
+    let nftActualRent = 0;
+    let tokenActualRent = 0;
+    let vacantActualRent = 0;
     
+    // Process each account to get actual balance
     for (const account of tokenAccounts.value) {
       const parsedInfo = account.account.data.parsed.info;
       const amount = Number(parsedInfo.tokenAmount.amount);
       const decimals = parsedInfo.tokenAmount.decimals;
+      const actualBalance = account.account.lamports; // Real balance in lamports
       
       if (amount === 1 && decimals === 0) {
         nftAccounts++;
+        
+        // For NFTs, also check for metadata account rent
+        try {
+          const mintPubkey = new PublicKey(parsedInfo.mint);
+          const metadataPda = findMetadataPda(parsedInfo.mint);
+          
+          if (metadataPda) {
+            const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
+            if (metadataAccountInfo) {
+              nftActualRent += actualBalance + metadataAccountInfo.lamports;
+            } else {
+              nftActualRent += actualBalance; // Just token account if metadata not found
+            }
+          } else {
+            nftActualRent += actualBalance;
+          }
+        } catch (metadataError) {
+          // If metadata check fails, just use token account balance
+          nftActualRent += actualBalance;
+        }
       } else if (amount > 0) {
         tokenAccounts_count++;
+        tokenActualRent += actualBalance;
       } else if (amount === 0) {
         vacantAccounts++;
+        vacantActualRent += actualBalance;
       }
+      
+      totalActualRent += actualBalance;
     }
     
-    // Calculate rent estimate with 1% project fee
+    // Calculate 1% fee on vacant accounts only
+    const vacantAccountFee = vacantActualRent * 0.01;
     
-    // NFTs return rent from multiple accounts: token account + metadata account + edition account
-    // This matches what other burn sites calculate (total ~0.0077 SOL per NFT vs our previous ~0.002 SOL)
-    const nftRentPerAsset = tokenAccountRent + metadataAccountRent + editionAccountRent;
-    const nftRentTotal = nftAccounts * nftRentPerAsset;
-    
-    // Tokens only have token account rent
-    const tokenRentTotal = tokenAccounts_count * tokenAccountRent;
-    
-    // Vacant accounts have full rent recovery with 1% fee structure
-    const vacantRentTotal = vacantAccounts * tokenAccountRent;
-    const vacantAccountFee = vacantRentTotal * 0.01; // 1% fee on total recovery
-    
-    const totalRentEstimate = nftRentTotal + tokenRentTotal + vacantRentTotal;
+    // Total estimate combines all actual rents
+    const totalRentEstimate = nftActualRent + tokenActualRent + vacantActualRent;
     
     // Calculate total fees collected (1% of vacant account rent)
     const totalBurningFees = vacantAccountFee;
+    
+    // Calculate average rent per asset type from actual data
+    const avgTokenRent = tokenAccounts_count > 0 ? tokenActualRent / tokenAccounts_count : 0;
+    const avgNftRent = nftAccounts > 0 ? nftActualRent / nftAccounts : 0;
+    const avgVacantRent = vacantAccounts > 0 ? vacantActualRent / vacantAccounts : 0;
     
     return {
       success: true,
@@ -388,17 +408,23 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         nftAccounts,
         tokenAccounts: tokenAccounts_count,
         vacantAccounts,
-        rentPerAccount: tokenAccountRent / 1e9, // Convert to SOL (basic token account)
-        nftRentPerAsset: nftRentPerAsset / 1e9, // Convert to SOL (NFT with all accounts)
-        totalRentEstimate: totalRentEstimate / 1e9, // Convert to SOL
+        rentPerAccount: avgTokenRent / 1e9, // Actual average token account rent
+        nftRentPerAsset: avgNftRent / 1e9, // Actual average NFT rent (includes metadata)
+        totalRentEstimate: totalRentEstimate / 1e9, // Total actual recoverable rent
         breakdown: {
-          nftRent: nftRentTotal / 1e9, // Full NFT rent (token + metadata + edition accounts)
-          tokenRent: tokenRentTotal / 1e9,
-          vacantRent: vacantRentTotal / 1e9 // Rent minus burning fee
+          nftRent: nftActualRent / 1e9, // Actual NFT rent from real accounts
+          tokenRent: tokenActualRent / 1e9, // Actual token rent from real accounts
+          vacantRent: vacantActualRent / 1e9 // Actual vacant account rent
         },
         fees: {
           vacantAccountBurningFee: vacantAccountFee / 1e9, // 1% fee on vacant account rent
           totalBurningFees: totalBurningFees / 1e9 // Total fees for all vacant accounts
+        },
+        actualBalances: {
+          totalActualRent: totalActualRent / 1e9,
+          avgTokenRent: avgTokenRent / 1e9,
+          avgNftRent: avgNftRent / 1e9,
+          avgVacantRent: avgVacantRent / 1e9
         }
       }
     };
