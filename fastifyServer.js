@@ -338,8 +338,6 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     
     const totalAccounts = tokenAccounts.value.length;
     
-    fastify.log.info(`Found ${totalAccounts} token accounts for wallet`);
-    
     // Calculate actual rent based on real account data
     let nftAccounts = 0;
     let tokenAccounts_count = 0;
@@ -356,15 +354,12 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       const decimals = parsedInfo.tokenAmount.decimals;
       const actualBalance = account.account.lamports; // Real balance in lamports
       
-      fastify.log.info(`Processing account: mint=${parsedInfo.mint}, amount=${amount}, decimals=${decimals}, balance=${actualBalance} lamports`);
-      
       if (amount === 1 && decimals === 0) {
         nftAccounts++;
         
         // For NFTs, use actual account balance which represents recoverable rent
         // The account balance IS the rent that will be recovered when burning
         nftActualRent += actualBalance;
-        fastify.log.info(`NFT account found, added ${actualBalance} lamports to nftActualRent`);
         
         // Check for metadata account (not included in burn recovery but good for transparency)
         try {
@@ -381,12 +376,10 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         tokenAccounts_count++;
         // Use actual account balance which represents recoverable rent
         tokenActualRent += actualBalance;
-        fastify.log.info(`Token account found, added ${actualBalance} lamports to tokenActualRent`);
       } else if (amount === 0) {
         vacantAccounts++;
         // Use actual account balance which represents recoverable rent
         vacantActualRent += actualBalance;
-        fastify.log.info(`Vacant account found, added ${actualBalance} lamports to vacantActualRent`);
       }
     }
     
@@ -404,8 +397,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     const avgNftRent = nftAccounts > 0 ? nftActualRent / nftAccounts : 0;
     const avgVacantRent = vacantAccounts > 0 ? vacantActualRent / vacantAccounts : 0;
     
-    fastify.log.info(`Final calculations: nftAccounts=${nftAccounts}, tokenAccounts=${tokenAccounts_count}, vacantAccounts=${vacantAccounts}`);
-    fastify.log.info(`Final rent amounts: nftRent=${nftActualRent}, tokenRent=${tokenActualRent}, vacantRent=${vacantActualRent}`);
+
     
     return {
       success: true,
