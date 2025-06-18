@@ -360,11 +360,16 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         // For NFTs, calculate exactly like the burning transaction does
         // This matches the logic in /api/batch-burn-nft endpoint
         const accountDataSize = account.account.data.length;
-        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        let minimumBalance;
+        try {
+          minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        } catch (error) {
+          console.log('Unable to fetch minimum balance for rent exemption');
+          // Fallback to actual account balance if RPC call fails
+          minimumBalance = actualBalance;
+        }
         
         // Use minimum balance (what gets recovered) not actual balance
-        // This matches: "const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);"
-        // from the burning endpoint
         nftActualRent += minimumBalance;
         
         // Check for metadata account (not included in burn recovery but good for transparency)
@@ -381,12 +386,24 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       } else if (amount > 0) {
         tokenAccounts_count++;
         const accountDataSize = account.account.data.length;
-        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        let minimumBalance;
+        try {
+          minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        } catch (error) {
+          // Fallback to actual account balance if RPC call fails
+          minimumBalance = actualBalance;
+        }
         tokenActualRent += minimumBalance;
       } else if (amount === 0) {
         vacantAccounts++;
         const accountDataSize = account.account.data.length;
-        const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        let minimumBalance;
+        try {
+          minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
+        } catch (error) {
+          // Fallback to actual account balance if RPC call fails
+          minimumBalance = actualBalance;
+        }
         vacantActualRent += minimumBalance;
       }
     }
