@@ -12,7 +12,19 @@ const App: React.FC = () => {
       <div className="app-container">
         <WalletProvider>
           <div className="content">
-            <h1>Solana Asset Manager</h1>
+            <div className="main-header">
+              <img 
+                src="/static/solburnt-logo.png" 
+                alt="Solburnt" 
+                className="main-logo"
+                style={{
+                  height: '50px',
+                  marginRight: '15px',
+                  filter: 'drop-shadow(0 0 10px rgba(255, 100, 0, 0.3))'
+                }}
+              />
+              <h1>Solburnt</h1>
+            </div>
             <TabsContainer />
           </div>
         </WalletProvider>

@@ -49,7 +49,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   updateProgress: () => (/* binding */ updateProgress)
 /* harmony export */ });
 /**
- * Animations and UI enhancements for the SolBurn Application
+ * Animations and UI enhancements for the Solburnt Application
  */
 
 // Create confetti effect when successfully burning tokens/NFTs
