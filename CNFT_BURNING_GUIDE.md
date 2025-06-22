@@ -1,6 +1,6 @@
 # Compressed NFT (cNFT) Burning Guide
 
-This guide explains how to set up and use real cNFT burning functionality in the SolBurn application.
+This guide explains how to set up and use real cNFT burning functionality in the Solburnt application.
 
 ## Overview
 

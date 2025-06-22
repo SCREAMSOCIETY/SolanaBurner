@@ -5,6 +5,32 @@
   margin-bottom: 15px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-logo {
+  transition: filter 0.3s ease;
+}
+
+.header-logo:hover {
+  filter: drop-shadow(0 0 12px rgba(255, 100, 0, 0.5)) !important;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.app-logo {
+  transition: filter 0.3s ease;
+}
+
+.app-logo:hover {
+  filter: drop-shadow(0 0 15px rgba(255, 100, 0, 0.5)) !important;
+}
+
 .refresh-button {
   background-color: #3a86ff;
   color: white;
