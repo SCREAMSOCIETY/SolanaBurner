@@ -14,13 +14,14 @@ const App: React.FC = () => {
           <div className="content">
             <div className="main-header">
               <img 
-                src="/static/solburnt-logo.png" 
+                src="/static/solburnt-logo-pixel.png" 
                 alt="Solburnt" 
                 className="main-logo"
                 style={{
                   height: '150px',
                   marginRight: '25px',
-                  filter: 'drop-shadow(0 0 15px rgba(255, 100, 0, 0.4))'
+                  filter: 'drop-shadow(0 0 15px rgba(255, 100, 0, 0.4))',
+                  imageRendering: 'pixelated'
                 }}
               />
               <div className="brand-text">
