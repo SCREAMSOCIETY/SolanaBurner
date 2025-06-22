@@ -28,6 +28,9 @@
 
 .app-logo {
   transition: filter 0.3s ease;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
 .app-logo:hover {

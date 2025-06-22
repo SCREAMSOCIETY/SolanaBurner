@@ -2102,13 +2102,14 @@ const WalletAssets: React.FC = () => {
         <div className="wallet-connect-section">
           <div className="app-header">
             <img 
-              src="/static/solburnt-logo-with-text.png" 
+              src="/static/solburnt-logo-pixel.png" 
               alt="Solburnt" 
               className="app-logo"
               style={{
                 height: '80px',
                 marginBottom: '20px',
-                filter: 'drop-shadow(0 0 10px rgba(255, 100, 0, 0.3))'
+                filter: 'drop-shadow(0 0 10px rgba(255, 100, 0, 0.3))',
+                imageRendering: 'pixelated'
               }}
             />
           </div>
