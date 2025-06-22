@@ -2100,6 +2100,18 @@ const WalletAssets: React.FC = () => {
     <div className="wallet-assets-container">
       {!publicKey && (
         <div className="wallet-connect-section">
+          <div className="app-header">
+            <img 
+              src="/static/solburnt-logo-with-text.png" 
+              alt="Solburnt" 
+              className="app-logo"
+              style={{
+                height: '80px',
+                marginBottom: '20px',
+                filter: 'drop-shadow(0 0 10px rgba(255, 100, 0, 0.3))'
+              }}
+            />
+          </div>
           <h2>Connect Wallet to View Assets</h2>
           <WalletMultiButton />
         </div>
@@ -2108,7 +2120,19 @@ const WalletAssets: React.FC = () => {
       {publicKey && (
         <div className="assets-section">
           <div className="wallet-header">
-            <h2>Your Wallet Assets</h2>
+            <div className="header-left">
+              <img 
+                src="/static/solburnt-logo.png" 
+                alt="Solburnt" 
+                className="header-logo"
+                style={{
+                  height: '40px',
+                  marginRight: '15px',
+                  filter: 'drop-shadow(0 0 8px rgba(255, 100, 0, 0.3))'
+                }}
+              />
+              <h2>Your Wallet Assets</h2>
+            </div>
             <WalletMultiButton />
           </div>
           

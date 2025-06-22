@@ -1,8 +1,8 @@
-# SolBurn - Solana Asset Management Application
+# Solburnt - Solana Asset Management Application
 
 ## Overview
 
-SolBurn is a sophisticated Solana blockchain asset management web application that provides advanced debugging, transaction analysis, and interactive crypto asset management tools. The application specializes in NFT and token management, including support for both regular NFTs and compressed NFTs (cNFTs), with features for burning, transferring, and estimating rent returns from token accounts.
+Solburnt is a sophisticated Solana blockchain asset management web application that provides advanced debugging, transaction analysis, and interactive crypto asset management tools. The application specializes in NFT and token management, including support for both regular NFTs and compressed NFTs (cNFTs), with features for burning, transferring, and estimating rent returns from token accounts.
 
 ## System Architecture
 

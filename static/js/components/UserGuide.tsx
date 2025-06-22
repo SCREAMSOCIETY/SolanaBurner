@@ -52,7 +52,7 @@ const UserGuide: React.FC = () => {
         <ol>
           <li>Install your preferred wallet extension</li>
           <li>Create or import your wallet</li>
-          <li>Click "Connect Wallet" in SolBurn</li>
+          <li>Click "Connect Wallet" in Solburnt</li>
           <li>Select your wallet from the list</li>
           <li>Approve the connection in your wallet</li>
         </ol>
@@ -240,7 +240,7 @@ const UserGuide: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <h2 style={{ margin: 0, color: 'white' }}>SolBurn User Guide</h2>
+          <h2 style={{ margin: 0, color: 'white' }}>Solburnt User Guide</h2>
           <button
             onClick={() => setIsVisible(false)}
             style={{
