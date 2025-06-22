@@ -18,12 +18,15 @@ const App: React.FC = () => {
                 alt="Solburnt" 
                 className="main-logo"
                 style={{
-                  height: '50px',
-                  marginRight: '15px',
-                  filter: 'drop-shadow(0 0 10px rgba(255, 100, 0, 0.3))'
+                  height: '150px',
+                  marginRight: '25px',
+                  filter: 'drop-shadow(0 0 15px rgba(255, 100, 0, 0.4))'
                 }}
               />
-              <h1>Solburnt</h1>
+              <div className="brand-text">
+                <h1 className="brand-title">Solburnt</h1>
+                <p className="brand-slogan">helping you get your sol back</p>
+              </div>
             </div>
             <TabsContainer />
           </div>
