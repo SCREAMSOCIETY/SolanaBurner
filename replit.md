@@ -95,6 +95,11 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- June 22, 2025: Successfully rebranded application from SolBurn to Solburnt:
+  - Updated site name and title throughout application
+  - Integrated new Solburnt logos with flame icon design
+  - Added logo to main header and wallet connection screen
+  - Updated all documentation and metadata files
 - June 14, 2025: Initial setup
 - June 14, 2025: Successfully resolved mobile Solflare vacant account burning compatibility issue and added user feedback improvements:
   - Fixed mobile touch event handling with explicit onTouchStart/onTouchEnd handlers

@@ -1,5 +1,5 @@
 /**
- * Basic Transfer - A simplified cNFT transfer method for SolBurn
+ * Basic Transfer - A simplified cNFT transfer method for Solburnt
  * 
  * This module provides a very basic token transfer without using any bubblegum SDK methods
  * It's intended as a last resort when other methods fail.
