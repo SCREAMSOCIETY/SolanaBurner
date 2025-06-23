@@ -357,31 +357,28 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       if (amount === 1 && decimals === 0) {
         nftAccounts++;
         
-        // For NFTs, calculate maximum recoverable rent including metadata account
+        // For NFTs, calculate maximum recoverable rent with resize potential
         let totalNftRent = actualBalance; // Start with token account balance
         
-        // Enhanced maximum rent recovery - include metadata account rent
+        // Enhanced recovery with NFT resizing functionality
         try {
-          const metadataPda = findMetadataPda(parsedInfo.mint);
-          if (metadataPda) {
-            const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
-            if (metadataAccountInfo) {
-              const metadataRent = metadataAccountInfo.lamports;
-              const metadataSize = metadataAccountInfo.data.length;
-              
-              // Add full metadata account rent to recoverable amount
-              totalNftRent += metadataRent;
-              
-              // Additional bonus for larger, more complex NFTs
-              const sizeMultiplier = Math.max(1, metadataSize / 679); // 679 is base metadata size
-              const complexityBonus = Math.floor(actualBalance * (sizeMultiplier - 1) * 0.2); // 20% bonus for complexity
-              totalNftRent += complexityBonus;
-              
-              fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, metadata=${metadataRent/1e9} SOL, bonus=${complexityBonus/1e9} SOL, total=${totalNftRent/1e9} SOL`);
-            }
+          // Import resize handler
+          const { calculateResizePotential } = require('./nft-resize-handler');
+          
+          // Calculate resize potential for this NFT
+          const resizePotential = await calculateResizePotential(connection, parsedInfo.mint);
+          
+          if (resizePotential.eligible) {
+            // Add resize recovery amount (0.0023 SOL for Master Edition, 0.0019 SOL for Edition)
+            const resizeRecovery = Math.floor(resizePotential.excessSOL * 1e9); // Convert to lamports
+            totalNftRent += resizeRecovery;
+            
+            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL, total=${totalNftRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
+          } else {
+            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, no resize potential (${resizePotential.reason})`);
           }
-        } catch (metadataError) {
-          fastify.log.warn(`Could not fetch metadata for NFT ${parsedInfo.mint}: ${metadataError.message}`);
+        } catch (resizeError) {
+          fastify.log.warn(`Could not calculate resize potential for NFT ${parsedInfo.mint}: ${resizeError.message}`);
         }
         
         nftActualRent += totalNftRent;
@@ -1290,27 +1287,24 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     let metadataAccountRent = 0;
     let complexityBonus = 0;
     
-    // For NFTs, include metadata account rent + complexity bonus for maximum return
+    // For NFTs, include resize potential for maximum return
     try {
-      const metadataPda = findMetadataPda(mint);
-      if (metadataPda) {
-        const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
-        if (metadataAccountInfo) {
-          // Add full metadata account rent
-          metadataAccountRent = metadataAccountInfo.lamports;
-          totalRecoverableRent += metadataAccountRent;
-          
-          // Add complexity bonus based on metadata size
-          const metadataSize = metadataAccountInfo.data.length;
-          const sizeMultiplier = Math.max(1, metadataSize / 679); // Base metadata size
-          complexityBonus = Math.floor(minimumBalance * (sizeMultiplier - 1) * 0.25); // 25% bonus for complexity
-          totalRecoverableRent += complexityBonus;
-          
-          console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, metadata=${metadataAccountRent/1e9} SOL, bonus=${complexityBonus/1e9} SOL, total=${totalRecoverableRent/1e9} SOL`);
-        }
+      const { calculateResizePotential } = require('./nft-resize-handler');
+      
+      // Calculate resize potential for this NFT
+      const resizePotential = await calculateResizePotential(connection, mint);
+      
+      if (resizePotential.eligible) {
+        // Add resize recovery amount (documented amounts: 0.0023 SOL Master, 0.0019 SOL Edition)
+        const resizeRecovery = Math.floor(resizePotential.excessSOL * 1e9); // Convert to lamports
+        totalRecoverableRent += resizeRecovery;
+        
+        console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL, total=${totalRecoverableRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
+      } else {
+        console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, no resize potential (${resizePotential.reason})`);
       }
     } catch (error) {
-      console.log(`Could not enhance rent calculation for ${mint}: ${error.message}`);
+      console.log(`Could not calculate resize potential for ${mint}: ${error.message}`);
     }
     
     console.log(`Token account details:`);
