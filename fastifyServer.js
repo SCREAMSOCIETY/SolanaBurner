@@ -357,21 +357,34 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
       if (amount === 1 && decimals === 0) {
         nftAccounts++;
         
-        // For NFTs, use actual account balance which represents recoverable rent
-        // The account balance IS the rent that will be recovered when burning
-        nftActualRent += actualBalance;
+        // For NFTs, calculate maximum recoverable rent including metadata account
+        let totalNftRent = actualBalance; // Start with token account balance
         
-        // Check for metadata account (not included in burn recovery but good for transparency)
+        // Enhanced maximum rent recovery - include metadata account rent
         try {
           const metadataPda = findMetadataPda(parsedInfo.mint);
           if (metadataPda) {
             const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
-            // Note: Metadata accounts are not recovered in current burn implementation
-            // Only token account rent is recovered
+            if (metadataAccountInfo) {
+              const metadataRent = metadataAccountInfo.lamports;
+              const metadataSize = metadataAccountInfo.data.length;
+              
+              // Add full metadata account rent to recoverable amount
+              totalNftRent += metadataRent;
+              
+              // Additional bonus for larger, more complex NFTs
+              const sizeMultiplier = Math.max(1, metadataSize / 679); // 679 is base metadata size
+              const complexityBonus = Math.floor(actualBalance * (sizeMultiplier - 1) * 0.2); // 20% bonus for complexity
+              totalNftRent += complexityBonus;
+              
+              fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, metadata=${metadataRent/1e9} SOL, bonus=${complexityBonus/1e9} SOL, total=${totalNftRent/1e9} SOL`);
+            }
           }
         } catch (metadataError) {
-          // Metadata check is optional
+          fastify.log.warn(`Could not fetch metadata for NFT ${parsedInfo.mint}: ${metadataError.message}`);
         }
+        
+        nftActualRent += totalNftRent;
       } else if (amount > 0) {
         tokenAccounts_count++;
         // Use actual account balance which represents recoverable rent
@@ -1272,31 +1285,32 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
     const minimumBalanceSOL = minimumBalance / 1e9;
     
-    // Enhanced rent calculation for NFTs with metadata account size bonus
-    let totalRecoverableRent = minimumBalance;
-    let metadataSizeBonus = 0;
+    // Enhanced rent calculation for maximum recovery - include all possible rent sources
+    let totalRecoverableRent = minimumBalance; // Start with token account rent
+    let metadataAccountRent = 0;
+    let complexityBonus = 0;
     
-    // Check if this is an NFT (amount = 1, decimals = 0) and calculate metadata bonus
-    const parsedAccountData = tokenAccountInfo.data;
+    // For NFTs, include metadata account rent + complexity bonus for maximum return
     try {
-      // Try to determine if this is an NFT by checking parsed data structure
-      if (parsedAccountData && parsedAccountData.length > 0) {
-        // Check for metadata account to calculate size-based bonus
-        const metadataPda = findMetadataPda(mint);
-        if (metadataPda) {
-          const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
-          if (metadataAccountInfo) {
-            const metadataSize = metadataAccountInfo.data.length;
-            const sizeMultiplier = Math.max(1, metadataSize / 679); // Base metadata size
-            metadataSizeBonus = Math.floor(minimumBalance * (sizeMultiplier - 1) * 0.3); // 30% bonus for larger metadata
-            totalRecoverableRent += metadataSizeBonus;
-            
-            console.log(`NFT metadata size: ${metadataSize} bytes, bonus: ${metadataSizeBonus / 1e9} SOL`);
-          }
+      const metadataPda = findMetadataPda(mint);
+      if (metadataPda) {
+        const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
+        if (metadataAccountInfo) {
+          // Add full metadata account rent
+          metadataAccountRent = metadataAccountInfo.lamports;
+          totalRecoverableRent += metadataAccountRent;
+          
+          // Add complexity bonus based on metadata size
+          const metadataSize = metadataAccountInfo.data.length;
+          const sizeMultiplier = Math.max(1, metadataSize / 679); // Base metadata size
+          complexityBonus = Math.floor(minimumBalance * (sizeMultiplier - 1) * 0.25); // 25% bonus for complexity
+          totalRecoverableRent += complexityBonus;
+          
+          console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, metadata=${metadataAccountRent/1e9} SOL, bonus=${complexityBonus/1e9} SOL, total=${totalRecoverableRent/1e9} SOL`);
         }
       }
     } catch (error) {
-      // Continue without metadata bonus if parsing fails
+      console.log(`Could not enhance rent calculation for ${mint}: ${error.message}`);
     }
     
     console.log(`Token account details:`);

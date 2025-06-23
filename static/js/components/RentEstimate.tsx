@@ -335,7 +335,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     // Only tokens and NFTs return rent, not cNFTs (they don't have token accounts)
     const totalSelected = selectedTokenCount + selectedNFTCount + selectedCNFTCount;
     
-    // Calculate rent based on asset type - NFTs return more rent due to multiple accounts
+    // Calculate rent based on asset type - NFTs return enhanced rent including metadata
     const tokenRent = selectedTokenCount * rentData.rentPerAccount;
     const nftRent = selectedNFTCount * (rentData.nftRentPerAsset || rentData.rentPerAccount);
     const selectedRent = tokenRent + nftRent;
@@ -396,7 +396,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         borderRadius: '4px',
         border: '1px solid rgba(76, 175, 80, 0.3)'
       }}>
-        ✓ Real-time estimates based on actual on-chain account balances
+        ✓ Maximum rent recovery including metadata accounts and complexity bonuses
       </div>
       <div className="rent-summary">
         {selectedRentData && selectedRentData.totalSelected > 0 ? (
@@ -448,7 +448,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         
         <div className="estimate-breakdown">
           <div className="breakdown-item">
-            <span>From {rentData.nftAccounts} NFT accounts:</span>
+            <span>From {rentData.nftAccounts} NFT accounts (enhanced):</span>
             <span>{rentData.breakdown.nftRent.toFixed(4)} SOL</span>
           </div>
           <div className="breakdown-item">
