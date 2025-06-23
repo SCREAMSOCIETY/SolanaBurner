@@ -95,6 +95,11 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- June 22, 2025: Enhanced rent calculation system with dynamic NFT metadata sizing:
+  - Implemented variable rent returns based on actual NFT metadata account sizes
+  - Larger NFTs with more complex metadata now return proportionally more SOL
+  - Added 30-50% bonus rent calculation for NFTs with above-average metadata sizes
+  - Base metadata size threshold set at 679 bytes (typical standard NFT metadata)
 - June 22, 2025: Successfully rebranded application from SolBurn to Solburnt:
   - Updated site name and title throughout application
   - Integrated new Solburnt logos with pixelated fire icon design

@@ -1272,14 +1272,41 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
     const minimumBalanceSOL = minimumBalance / 1e9;
     
+    // Enhanced rent calculation for NFTs with metadata account size bonus
+    let totalRecoverableRent = minimumBalance;
+    let metadataSizeBonus = 0;
+    
+    // Check if this is an NFT (amount = 1, decimals = 0) and calculate metadata bonus
+    const parsedAccountData = tokenAccountInfo.data;
+    try {
+      // Try to determine if this is an NFT by checking parsed data structure
+      if (parsedAccountData && parsedAccountData.length > 0) {
+        // Check for metadata account to calculate size-based bonus
+        const metadataPda = findMetadataPda(mint);
+        if (metadataPda) {
+          const metadataAccountInfo = await connection.getAccountInfo(new PublicKey(metadataPda));
+          if (metadataAccountInfo) {
+            const metadataSize = metadataAccountInfo.data.length;
+            const sizeMultiplier = Math.max(1, metadataSize / 679); // Base metadata size
+            metadataSizeBonus = Math.floor(minimumBalance * (sizeMultiplier - 1) * 0.3); // 30% bonus for larger metadata
+            totalRecoverableRent += metadataSizeBonus;
+            
+            console.log(`NFT metadata size: ${metadataSize} bytes, bonus: ${metadataSizeBonus / 1e9} SOL`);
+          }
+        }
+      }
+    } catch (error) {
+      // Continue without metadata bonus if parsing fails
+    }
+    
     console.log(`Token account details:`);
     console.log(`  Current balance: ${actualRentSOL} SOL (${actualRentLamports} lamports)`);
     console.log(`  Account data size: ${accountDataSize} bytes`);
     console.log(`  Minimum rent exemption: ${minimumBalanceSOL} SOL (${minimumBalance} lamports)`);
     
-    // Use the minimum balance for rent exemption as the recoverable amount
-    const recoverableRentLamports = minimumBalance;
-    const recoverableRentSOL = minimumBalanceSOL;
+    // Use the enhanced calculation with metadata size bonus
+    const recoverableRentLamports = totalRecoverableRent;
+    const recoverableRentSOL = totalRecoverableRent / 1e9;
     
     const feePercentage = 0.01;
     const feeAmount = Math.floor(recoverableRentLamports * feePercentage);
