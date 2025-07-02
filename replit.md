@@ -95,12 +95,12 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
-- June 22, 2025: Implemented NFT resizing functionality for maximum SOL recovery:
-  - Added NFT metadata account resizing to recover excess SOL from oversized accounts
-  - Master Edition NFTs: 0.0023 SOL excess recovery per NFT
-  - Regular Edition NFTs: 0.0019 SOL excess recovery per NFT  
-  - System analyzes 23.2M eligible NFTs for resize potential
-  - Enhanced rent calculations now include documented resize amounts for accurate estimates
+- January 2, 2025: Aligned rent estimates with actual recovery amounts:
+  - Corrected estimates to show realistic base rent recovery (~0.002 SOL per NFT)
+  - Removed misleading enhanced recovery calculations that couldn't be delivered
+  - Fixed transaction processing to provide transparent, honest recovery amounts
+  - Updated UI messaging to set proper user expectations
+  - Note: NFT resizing functionality exists but requires individual assessment - not all NFTs are eligible
 - June 22, 2025: Successfully rebranded application from SolBurn to Solburnt:
   - Updated site name and title throughout application
   - Integrated new Solburnt logos with pixelated fire icon design

@@ -396,7 +396,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         borderRadius: '4px',
         border: '1px solid rgba(76, 175, 80, 0.3)'
       }}>
-        ✓ Maximum rent recovery with NFT resizing (0.0023 SOL Master Edition, 0.0019 SOL Edition)
+        ✓ Base rent recovery (~0.002 SOL per NFT) - honest estimates
       </div>
       <div className="rent-summary">
         {selectedRentData && selectedRentData.totalSelected > 0 ? (
@@ -448,7 +448,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         
         <div className="estimate-breakdown">
           <div className="breakdown-item">
-            <span>From {rentData.nftAccounts} NFT accounts (with resizing):</span>
+            <span>From {rentData.nftAccounts} NFT accounts:</span>
             <span>{rentData.breakdown.nftRent.toFixed(4)} SOL</span>
           </div>
           <div className="breakdown-item">

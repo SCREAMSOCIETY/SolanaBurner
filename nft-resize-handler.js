@@ -1,12 +1,13 @@
 /**
  * NFT Resize Handler
  * 
- * Implements NFT resizing functionality to recover excess SOL from Token Metadata accounts.
- * Based on Solana's NFT resizing feature that releases excess SOL from oversized metadata accounts.
+ * Placeholder for potential NFT resizing functionality.
+ * Note: Not all NFTs are eligible for resizing - depends on actual metadata account sizes.
+ * Current implementation returns base rent recovery only.
  * 
- * Reference amounts:
- * - Master Edition: 0.0023 SOL excess recoverable
- * - Edition: 0.0019 SOL excess recoverable
+ * Potential amounts (if eligible):
+ * - Master Edition: up to 0.0023 SOL excess recoverable
+ * - Edition: up to 0.0019 SOL excess recoverable
  */
 
 const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = require('@solana/web3.js');
