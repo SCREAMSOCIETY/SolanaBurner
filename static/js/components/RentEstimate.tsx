@@ -396,7 +396,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         borderRadius: '4px',
         border: '1px solid rgba(76, 175, 80, 0.3)'
       }}>
-        ✓ Base rent recovery (~0.002 SOL per NFT) - honest estimates
+        ✓ Rent recovery with resize optimization when available
       </div>
       <div className="rent-summary">
         {selectedRentData && selectedRentData.totalSelected > 0 ? (

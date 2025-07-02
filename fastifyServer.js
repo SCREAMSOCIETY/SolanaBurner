@@ -2149,6 +2149,32 @@ fastify.get('/api/helius/wallet-assets/:walletAddress', async (request, reply) =
   }
 });
 
+// NFT Resize endpoint
+fastify.post('/api/nft/resize', async (request, reply) => {
+  try {
+    const { mintAddress, updateAuthority } = request.body;
+    
+    if (!mintAddress || !updateAuthority) {
+      return reply.status(400).send({
+        success: false,
+        error: 'mintAddress and updateAuthority are required'
+      });
+    }
+    
+    const resizeEndpoint = require('./nft-resize-endpoint');
+    const result = await resizeEndpoint.createResizeTransaction(mintAddress, updateAuthority);
+    
+    reply.send(result);
+    
+  } catch (error) {
+    fastify.log.error(`Error in resize endpoint: ${error.message}`);
+    reply.status(500).send({
+      success: false,
+      error: error.message || 'Failed to process resize request'
+    });
+  }
+});
+
 // Catch-all route for SPA - always serve index.html
 // But distinguish between API requests and frontend routes
 fastify.setNotFoundHandler(async (request, reply) => {
