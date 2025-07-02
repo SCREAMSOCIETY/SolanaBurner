@@ -373,7 +373,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
             const resizeRecovery = Math.floor(resizePotential.excessSOL * 1e9); // Convert to lamports
             totalNftRent += resizeRecovery;
             
-            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL, total=${totalNftRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
+            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL (base=${resizePotential.baseResize}, opt=${resizePotential.additionalOptimization}), total=${totalNftRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
           } else {
             fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, no resize potential (${resizePotential.reason})`);
           }
@@ -1299,7 +1299,7 @@ fastify.post('/api/burn-nft', async (request, reply) => {
         const resizeRecovery = Math.floor(resizePotential.excessSOL * 1e9); // Convert to lamports
         totalRecoverableRent += resizeRecovery;
         
-        console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL, total=${totalRecoverableRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
+        console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL (base=${resizePotential.baseResize}, opt=${resizePotential.additionalOptimization}), total=${totalRecoverableRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
       } else {
         console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, no resize potential (${resizePotential.reason})`);
       }
