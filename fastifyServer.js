@@ -1602,23 +1602,8 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
         const baseRentSOL = minimumBalance / 1e9;
         
-        // Add enhanced resizing recovery
-        let enhancedRecovery = 0;
-        try {
-          const { calculateResizePotential } = require('./nft-resize-handler');
-          const resizePotential = await calculateResizePotential(connection, mint);
-          
-          if (resizePotential.eligible) {
-            enhancedRecovery = resizePotential.excessSOL;
-          } else {
-            enhancedRecovery = 0.005; // Minimum additional recovery to match estimates
-          }
-        } catch (enhancedError) {
-          enhancedRecovery = 0.005; // Default enhanced recovery
-        }
-        
-        const totalRentSOL = baseRentSOL + enhancedRecovery;
-        const feeSOL = baseRentSOL * 0.01; // Fee only on base rent, not enhanced
+        // Use base rent recovery only for now
+        const feeSOL = baseRentSOL * 0.01;
         
         totalRentRecovered += baseRentSOL - feeSOL;
         totalFee += feeSOL;
@@ -1669,10 +1654,8 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         processedNFTs.push({
           mint,
           tokenAccount,
-          rentRecovered: (baseRentSOL - feeSOL).toFixed(4), // Show actual recoverable amount
-          fee: feeSOL.toFixed(4),
-          enhancedRecovery: enhancedRecovery.toFixed(4),
-          note: "Base rent recovery only - enhanced amounts require separate implementation"
+          rentRecovered: (baseRentSOL - feeSOL).toFixed(4),
+          fee: feeSOL.toFixed(4)
         });
         
       } catch (error) {
