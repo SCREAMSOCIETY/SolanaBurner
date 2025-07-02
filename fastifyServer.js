@@ -1602,10 +1602,26 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         const minimumBalance = await connection.getMinimumBalanceForRentExemption(accountDataSize);
         const baseRentSOL = minimumBalance / 1e9;
         
-        // Use base rent recovery only for now
-        const feeSOL = baseRentSOL * 0.01;
+        // Check if this NFT was previously resized to include additional recovery
+        let totalRecovery = baseRentSOL;
+        let resizeRecovery = 0;
         
-        totalRentRecovered += baseRentSOL - feeSOL;
+        try {
+          const { checkResizeStatus } = require('./nft-resize-handler');
+          const resizeStatus = await checkResizeStatus(connection, mint);
+          
+          if (resizeStatus.isResized) {
+            resizeRecovery = resizeStatus.additionalRecovery;
+            totalRecovery = baseRentSOL + resizeRecovery;
+            console.log(`NFT ${mint} was previously resized - adding ${resizeRecovery} SOL metadata recovery`);
+          }
+        } catch (resizeError) {
+          console.log(`Could not check resize status for ${mint}: ${resizeError.message}`);
+        }
+        
+        const feeSOL = baseRentSOL * 0.01; // Fee only on base rent
+        
+        totalRentRecovered += totalRecovery - feeSOL;
         totalFee += feeSOL;
         
         // Add burn instruction with proper amount and decimals for Metaplex resized NFTs
@@ -1636,14 +1652,31 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           )
         );
         
-        // Remove the problematic enhanced recovery transfer that requires project wallet signature
-        console.log(`Processing NFT ${mint} - base rent recovery: ${baseRentSOL} SOL`);
+        // Add transfer for resized NFT additional recovery if applicable
+        if (resizeRecovery > 0) {
+          const { SystemProgram } = require('@solana/web3.js');
+          const PROJECT_WALLET_PUBKEY = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+          
+          const resizeRecoveryLamports = Math.floor(resizeRecovery * 1e9);
+          const resizeTransfer = SystemProgram.transfer({
+            fromPubkey: PROJECT_WALLET_PUBKEY,
+            toPubkey: ownerPubkey,
+            lamports: resizeRecoveryLamports
+          });
+          transaction.add(resizeTransfer);
+          console.log(`Added resize recovery transfer: ${resizeRecovery} SOL for previously resized NFT ${mint}`);
+        }
+        
+        console.log(`Processing NFT ${mint} - total recovery: ${totalRecovery} SOL (base: ${baseRentSOL}, resize: ${resizeRecovery})`);
         
         processedNFTs.push({
           mint,
           tokenAccount,
-          rentRecovered: (baseRentSOL - feeSOL).toFixed(4),
-          fee: feeSOL.toFixed(4)
+          rentRecovered: (totalRecovery - feeSOL).toFixed(4),
+          fee: feeSOL.toFixed(4),
+          baseRent: baseRentSOL.toFixed(4),
+          resizeRecovery: resizeRecovery.toFixed(4),
+          wasResized: resizeRecovery > 0
         });
         
       } catch (error) {
@@ -2145,6 +2178,32 @@ fastify.get('/api/helius/wallet-assets/:walletAddress', async (request, reply) =
     return reply.code(500).send({
       success: false,
       error: `Error fetching wallet assets: ${error.message}`
+    });
+  }
+});
+
+// NFT Resize Status Check endpoint
+fastify.post('/api/nft/check-resize-status', async (request, reply) => {
+  try {
+    const { mintAddresses } = request.body;
+    
+    if (!mintAddresses || !Array.isArray(mintAddresses)) {
+      return reply.status(400).send({
+        success: false,
+        error: 'mintAddresses array is required'
+      });
+    }
+    
+    const resizeDetectionApi = require('./resize-detection-api');
+    const result = await resizeDetectionApi.checkMultipleNFTsResizeStatus(mintAddresses);
+    
+    reply.send(result);
+    
+  } catch (error) {
+    fastify.log.error(`Error in resize status check: ${error.message}`);
+    reply.status(500).send({
+      success: false,
+      error: error.message || 'Failed to check resize status'
     });
   }
 });
