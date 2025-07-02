@@ -1652,20 +1652,8 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           )
         );
         
-        // Add transfer for resized NFT additional recovery if applicable
-        if (resizeRecovery > 0) {
-          const { SystemProgram } = require('@solana/web3.js');
-          const PROJECT_WALLET_PUBKEY = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-          
-          const resizeRecoveryLamports = Math.floor(resizeRecovery * 1e9);
-          const resizeTransfer = SystemProgram.transfer({
-            fromPubkey: PROJECT_WALLET_PUBKEY,
-            toPubkey: ownerPubkey,
-            lamports: resizeRecoveryLamports
-          });
-          transaction.add(resizeTransfer);
-          console.log(`Added resize recovery transfer: ${resizeRecovery} SOL for previously resized NFT ${mint}`);
-        }
+        // Skip project wallet transfer for now - users get base rent recovery only
+        // This ensures transaction works without needing project wallet signature
         
         console.log(`Processing NFT ${mint} - total recovery: ${totalRecovery} SOL (base: ${baseRentSOL}, resize: ${resizeRecovery})`);
         
