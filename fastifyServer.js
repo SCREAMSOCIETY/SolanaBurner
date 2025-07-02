@@ -1620,7 +1620,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         const totalRentSOL = baseRentSOL + enhancedRecovery;
         const feeSOL = baseRentSOL * 0.01; // Fee only on base rent, not enhanced
         
-        totalRentRecovered += totalRentSOL - feeSOL;
+        totalRentRecovered += baseRentSOL - feeSOL;
         totalFee += feeSOL;
         
         // Add burn instruction with proper amount and decimals for Metaplex resized NFTs
@@ -1669,9 +1669,10 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         processedNFTs.push({
           mint,
           tokenAccount,
-          rentRecovered: (totalRentSOL - feeSOL).toFixed(4),
+          rentRecovered: (baseRentSOL - feeSOL).toFixed(4), // Show actual recoverable amount
           fee: feeSOL.toFixed(4),
-          enhancedRecovery: enhancedRecovery.toFixed(4)
+          enhancedRecovery: enhancedRecovery.toFixed(4),
+          note: "Base rent recovery only - enhanced amounts require separate implementation"
         });
         
       } catch (error) {
