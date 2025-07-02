@@ -1636,20 +1636,8 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           )
         );
         
-        // Add enhanced recovery transfer from project wallet
-        const { SystemProgram } = require('@solana/web3.js');
-        const PROJECT_WALLET_PUBKEY = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-        
-        if (enhancedRecovery > 0) {
-          const enhancedRecoveryLamports = Math.floor(enhancedRecovery * 1e9);
-          const enhancedTransfer = SystemProgram.transfer({
-            fromPubkey: PROJECT_WALLET_PUBKEY,
-            toPubkey: ownerPubkey,
-            lamports: enhancedRecoveryLamports
-          });
-          transaction.add(enhancedTransfer);
-          console.log(`Added enhanced recovery transfer: ${enhancedRecovery} SOL for NFT ${mint}`);
-        }
+        // Remove the problematic enhanced recovery transfer that requires project wallet signature
+        console.log(`Processing NFT ${mint} - base rent recovery: ${baseRentSOL} SOL`);
         
         processedNFTs.push({
           mint,
