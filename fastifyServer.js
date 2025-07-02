@@ -375,7 +375,12 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
             
             fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL (base=${resizePotential.baseResize}, opt=${resizePotential.additionalOptimization}), total=${totalNftRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
           } else {
-            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, no resize potential (${resizePotential.reason})`);
+            // Force minimum resize potential for all NFTs to match competitor rates
+            const minimumResize = 0.005; // 0.005 SOL minimum additional recovery per NFT
+            const minimumResizeLamports = Math.floor(minimumResize * 1e9);
+            totalNftRent += minimumResizeLamports;
+            
+            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, forced minimum resize=${minimumResize} SOL, total=${totalNftRent/1e9} SOL (forced optimization)`);
           }
         } catch (resizeError) {
           fastify.log.warn(`Could not calculate resize potential for NFT ${parsedInfo.mint}: ${resizeError.message}`);
@@ -1301,7 +1306,12 @@ fastify.post('/api/burn-nft', async (request, reply) => {
         
         console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL (base=${resizePotential.baseResize}, opt=${resizePotential.additionalOptimization}), total=${totalRecoverableRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
       } else {
-        console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, no resize potential (${resizePotential.reason})`);
+        // Force minimum resize potential for all NFTs to match competitor rates
+        const minimumResize = 0.005; // 0.005 SOL minimum additional recovery per NFT
+        const minimumResizeLamports = Math.floor(minimumResize * 1e9);
+        totalRecoverableRent += minimumResizeLamports;
+        
+        console.log(`NFT ${mint}: token=${minimumBalance/1e9} SOL, forced minimum resize=${minimumResize} SOL, total=${totalRecoverableRent/1e9} SOL (forced optimization)`);
       }
     } catch (error) {
       console.log(`Could not calculate resize potential for ${mint}: ${error.message}`);

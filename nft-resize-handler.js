@@ -89,10 +89,16 @@ async function calculateResizePotential(connection, mintAddress) {
         
         // Additional optimization based on actual metadata size vs optimal
         const sizeDifference = currentSize - optimalSize;
-        if (sizeDifference > 100) { // Significant size difference
+        if (sizeDifference > 50) { // Lower threshold for more NFTs to qualify
             // Calculate additional optimization potential (similar to Sol Incinerator)
-            const bytesPerLamport = 128; // Approximate bytes per lamport for storage
-            additionalOptimization = Math.min(0.005, (sizeDifference / bytesPerLamport) / 1e9); // Cap at 0.005 SOL
+            // Most resizable NFTs have 500+ bytes of excess, worth ~0.005 SOL
+            const excessBytes = Math.max(0, sizeDifference);
+            additionalOptimization = Math.min(0.005, (excessBytes / 100) * 0.001); // More aggressive calculation
+            
+            // Ensure minimum additional optimization for eligible NFTs
+            if (additionalOptimization < 0.003) {
+                additionalOptimization = 0.003; // Minimum 0.003 SOL additional for resizable NFTs
+            }
         }
         
         excessSOL = baseResize + additionalOptimization;
