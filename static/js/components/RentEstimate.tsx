@@ -389,14 +389,14 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
       <h3>💰 Rent Return Estimate</h3>
       <div className="accuracy-indicator" style={{ 
         fontSize: '12px', 
-        color: '#4CAF50', 
+        color: '#ff6400', 
         marginBottom: '10px',
         padding: '5px 10px',
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        backgroundColor: 'rgba(255, 100, 0, 0.1)',
         borderRadius: '4px',
-        border: '1px solid rgba(76, 175, 80, 0.3)'
+        border: '1px solid rgba(255, 100, 0, 0.3)'
       }}>
-        ✓ Rent recovery with resize optimization when available
+        ⚠️ Estimates shown - actual wallet amounts may vary (~0.002 SOL per NFT)
       </div>
       <div className="rent-summary">
         {selectedRentData && selectedRentData.totalSelected > 0 ? (

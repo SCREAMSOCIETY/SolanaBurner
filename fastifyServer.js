@@ -315,6 +315,35 @@ fastify.get('/api/helius/wallet/nfts/:walletAddress', async (request, reply) => 
   }
 });
 
+// Accurate NFT Rent Estimate endpoint
+fastify.post('/api/nft/accurate-rent-estimate', async (request, reply) => {
+  try {
+    const { nfts } = request.body;
+    
+    if (!nfts || !Array.isArray(nfts)) {
+      return reply.status(400).send({
+        success: false,
+        error: 'nfts array is required'
+      });
+    }
+    
+    const { getHonestRentEstimate } = require('./accurate-rent-calculator');
+    const estimate = await getHonestRentEstimate(connection, nfts);
+    
+    reply.send({
+      success: true,
+      ...estimate
+    });
+    
+  } catch (error) {
+    fastify.log.error(`Error in accurate rent estimate: ${error.message}`);
+    reply.status(500).send({
+      success: false,
+      error: error.message || 'Failed to calculate accurate rent estimate'
+    });
+  }
+});
+
 // Rent estimate endpoint for token accounts
 fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
   const { walletAddress } = request.params;

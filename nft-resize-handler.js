@@ -287,9 +287,82 @@ async function analyzeWalletForResize(connection, walletAddress) {
     }
 }
 
+/**
+ * Check if an NFT has been previously resized by comparing current vs expected metadata size
+ * @param {Connection} connection - Solana connection
+ * @param {string} mintAddress - NFT mint address
+ * @returns {Promise<object>} - Resize status and potential additional recovery
+ */
+async function checkResizeStatus(connection, mintAddress) {
+    try {
+        const mintPubkey = new PublicKey(mintAddress);
+        
+        // Get metadata account PDA
+        const [metadataPda] = PublicKey.findProgramAddressSync(
+            [
+                Buffer.from('metadata'),
+                METADATA_PROGRAM_ID.toBuffer(),
+                mintPubkey.toBuffer(),
+            ],
+            METADATA_PROGRAM_ID
+        );
+        
+        const metadataAccount = await connection.getAccountInfo(metadataPda);
+        if (!metadataAccount) {
+            return {
+                isResized: false,
+                hasMetadata: false,
+                currentSize: 0,
+                standardSize: 679,
+                additionalRecovery: 0
+            };
+        }
+        
+        const currentSize = metadataAccount.data.length;
+        const standardSize = 679; // Standard optimized metadata size
+        
+        // If current size equals standard size, it was likely resized
+        const isResized = currentSize === standardSize;
+        
+        // Calculate potential additional recovery if this was a resized NFT
+        let additionalRecovery = 0;
+        if (isResized) {
+            // For resized NFTs, estimate the SOL that was recovered during resize
+            // This is an approximation based on typical oversized metadata accounts
+            const typicalOversizeBytes = 200; // Typical excess before resize
+            const lamportsPerByte = await connection.getMinimumBalanceForRentExemption(1) - await connection.getMinimumBalanceForRentExemption(0);
+            additionalRecovery = (typicalOversizeBytes * lamportsPerByte) / 1e9;
+        }
+        
+        return {
+            isResized,
+            hasMetadata: true,
+            currentSize,
+            standardSize,
+            additionalRecovery,
+            details: {
+                isOptimized: isResized,
+                metadataRentAlreadyRecovered: isResized ? additionalRecovery : 0
+            }
+        };
+        
+    } catch (error) {
+        console.error(`Error checking resize status for ${mintAddress}:`, error);
+        return {
+            isResized: false,
+            hasMetadata: false,
+            currentSize: 0,
+            standardSize: 679,
+            additionalRecovery: 0,
+            error: error.message
+        };
+    }
+}
+
 module.exports = {
     calculateResizePotential,
     createEnhancedBurnInstructions,
     analyzeWalletForResize,
-    estimateOptimalMetadataSize
+    estimateOptimalMetadataSize,
+    checkResizeStatus
 };
