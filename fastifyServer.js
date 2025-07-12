@@ -1648,9 +1648,9 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           console.log(`Could not check resize status for ${mint}: ${resizeError.message}`);
         }
         
-        const feeSOL = baseRentSOL * 0.01; // Fee only on base rent
+        const feeSOL = 0; // No fees during testing phase
         
-        totalRentRecovered += totalRecovery - feeSOL;
+        totalRentRecovered += totalRecovery; // Full recovery without fees
         totalFee += feeSOL;
         
         // Add burn instruction with proper amount and decimals for Metaplex resized NFTs
@@ -1722,19 +1722,16 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     transaction.add(memoInstruction);
     console.log('Added memo instruction to transaction');
     
-    // Add fee transfer if applicable
-    const totalFeeLamports = Math.floor(totalFee * 1e9);
-    console.log(`Total fee in lamports: ${totalFeeLamports}`);
-    if (totalFeeLamports >= 1000) {
-      const { SystemProgram } = require('@solana/web3.js');
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: ownerPubkey,
-          toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
-          lamports: totalFeeLamports
-        })
-      );
-      console.log('Added fee transfer instruction to transaction');
+    // Fee transfer disabled for testing - users get full rent recovery
+    console.log(`Fee that would be charged: ${totalFee.toFixed(4)} SOL (disabled for testing)`);
+    // Reset fee calculation for response
+    totalFee = 0;
+    // Recalculate processed NFTs without fees
+    for (let i = 0; i < processedNFTs.length; i++) {
+      const baseRent = parseFloat(processedNFTs[i].baseRent);
+      processedNFTs[i].rentRecovered = baseRent.toFixed(4);
+      processedNFTs[i].fee = "0.0000";
+      totalRentRecovered += baseRent;
     }
     
     // Get recent blockhash for the transaction
