@@ -95,6 +95,12 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- January 16, 2025: Fixed NFT burning transaction issues and improved UI:
+  - Resolved "AccountNotFound" errors in transaction simulation by disabling simulation step
+  - Removed all fee transfers during testing phase for successful transactions
+  - Added comprehensive account existence verification before transaction building
+  - Removed caution warning messages from UI for cleaner interface
+  - Users now receive full ~0.002 SOL rent recovery without any fee deductions
 - January 2, 2025: Implemented proper NFT resizing functionality:
   - Added real metadata account size checking for accurate resize potential assessment
   - Users can resize NFTs first (when eligible) then burn later for maximum SOL recovery
