@@ -441,6 +441,9 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     const avgNftRent = nftAccounts > 0 ? nftActualRent / nftAccounts : 0;
     const avgVacantRent = vacantAccounts > 0 ? vacantActualRent / vacantAccounts : 0;
     
+    // Set NFT rent to standard base amount of 0.002 SOL for UI display
+    const baseNftRent = 0.002 * 1e9; // 0.002 SOL in lamports
+    
 
     
     return {
@@ -451,7 +454,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         tokenAccounts: tokenAccounts_count,
         vacantAccounts,
         rentPerAccount: avgTokenRent / 1e9, // Actual average token account rent
-        nftRentPerAsset: avgNftRent / 1e9, // Actual average NFT rent (includes metadata)
+        nftRentPerAsset: 0.002, // Standard base NFT rent amount for UI display
         totalRentEstimate: totalRentEstimate / 1e9, // Total actual recoverable rent
         breakdown: {
           nftRent: nftActualRent / 1e9, // Actual NFT rent from real accounts
@@ -465,7 +468,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         actualBalances: {
           totalActualRent: totalActualRent / 1e9,
           avgTokenRent: avgTokenRent / 1e9,
-          avgNftRent: avgNftRent / 1e9,
+          avgNftRent: 0.002, // Standard base NFT rent for UI display
           avgVacantRent: avgVacantRent / 1e9
         }
       }
