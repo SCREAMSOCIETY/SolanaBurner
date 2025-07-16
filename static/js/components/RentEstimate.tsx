@@ -387,17 +387,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   return (
     <div className="rent-estimate-card">
       <h3>💰 Rent Return Estimate</h3>
-      <div className="accuracy-indicator" style={{ 
-        fontSize: '12px', 
-        color: '#ff6400', 
-        marginBottom: '10px',
-        padding: '5px 10px',
-        backgroundColor: 'rgba(255, 100, 0, 0.1)',
-        borderRadius: '4px',
-        border: '1px solid rgba(255, 100, 0, 0.3)'
-      }}>
-        ⚠️ Estimates shown - actual wallet amounts may vary (~0.002 SOL per NFT)
-      </div>
+
       <div className="rent-summary">
         {selectedRentData && selectedRentData.totalSelected > 0 ? (
           <div className="selected-estimate">
@@ -421,7 +411,7 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
             {(selectedRentData.nftBatchWarning || selectedRentData.tokenBatchWarning) && (
               <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#4a1a1a', border: '1px solid #ff6b6b', borderRadius: '6px' }}>
                 <div style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>
-                  ⚠️ Batch Size Limit Exceeded
+                  Batch Size Limit Exceeded
                 </div>
                 {selectedRentData.nftBatchWarning && (
                   <div style={{ color: '#ffb3b3', fontSize: '12px' }}>
