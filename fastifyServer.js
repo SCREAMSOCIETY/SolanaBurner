@@ -430,8 +430,9 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     // Calculate 1% fee on vacant accounts only  
     const vacantAccountFee = vacantActualRent * 0.01;
     
-    // Total recoverable rent (matches actual burning transaction calculations)
-    const totalRentEstimate = nftActualRent + tokenActualRent + vacantActualRent;
+    // Calculate total rent estimate using base amounts for UI consistency
+    const baseNftTotal = nftAccounts * (0.002 * 1e9); // Base NFT rent for UI display
+    const totalRentEstimate = baseNftTotal + tokenActualRent + vacantActualRent;
     
     // Calculate total fees collected (1% of vacant account rent)
     const totalBurningFees = vacantAccountFee;
@@ -457,7 +458,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
         nftRentPerAsset: 0.002, // Standard base NFT rent amount for UI display
         totalRentEstimate: totalRentEstimate / 1e9, // Total actual recoverable rent
         breakdown: {
-          nftRent: nftActualRent / 1e9, // Actual NFT rent from real accounts
+          nftRent: (nftAccounts * 0.002), // Base NFT rent for UI consistency
           tokenRent: tokenActualRent / 1e9, // Actual token rent from real accounts
           vacantRent: vacantActualRent / 1e9 // Actual vacant account rent
         },
