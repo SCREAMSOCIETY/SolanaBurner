@@ -3371,6 +3371,169 @@ fastify.post('/api/server-transfer/submit', async (request, reply) => {
   }
 });
 
+// Smart Burn Recommendations endpoint
+fastify.get('/api/smart-burn-recommendations/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  try {
+    fastify.log.info(`Generating smart burn recommendations for wallet: ${walletAddress}`);
+    
+    // Import the smart burn analyzer
+    const { analyzeWalletForBurns } = require('./smart-burn-analyzer');
+    
+    // Get wallet assets from existing endpoints
+    const ownerPubkey = new PublicKey(walletAddress);
+    
+    // Fetch NFTs
+    const nftResponse = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'get-assets',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: walletAddress,
+          page: 1,
+          limit: 1000,
+          displayOptions: {
+            showFungible: false,
+            showNativeBalance: false
+          }
+        }
+      })
+    });
+    
+    const nftData = await nftResponse.json();
+    const allAssets = nftData.result?.items || [];
+    
+    // Separate regular NFTs and cNFTs
+    const nfts = allAssets.filter(asset => !asset.compression?.compressed);
+    const cnfts = allAssets.filter(asset => asset.compression?.compressed);
+    
+    // Fetch tokens
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      ownerPubkey,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+    
+    const tokens = tokenAccounts.value
+      .filter(account => {
+        const amount = Number(account.account.data.parsed.info.tokenAmount.amount);
+        const decimals = account.account.data.parsed.info.tokenAmount.decimals;
+        return !(amount === 1 && decimals === 0); // Exclude NFTs
+      })
+      .map(account => ({
+        mint: account.account.data.parsed.info.mint,
+        amount: account.account.data.parsed.info.tokenAmount.amount,
+        decimals: account.account.data.parsed.info.tokenAmount.decimals,
+        tokenAccount: account.pubkey.toString()
+      }));
+    
+    // Analyze wallet for burn recommendations
+    const recommendations = await analyzeWalletForBurns(
+      connection,
+      walletAddress,
+      nfts,
+      tokens,
+      cnfts
+    );
+    
+    reply.send({
+      success: true,
+      recommendations
+    });
+    
+  } catch (error) {
+    fastify.log.error(`Error generating burn recommendations: ${error.message}`);
+    reply.status(500).send({
+      success: false,
+      error: 'Failed to generate burn recommendations',
+      message: error.message
+    });
+  }
+});
+
+// Advanced Rent Optimization endpoint
+fastify.get('/api/rent-optimization/:walletAddress', async (request, reply) => {
+  const { walletAddress } = request.params;
+  
+  try {
+    fastify.log.info(`Calculating rent optimization for wallet: ${walletAddress}`);
+    
+    // Import the rent optimizer
+    const { 
+      compareWithCompetitors,
+      detectAuxiliaryAccounts,
+      calculateMaximumRecovery,
+      generateOptimizationReport,
+      calculateOptimalBurnOrder
+    } = require('./rent-optimizer');
+    
+    // Get wallet assets
+    const ownerPubkey = new PublicKey(walletAddress);
+    
+    // Fetch NFTs and tokens (reuse logic from above)
+    const nftResponse = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'get-assets',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: walletAddress,
+          page: 1,
+          limit: 1000
+        }
+      })
+    });
+    
+    const nftData = await nftResponse.json();
+    const nfts = (nftData.result?.items || []).filter(asset => !asset.compression?.compressed);
+    
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      ownerPubkey,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+    
+    const tokens = tokenAccounts.value
+      .filter(account => {
+        const amount = Number(account.account.data.parsed.info.tokenAmount.amount);
+        const decimals = account.account.data.parsed.info.tokenAmount.decimals;
+        return !(amount === 1 && decimals === 0);
+      });
+    
+    // Perform optimization analysis
+    const assets = { nfts, tokens };
+    const comparison = compareWithCompetitors(assets);
+    const auxiliaryAccounts = await detectAuxiliaryAccounts(connection, walletAddress, nfts);
+    const maxRecovery = calculateMaximumRecovery(assets, auxiliaryAccounts);
+    
+    // Get burn order (simplified for now)
+    const allAssets = [
+      ...nfts.map(nft => ({ type: 'nft', ...nft })),
+      ...tokens.map(token => ({ type: 'token', ...token }))
+    ];
+    const burnOrder = calculateOptimalBurnOrder(allAssets);
+    
+    const optimizationReport = generateOptimizationReport(comparison, maxRecovery, burnOrder);
+    
+    reply.send({
+      success: true,
+      optimization: optimizationReport
+    });
+    
+  } catch (error) {
+    fastify.log.error(`Error calculating rent optimization: ${error.message}`);
+    reply.status(500).send({
+      success: false,
+      error: 'Failed to calculate rent optimization',
+      message: error.message
+    });
+  }
+});
+
 // Start the server - use port 5001 for Replit
 const port = process.env.PORT || 5001;
 const start = async () => {

@@ -95,6 +95,12 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- January 16, 2025: Added Advanced Rent Optimization and Smart Burn Recommendations features:
+  - Smart Burn Recommendations: AI-powered analysis to identify best assets to burn
+  - Advanced Rent Optimization: Real-time competitor comparison showing Solburnt vs Sol Incinerator rates
+  - Backend analyzers for wallet asset evaluation and rent optimization strategies
+  - React components with collapsible UI sections for both features
+  - API endpoints for smart burn analysis and rent optimization calculations
 - January 16, 2025: Fixed NFT burning transaction issues and improved UI:
   - Resolved "AccountNotFound" errors in transaction simulation by disabling simulation step
   - Removed all fee transfers during testing phase for successful transactions
