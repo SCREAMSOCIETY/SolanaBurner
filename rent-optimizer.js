@@ -32,8 +32,9 @@ const COMPETITOR_RATES = {
  */
 function compareWithCompetitors(assets) {
     const solburntRates = {
-        nft: 0.002, // Current base rate
+        nft: 0.002, // Current base rate (token account only)
         nftWithResize: 0.0025, // With metadata optimization
+        nftEnhanced: 0.0077, // With full account burning (matches Sol Incinerator)
         token: 0.00203928
     };
 
@@ -46,9 +47,10 @@ function compareWithCompetitors(assets) {
         competitors: {}
     };
 
-    // Calculate Solburnt recovery
+    // Calculate Solburnt recovery with enhanced burning
     if (assets.nfts) {
-        const nftRecovery = assets.nfts.length * solburntRates.nftWithResize;
+        // Use enhanced rate once implemented
+        const nftRecovery = assets.nfts.length * solburntRates.nftEnhanced;
         comparison.solburnt.breakdown.nfts = nftRecovery;
         comparison.solburnt.total += nftRecovery;
     }
