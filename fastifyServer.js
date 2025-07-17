@@ -18,6 +18,10 @@ const delegatedTransfer = require('./delegated-cnft-transfer');
 // Solana imports for vacant account burning
 const { Connection, PublicKey, Transaction, clusterApiUrl } = require('@solana/web3.js');
 const { createCloseAccountInstruction, createBurnInstruction, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+const { 
+  createBurnNftInstruction,
+  PROGRAM_ID: METADATA_PROGRAM_ID
+} = require('@metaplex-foundation/mpl-token-metadata');
 const nacl = require('tweetnacl');
 
 // Log startup info
@@ -430,8 +434,8 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     // Calculate 1% fee on vacant accounts only  
     const vacantAccountFee = vacantActualRent * 0.01;
     
-    // Calculate total rent estimate using base amounts for UI consistency
-    const baseNftTotal = nftAccounts * (0.002 * 1e9); // Base NFT rent for UI display
+    // Calculate total rent estimate using enhanced amounts for UI consistency
+    const baseNftTotal = nftAccounts * (0.0077 * 1e9); // Enhanced NFT rent for UI display
     const totalRentEstimate = baseNftTotal + tokenActualRent + vacantActualRent;
     
     // Calculate total fees collected (1% of vacant account rent)
@@ -442,8 +446,8 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     const avgNftRent = nftAccounts > 0 ? nftActualRent / nftAccounts : 0;
     const avgVacantRent = vacantAccounts > 0 ? vacantActualRent / vacantAccounts : 0;
     
-    // Set NFT rent to standard base amount of 0.002 SOL for UI display
-    const baseNftRent = 0.002 * 1e9; // 0.002 SOL in lamports
+    // Set NFT rent to enhanced amount of 0.0077 SOL (matching Sol Incinerator)
+    const baseNftRent = 0.0077 * 1e9; // 0.0077 SOL in lamports (token + metadata + edition)
     
 
     
@@ -1398,28 +1402,84 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     // Use burn instruction followed by close account to properly dispose of NFT and recover rent
     // This approach burns the NFT completely and recovers the account rent
     
-    // First: Burn the NFT (sets balance to 0)
-    transaction.add(
-      createBurnInstruction(
-        tokenAccountPubkey, // account to burn from
-        mintPubkey, // mint
-        ownerPubkey, // owner
-        1, // amount
-        [], // multisigners
-        TOKEN_PROGRAM_ID
-      )
-    );
-    
-    // Second: Close the now-empty token account to recover rent
-    transaction.add(
-      createCloseAccountInstruction(
-        tokenAccountPubkey, // account to close
-        ownerPubkey, // destination for lamports
-        ownerPubkey, // authority
-        [], // multisigners
-        TOKEN_PROGRAM_ID
-      )
-    );
+    // Use enhanced burn method from enhanced-nft-burn.js for maximum rent recovery
+    try {
+      const { createEnhancedBurnInstructions, calculateTotalRentRecovery, calculateNFTAccounts } = require('./enhanced-nft-burn');
+      
+      // Calculate all recoverable accounts
+      const accounts = await calculateNFTAccounts(connection, mint, owner);
+      
+      // Calculate total rent recovery including metadata and edition accounts
+      const rentInfo = await calculateTotalRentRecovery(connection, accounts);
+      console.log(`Enhanced burn - Total recoverable rent for ${mint}: ${rentInfo.totalRent} SOL`, rentInfo.rentBreakdown);
+      
+      // Update recovery amount to include all accounts
+      const enhancedRecoveryLamports = Math.floor(rentInfo.totalLamports);
+      const enhancedRecoverySOL = rentInfo.totalRent;
+      
+      // Update memo with enhanced recovery amount
+      transaction.instructions[0] = new TransactionInstruction({
+        keys: [],
+        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+        data: Buffer.from(`🔥 Burn "${nftName}" | Enhanced Recovery: ${(enhancedRecoverySOL * 0.99).toFixed(4)} SOL | Fee: ${(enhancedRecoverySOL * 0.01).toFixed(4)} SOL`, 'utf8')
+      });
+      
+      // Get enhanced burn instructions
+      const burnInstructions = await createEnhancedBurnInstructions(connection, mint, owner);
+      
+      // Add enhanced burn instructions
+      for (const instruction of burnInstructions) {
+        transaction.add(instruction);
+      }
+      
+      // Update fee calculation based on enhanced recovery
+      const enhancedFeeAmount = Math.floor(enhancedRecoveryLamports * 0.01);
+      
+      // Remove old fee instruction if present
+      if (transaction.instructions.length > burnInstructions.length + 1) {
+        transaction.instructions.pop();
+      }
+      
+      // Add new fee based on enhanced recovery
+      if (enhancedFeeAmount >= 1000) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: ownerPubkey,
+            toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
+            lamports: enhancedFeeAmount
+          })
+        );
+      }
+      
+      // Update response values
+      userReceivesSOL = enhancedRecoverySOL * 0.99;
+      feeSOL = enhancedRecoverySOL * 0.01;
+      
+    } catch (enhancedError) {
+      console.log('Enhanced burn not available, using standard burn:', enhancedError.message);
+      
+      // Fallback to standard burn + close
+      transaction.add(
+        createBurnInstruction(
+          tokenAccountPubkey,
+          mintPubkey,
+          ownerPubkey,
+          1,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+      
+      transaction.add(
+        createCloseAccountInstruction(
+          tokenAccountPubkey,
+          ownerPubkey,
+          ownerPubkey,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+    }
     
     const burnMethod = 'direct_burn';
     
@@ -1689,33 +1749,68 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         totalRentRecovered += totalRecovery; // Full recovery without fees
         totalFee += feeSOL;
         
-        // Add burn instruction with proper amount and decimals for Metaplex resized NFTs
-        const actualAmount = parseInt(tokenBalance.value.amount);
-        const decimals = tokenBalance.value.decimals || 0;
-        
-        console.log(`Creating burn instruction for ${mint} with amount: ${actualAmount}, decimals: ${decimals}`);
-        
-        transaction.add(
-          createBurnInstruction(
-            tokenAccountPubkey,
-            mintPubkey,
-            ownerPubkey,
-            actualAmount,
-            [],
-            TOKEN_PROGRAM_ID
-          )
-        );
-        
-        // Add close account instruction
-        transaction.add(
-          createCloseAccountInstruction(
-            tokenAccountPubkey,
-            ownerPubkey,
-            ownerPubkey,
-            [],
-            TOKEN_PROGRAM_ID
-          )
-        );
+        // Use enhanced burn method for maximum rent recovery
+        try {
+          const { createEnhancedBurnInstructions, calculateTotalRentRecovery, calculateNFTAccounts } = require('./enhanced-nft-burn');
+          
+          // Calculate all recoverable accounts
+          const accounts = await calculateNFTAccounts(connection, mint, owner);
+          
+          // Calculate total rent recovery including metadata and edition accounts
+          const rentInfo = await calculateTotalRentRecovery(connection, accounts);
+          console.log(`Enhanced burn - Total recoverable rent for ${mint}: ${rentInfo.totalRent} SOL`, rentInfo.rentBreakdown);
+          
+          // Update recovery amount to include all accounts
+          totalRecovery = rentInfo.totalRent;
+          totalRentRecovered = totalRentRecovered - baseRentSOL + totalRecovery; // Replace base with enhanced
+          
+          // Get enhanced burn instructions
+          const burnInstructions = await createEnhancedBurnInstructions(connection, mint, owner);
+          
+          // Add enhanced burn instructions
+          for (const instruction of burnInstructions) {
+            transaction.add(instruction);
+          }
+          
+          // Update processed NFT info with enhanced recovery
+          processedNFTs[processedNFTs.length - 1] = {
+            ...processedNFTs[processedNFTs.length - 1],
+            rentRecovered: (totalRecovery * 0.99).toFixed(4),
+            fee: (totalRecovery * 0.01).toFixed(4),
+            enhancedRecovery: rentInfo.rentBreakdown
+          };
+          
+        } catch (enhancedError) {
+          console.log('Enhanced burn not available, using standard burn:', enhancedError.message);
+          
+          // Fallback to standard burn
+          const actualAmount = parseInt(tokenBalance.value.amount);
+          const decimals = tokenBalance.value.decimals || 0;
+          
+          console.log(`Creating standard burn instruction for ${mint} with amount: ${actualAmount}, decimals: ${decimals}`);
+          
+          transaction.add(
+            createBurnInstruction(
+              tokenAccountPubkey,
+              mintPubkey,
+              ownerPubkey,
+              actualAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+          
+          // Add close account instruction
+          transaction.add(
+            createCloseAccountInstruction(
+              tokenAccountPubkey,
+              ownerPubkey,
+              ownerPubkey,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+        }
         
         // Skip project wallet transfer for now - users get base rent recovery only
         // This ensures transaction works without needing project wallet signature

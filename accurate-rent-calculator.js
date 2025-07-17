@@ -16,11 +16,14 @@ const { Connection, PublicKey } = require('@solana/web3.js');
  */
 async function calculateActualNFTRent(connection, mintAddress, tokenAccount) {
     try {
-        const tokenAccountPubkey = new PublicKey(tokenAccount);
+        // Use enhanced burn calculation
+        const { calculateNFTAccounts, calculateTotalRentRecovery } = require('./enhanced-nft-burn');
         
-        // Get actual token account info
-        const accountInfo = await connection.getAccountInfo(tokenAccountPubkey);
-        if (!accountInfo) {
+        // Get token account owner first
+        const tokenAccountPubkey = new PublicKey(tokenAccount);
+        const tokenAccountInfo = await connection.getParsedAccountInfo(tokenAccountPubkey);
+        
+        if (!tokenAccountInfo || !tokenAccountInfo.value) {
             return {
                 success: false,
                 error: 'Token account not found',
@@ -28,40 +31,45 @@ async function calculateActualNFTRent(connection, mintAddress, tokenAccount) {
             };
         }
         
-        // Calculate actual rent from account balance
-        const actualBalance = accountInfo.lamports;
-        const actualRecoverySOL = actualBalance / 1e9;
+        const owner = tokenAccountInfo.value.data.parsed.info.owner;
+        
+        // Calculate all recoverable accounts (token + metadata + edition)
+        const accounts = await calculateNFTAccounts(connection, mintAddress, owner);
+        const rentInfo = await calculateTotalRentRecovery(connection, accounts);
         
         // Apply 1% fee
-        const feeSOL = actualRecoverySOL * 0.01;
-        const netRecoverySOL = actualRecoverySOL - feeSOL;
+        const feeSOL = rentInfo.totalRent * 0.01;
+        const netRecoverySOL = rentInfo.totalRent - feeSOL;
         
         return {
             success: true,
-            actualBalance: actualBalance,
-            actualRecoverySOL: actualRecoverySOL,
+            actualBalance: rentInfo.totalLamports,
+            actualRecoverySOL: rentInfo.totalRent,
             feeSOL: feeSOL,
             netRecoverySOL: netRecoverySOL,
-            accountSize: accountInfo.data.length,
+            accountSize: tokenAccountInfo.value.data.parsed.info.tokenAmount.uiAmount,
+            breakdown: rentInfo.rentBreakdown,
+            enhanced: true,
             details: {
                 honest: true,
-                source: 'actual_account_balance',
-                note: 'This is the exact amount you will receive'
+                source: 'enhanced_burn_calculation',
+                note: 'Full recovery including metadata and edition accounts'
             }
         };
         
     } catch (error) {
         console.error(`Error calculating actual rent for ${mintAddress}:`, error);
         
-        // Fallback to conservative estimate
-        const fallbackRent = 0.00203928; // Conservative base rent
+        // Fallback to enhanced estimate
+        const fallbackRent = 0.0077; // Enhanced rent recovery (token + metadata + edition)
         const fallbackFee = fallbackRent * 0.01;
         
         return {
             success: false,
             error: error.message,
             estimatedRecovery: fallbackRent - fallbackFee,
-            fallback: true
+            fallback: true,
+            enhanced: true
         };
     }
 }

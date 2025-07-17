@@ -95,6 +95,12 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- January 17, 2025: Implemented enhanced NFT burning to match competitor rates:
+  - Integrated Metaplex burnNft instruction to close all associated accounts (token, metadata, edition)
+  - Enhanced rent recovery from ~0.002 SOL to ~0.0077 SOL per NFT (matching Sol Incinerator)
+  - Added fallback to standard burn for compatibility
+  - Updated both single and batch NFT burn endpoints with enhanced burning
+  - Full account closure includes: Token Account (~0.00203 SOL) + Metadata Account (~0.00355 SOL) + Master Edition Account (~0.00212 SOL)
 - January 16, 2025: Added Advanced Rent Optimization and Smart Burn Recommendations features:
   - Smart Burn Recommendations: AI-powered analysis to identify best assets to burn
   - Advanced Rent Optimization: Real-time competitor comparison showing Solburnt vs Sol Incinerator rates
