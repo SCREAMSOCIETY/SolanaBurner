@@ -126,4 +126,6 @@ export class ActivityLogger {
 }
 
 // Make available globally for use in other components
-window.ActivityLogger = ActivityLogger;
+if (typeof window !== 'undefined') {
+  window.ActivityLogger = ActivityLogger;
+}

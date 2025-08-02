@@ -599,7 +599,11 @@ const TokensTab: React.FC = () => {
       ) : (
         <div className="assets-grid">
           {tokens.map((token) => (
-            <div key={token.mint} className="asset-card token-card" data-mint={token.mint}>
+            <div 
+              key={token.mint} 
+              className={`asset-card token-card ${selectedTokens.has(token.mint) ? 'selected' : ''}`}
+              data-mint={token.mint}
+            >
               <div className="token-header">
                 <input
                   type="checkbox"

@@ -504,7 +504,11 @@ const NFTsTab: React.FC = () => {
               <h3 className="collection-title">{collection}</h3>
               <div className="nfts-grid">
                 {collectionNfts.map((nft) => (
-                  <div key={nft.mint} className="asset-card nft-card" data-mint={nft.mint}>
+                  <div 
+                    key={nft.mint} 
+                    className={`asset-card nft-card ${selectedNfts.has(nft.mint) ? 'selected' : ''}`}
+                    data-mint={nft.mint}
+                  >
                     <div className="nft-header">
                       <input
                         type="checkbox"
