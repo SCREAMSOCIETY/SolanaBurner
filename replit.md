@@ -95,6 +95,12 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- August 2, 2025: Updated cNFT system to view-only mode for user safety:
+  - Removed all cNFT burn buttons and interactive functionality 
+  - Replaced with "View Only" badges to indicate cNFTs are display-only
+  - cNFT burning now operates in simulation mode only due to API compatibility issues
+  - Users can view their cNFTs but cannot attempt to burn them
+  - Eliminates user confusion and failed transaction attempts
 - January 17, 2025: RESOLVED ALL FEE INCONSISTENCIES - Complete 1% fee structure implementation:
   - Fixed batch NFT burn endpoint that had fees disabled for testing
   - Fixed vacant account burning endpoint that had fees completely removed 

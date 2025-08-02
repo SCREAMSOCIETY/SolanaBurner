@@ -193,6 +193,41 @@ async function processBurnRequest(ownerAddress, assetId, signedMessage, proofDat
 }
 
 /**
+ * Simulate a cNFT burn for educational purposes
+ * @param {string} ownerAddress - The owner's public key as a string
+ * @param {string} assetId - The asset ID (mint address) of the cNFT
+ * @param {string} signedMessage - Base64-encoded signature for verification
+ * @param {object} proofData - The merkle proof data for the cNFT
+ * @param {object} assetData - The asset data for the cNFT
+ * @returns {Promise<object>} - Simulation result
+ */
+async function simulateBurn(ownerAddress, assetId, signedMessage, proofData, assetData) {
+  try {
+    // Generate a fake simulation ID for educational purposes
+    const simulationId = `sim_${assetId.slice(0, 8)}_${Date.now()}`;
+    
+    return {
+      success: true,
+      isSimulated: true,
+      status: "simulated",
+      simulationId: simulationId,
+      message: "cNFT burn simulation completed successfully. This demonstrates what would happen with proper tree authority permissions.",
+      assetDetails: {
+        id: assetId,
+        name: assetData.content?.metadata?.name || "Compressed NFT",
+        collection: assetData.content?.metadata?.collection?.name || "Unknown Collection"
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Simulation failed: ${error.message}`,
+      status: "failed"
+    };
+  }
+}
+
+/**
  * Transfer a cNFT to a burn address (effectively "burning" it)
  * @param {string} ownerAddress - The current owner's public key
  * @param {string} assetId - The asset ID of the cNFT
@@ -280,5 +315,6 @@ async function transferCNFTToBurnAddress(ownerAddress, assetId, burnAddress, pro
 module.exports = {
   processBurnRequest,
   transferCNFTToBurnAddress,
+  simulateBurn,
   hasTreeAuthority
 };

@@ -2387,21 +2387,9 @@ const WalletAssets: React.FC = () => {
                   </div>
                   
                   {!bulkBurnMode && (
-                    <button 
-                      className="burn-button cnft-burn" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCnftForBurn({
-                          id: cnft.mint,
-                          name: cnft.name || `cNFT ${cnft.mint.slice(0, 8)}...`,
-                          image: cnft.image
-                        });
-                        setCnftBurnModalOpen(true);
-                      }}
-                      title="View cNFT burn simulation (educational only - no real burning occurs)"
-                    >
-                      🔥 Burn
-                    </button>
+                    <div className="cnft-info-badge" title="cNFTs are view-only - no burning functionality available">
+                      👁️ View Only
+                    </div>
                   )}
 
                   {bulkBurnMode && (
