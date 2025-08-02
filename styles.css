@@ -14,6 +14,27 @@ body {
     color: var(--text-color);
 }
 
+/* Highlight flash animation for quick actions */
+@keyframes highlight-flash {
+  0% { 
+    background-color: rgba(255, 100, 0, 0.3);
+    box-shadow: 0 0 20px rgba(255, 100, 0, 0.5);
+  }
+  50% { 
+    background-color: rgba(255, 100, 0, 0.5);
+    box-shadow: 0 0 30px rgba(255, 100, 0, 0.7);
+  }
+  100% { 
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.highlight-flash {
+  animation: highlight-flash 2s ease-in-out;
+  border-radius: 12px;
+}
+
 .container {
     max-width: 800px;
     margin: 0 auto;

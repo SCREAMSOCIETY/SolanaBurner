@@ -97,6 +97,43 @@ export const RentOptimization: React.FC = () => {
     return amount.toFixed(4);
   };
 
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'resize-all':
+        // Scroll to NFT section and highlight resize options
+        const nftSection = document.querySelector('.nft-section');
+        if (nftSection) {
+          nftSection.scrollIntoView({ behavior: 'smooth' });
+          // Flash highlight effect
+          nftSection.classList.add('highlight-flash');
+          setTimeout(() => nftSection.classList.remove('highlight-flash'), 2000);
+        }
+        break;
+      case 'burn-vacant':
+        // Scroll to vacant accounts section
+        const vacantSection = document.querySelector('.vacant-accounts-section');
+        if (vacantSection) {
+          vacantSection.scrollIntoView({ behavior: 'smooth' });
+          vacantSection.classList.add('highlight-flash');
+          setTimeout(() => vacantSection.classList.remove('highlight-flash'), 2000);
+        }
+        break;
+      case 'batch-tokens':
+        // Scroll to tokens section and highlight batch options
+        const tokenSection = document.querySelector('.token-section');
+        if (tokenSection) {
+          tokenSection.scrollIntoView({ behavior: 'smooth' });
+          tokenSection.classList.add('highlight-flash');
+          setTimeout(() => tokenSection.classList.remove('highlight-flash'), 2000);
+        }
+        break;
+      case 'analyze-deep':
+        // Trigger fresh analysis
+        fetchOptimization();
+        break;
+    }
+  };
+
   if (!publicKey) return null;
 
   return (
@@ -118,28 +155,41 @@ export const RentOptimization: React.FC = () => {
           
           {optimization && !loading && (
             <>
-              {/* Competitor Comparison */}
-              <div className="comparison-section">
-                <h4>⚔️ Competitor Comparison</h4>
-                <div className="comparison-grid">
-                  <div className="competitor-card solburnt">
-                    <div className="competitor-name">Solburnt (You)</div>
-                    <div className="competitor-total">{formatSOL(optimization.competitorAnalysis.solburnt.total)} SOL</div>
-                    {optimization.competitorAnalysis.solburntAdvantage && (
-                      <div className="advantage-badge">Best Rate!</div>
-                    )}
-                  </div>
-                  
-                  {Object.entries(optimization.competitorAnalysis.competitors).map(([name, data]) => (
-                    <div key={name} className="competitor-card">
-                      <div className="competitor-name">{name}</div>
-                      <div className="competitor-total">{formatSOL(data.total)} SOL</div>
-                      <div className={`difference ${data.difference > 0 ? 'positive' : 'negative'}`}>
-                        {data.difference > 0 ? '+' : ''}{formatSOL(data.difference)} SOL
-                        <span className="percentage">({data.percentageDiff}%)</span>
-                      </div>
+              {/* Quick Action Buttons */}
+              <div className="quick-actions-section">
+                <h4>⚡ Quick Actions</h4>
+                <div className="action-buttons-grid">
+                  <button className="action-button primary" onClick={() => handleQuickAction('resize-all')}>
+                    <div className="action-icon">📏</div>
+                    <div className="action-text">
+                      <div className="action-title">Resize All NFTs</div>
+                      <div className="action-desc">Optimize metadata first</div>
                     </div>
-                  ))}
+                  </button>
+                  
+                  <button className="action-button secondary" onClick={() => handleQuickAction('burn-vacant')}>
+                    <div className="action-icon">🗑️</div>
+                    <div className="action-text">
+                      <div className="action-title">Burn Vacant Accounts</div>
+                      <div className="action-desc">Quick SOL recovery</div>
+                    </div>
+                  </button>
+                  
+                  <button className="action-button tertiary" onClick={() => handleQuickAction('batch-tokens')}>
+                    <div className="action-icon">⚡</div>
+                    <div className="action-text">
+                      <div className="action-title">Batch Burn Tokens</div>
+                      <div className="action-desc">Process multiple at once</div>
+                    </div>
+                  </button>
+                  
+                  <button className="action-button quaternary" onClick={() => handleQuickAction('analyze-deep')}>
+                    <div className="action-icon">🔍</div>
+                    <div className="action-text">
+                      <div className="action-title">Deep Analysis</div>
+                      <div className="action-desc">Find hidden opportunities</div>
+                    </div>
+                  </button>
                 </div>
               </div>
               
@@ -257,11 +307,97 @@ export const RentOptimization: React.FC = () => {
           margin-top: 20px;
         }
         
-        .comparison-section,
+        .quick-actions-section,
         .recovery-section,
         .recommendations-section,
         .strategy-section {
           margin-bottom: 30px;
+        }
+        
+        .action-buttons-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 15px;
+        }
+        
+        .action-button {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 12px;
+          padding: 20px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          color: #fff;
+          text-align: left;
+        }
+        
+        .action-button:hover {
+          background: rgba(255, 255, 255, 0.12);
+          border-color: rgba(255, 255, 255, 0.25);
+          transform: translateY(-2px);
+        }
+        
+        .action-button.primary {
+          border-color: #4caf50;
+          background: rgba(76, 175, 80, 0.1);
+        }
+        
+        .action-button.primary:hover {
+          background: rgba(76, 175, 80, 0.15);
+          border-color: #4caf50;
+        }
+        
+        .action-button.secondary {
+          border-color: #ff6400;
+          background: rgba(255, 100, 0, 0.1);
+        }
+        
+        .action-button.secondary:hover {
+          background: rgba(255, 100, 0, 0.15);
+          border-color: #ff6400;
+        }
+        
+        .action-button.tertiary {
+          border-color: #2196f3;
+          background: rgba(33, 150, 243, 0.1);
+        }
+        
+        .action-button.tertiary:hover {
+          background: rgba(33, 150, 243, 0.15);
+          border-color: #2196f3;
+        }
+        
+        .action-button.quaternary {
+          border-color: #9c27b0;
+          background: rgba(156, 39, 176, 0.1);
+        }
+        
+        .action-button.quaternary:hover {
+          background: rgba(156, 39, 176, 0.15);
+          border-color: #9c27b0;
+        }
+        
+        .action-icon {
+          font-size: 32px;
+          flex-shrink: 0;
+        }
+        
+        .action-text {
+          flex: 1;
+        }
+        
+        .action-title {
+          font-size: 16px;
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+        
+        .action-desc {
+          font-size: 13px;
+          color: #999;
         }
         
         h4 {
@@ -270,65 +406,7 @@ export const RentOptimization: React.FC = () => {
           margin: 0 0 15px 0;
         }
         
-        .comparison-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 15px;
-        }
-        
-        .competitor-card {
-          background: rgba(255, 255, 255, 0.08);
-          padding: 20px;
-          border-radius: 8px;
-          text-align: center;
-          position: relative;
-        }
-        
-        .competitor-card.solburnt {
-          border: 2px solid #ff6400;
-        }
-        
-        .competitor-name {
-          font-size: 14px;
-          color: #999;
-          margin-bottom: 10px;
-        }
-        
-        .competitor-total {
-          font-size: 24px;
-          font-weight: bold;
-          color: #fff;
-          margin-bottom: 10px;
-        }
-        
-        .advantage-badge {
-          position: absolute;
-          top: -10px;
-          right: 10px;
-          background: #4caf50;
-          color: white;
-          padding: 4px 12px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: bold;
-        }
-        
-        .difference {
-          font-size: 14px;
-        }
-        
-        .difference.positive {
-          color: #4caf50;
-        }
-        
-        .difference.negative {
-          color: #f44336;
-        }
-        
-        .percentage {
-          opacity: 0.7;
-          margin-left: 5px;
-        }
+
         
         .recovery-breakdown {
           background: rgba(255, 255, 255, 0.05);
