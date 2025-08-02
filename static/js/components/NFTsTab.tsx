@@ -26,6 +26,7 @@ declare global {
       updateProgress: (currentVal: number, maxVal: number, level: number) => void;
       checkAchievements: (type: string, value: number) => void;
       initUIEnhancements: () => void;
+      showNotification?: (title: string, message: string) => void;
     };
   }
 }
@@ -414,7 +415,7 @@ const NFTsTab: React.FC = () => {
       // Apply burn animations for successful burns
       if (processedNFTs.length > 0 && window.BurnAnimations) {
         // Animate NFT elements that were successfully burned
-        const burnedMints = processedNFTs.map(nft => nft.mint);
+        const burnedMints = processedNFTs.map((nft: any) => nft.mint);
         const nftElements = Array.from(document.querySelectorAll('.nft-card')).filter(element => {
           const mintAttribute = (element as HTMLElement).dataset.mint;
           return mintAttribute && burnedMints.includes(mintAttribute);
@@ -440,7 +441,7 @@ const NFTsTab: React.FC = () => {
       }
       
       // Remove successfully burned NFTs from the list
-      const burnedMints = processedNFTs.map(nft => nft.mint);
+      const burnedMints = processedNFTs.map((nft: any) => nft.mint);
       setNfts(nfts.filter(nft => !burnedMints.includes(nft.mint)));
       setSelectedNfts(new Set());
       
