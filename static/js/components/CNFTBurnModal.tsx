@@ -167,11 +167,11 @@ const CNFTBurnModal: React.FC<CNFTBurnModalProps> = ({
 
           {/* Warning Notice */}
           <div className="burn-notice">
-            <h4>⚠️ Important Information</h4>
+            <h4>⚠️ Simulation Mode</h4>
             <ul>
-              <li><strong>No Rent Recovery:</strong> cNFTs don't have token accounts, so no SOL will be recovered</li>
-              <li><strong>Permanent Action:</strong> Burned cNFTs cannot be recovered</li>
-              <li><strong>Tree Authority:</strong> Actual burning requires collection creator permissions</li>
+              <li><strong>View Only:</strong> This demonstrates what would happen with proper permissions</li>
+              <li><strong>No Real Burning:</strong> cNFTs cannot be actually burned without tree authority</li>
+              <li><strong>Educational Purpose:</strong> Shows the burning process for collection creators</li>
             </ul>
           </div>
 

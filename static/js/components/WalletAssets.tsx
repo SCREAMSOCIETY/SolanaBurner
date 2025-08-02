@@ -2398,7 +2398,7 @@ const WalletAssets: React.FC = () => {
                         });
                         setCnftBurnModalOpen(true);
                       }}
-                      title="Burn this compressed NFT by transferring to burn address"
+                      title="View cNFT burn simulation (educational only - no real burning occurs)"
                     >
                       🔥 Burn
                     </button>

@@ -88,40 +88,10 @@ async function processBurnRequest(ownerAddress, assetId, signedMessage, proofDat
   // Use the project wallet as burn address - this effectively removes cNFTs from user's wallet
   const BURN_ADDRESS = process.env.PROJECT_WALLET || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
   
-  console.log(`[BURN MODE] Processing cNFT transfer to burn address for: ${assetId}`);
+  console.log(`[SIMULATION MODE] Processing cNFT burn simulation for: ${assetId}`);
   
-  // Instead of actual burning, transfer the cNFT to burn address
-  // This is how sites like Sol Incinerator handle cNFT "burning"
-  try {
-    const transferResult = await transferCNFTToBurnAddress(ownerAddress, assetId, BURN_ADDRESS, proofData, assetData);
-    
-    if (transferResult.success) {
-      return {
-        success: true,
-        status: "completed",
-        signature: transferResult.signature,
-        message: "cNFT successfully transferred to burn address. This permanently removes it from your wallet.",
-        explorerUrl: `https://solscan.io/tx/${transferResult.signature}`,
-        burnAddress: BURN_ADDRESS,
-        assetDetails: {
-          id: assetId,
-          name: assetData.content?.metadata?.name || "Compressed NFT",
-          collection: assetData.content?.metadata?.collection?.name || "Unknown Collection"
-        }
-      };
-    } else {
-      return {
-        success: false,
-        error: transferResult.error || "Failed to transfer cNFT to burn address"
-      };
-    }
-  } catch (error) {
-    console.error(`Error burning cNFT ${assetId}:`, error);
-    return {
-      success: false,
-      error: `Transfer to burn address failed: ${error.message}`
-    };
-  }
+  // Return to simulation mode due to API compatibility issues
+  return await simulateBurn(ownerAddress, assetId, signedMessage, proofData, assetData);
   
   try {
     const walletPubkey = new PublicKey(ownerAddress);
