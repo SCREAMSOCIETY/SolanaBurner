@@ -146,7 +146,7 @@ const WalletAssets: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   // Bulk burn mode - disabled by default so users can see individual burn buttons
-  const [bulkBurnMode, setBulkBurnMode] = useState(false);
+  const [bulkBurnMode, setBulkBurnMode] = useState(true);
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]); 
   const [selectedNFTs, setSelectedNFTs] = useState<string[]>([]);
   const [selectedCNFTs, setSelectedCNFTs] = useState<string[]>([]);

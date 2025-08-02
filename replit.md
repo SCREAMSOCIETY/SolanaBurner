@@ -95,6 +95,11 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- August 2, 2025: Set bulk burn mode as default behavior per user preference:
+  - Bulk burn mode now starts enabled automatically when wallet connects
+  - Selection checkboxes appear immediately on NFT cards without requiring toggle activation
+  - Toggle button still available to disable bulk mode if needed
+  - Improves user experience by eliminating extra click for common bulk operations
 - August 2, 2025: Updated cNFT system to view-only mode for user safety:
   - Removed all cNFT burn buttons and interactive functionality 
   - Replaced with "View Only" badges to indicate cNFTs are display-only
