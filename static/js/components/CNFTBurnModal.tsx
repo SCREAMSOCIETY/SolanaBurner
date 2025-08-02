@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { Transaction } from '@solana/web3.js';
 import axios from 'axios';
 
 interface CNFTBurnModalProps {
@@ -26,7 +27,8 @@ const CNFTBurnModal: React.FC<CNFTBurnModalProps> = ({
   onSuccess,
   onError
 }) => {
-  const { publicKey, signMessage } = useWallet();
+  const { connection } = useConnection();
+  const { publicKey, signTransaction } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [processingStatus, setProcessingStatus] = useState('');
@@ -46,50 +48,84 @@ const CNFTBurnModal: React.FC<CNFTBurnModalProps> = ({
     try {
       setIsLoading(true);
       setError('');
-      setProcessingStatus('Preparing cNFT burn...');
+      setProcessingStatus('🔄 Preparing burn transaction...');
 
-      if (!publicKey || !signMessage) {
-        throw new Error('Wallet not connected or does not support message signing');
+      if (!publicKey) {
+        throw new Error('Wallet not connected');
       }
 
-      // Create authorization message
-      const message = `I authorize the burning of my cNFT with ID ${assetId}`;
-      setProcessingStatus('Please sign the authorization message...');
-
-      // Sign the message
-      const messageBytes = new TextEncoder().encode(message);
-      const signature = await signMessage(messageBytes);
-      const signedMessage = Array.from(signature);
-
-      setProcessingStatus('Processing burn request...');
-
-      // Call the real cNFT burning endpoint
+      // Call the burn endpoint to get transaction
       const response = await axios.post('/api/cnft/burn-request', {
         ownerAddress: publicKey.toString(),
         assetId: assetId,
-        signedMessage: signedMessage
+        signedMessage: null // Not needed for transfer-based burning
       });
 
       if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to burn cNFT');
+        throw new Error(response.data.error || 'Failed to prepare burn transaction');
       }
 
       const result = response.data;
-      setBurnResult(result);
 
-      if (result.isSimulated) {
+      if (result.requiresClientSigning) {
+        // Real transfer to burn address - requires wallet signing
+        setProcessingStatus('⏳ Please sign the transaction in your wallet...');
+        
+        if (!signTransaction) {
+          throw new Error('Wallet does not support transaction signing');
+        }
+        
+        // Deserialize and sign transaction
+        const transaction = Transaction.from(Buffer.from(result.transaction, 'base64'));
+        const signedTransaction = await signTransaction(transaction);
+        
+        // Submit transaction
+        setProcessingStatus('🔄 Submitting burn transaction...');
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        
+        // Confirm transaction
+        setProcessingStatus('⏳ Confirming transaction...');
+        await connection.confirmTransaction(signature, 'confirmed');
+        
+        const finalResult = {
+          success: true,
+          status: "completed",
+          signature: signature,
+          message: "cNFT successfully transferred to burn address and removed from your wallet!",
+          explorerUrl: `https://solscan.io/tx/${signature}`,
+          burnAddress: result.burnAddress,
+          assetDetails: result.assetDetails
+        };
+        
+        setBurnResult(finalResult);
+        setProcessingStatus('🔥 cNFT successfully burned!');
+        onSuccess(finalResult);
+        
+      } else if (result.isSimulated) {
+        // Simulation mode fallback
+        setBurnResult(result);
         setProcessingStatus('✨ Burn simulation completed successfully');
-        setError(`Note: This was a simulation because tree authority permissions are required for actual cNFT burning. In production, only collection creators can burn cNFTs.`);
+        setError(`Note: This was a simulation because tree authority permissions are required for actual cNFT burning. The system will now use transfer-based burning instead.`);
+        onSuccess(result);
       } else {
-        setProcessingStatus('🔥 cNFT successfully burned on-chain!');
+        // Other success cases
+        setBurnResult(result);
+        setProcessingStatus('🔥 cNFT successfully burned!');
+        onSuccess(result);
       }
-
-      // Call success callback
-      onSuccess(result);
 
     } catch (err: any) {
       console.error('Error burning cNFT:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to burn cNFT';
+      let errorMessage = 'Failed to burn cNFT';
+      
+      if (err.message?.includes('User rejected') || err.message?.includes('cancelled')) {
+        errorMessage = 'Transaction cancelled by user';
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       onError(errorMessage);
     } finally {

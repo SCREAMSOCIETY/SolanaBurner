@@ -2002,12 +2002,23 @@ fastify.post('/api/cnft/burn-request', async (request, reply) => {
     );
     
     if (result.success) {
-      if (result.isSimulated) {
+      if (result.requiresClientSigning) {
+        fastify.log.info(`[TRANSACTION] Prepared burn transaction for client signing: ${assetId}`);
+        return reply.code(200).send({
+          success: true,
+          requiresClientSigning: true,
+          transaction: result.transaction,
+          message: "Transaction prepared for wallet signing",
+          burnAddress: result.burnAddress || process.env.PROJECT_WALLET || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK",
+          assetDetails: result.assetDetails
+        });
+      } else if (result.isSimulated) {
         fastify.log.info(`[TRANSACTION] Simulating burn process for ${assetId}`);
+        return reply.code(200).send(result);
       } else {
         fastify.log.info(`[TRANSACTION] Successfully burned ${assetId} with signature: ${result.signature}`);
+        return reply.code(200).send(result);
       }
-      return reply.code(200).send(result);
     } else {
       fastify.log.error(`[TRANSACTION] Failed to burn ${assetId}: ${result.error}`);
       return reply.code(500).send(result);

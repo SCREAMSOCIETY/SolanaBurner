@@ -2386,13 +2386,11 @@ const WalletAssets: React.FC = () => {
                     </div>
                   </div>
                   
-                  {console.log(`[WalletAssets] cNFT ${cnft.mint.slice(0, 8)}: bulkBurnMode=${bulkBurnMode}, showing burn button=${!bulkBurnMode}`)}
                   {!bulkBurnMode && (
                     <button 
                       className="burn-button cnft-burn" 
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log(`[WalletAssets] cNFT burn button clicked for ${cnft.mint}`);
                         setSelectedCnftForBurn({
                           id: cnft.mint,
                           name: cnft.name || `cNFT ${cnft.mint.slice(0, 8)}...`,
@@ -2400,7 +2398,7 @@ const WalletAssets: React.FC = () => {
                         });
                         setCnftBurnModalOpen(true);
                       }}
-                      title="Burn this compressed NFT (requires tree authority permissions)"
+                      title="Burn this compressed NFT by transferring to burn address"
                     >
                       🔥 Burn
                     </button>
