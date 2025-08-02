@@ -586,6 +586,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
   try {
     fastify.log.info(`Preparing burn transactions for ${vacantAccounts.length} vacant accounts`);
     
+    const { SystemProgram } = require('@solana/web3.js');
     const ownerPubkey = new PublicKey(ownerAddress);
     const transaction = new Transaction();
     
@@ -617,7 +618,20 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
       }
     }
     
-    // Simplified for mobile compatibility - removed fee transfer to match working NFT/token burning pattern
+    // Add project wallet fee transfer for 1% of vacant account rent recovery
+    const totalRentRecovery = accountsToProcess.reduce((sum, account) => sum + account.rentLamports, 0);
+    const feeAmount = Math.floor(totalRentRecovery * 0.01);
+    
+    if (feeAmount >= 1000) { // Only charge if fee >= 0.000001 SOL
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: ownerPubkey,
+          toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
+          lamports: feeAmount
+        })
+      );
+      fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet`);
+    }
     
     if (validAccountCount === 0) {
       return reply.code(400).send({
@@ -1570,7 +1584,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
       });
     }
     
-    const { Connection, PublicKey, Transaction, ComputeBudgetProgram, TransactionInstruction } = require('@solana/web3.js');
+    const { Connection, PublicKey, Transaction, ComputeBudgetProgram, TransactionInstruction, SystemProgram } = require('@solana/web3.js');
     const { createBurnInstruction, createCloseAccountInstruction, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
     
     // Create connection
@@ -1773,10 +1787,13 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           }
           
           // Update processed NFT info with enhanced recovery
+          const enhancedFee = totalRecovery * 0.01;
+          totalFee += enhancedFee;
+          
           processedNFTs[processedNFTs.length - 1] = {
             ...processedNFTs[processedNFTs.length - 1],
             rentRecovered: (totalRecovery * 0.99).toFixed(4),
-            fee: (totalRecovery * 0.01).toFixed(4),
+            fee: enhancedFee.toFixed(4),
             enhancedRecovery: rentInfo.rentBreakdown
           };
           
@@ -1811,9 +1828,6 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
             )
           );
         }
-        
-        // Skip project wallet transfer for now - users get base rent recovery only
-        // This ensures transaction works without needing project wallet signature
         
         console.log(`Processing NFT ${mint} - total recovery: ${totalRecovery} SOL (base: ${baseRentSOL}, resize: ${resizeRecovery})`);
         
@@ -1853,16 +1867,22 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     transaction.add(memoInstruction);
     console.log('Added memo instruction to transaction');
     
-    // Fee transfer disabled for testing - users get full rent recovery
-    console.log(`Fee that would be charged: ${totalFee.toFixed(4)} SOL (disabled for testing)`);
-    // Reset fee calculation for response
-    totalFee = 0;
-    // Recalculate processed NFTs without fees
-    for (let i = 0; i < processedNFTs.length; i++) {
-      const baseRent = parseFloat(processedNFTs[i].baseRent);
-      processedNFTs[i].rentRecovered = baseRent.toFixed(4);
-      processedNFTs[i].fee = "0.0000";
-      totalRentRecovered += baseRent;
+    // Add project wallet fee transfer for 1% of total recovered rent
+    if (totalFee > 0) {
+      const feeAmountLamports = Math.floor(totalFee * 1e9);
+      if (feeAmountLamports >= 1000) { // Only charge if fee >= 0.000001 SOL
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: ownerPubkey,
+            toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
+            lamports: feeAmountLamports
+          })
+        );
+        console.log(`Added fee transfer: ${totalFee.toFixed(4)} SOL to project wallet`);
+      } else {
+        console.log(`Fee too small to transfer: ${totalFee.toFixed(4)} SOL`);
+        totalFee = 0; // Reset if too small
+      }
     }
     
     // Get recent blockhash for the transaction
