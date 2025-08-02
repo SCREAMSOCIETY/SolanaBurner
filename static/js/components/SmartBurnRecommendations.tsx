@@ -35,6 +35,9 @@ export const SmartBurnRecommendations: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
+  const [showMoreHigh, setShowMoreHigh] = useState(false);
+  const [showMoreMedium, setShowMoreMedium] = useState(false);
+  const [showMoreDoNotBurn, setShowMoreDoNotBurn] = useState(false);
 
   useEffect(() => {
     if (publicKey) {
@@ -155,7 +158,17 @@ export const SmartBurnRecommendations: React.FC = () => {
                 <div className="priority-section">
                   <h4>🔥 High Priority ({recommendations.highPriority.length})</h4>
                   <div className="priority-description">These assets are strongly recommended for burning</div>
-                  {recommendations.highPriority.map(asset => renderAsset(asset))}
+                  {recommendations.highPriority
+                    .slice(0, showMoreHigh ? recommendations.highPriority.length : 3)
+                    .map(asset => renderAsset(asset))}
+                  {recommendations.highPriority.length > 3 && (
+                    <button 
+                      className="show-more-button" 
+                      onClick={() => setShowMoreHigh(!showMoreHigh)}
+                    >
+                      {showMoreHigh ? `Show Less` : `Show ${recommendations.highPriority.length - 3} More`}
+                    </button>
+                  )}
                 </div>
               )}
               
@@ -163,7 +176,17 @@ export const SmartBurnRecommendations: React.FC = () => {
                 <div className="priority-section">
                   <h4>📊 Medium Priority ({recommendations.mediumPriority.length})</h4>
                   <div className="priority-description">Consider burning these for additional recovery</div>
-                  {recommendations.mediumPriority.map(asset => renderAsset(asset))}
+                  {recommendations.mediumPriority
+                    .slice(0, showMoreMedium ? recommendations.mediumPriority.length : 2)
+                    .map(asset => renderAsset(asset))}
+                  {recommendations.mediumPriority.length > 2 && (
+                    <button 
+                      className="show-more-button" 
+                      onClick={() => setShowMoreMedium(!showMoreMedium)}
+                    >
+                      {showMoreMedium ? `Show Less` : `Show ${recommendations.mediumPriority.length - 2} More`}
+                    </button>
+                  )}
                 </div>
               )}
               
@@ -171,7 +194,17 @@ export const SmartBurnRecommendations: React.FC = () => {
                 <div className="priority-section warning-section">
                   <h4>⛔ Do Not Burn ({recommendations.doNotBurn.length})</h4>
                   <div className="priority-description">These assets have value and should be kept</div>
-                  {recommendations.doNotBurn.map(asset => renderAsset(asset, true))}
+                  {recommendations.doNotBurn
+                    .slice(0, showMoreDoNotBurn ? recommendations.doNotBurn.length : 2)
+                    .map(asset => renderAsset(asset, true))}
+                  {recommendations.doNotBurn.length > 2 && (
+                    <button 
+                      className="show-more-button warning-button" 
+                      onClick={() => setShowMoreDoNotBurn(!showMoreDoNotBurn)}
+                    >
+                      {showMoreDoNotBurn ? `Show Less` : `Show ${recommendations.doNotBurn.length - 2} More`}
+                    </button>
+                  )}
                 </div>
               )}
               
@@ -357,6 +390,34 @@ export const SmartBurnRecommendations: React.FC = () => {
         .refresh-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+        
+        .show-more-button {
+          background: rgba(255, 255, 255, 0.1);
+          color: #ccc;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+          margin-top: 10px;
+          transition: all 0.2s;
+          width: 100%;
+        }
+        
+        .show-more-button:hover {
+          background: rgba(255, 255, 255, 0.15);
+          color: #fff;
+        }
+        
+        .show-more-button.warning-button {
+          background: rgba(244, 67, 54, 0.1);
+          color: #f44336;
+          border-color: rgba(244, 67, 54, 0.3);
+        }
+        
+        .show-more-button.warning-button:hover {
+          background: rgba(244, 67, 54, 0.2);
         }
         
         .loading-state,
