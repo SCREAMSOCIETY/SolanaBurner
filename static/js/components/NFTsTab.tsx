@@ -474,6 +474,16 @@ const NFTsTab: React.FC = () => {
   return (
     <div className="container">
       <h2>NFTs</h2>
+      {nfts.length > 0 && (
+        <div className="selection-help">
+          <span className="help-text">
+            {selectedNfts.size === 0 
+              ? "Click the checkboxes to select NFTs for bulk burning" 
+              : `${selectedNfts.size} NFT${selectedNfts.size > 1 ? 's' : ''} selected`
+            }
+          </span>
+        </div>
+      )}
       {selectedNfts.size > 0 && (
         <div className="bulk-actions">
           <button 
@@ -481,7 +491,14 @@ const NFTsTab: React.FC = () => {
             onClick={handleBulkBurn}
             disabled={burning}
           >
-            {burning ? 'Burning...' : `Burn Selected (${selectedNfts.size})`}
+            {burning ? 'Burning...' : `🔥 Burn Selected (${selectedNfts.size})`}
+          </button>
+          <button 
+            className="clear-selection-btn"
+            onClick={() => setSelectedNfts(new Set())}
+            disabled={burning}
+          >
+            Clear Selection
           </button>
         </div>
       )}
@@ -515,6 +532,7 @@ const NFTsTab: React.FC = () => {
                         checked={selectedNfts.has(nft.mint)}
                         onChange={() => toggleNftSelection(nft.mint)}
                         className="nft-select"
+                        title="Select this NFT for bulk burning"
                       />
                     </div>
                     <div className="nft-image-wrapper">

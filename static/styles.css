@@ -715,14 +715,16 @@ h3 {
 .nft-header,
 .cnft-header {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 8px;
+    left: 8px;
     z-index: 10;
-    background: rgba(0, 0, 0, 0.8);
-    padding: 5px;
-    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 8px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
+    border: 2px solid rgba(153, 69, 255, 0.3);
+    backdrop-filter: blur(5px);
 }
 
 .nft-actions,
@@ -742,10 +744,18 @@ h3 {
 
 .nft-card.selected,
 .token-card.selected {
-    border: 2px solid var(--primary-color);
-    box-shadow: 0 0 15px rgba(153, 69, 255, 0.3);
-    background: rgba(153, 69, 255, 0.1);
-    transform: scale(1.02);
+    border: 3px solid var(--primary-color);
+    box-shadow: 0 0 20px rgba(153, 69, 255, 0.5);
+    background: rgba(153, 69, 255, 0.15);
+    transform: scale(1.03);
+}
+
+/* Make cards selectable on click */
+.nft-card:hover,
+.token-card:hover {
+    cursor: pointer;
+    border-color: rgba(153, 69, 255, 0.5);
+    box-shadow: 0 4px 15px rgba(153, 69, 255, 0.2);
 }
 
 .nft-image-wrapper,
@@ -1378,19 +1388,50 @@ p {
 .token-select,
 .nft-select {
   margin-right: 1rem;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
   accent-color: var(--primary-color);
-  transform: scale(1.2);
-  border: 2px solid var(--primary-color);
-  border-radius: 4px;
+  transform: scale(1.3);
+  border: 3px solid var(--primary-color);
+  border-radius: 6px;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.3);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.token-select::before,
+.nft-select::before {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .token-select:checked,
 .nft-select:checked {
   background-color: var(--primary-color);
   border-color: var(--primary-color);
+  box-shadow: 0 0 10px rgba(153, 69, 255, 0.5);
+}
+
+.token-select:checked::before,
+.nft-select:checked::before {
+  opacity: 1;
+}
+
+.token-select:hover,
+.nft-select:hover {
+  border-color: var(--primary-color);
+  background-color: rgba(153, 69, 255, 0.2);
+  transform: scale(1.4);
 }
 
 .bulk-actions {
@@ -1422,6 +1463,45 @@ p {
 }
 
 .bulk-burn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.selection-help {
+  margin-bottom: 20px;
+  text-align: center;
+  background: rgba(153, 69, 255, 0.1);
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(153, 69, 255, 0.3);
+}
+
+.help-text {
+  color: var(--primary-color);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.clear-selection-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 12px 24px;
+  margin-left: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.clear-selection-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.clear-selection-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;

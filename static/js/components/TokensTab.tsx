@@ -576,6 +576,16 @@ const TokensTab: React.FC = () => {
   return (
     <div className="container">
       <h2>Tokens</h2>
+      {tokens.length > 0 && (
+        <div className="selection-help">
+          <span className="help-text">
+            {selectedTokens.size === 0 
+              ? "Click the checkboxes to select tokens for bulk burning" 
+              : `${selectedTokens.size} token${selectedTokens.size > 1 ? 's' : ''} selected`
+            }
+          </span>
+        </div>
+      )}
       {selectedTokens.size > 0 && (
         <div className="bulk-actions">
           <button 
@@ -583,7 +593,14 @@ const TokensTab: React.FC = () => {
             onClick={handleBulkBurn}
             disabled={burning}
           >
-            {burning ? 'Burning...' : `Burn Selected (${selectedTokens.size})`}
+            {burning ? 'Burning...' : `🔥 Burn Selected (${selectedTokens.size})`}
+          </button>
+          <button 
+            className="clear-selection-btn"
+            onClick={() => setSelectedTokens(new Set())}
+            disabled={burning}
+          >
+            Clear Selection
           </button>
         </div>
       )}
@@ -610,6 +627,7 @@ const TokensTab: React.FC = () => {
                   checked={selectedTokens.has(token.mint)}
                   onChange={() => toggleTokenSelection(token.mint)}
                   className="token-select"
+                  title="Select this token for bulk burning"
                 />
                 <div className="token-icon-wrapper">
                   <img 
