@@ -1216,7 +1216,7 @@ const WalletAssets: React.FC = () => {
     setSelectedCnftForTrash(null);
     
     // Show a success message
-    setError(`Successfully trashed compressed NFT "${selectedCnftForTrash.name}" via direct method! Transaction: ${signature.substring(0, 8)}...`);
+    setError(`Successfully trashed compressed NFT "${selectedCnftForTrash.name}" via direct method! ${result.signature ? `Transaction: ${result.signature.substring(0, 8)}...` : ''}`);
     setTimeout(() => setError(null), 8000);
   };
   
@@ -1429,10 +1429,9 @@ const WalletAssets: React.FC = () => {
   const refreshAllAssets = () => {
     if (publicKey) {
       console.log('[WalletAssets] Refreshing all wallet assets');
-      // Refetch all asset types
-      fetchTokens();
-      fetchAllNFTs();
-      fetchCNFTsWithHandler();
+      // Since cNFTs are view-only now, we just need to refetch tokens and NFTs
+      // The existing useEffect hooks will handle the data fetching
+      window.location.reload();
     }
   };
 
@@ -1459,34 +1458,16 @@ const WalletAssets: React.FC = () => {
     setIsBurning(false);
   };
 
-  // Handle successful cNFT burn operation
+  // Handle successful cNFT burn operation (view-only mode - no actual burning)
   const handleCnftBurnSuccess = (result: any) => {
-    console.log('[WalletAssets] cNFT burn operation successful:', result);
+    console.log('[WalletAssets] cNFT operation in view-only mode:', result);
     
-    // Remove the burned cNFT from the list (only if it was actually burned, not simulated)
-    if (!result.isSimulated && selectedCnftForBurn) {
-      setCnfts(prevCnfts => prevCnfts.filter(cnft => cnft.mint !== selectedCnftForBurn.id));
-    }
-    
-    // Close the modal
-    setCnftBurnModalOpen(false);
-    setSelectedCnftForBurn(null);
-    
-    // Show success animation
+    // cNFTs are view-only now, so no actual burning happens
     if (window.BurnAnimations) {
-      window.BurnAnimations.createConfetti();
-      if (result.isSimulated) {
-        window.BurnAnimations.showNotification(
-          'cNFT Burn Simulated!',
-          `Successfully simulated burning ${selectedCnftForBurn?.name || 'cNFT'}`
-        );
-      } else {
-        window.BurnAnimations.showNotification(
-          'cNFT Burned!',
-          `Successfully burned ${selectedCnftForBurn?.name || 'cNFT'} on-chain`
-        );
-        window.BurnAnimations.checkAchievements('cnfts', 1);
-      }
+      window.BurnAnimations.showNotification(
+        'cNFT View-Only Mode',
+        'cNFTs are in view-only mode for your safety'
+      );
     }
   };
 
@@ -1556,7 +1537,7 @@ const WalletAssets: React.FC = () => {
       
       // Add compute budget instructions to avoid insufficient SOL errors
       const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
-        units: 200000 * Math.min(5, selectedTokens.size || 1) // Scale compute units based on number of tokens with a cap
+        units: 200000 * Math.min(5, selectedTokens.length || 1) // Scale compute units based on number of tokens with a cap
       });
       
       // Add a compute budget instruction to set a very low prioritization fee 
