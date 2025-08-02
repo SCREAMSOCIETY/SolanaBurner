@@ -248,23 +248,30 @@ async function transferCNFTToBurnAddress(ownerAddress, assetId, burnAddress, pro
       BUBBLEGUM_PROGRAM_ID
     );
     
-    // Build the transfer instruction using mpl-bubblegum
-    const transferIx = mplBubblegum.createTransferInstruction({
-      merkleTree: treeAddress,
-      treeAuthority: treeAuthority,
-      leafOwner: ownerPubkey,
-      leafDelegate: ownerPubkey,
-      newLeafOwner: newOwnerPubkey,
-      // Convert proof data formats
-      root: Buffer.from(proofData.root, 'base64'),
-      dataHash: Buffer.from(assetData.compression.data_hash, 'base64'),
-      creatorHash: Buffer.from(assetData.compression.creator_hash, 'base64'),
-      nonce: assetData.compression.leaf_id,
-      index: assetData.compression.leaf_id,
-      proof: proofData.proof.map(p => new PublicKey(p)),
-    }, {
-      bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
-    });
+    // Build the transfer instruction using mpl-bubblegum v4.4.0 API
+    const transferIx = mplBubblegum.transfer(
+      {
+        merkleTree: treeAddress,
+        treeAuthority: treeAuthority,
+        leafOwner: ownerPubkey,
+        leafDelegate: ownerPubkey,
+        newLeafOwner: newOwnerPubkey,
+        logWrapper: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
+        compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+        anchorRemainingAccounts: proofData.proof.map(p => ({
+          pubkey: new PublicKey(p),
+          isSigner: false,
+          isWritable: false
+        }))
+      },
+      {
+        root: [...Buffer.from(proofData.root, 'base64')],
+        dataHash: [...Buffer.from(assetData.compression.data_hash, 'base64')],
+        creatorHash: [...Buffer.from(assetData.compression.creator_hash, 'base64')],
+        nonce: assetData.compression.leaf_id,
+        index: assetData.compression.leaf_id
+      }
+    );
     
     // Create a transaction with compute budget
     const transaction = new Transaction()
