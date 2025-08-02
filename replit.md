@@ -95,6 +95,12 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
 
 ## Changelog
 
+- January 17, 2025: RESOLVED ALL FEE INCONSISTENCIES - Complete 1% fee structure implementation:
+  - Fixed batch NFT burn endpoint that had fees disabled for testing
+  - Fixed vacant account burning endpoint that had fees completely removed 
+  - All burning endpoints now consistently charge 1% fee to project wallet `EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK`
+  - Complete fee structure: Single NFT burn, batch NFT burn, and vacant account burn all properly configured
+  - cNFT burning remains fee-free (appropriate since cNFTs don't return rent)
 - January 17, 2025: Implemented enhanced NFT burning to match competitor rates:
   - Integrated Metaplex burnNft instruction to close all associated accounts (token, metadata, edition)
   - Enhanced rent recovery from ~0.002 SOL to ~0.0077 SOL per NFT (matching Sol Incinerator)
