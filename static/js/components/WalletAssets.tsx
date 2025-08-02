@@ -2183,7 +2183,27 @@ const WalletAssets: React.FC = () => {
               />
               <h2>Your Wallet Assets</h2>
             </div>
-            <WalletMultiButton />
+            <div className="header-right">
+              <button 
+                className={`bulk-mode-toggle ${bulkBurnMode ? 'active' : ''}`}
+                onClick={toggleBulkBurnMode}
+                style={{
+                  backgroundColor: bulkBurnMode ? '#9945FF' : 'transparent',
+                  color: bulkBurnMode ? 'white' : '#9945FF',
+                  border: '2px solid #9945FF',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  marginRight: '15px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {bulkBurnMode ? '✓ Bulk Mode ON' : 'Bulk Select Mode'}
+              </button>
+              <WalletMultiButton />
+            </div>
           </div>
           
           <RentEstimate 
@@ -2198,6 +2218,22 @@ const WalletAssets: React.FC = () => {
           {/* Advanced Rent Optimization */}
           <RentOptimization />
           
+          {/* Bulk Mode Instructions */}
+          {bulkBurnMode && (
+            <div className="bulk-mode-instructions" style={{
+              backgroundColor: '#9945FF',
+              color: 'white',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              marginBottom: '20px',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}>
+              🔥 Bulk Mode Active! Click on NFT cards to see selection checkboxes and select multiple items for bulk burning.
+            </div>
+          )}
+
           {/* Bulk Burn Selection Panel - Always Visible */}
           {publicKey && (
             <div className="bulk-burn-section">
@@ -2318,6 +2354,41 @@ const WalletAssets: React.FC = () => {
                   data-mint={nft.mint}
                   onClick={bulkBurnMode ? () => handleNFTSelection(nft.mint) : undefined}
                 >
+                  {bulkBurnMode && (
+                    <div className="nft-header" style={{
+                      position: 'absolute',
+                      top: '8px',
+                      left: '8px',
+                      zIndex: 1000,
+                      backgroundColor: 'rgba(153, 69, 255, 0.9)',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      border: '2px solid #9945FF',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedNFTs.includes(nft.mint)}
+                        onChange={() => handleNFTSelection(nft.mint)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          cursor: 'pointer',
+                          accentColor: '#9945FF'
+                        }}
+                      />
+                      <span style={{
+                        color: 'white',
+                        fontSize: '11px',
+                        marginLeft: '4px',
+                        fontWeight: 'bold'
+                      }}>
+                        Select
+                      </span>
+                    </div>
+                  )}
                   <div className="nft-info">
                     <img 
                       src={nft.image || '/default-nft-image.svg'} 
