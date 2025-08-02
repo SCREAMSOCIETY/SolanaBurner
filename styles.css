@@ -195,4 +195,172 @@ button[type="submit"]:disabled {
         opacity: 1;
         transform: translateY(0);
     }
+}.cnft-burn-modal {
+  max-width: 500px;
+  width: 90%;
+}
+
+.cnft-burn-modal .asset-preview {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.cnft-burn-modal .asset-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid #ddd;
+}
+
+.cnft-burn-modal .asset-info h4 {
+  margin: 0 0 5px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.cnft-burn-modal .asset-id {
+  margin: 0;
+  color: #666;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.cnft-burn-modal .burn-notice {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.cnft-burn-modal .burn-notice h4 {
+  margin: 0 0 10px 0;
+  color: #856404;
+  font-size: 14px;
+}
+
+.cnft-burn-modal .burn-notice ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.cnft-burn-modal .burn-notice li {
+  margin-bottom: 5px;
+  font-size: 13px;
+  color: #856404;
+}
+
+.cnft-burn-modal .processing-status {
+  background: #d1ecf1;
+  border: 1px solid #bee5eb;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.cnft-burn-modal .processing-status p {
+  margin: 0;
+  color: #0c5460;
+  font-weight: 500;
+}
+
+.cnft-burn-modal .error-message {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+.cnft-burn-modal .error-message p {
+  margin: 0;
+  color: #721c24;
+  font-size: 13px;
+}
+
+.cnft-burn-modal .burn-result {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.cnft-burn-modal .simulation-result h4,
+.cnft-burn-modal .success-result h4 {
+  margin: 0 0 10px 0;
+  color: #155724;
+  font-size: 16px;
+}
+
+.cnft-burn-modal .simulation-result p,
+.cnft-burn-modal .success-result p {
+  margin: 5px 0;
+  color: #155724;
+  font-size: 13px;
+}
+
+.cnft-burn-modal .success-result a {
+  color: #155724;
+  text-decoration: underline;
+}
+
+.cnft-burn-modal .success-result a:hover {
+  color: #0a3d2e;
+}
+
+.cnft-burn-modal .btn-danger {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.cnft-burn-modal .btn-danger:hover:not(:disabled) {
+  background: #c82333;
+  border-color: #bd2130;
+}
+
+.cnft-burn-modal .btn-danger:disabled {
+  background: #6c757d;
+  border-color: #6c757d;
+  opacity: 0.6;
+}
+
+/* cNFT Burn Button Styling */
+.burn-button.cnft-burn {
+  background: linear-gradient(135deg, #ff6b35, #ff8c42);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(255, 107, 53, 0.3);
+}
+
+.burn-button.cnft-burn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e55a2e, #e67d38);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(255, 107, 53, 0.4);
+}
+
+.burn-button.cnft-burn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(255, 107, 53, 0.3);
+}
+
+.burn-button.cnft-burn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }

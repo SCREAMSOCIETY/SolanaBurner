@@ -16,6 +16,7 @@ import { CNFTHandler } from '../cnft-handler';
 import DirectTrashModal from './DirectTrashModal';
 import QueueTransferModal from './QueueTransferModal';
 import DelegatedTransferModal from './DelegatedTransferModal';
+import CNFTBurnModal from './CNFTBurnModal';
 import RentEstimate from './RentEstimate';
 import { SmartBurnRecommendations } from './SmartBurnRecommendations';
 import { RentOptimization } from './RentOptimization';
@@ -165,6 +166,10 @@ const WalletAssets: React.FC = () => {
   // State for Delegated Transfer Modal
   const [delegatedTransferModalOpen, setDelegatedTransferModalOpen] = useState<boolean>(false);
   const [selectedCnftForDelegatedTransfer, setSelectedCnftForDelegatedTransfer] = useState<{ id: string; name: string; image?: string } | null>(null);
+  
+  // State for cNFT Burn Modal
+  const [cnftBurnModalOpen, setCnftBurnModalOpen] = useState<boolean>(false);
+  const [selectedCnftForBurn, setSelectedCnftForBurn] = useState<{ id: string; name: string; image?: string } | null>(null);
   
   // Fetch API key on component load
   useEffect(() => {
@@ -1455,6 +1460,49 @@ const WalletAssets: React.FC = () => {
     // Set burning state to false
     setIsBurning(false);
   };
+
+  // Handle successful cNFT burn operation
+  const handleCnftBurnSuccess = (result: any) => {
+    console.log('[WalletAssets] cNFT burn operation successful:', result);
+    
+    // Remove the burned cNFT from the list (only if it was actually burned, not simulated)
+    if (!result.isSimulated && selectedCnftForBurn) {
+      setCnfts(prevCnfts => prevCnfts.filter(cnft => cnft.mint !== selectedCnftForBurn.id));
+    }
+    
+    // Close the modal
+    setCnftBurnModalOpen(false);
+    setSelectedCnftForBurn(null);
+    
+    // Show success animation
+    if (window.BurnAnimations) {
+      window.BurnAnimations.createConfetti();
+      if (result.isSimulated) {
+        window.BurnAnimations.showNotification(
+          'cNFT Burn Simulated!',
+          `Successfully simulated burning ${selectedCnftForBurn?.name || 'cNFT'}`
+        );
+      } else {
+        window.BurnAnimations.showNotification(
+          'cNFT Burned!',
+          `Successfully burned ${selectedCnftForBurn?.name || 'cNFT'} on-chain`
+        );
+        window.BurnAnimations.checkAchievements('cnfts', 1);
+      }
+    }
+  };
+
+  // Handle cNFT burn error
+  const handleCnftBurnError = (error: string) => {
+    console.error('[WalletAssets] cNFT burn operation failed:', error);
+    
+    if (window.BurnAnimations) {
+      window.BurnAnimations.showNotification(
+        'cNFT Burn Failed',
+        `Failed to burn cNFT: ${error}`
+      );
+    }
+  };
   
   // Toggle bulk burn mode
   const toggleBulkBurnMode = () => {
@@ -2337,6 +2385,24 @@ const WalletAssets: React.FC = () => {
                       {cnft.collection && <div className="nft-collection">{cnft.collection}</div>}
                     </div>
                   </div>
+                  
+                  {!bulkBurnMode && (
+                    <button 
+                      className="burn-button cnft-burn" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCnftForBurn({
+                          id: cnft.mint,
+                          name: cnft.name || `cNFT ${cnft.mint.slice(0, 8)}...`,
+                          image: cnft.image
+                        });
+                        setCnftBurnModalOpen(true);
+                      }}
+                      title="Burn this compressed NFT (requires tree authority permissions)"
+                    >
+                      🔥 Burn
+                    </button>
+                  )}
 
                   {bulkBurnMode && (
                     <div className="selection-indicator">
@@ -2386,6 +2452,19 @@ const WalletAssets: React.FC = () => {
           selectedAssets={selectedCnftsForQueueTransfer}
           wallet={publicKey ? publicKey.toString() : ''}
           onSuccess={handleQueueTransferSuccess}
+        />
+      )}
+
+      {/* CNFTBurnModal for real cNFT burning */}
+      {cnftBurnModalOpen && selectedCnftForBurn && (
+        <CNFTBurnModal
+          isOpen={cnftBurnModalOpen}
+          onClose={() => setCnftBurnModalOpen(false)}
+          assetId={selectedCnftForBurn.id}
+          assetName={selectedCnftForBurn.name}
+          assetImage={selectedCnftForBurn.image || '/default-nft-image.svg'}
+          onSuccess={handleCnftBurnSuccess}
+          onError={handleCnftBurnError}
         />
       )}
     </div>
