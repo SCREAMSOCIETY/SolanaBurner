@@ -16,7 +16,7 @@ import { CNFTHandler } from '../cnft-handler';
 import DirectTrashModal from './DirectTrashModal';
 import QueueTransferModal from './QueueTransferModal';
 import DelegatedTransferModal from './DelegatedTransferModal';
-import CNFTBurnModal from './CNFTBurnModal';
+// CNFTBurnModal removed - cNFTs are view-only
 import RentEstimate from './RentEstimate';
 import { SmartBurnRecommendations } from './SmartBurnRecommendations';
 import { RentOptimization } from './RentOptimization';
@@ -167,9 +167,7 @@ const WalletAssets: React.FC = () => {
   const [delegatedTransferModalOpen, setDelegatedTransferModalOpen] = useState<boolean>(false);
   const [selectedCnftForDelegatedTransfer, setSelectedCnftForDelegatedTransfer] = useState<{ id: string; name: string; image?: string } | null>(null);
   
-  // State for cNFT Burn Modal
-  const [cnftBurnModalOpen, setCnftBurnModalOpen] = useState<boolean>(false);
-  const [selectedCnftForBurn, setSelectedCnftForBurn] = useState<{ id: string; name: string; image?: string } | null>(null);
+  // cNFT Burn Modal removed - cNFTs are view-only
   
   // Fetch API key on component load
   useEffect(() => {
@@ -2443,18 +2441,7 @@ const WalletAssets: React.FC = () => {
         />
       )}
 
-      {/* CNFTBurnModal for real cNFT burning */}
-      {cnftBurnModalOpen && selectedCnftForBurn && (
-        <CNFTBurnModal
-          isOpen={cnftBurnModalOpen}
-          onClose={() => setCnftBurnModalOpen(false)}
-          assetId={selectedCnftForBurn.id}
-          assetName={selectedCnftForBurn.name}
-          assetImage={selectedCnftForBurn.image || '/default-nft-image.svg'}
-          onSuccess={handleCnftBurnSuccess}
-          onError={handleCnftBurnError}
-        />
-      )}
+      {/* CNFTBurnModal removed - cNFTs are view-only */}
     </div>
   );
 };
