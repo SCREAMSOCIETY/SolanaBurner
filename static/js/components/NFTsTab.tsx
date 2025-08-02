@@ -476,11 +476,20 @@ const NFTsTab: React.FC = () => {
     <div className="container">
       <h2>NFTs</h2>
       {nfts.length > 0 && (
-        <div className="selection-help">
+        <div className="selection-help" style={{
+          backgroundColor: '#9945FF',
+          color: 'white',
+          padding: '15px',
+          borderRadius: '10px',
+          textAlign: 'center',
+          marginBottom: '20px',
+          fontSize: '16px',
+          fontWeight: 'bold'
+        }}>
           <span className="help-text">
             {selectedNfts.size === 0 
-              ? "Click the checkboxes to select NFTs for bulk burning" 
-              : `${selectedNfts.size} NFT${selectedNfts.size > 1 ? 's' : ''} selected`
+              ? "🔥 Click the PURPLE BOXES on NFT cards to select them for bulk burning!" 
+              : `✅ ${selectedNfts.size} NFT${selectedNfts.size > 1 ? 's' : ''} selected - Ready to burn!`
             }
           </span>
         </div>
@@ -527,14 +536,36 @@ const NFTsTab: React.FC = () => {
                     className={`asset-card nft-card ${selectedNfts.has(nft.mint) ? 'selected' : ''}`}
                     data-mint={nft.mint}
                   >
-                    <div className="nft-header">
+                    <div className="nft-header" style={{
+                      position: 'absolute',
+                      top: '5px',
+                      left: '5px',
+                      zIndex: 1000,
+                      backgroundColor: 'rgba(153, 69, 255, 0.9)',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: '2px solid #9945FF'
+                    }}>
                       <input
                         type="checkbox"
                         checked={selectedNfts.has(nft.mint)}
                         onChange={() => toggleNftSelection(nft.mint)}
                         className="nft-select"
                         title="Select this NFT for bulk burning"
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          cursor: 'pointer',
+                          accentColor: '#9945FF'
+                        }}
                       />
+                      <span style={{
+                        color: 'white',
+                        fontSize: '12px',
+                        marginLeft: '5px'
+                      }}>
+                        Select
+                      </span>
                     </div>
                     <div className="nft-image-wrapper">
                       <img 
