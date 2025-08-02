@@ -97,41 +97,55 @@ export const RentOptimization: React.FC = () => {
     return amount.toFixed(4);
   };
 
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'resize-all':
-        // Scroll to NFT section and highlight resize options
-        const nftSection = document.querySelector('.nft-section');
-        if (nftSection) {
-          nftSection.scrollIntoView({ behavior: 'smooth' });
-          // Flash highlight effect
-          nftSection.classList.add('highlight-flash');
-          setTimeout(() => nftSection.classList.remove('highlight-flash'), 2000);
+  const getRecentActivity = () => {
+    // Get activity from localStorage
+    const storedActivity = localStorage.getItem('solburnt-recent-activity');
+    if (!storedActivity) {
+      // Return sample data for demonstration
+      return [
+        {
+          type: 'nft-burn',
+          title: 'NFT Burned',
+          description: 'Solana Monkey Business #1234',
+          recovery: 0.0077,
+          time: '2m ago',
+          timestamp: Date.now() - 2 * 60 * 1000
+        },
+        {
+          type: 'vacant-burn',
+          title: 'Vacant Accounts Cleared',
+          description: '3 empty token accounts',
+          recovery: 0.0061,
+          time: '15m ago',
+          timestamp: Date.now() - 15 * 60 * 1000
+        },
+        {
+          type: 'token-burn',
+          title: 'Token Burned',
+          description: 'DUST token (0 balance)',
+          recovery: 0.0020,
+          time: '1h ago',
+          timestamp: Date.now() - 60 * 60 * 1000
         }
-        break;
-      case 'burn-vacant':
-        // Scroll to vacant accounts section
-        const vacantSection = document.querySelector('.vacant-accounts-section');
-        if (vacantSection) {
-          vacantSection.scrollIntoView({ behavior: 'smooth' });
-          vacantSection.classList.add('highlight-flash');
-          setTimeout(() => vacantSection.classList.remove('highlight-flash'), 2000);
-        }
-        break;
-      case 'batch-tokens':
-        // Scroll to tokens section and highlight batch options
-        const tokenSection = document.querySelector('.token-section');
-        if (tokenSection) {
-          tokenSection.scrollIntoView({ behavior: 'smooth' });
-          tokenSection.classList.add('highlight-flash');
-          setTimeout(() => tokenSection.classList.remove('highlight-flash'), 2000);
-        }
-        break;
-      case 'analyze-deep':
-        // Trigger fresh analysis
-        fetchOptimization();
-        break;
+      ];
     }
+    
+    try {
+      const activity = JSON.parse(storedActivity);
+      // Filter to last 24 hours and sort by most recent
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+      return activity
+        .filter((item: any) => item.timestamp > oneDayAgo)
+        .sort((a: any, b: any) => b.timestamp - a.timestamp)
+        .slice(0, 10); // Show last 10 activities
+    } catch {
+      return [];
+    }
+  };
+
+  const getTotalRecoveredToday = () => {
+    const activities = getRecentActivity();
+    return activities.reduce((total: number, activity: any) => total + activity.recovery, 0);
   };
 
   if (!publicKey) return null;
@@ -155,41 +169,49 @@ export const RentOptimization: React.FC = () => {
           
           {optimization && !loading && (
             <>
-              {/* Quick Action Buttons */}
-              <div className="quick-actions-section">
-                <h4>⚡ Quick Actions</h4>
-                <div className="action-buttons-grid">
-                  <button className="action-button primary" onClick={() => handleQuickAction('resize-all')}>
-                    <div className="action-icon">📏</div>
-                    <div className="action-text">
-                      <div className="action-title">Resize All NFTs</div>
-                      <div className="action-desc">Optimize metadata first</div>
+              {/* Recent Activity Feed */}
+              <div className="recent-activity-section">
+                <h4>📈 Recent Activity</h4>
+                <div className="activity-feed">
+                  {getRecentActivity().length > 0 ? (
+                    getRecentActivity().map((activity, index) => (
+                      <div key={index} className="activity-item">
+                        <div className="activity-icon">
+                          {activity.type === 'nft-burn' && '🔥'}
+                          {activity.type === 'token-burn' && '💰'}
+                          {activity.type === 'vacant-burn' && '🗑️'}
+                          {activity.type === 'resize' && '📏'}
+                        </div>
+                        <div className="activity-details">
+                          <div className="activity-title">{activity.title}</div>
+                          <div className="activity-desc">{activity.description}</div>
+                        </div>
+                        <div className="activity-recovery">
+                          +{activity.recovery.toFixed(4)} SOL
+                        </div>
+                        <div className="activity-time">{activity.time}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-activity">
+                      <div className="no-activity-icon">💤</div>
+                      <div className="no-activity-text">
+                        <div>No recent activity</div>
+                        <div className="no-activity-desc">Your successful burns will appear here</div>
+                      </div>
                     </div>
-                  </button>
-                  
-                  <button className="action-button secondary" onClick={() => handleQuickAction('burn-vacant')}>
-                    <div className="action-icon">🗑️</div>
-                    <div className="action-text">
-                      <div className="action-title">Burn Vacant Accounts</div>
-                      <div className="action-desc">Quick SOL recovery</div>
-                    </div>
-                  </button>
-                  
-                  <button className="action-button tertiary" onClick={() => handleQuickAction('batch-tokens')}>
-                    <div className="action-icon">⚡</div>
-                    <div className="action-text">
-                      <div className="action-title">Batch Burn Tokens</div>
-                      <div className="action-desc">Process multiple at once</div>
-                    </div>
-                  </button>
-                  
-                  <button className="action-button quaternary" onClick={() => handleQuickAction('analyze-deep')}>
-                    <div className="action-icon">🔍</div>
-                    <div className="action-text">
-                      <div className="action-title">Deep Analysis</div>
-                      <div className="action-desc">Find hidden opportunities</div>
-                    </div>
-                  </button>
+                  )}
+                </div>
+                
+                <div className="activity-summary">
+                  <div className="summary-stat">
+                    <span className="stat-label">Total Recovered Today</span>
+                    <span className="stat-value">{getTotalRecoveredToday().toFixed(4)} SOL</span>
+                  </div>
+                  <div className="summary-stat">
+                    <span className="stat-label">Transactions</span>
+                    <span className="stat-value">{getRecentActivity().length}</span>
+                  </div>
                 </div>
               </div>
               
@@ -307,97 +329,120 @@ export const RentOptimization: React.FC = () => {
           margin-top: 20px;
         }
         
-        .quick-actions-section,
+        .recent-activity-section,
         .recovery-section,
         .recommendations-section,
         .strategy-section {
           margin-bottom: 30px;
         }
         
-        .action-buttons-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 15px;
+        .activity-feed {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 8px;
+          padding: 15px;
+          max-height: 300px;
+          overflow-y: auto;
         }
         
-        .action-button {
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          border-radius: 12px;
-          padding: 20px;
-          cursor: pointer;
-          transition: all 0.3s ease;
+        .activity-item {
           display: flex;
           align-items: center;
-          gap: 15px;
-          color: #fff;
-          text-align: left;
+          gap: 12px;
+          padding: 12px 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        .action-button:hover {
-          background: rgba(255, 255, 255, 0.12);
-          border-color: rgba(255, 255, 255, 0.25);
-          transform: translateY(-2px);
+        .activity-item:last-child {
+          border-bottom: none;
         }
         
-        .action-button.primary {
-          border-color: #4caf50;
-          background: rgba(76, 175, 80, 0.1);
-        }
-        
-        .action-button.primary:hover {
-          background: rgba(76, 175, 80, 0.15);
-          border-color: #4caf50;
-        }
-        
-        .action-button.secondary {
-          border-color: #ff6400;
-          background: rgba(255, 100, 0, 0.1);
-        }
-        
-        .action-button.secondary:hover {
-          background: rgba(255, 100, 0, 0.15);
-          border-color: #ff6400;
-        }
-        
-        .action-button.tertiary {
-          border-color: #2196f3;
-          background: rgba(33, 150, 243, 0.1);
-        }
-        
-        .action-button.tertiary:hover {
-          background: rgba(33, 150, 243, 0.15);
-          border-color: #2196f3;
-        }
-        
-        .action-button.quaternary {
-          border-color: #9c27b0;
-          background: rgba(156, 39, 176, 0.1);
-        }
-        
-        .action-button.quaternary:hover {
-          background: rgba(156, 39, 176, 0.15);
-          border-color: #9c27b0;
-        }
-        
-        .action-icon {
-          font-size: 32px;
+        .activity-icon {
+          font-size: 20px;
+          width: 32px;
+          text-align: center;
           flex-shrink: 0;
         }
         
-        .action-text {
+        .activity-details {
           flex: 1;
         }
         
-        .action-title {
-          font-size: 16px;
-          font-weight: 600;
-          margin-bottom: 4px;
+        .activity-title {
+          font-size: 14px;
+          font-weight: 500;
+          color: #fff;
+          margin-bottom: 2px;
         }
         
-        .action-desc {
-          font-size: 13px;
+        .activity-desc {
+          font-size: 12px;
           color: #999;
+        }
+        
+        .activity-recovery {
+          font-size: 14px;
+          font-weight: 600;
+          color: #4caf50;
+          margin-right: 10px;
+        }
+        
+        .activity-time {
+          font-size: 11px;
+          color: #666;
+          width: 60px;
+          text-align: right;
+          flex-shrink: 0;
+        }
+        
+        .no-activity {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+          text-align: center;
+          gap: 15px;
+        }
+        
+        .no-activity-icon {
+          font-size: 32px;
+          opacity: 0.5;
+        }
+        
+        .no-activity-text {
+          color: #999;
+        }
+        
+        .no-activity-desc {
+          font-size: 12px;
+          margin-top: 5px;
+          opacity: 0.7;
+        }
+        
+        .activity-summary {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          margin-top: 15px;
+          padding-top: 15px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .summary-stat {
+          text-align: center;
+        }
+        
+        .summary-stat .stat-label {
+          display: block;
+          font-size: 12px;
+          color: #999;
+          margin-bottom: 5px;
+        }
+        
+        .summary-stat .stat-value {
+          display: block;
+          font-size: 16px;
+          font-weight: 600;
+          color: #fff;
         }
         
         h4 {
