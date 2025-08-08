@@ -462,19 +462,64 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
           </small>
         </div>
         
-        {/* Vacant Account Burning Section - only show if there are vacant accounts */}
+        {/* PROMINENT Vacant Account Burning Section */}
         {rentData && rentData.vacantAccounts > 0 && rentData.breakdown.vacantRent > 0 && (
-          <div className="vacant-burn-section" style={{ marginTop: '15px', padding: '15px', border: '1px solid #444', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-            <div style={{ marginBottom: '10px' }}>
-              <strong>🔥 Recover Rent from Vacant Accounts</strong>
+          <div className="vacant-burn-section-prominent" style={{ 
+            marginTop: '25px', 
+            marginBottom: '20px',
+            padding: '20px', 
+            border: '3px solid #ff6600', 
+            borderRadius: '15px', 
+            background: 'linear-gradient(135deg, #2a1a0f, #1a1a1a)', 
+            boxShadow: '0 4px 20px rgba(255, 102, 0, 0.4)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Animated glow effect */}
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              bottom: '0',
+              background: 'linear-gradient(45deg, transparent, rgba(255, 102, 0, 0.1), transparent)',
+              animation: 'glow-sweep 3s ease-in-out infinite',
+              pointerEvents: 'none'
+            }} />
+            
+            <div style={{ 
+              marginBottom: '15px', 
+              fontSize: '20px', 
+              color: '#ff6600', 
+              textAlign: 'center',
+              fontWeight: 'bold',
+              textShadow: '0 0 10px rgba(255, 102, 0, 0.8)',
+              position: 'relative',
+              zIndex: 1
+            }}>
+              💰 INSTANT SOL RECOVERY AVAILABLE! 💰
             </div>
-            <div style={{ marginBottom: '10px', fontSize: '14px', color: '#ccc' }}>
-              Found {rentData.vacantAccounts} empty token accounts that can be closed to recover {rentData.breakdown.vacantRent.toFixed(4)} SOL
+            
+            <div style={{ 
+              marginBottom: '18px', 
+              fontSize: '16px', 
+              color: '#ffcc99',
+              textAlign: 'center',
+              padding: '12px',
+              backgroundColor: 'rgba(255, 102, 0, 0.15)',
+              borderRadius: '10px',
+              border: '2px solid rgba(255, 102, 0, 0.4)',
+              fontWeight: '600',
+              position: 'relative',
+              zIndex: 1
+            }}>
+              🔥 Found {rentData.vacantAccounts} Empty Accounts → Get {rentData.breakdown.vacantRent.toFixed(4)} SOL Now!
             </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
               <button 
                 key={`vacant-burn-${processId}`}
-                className="vacant-burn-button"
+                className="vacant-burn-button-mega"
                 onClick={handleBurnVacantAccounts}
                 onTouchStart={(e) => {
                   console.log('[RentEstimate] Touch start detected on vacant burn button');
@@ -489,29 +534,52 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
                 }}
                 disabled={isProcessing}
                 style={{
-                  padding: '10px 20px',
-                  backgroundColor: isProcessing ? '#666' : '#ff6b35',
+                  padding: '18px 35px',
+                  background: isProcessing ? '#666' : 'linear-gradient(45deg, #ff4444, #ff6600, #ff8800)',
+                  backgroundSize: '200% 200%',
+                  animation: isProcessing ? 'none' : 'gradient-shift 2s ease infinite',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '12px',
                   cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  boxShadow: isProcessing ? 'none' : '0 6px 25px rgba(255, 68, 68, 0.5)',
+                  transform: 'scale(1)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  flex: 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!isProcessing) {
+                    const button = e.target as HTMLButtonElement;
+                    button.style.transform = 'scale(1.05) translateY(-2px)';
+                    button.style.boxShadow = '0 8px 30px rgba(255, 68, 68, 0.7)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isProcessing) {
+                    const button = e.target as HTMLButtonElement;
+                    button.style.transform = 'scale(1) translateY(0)';
+                    button.style.boxShadow = '0 6px 25px rgba(255, 68, 68, 0.5)';
+                  }
                 }}
               >
-                {isProcessing ? 'Processing...' : `Burn ${rentData.vacantAccounts} Vacant Accounts`}
+                {isProcessing ? '⏳ PROCESSING...' : `🚀 RECOVER ${rentData.breakdown.vacantRent.toFixed(4)} SOL NOW! 🚀`}
               </button>
               {isProcessing && (
                 <button
                   onClick={resetProcessingState}
                   style={{
-                    padding: '5px 10px',
+                    padding: '8px 15px',
                     backgroundColor: '#666',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '4px',
+                    borderRadius: '6px',
                     cursor: 'pointer',
-                    fontSize: '12px'
+                    fontSize: '12px',
+                    fontWeight: 'bold'
                   }}
                   title="Reset if button gets stuck"
                 >
