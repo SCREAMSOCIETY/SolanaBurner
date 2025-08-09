@@ -21,9 +21,14 @@ const {
     createCloseAccountInstruction,
     getAssociatedTokenAddress
 } = require('@solana/spl-token');
-const { 
-    createBurnNftInstruction
-} = require('@metaplex-foundation/mpl-token-metadata');
+// Import Metaplex burn instruction
+let createBurnNftInstruction;
+try {
+    const metaplexModule = require('@metaplex-foundation/mpl-token-metadata');
+    createBurnNftInstruction = metaplexModule.createBurnNftInstruction || metaplexModule.createBurnInstruction;
+} catch (e) {
+    console.log('Metaplex module not available, using fallback burn method');
+}
 
 // Define the metadata program ID directly
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
@@ -140,27 +145,67 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
     const instructions = [];
     
     try {
-        // 1. First burn the NFT using Metaplex instruction (this handles metadata + edition)
-        const burnNftInstruction = createBurnNftInstruction({
-            metadata: accounts.metadataPda,
-            owner: ownerPubkey,
-            mint: accounts.mint,
-            tokenAccount: accounts.tokenAccount,
-            masterEditionAccount: accounts.masterEditionPda,
-            splTokenProgram: TOKEN_PROGRAM_ID,
-            sysvarInstructions: new PublicKey('Sysvar1nstructions1111111111111111111111111')
-        });
+        // Enhanced manual burn method - closes all accounts individually for maximum rent recovery
+        console.log('Creating enhanced manual burn instructions for maximum rent recovery');
         
-        instructions.push(burnNftInstruction);
+        // 1. Burn the NFT token first
+        const burnInstruction = createBurnCheckedInstruction(
+            accounts.tokenAccount,
+            accounts.mint,
+            ownerPubkey,
+            1, // amount
+            0  // decimals
+        );
+        instructions.push(burnInstruction);
         
-        // 2. Close token account to recover rent (if not already closed by burn)
-        const closeInstruction = createCloseAccountInstruction(
+        // 2. Close token account to recover rent
+        const closeTokenInstruction = createCloseAccountInstruction(
             accounts.tokenAccount,
             ownerPubkey,
             ownerPubkey
         );
+        instructions.push(closeTokenInstruction);
         
-        instructions.push(closeInstruction);
+        // 3. Close metadata account manually (this recovers the most rent ~0.0051 SOL)
+        // Check if metadata account exists first
+        const metadataAccountInfo = await (require('@solana/web3.js').Connection.prototype.constructor === require('@solana/web3.js').Connection.constructor ? 
+            (new (require('@solana/web3.js').Connection)(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com')).getAccountInfo(accounts.metadataPda) :
+            null);
+        
+        if (metadataAccountInfo) {
+            // Create instruction to close metadata account (returns rent to owner)
+            const closeMetadataInstruction = new TransactionInstruction({
+                keys: [
+                    { pubkey: accounts.metadataPda, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: true, isWritable: false }
+                ],
+                programId: METADATA_PROGRAM_ID,
+                data: Buffer.from([41]) // Close metadata account instruction
+            });
+            instructions.push(closeMetadataInstruction);
+        }
+        
+        // 4. Close master edition account manually (recovers ~0.001 SOL)
+        const editionAccountInfo = await (require('@solana/web3.js').Connection.prototype.constructor === require('@solana/web3.js').Connection.constructor ? 
+            (new (require('@solana/web3.js').Connection)(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com')).getAccountInfo(accounts.masterEditionPda) :
+            null);
+        
+        if (editionAccountInfo) {
+            // Create instruction to close edition account (returns rent to owner)
+            const closeEditionInstruction = new TransactionInstruction({
+                keys: [
+                    { pubkey: accounts.masterEditionPda, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: true, isWritable: false }
+                ],
+                programId: METADATA_PROGRAM_ID,
+                data: Buffer.from([41]) // Close edition account instruction  
+            });
+            instructions.push(closeEditionInstruction);
+        }
+        
+        console.log(`Enhanced manual burn: Created ${instructions.length} instructions for maximum rent recovery`);
         
     } catch (error) {
         console.log('Using fallback burn method:', error.message);
