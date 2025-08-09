@@ -653,7 +653,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
 
 // Endpoint to submit signed burn transaction
 fastify.post('/api/submit-burn-transaction', async (request, reply) => {
-  const { signedTransaction, accountCount } = request.body;
+  const { signedTransaction, accountCount, rentRecovery } = request.body;
   
   if (!signedTransaction) {
     return reply.code(400).send({ 
@@ -716,12 +716,17 @@ fastify.post('/api/submit-burn-transaction', async (request, reply) => {
     
     fastify.log.info(`Burn transaction successful: ${signature}`);
     
+    // Use actual rent recovery amount if provided, otherwise estimate based on account count
+    const totalRecovered = rentRecovery ? (rentRecovery / 1e9) : ((accountCount || 0) * 0.00204);
+    
     return {
       success: true,
       signature: signature,
       explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=mainnet-beta`,
       accountCount: accountCount || 0,
-      message: 'Vacant accounts burned successfully'
+      recoveredAmount: totalRecovered,
+      message: `🎉 Success! Recovered ${totalRecovered.toFixed(6)} SOL from ${accountCount || 0} vacant accounts. No fees charged - you get 100% of your recovered rent!`,
+      detailedMessage: `Transaction completed successfully! Your ${accountCount || 0} vacant accounts have been burned and you've recovered ${totalRecovered.toFixed(6)} SOL. View your transaction on Solana Explorer using the link above.`
     };
     
   } catch (error) {
