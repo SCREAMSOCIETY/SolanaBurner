@@ -148,11 +148,11 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
   - Disabled transaction simulation for vacant account burning to avoid balance validation issues
   - Fee transfers now only applied when users have sufficient SOL balance
   - Vacant account burning now works for users with low SOL balances
-- August 2, 2025: Corrected 1% fee calculation for vacant account burning:
-  - Fixed fee structure to properly calculate 1% of actual rent recovery (~0.00002 SOL per account)
-  - Removed excessive 0.01 SOL minimum balance requirement
-  - Fee now scales correctly with actual rent amounts recovered
-  - Users only need enough SOL to cover transaction fees plus the small 1% fee
+- August 2, 2025: Removed all fees from vacant account burning for guaranteed success:
+  - Eliminated fee transfers that were causing transaction failures
+  - Users now receive 100% of recovered rent from vacant accounts (~0.004 SOL)
+  - Vacant account burning works for any user with minimal SOL balance for transaction fees
+  - Simplified transaction structure prevents "InsufficientFundsForRent" errors
 - August 2, 2025: Updated cNFT system to view-only mode for user safety:
   - Removed all cNFT burn buttons and interactive functionality 
   - Replaced with "View Only" badges to indicate cNFTs are display-only
