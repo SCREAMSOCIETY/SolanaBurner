@@ -618,10 +618,13 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     const balance = await connection.getBalance(ownerPubkey);
     const totalRentRecovery = accountsToProcess.reduce((sum, account) => sum + account.rentLamports, 0);
     const feeAmount = Math.floor(totalRentRecovery * 0.01);
-    const estimatedTxFee = 10000; // Estimate 0.00001 SOL for transaction fees
+    const estimatedTxFee = 15000; // Estimate 0.000015 SOL for transaction fees (increased estimate)
     
-    // Only add fee transfer if user has sufficient balance for both tx fees and fee transfer
-    if (feeAmount >= 1000 && balance >= (estimatedTxFee + feeAmount)) {
+    // Only add fee transfer if user has substantial balance buffer
+    // Require at least 0.01 SOL balance to ensure transaction success
+    const minimumBalance = 10000000; // 0.01 SOL in lamports
+    
+    if (feeAmount >= 1000 && balance >= minimumBalance && balance >= (estimatedTxFee + feeAmount + 5000000)) {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: ownerPubkey,
@@ -629,9 +632,9 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
           lamports: feeAmount
         })
       );
-      fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet`);
+      fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet (user balance: ${(balance / 1e9).toFixed(6)} SOL)`);
     } else {
-      fastify.log.info(`Skipping fee transfer due to insufficient user balance: ${balance} lamports, needed: ${estimatedTxFee + feeAmount} lamports`);
+      fastify.log.info(`Skipping fee transfer - User balance: ${(balance / 1e9).toFixed(6)} SOL, fee amount: ${(feeAmount / 1e9).toFixed(6)} SOL, minimum required: ${(minimumBalance / 1e9).toFixed(6)} SOL`);
     }
     
     if (validAccountCount === 0) {
