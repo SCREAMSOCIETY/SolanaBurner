@@ -1777,18 +1777,11 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
             transaction.add(instruction);
           }
           
-          // Add fee transfer for enhanced recovery (1% of total recovery)
-          const enhancedFee = Math.floor(rentInfo.totalLamports * 0.01);
-          if (enhancedFee >= 1000) { // Only add fee if significant enough
-            transaction.add(
-              SystemProgram.transfer({
-                fromPubkey: ownerPubkey,
-                toPubkey: new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK'),
-                lamports: enhancedFee
-              })
-            );
-            totalFee += enhancedFee / 1e9;
-          }
+          // Note: Temporarily using just token account recovery for reliability
+          // Will add metadata/edition recovery in next update
+          const actualRecovery = rentInfo.rentBreakdown.tokenAccount || baseRentSOL;
+          totalRecovery = actualRecovery;
+          totalRentRecovered = totalRentRecovered - baseRentSOL + actualRecovery;
           
           console.log(`Enhanced burn successful for ${mint} - Total recovery: ${totalRecovery} SOL (Token: ${rentInfo.rentBreakdown.tokenAccount || 0}, Metadata: ${rentInfo.rentBreakdown.metadata || 0}, Edition: ${rentInfo.rentBreakdown.masterEdition || 0})`);
           

@@ -145,8 +145,8 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
     const instructions = [];
     
     try {
-        // Enhanced manual burn method - closes all accounts individually for maximum rent recovery
-        console.log('Creating enhanced manual burn instructions for maximum rent recovery');
+        // Reliable burn method - just burn token and close token account for now
+        console.log('Creating reliable burn instructions (token account only)');
         
         // 1. Burn the NFT token first
         const burnInstruction = createBurnCheckedInstruction(
@@ -158,7 +158,7 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
         );
         instructions.push(burnInstruction);
         
-        // 2. Close token account to recover rent
+        // 2. Close token account to recover rent (~0.002 SOL)
         const closeTokenInstruction = createCloseAccountInstruction(
             accounts.tokenAccount,
             ownerPubkey,
@@ -166,46 +166,7 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
         );
         instructions.push(closeTokenInstruction);
         
-        // 3. Close metadata account manually (this recovers the most rent ~0.0051 SOL)
-        // Check if metadata account exists first
-        const metadataAccountInfo = await (require('@solana/web3.js').Connection.prototype.constructor === require('@solana/web3.js').Connection.constructor ? 
-            (new (require('@solana/web3.js').Connection)(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com')).getAccountInfo(accounts.metadataPda) :
-            null);
-        
-        if (metadataAccountInfo) {
-            // Create instruction to close metadata account (returns rent to owner)
-            const closeMetadataInstruction = new TransactionInstruction({
-                keys: [
-                    { pubkey: accounts.metadataPda, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: true, isWritable: false }
-                ],
-                programId: METADATA_PROGRAM_ID,
-                data: Buffer.from([41]) // Close metadata account instruction
-            });
-            instructions.push(closeMetadataInstruction);
-        }
-        
-        // 4. Close master edition account manually (recovers ~0.001 SOL)
-        const editionAccountInfo = await (require('@solana/web3.js').Connection.prototype.constructor === require('@solana/web3.js').Connection.constructor ? 
-            (new (require('@solana/web3.js').Connection)(process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com')).getAccountInfo(accounts.masterEditionPda) :
-            null);
-        
-        if (editionAccountInfo) {
-            // Create instruction to close edition account (returns rent to owner)
-            const closeEditionInstruction = new TransactionInstruction({
-                keys: [
-                    { pubkey: accounts.masterEditionPda, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: true, isWritable: false }
-                ],
-                programId: METADATA_PROGRAM_ID,
-                data: Buffer.from([41]) // Close edition account instruction  
-            });
-            instructions.push(closeEditionInstruction);
-        }
-        
-        console.log(`Enhanced manual burn: Created ${instructions.length} instructions for maximum rent recovery`);
+        console.log(`Reliable burn: Created ${instructions.length} instructions for token account recovery`);
         
     } catch (error) {
         console.log('Using fallback burn method:', error.message);
