@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import axios from 'axios';
+import { ActivityLogger } from '../activity-logger.js';
 
 interface RentEstimateData {
   totalAccounts: number;
@@ -229,6 +230,16 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
           `🔗 Transaction: ${submitResult.signature}\n\n` +
           `The rent has been returned to your wallet. The page will refresh to show your updated balance.`
         );
+        
+        // Log the activity for recent activity display
+        ActivityLogger.logActivity(
+          'vacant-burn',
+          'Vacant Accounts Burned',
+          `Burned ${submitResult.accountCount || result.accountCount} vacant accounts`,
+          actualRecoveredSOL,
+          submitResult.signature
+        );
+        
         // Refresh the page to show updated balances
         window.location.reload();
       } else {
