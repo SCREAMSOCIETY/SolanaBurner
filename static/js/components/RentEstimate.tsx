@@ -284,7 +284,9 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
+        // First try to get accurate rent estimates using the enhanced calculator
         const response = await axios.get(`/api/rent-estimate/${publicKey.toString()}`, {
+          params: { useAccurateCalculator: true },
           signal: controller.signal
         });
         

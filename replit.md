@@ -115,6 +115,18 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
   - Removed Optimization Recommendations component (RentOptimization) 
   - Kept Recent Activity functionality for user transaction history
   - Streamlined UI focuses on core burning functionality with essential rent estimates
+- August 2, 2025: Enhanced cNFT system to view-only mode for user safety:
+  - Removed all cNFT burn buttons and interactive functionality 
+  - Replaced with "View Only" badges to indicate cNFTs are display-only
+  - cNFT burning now operates in simulation mode only due to API compatibility issues
+  - Users can view their cNFTs but cannot attempt to burn them
+  - Eliminates user confusion and failed transaction attempts
+- August 2, 2025: Restored Recent Activity functionality and improved rent accuracy:
+  - Created standalone RecentActivity component extracted from removed RentOptimization
+  - Integrated accurate rent calculator for enhanced rent estimation precision
+  - Recent Activity now tracks user burning transactions with real recovery amounts
+  - Rent estimates now use actual account balances instead of approximations
+  - Enhanced calculator includes metadata account analysis for maximum accuracy
 - August 2, 2025: Updated cNFT system to view-only mode for user safety:
   - Removed all cNFT burn buttons and interactive functionality 
   - Replaced with "View Only" badges to indicate cNFTs are display-only

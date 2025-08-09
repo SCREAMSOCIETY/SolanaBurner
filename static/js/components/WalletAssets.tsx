@@ -18,6 +18,7 @@ import QueueTransferModal from './QueueTransferModal';
 import DelegatedTransferModal from './DelegatedTransferModal';
 // CNFTBurnModal removed - cNFTs are view-only
 import RentEstimate from './RentEstimate';
+import RecentActivity from './RecentActivity';
 
 // Add global variable to global window object to access in console for debugging
 declare global {
@@ -2190,6 +2191,9 @@ const WalletAssets: React.FC = () => {
             selectedNFTs={selectedNFTs}
             selectedCNFTs={selectedCNFTs}
           />
+          
+          {/* Recent Activity */}
+          <RecentActivity />
           
           {/* Bulk Mode Instructions */}
           {bulkBurnMode && (
