@@ -138,6 +138,17 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
   - cNFT burning now operates in simulation mode only due to API compatibility issues
   - Users can view their cNFTs but cannot attempt to burn them
   - Eliminates user confusion and failed transaction attempts
+- August 2, 2025: CRITICAL FIX - Removed inflated rent estimates to match actual burn returns:
+  - Removed forced minimum resize of 0.005 SOL per NFT that was inflating estimates
+  - Rent estimates now use actual token account balances instead of theoretical enhanced burning
+  - Fixed discrepancy where estimates showed 0.0229 SOL but actual burns only returned 0.006 SOL
+  - Total Potential Return now accurately reflects what users will actually receive from burns
+- August 2, 2025: Updated cNFT system to view-only mode for user safety:
+  - Removed all cNFT burn buttons and interactive functionality 
+  - Replaced with "View Only" badges to indicate cNFTs are display-only
+  - cNFT burning now operates in simulation mode only due to API compatibility issues
+  - Users can view their cNFTs but cannot attempt to burn them
+  - Eliminates user confusion and failed transaction attempts
 - January 17, 2025: RESOLVED ALL FEE INCONSISTENCIES - Complete 1% fee structure implementation:
   - Fixed batch NFT burn endpoint that had fees disabled for testing
   - Fixed vacant account burning endpoint that had fees completely removed 

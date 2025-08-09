@@ -408,12 +408,9 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
             
             fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, resize=${resizePotential.excessSOL} SOL (base=${resizePotential.baseResize}, opt=${resizePotential.additionalOptimization}), total=${totalNftRent/1e9} SOL (${resizePotential.isMasterEdition ? 'Master' : 'Regular'} Edition)`);
           } else {
-            // Force minimum resize potential for all NFTs to match competitor rates
-            const minimumResize = 0.005; // 0.005 SOL minimum additional recovery per NFT
-            const minimumResizeLamports = Math.floor(minimumResize * 1e9);
-            totalNftRent += minimumResizeLamports;
-            
-            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL, forced minimum resize=${minimumResize} SOL, total=${totalNftRent/1e9} SOL (forced optimization)`);
+            // Use actual token account balance only - no forced minimum resize
+            // This matches what the burn process actually recovers
+            fastify.log.info(`NFT ${parsedInfo.mint}: token=${actualBalance/1e9} SOL (realistic recovery)`);
           }
         } catch (resizeError) {
           fastify.log.warn(`Could not calculate resize potential for NFT ${parsedInfo.mint}: ${resizeError.message}`);
@@ -434,9 +431,8 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     // Calculate 1% fee on vacant accounts only  
     const vacantAccountFee = vacantActualRent * 0.01;
     
-    // Calculate total rent estimate using enhanced amounts for UI consistency
-    const baseNftTotal = nftAccounts * (0.0077 * 1e9); // Enhanced NFT rent for UI display
-    const totalRentEstimate = baseNftTotal + tokenActualRent + vacantActualRent;
+    // Calculate total rent estimate using realistic actual values
+    const totalRentEstimate = nftActualRent + tokenActualRent + vacantActualRent;
     
     // Calculate total fees collected (1% of vacant account rent)
     const totalBurningFees = vacantAccountFee;
@@ -446,8 +442,8 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     const avgNftRent = nftAccounts > 0 ? nftActualRent / nftAccounts : 0;
     const avgVacantRent = vacantAccounts > 0 ? vacantActualRent / vacantAccounts : 0;
     
-    // Set NFT rent to enhanced amount of 0.0077 SOL (matching Sol Incinerator)
-    const baseNftRent = 0.0077 * 1e9; // 0.0077 SOL in lamports (token + metadata + edition)
+    // Use actual average NFT rent from real account balances
+    const baseNftRent = avgNftRent; // Real rent recovery amount
     
 
     
