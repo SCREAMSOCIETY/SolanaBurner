@@ -127,6 +127,11 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
   - Recent Activity now tracks user burning transactions with real recovery amounts
   - Rent estimates now use actual account balances instead of approximations
   - Enhanced calculator includes metadata account analysis for maximum accuracy
+- August 2, 2025: Fixed rent calculation accuracy and cleaned up interface:
+  - Fixed Total Potential Return calculation to properly apply 1% fee deduction
+  - Removed "Bulk Mode Active!" instructional text for cleaner interface
+  - Total Potential Return now shows net amount users will actually receive
+  - Rent estimates consistently apply fee structure across all calculations
 - August 2, 2025: Updated cNFT system to view-only mode for user safety:
   - Removed all cNFT burn buttons and interactive functionality 
   - Replaced with "View Only" badges to indicate cNFTs are display-only

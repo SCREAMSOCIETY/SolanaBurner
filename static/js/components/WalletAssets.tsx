@@ -2195,21 +2195,7 @@ const WalletAssets: React.FC = () => {
           {/* Recent Activity */}
           <RecentActivity />
           
-          {/* Bulk Mode Instructions */}
-          {bulkBurnMode && (
-            <div className="bulk-mode-instructions" style={{
-              backgroundColor: '#9945FF',
-              color: 'white',
-              padding: '15px',
-              borderRadius: '10px',
-              textAlign: 'center',
-              marginBottom: '20px',
-              fontSize: '16px',
-              fontWeight: 'bold'
-            }}>
-              🔥 Bulk Mode Active! Click on NFT cards to see selection checkboxes and select multiple items for bulk burning.
-            </div>
-          )}
+
 
           {/* Bulk Burn Selection Panel - Always Visible */}
           {publicKey && (

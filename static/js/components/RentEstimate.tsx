@@ -434,7 +434,14 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
         ) : (
           <div className="total-estimate">
             <span className="estimate-label">Total Potential Return:</span>
-            <span className="estimate-value">{rentData.totalRentEstimate.toFixed(4)} SOL</span>
+            <span className="estimate-value">
+              {(() => {
+                // Apply 1% fee to total rent estimate for accurate display
+                const feeAmount = rentData.totalRentEstimate * 0.01;
+                const netAmount = rentData.totalRentEstimate - feeAmount;
+                return netAmount.toFixed(4);
+              })()} SOL
+            </span>
           </div>
         )}
         
