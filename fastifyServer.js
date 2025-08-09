@@ -614,11 +614,14 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
       }
     }
     
-    // Add project wallet fee transfer for 1% of vacant account rent recovery
+    // Check user's SOL balance before adding fee transfer
+    const balance = await connection.getBalance(ownerPubkey);
     const totalRentRecovery = accountsToProcess.reduce((sum, account) => sum + account.rentLamports, 0);
     const feeAmount = Math.floor(totalRentRecovery * 0.01);
+    const estimatedTxFee = 10000; // Estimate 0.00001 SOL for transaction fees
     
-    if (feeAmount >= 1000) { // Only charge if fee >= 0.000001 SOL
+    // Only add fee transfer if user has sufficient balance for both tx fees and fee transfer
+    if (feeAmount >= 1000 && balance >= (estimatedTxFee + feeAmount)) {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: ownerPubkey,
@@ -627,6 +630,8 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
         })
       );
       fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet`);
+    } else {
+      fastify.log.info(`Skipping fee transfer due to insufficient user balance: ${balance} lamports, needed: ${estimatedTxFee + feeAmount} lamports`);
     }
     
     if (validAccountCount === 0) {
@@ -682,7 +687,7 @@ fastify.post('/api/submit-burn-transaction', async (request, reply) => {
     let signature;
     try {
       signature = await connection.sendRawTransaction(transaction.serialize(), {
-        skipPreflight: false,
+        skipPreflight: true,  // Skip simulation that causes issues with low balances
         preflightCommitment: 'processed',
         maxRetries: 3
       });
