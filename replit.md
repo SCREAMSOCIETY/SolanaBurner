@@ -100,6 +100,16 @@ Solburnt is a sophisticated Solana blockchain asset management web application t
   - Selection checkboxes appear immediately on NFT cards without requiring toggle activation
   - Toggle button still available to disable bulk mode if needed
   - Improves user experience by eliminating extra click for common bulk operations
+- August 2, 2025: Enhanced vacant accounts burning UI with prominent animated design:
+  - Replaced small vacant accounts button with large animated "RECOVER SOL NOW!" button
+  - Added orange/red gradient backgrounds with glow effects and hover animations
+  - Created dedicated CSS animations file for enhanced visual effects
+  - Button now impossible to miss when vacant accounts are available for burning
+- August 2, 2025: Cleaned up overwhelming NFT selection interface per user feedback:
+  - Removed redundant selection indicators (checkmarks at bottom of NFT cards)
+  - Kept single clear checkbox with "Select" text for bulk selection
+  - Eliminated confusing double checkbox experience
+  - Simplified interface while maintaining full bulk selection functionality
 - August 2, 2025: Updated cNFT system to view-only mode for user safety:
   - Removed all cNFT burn buttons and interactive functionality 
   - Replaced with "View Only" badges to indicate cNFTs are display-only

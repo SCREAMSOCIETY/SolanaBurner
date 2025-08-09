@@ -2395,11 +2395,6 @@ const WalletAssets: React.FC = () => {
                       Burn
                     </button>
                   )}
-                  {bulkBurnMode && (
-                    <div className="selection-indicator">
-                      {selectedNFTs.includes(nft.mint) ? '✓' : ''}
-                    </div>
-                  )}
                 </div>
               ))}
               
@@ -2439,12 +2434,6 @@ const WalletAssets: React.FC = () => {
                   {!bulkBurnMode && (
                     <div className="cnft-info-badge" title="cNFTs are view-only - no burning functionality available">
                       👁️ View Only
-                    </div>
-                  )}
-
-                  {bulkBurnMode && (
-                    <div className="selection-indicator">
-                      {selectedCNFTs.includes(cnft.mint) ? '✓' : ''}
                     </div>
                   )}
                 </div>
