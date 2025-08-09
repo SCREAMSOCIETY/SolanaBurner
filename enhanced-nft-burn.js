@@ -145,8 +145,8 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
     const instructions = [];
     
     try {
-        // Enhanced burn method - close all accounts for maximum rent recovery
-        console.log('Creating enhanced burn instructions for maximum rent recovery');
+        // Reliable enhanced burn method - start with token burning, then add metadata closure
+        console.log('Creating enhanced burn instructions with token + metadata recovery');
         
         // 1. Burn the NFT token first
         const burnInstruction = createBurnCheckedInstruction(
@@ -158,33 +158,7 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
         );
         instructions.push(burnInstruction);
         
-        // 2. Close metadata account first (recovers ~0.0051 SOL) using proper Metaplex close instruction
-        // This is instruction 36 (close_metadata_account) in the Metaplex program
-        const closeMetadataInstruction = new TransactionInstruction({
-            keys: [
-                { pubkey: accounts.metadataPda, isSigner: false, isWritable: true },
-                { pubkey: ownerPubkey, isSigner: false, isWritable: true },
-                { pubkey: ownerPubkey, isSigner: true, isWritable: false }
-            ],
-            programId: METADATA_PROGRAM_ID,
-            data: Buffer.from([36]) // Close metadata account instruction code
-        });
-        instructions.push(closeMetadataInstruction);
-        
-        // 3. Close master edition account (recovers ~0.001 SOL)
-        // This is instruction 37 (close_edition_account) in the Metaplex program  
-        const closeEditionInstruction = new TransactionInstruction({
-            keys: [
-                { pubkey: accounts.masterEditionPda, isSigner: false, isWritable: true },
-                { pubkey: ownerPubkey, isSigner: false, isWritable: true },
-                { pubkey: ownerPubkey, isSigner: true, isWritable: false }
-            ],
-            programId: METADATA_PROGRAM_ID,
-            data: Buffer.from([37]) // Close edition account instruction code
-        });
-        instructions.push(closeEditionInstruction);
-        
-        // 4. Close token account last to recover rent (~0.002 SOL)
+        // 2. Close token account to recover rent (~0.002 SOL)
         const closeTokenInstruction = createCloseAccountInstruction(
             accounts.tokenAccount,
             ownerPubkey,
@@ -192,7 +166,27 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
         );
         instructions.push(closeTokenInstruction);
         
-        console.log(`Enhanced burn: Created ${instructions.length} instructions for maximum rent recovery (~0.0081 SOL)`);
+        // 3. Try to close metadata account with proper instruction format
+        // Use the correct Metaplex instruction for burning metadata
+        try {
+            const closeMetadataInstruction = new TransactionInstruction({
+                keys: [
+                    { pubkey: accounts.metadataPda, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: true, isWritable: false },
+                    { pubkey: accounts.mint, isSigner: false, isWritable: false },
+                    { pubkey: accounts.tokenAccount, isSigner: false, isWritable: false }
+                ],
+                programId: METADATA_PROGRAM_ID,
+                data: Buffer.from([19]) // Close metadata account instruction (burn_nft)
+            });
+            instructions.push(closeMetadataInstruction);
+            console.log('Added metadata close instruction');
+        } catch (metaError) {
+            console.log('Skipping metadata close:', metaError.message);
+        }
+        
+        console.log(`Enhanced burn: Created ${instructions.length} instructions for enhanced recovery`);
         
     } catch (error) {
         console.log('Using fallback burn method:', error.message);

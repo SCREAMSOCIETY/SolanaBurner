@@ -1777,11 +1777,13 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
             transaction.add(instruction);
           }
           
-          // Enhanced burn: Use full recovery including all accounts
-          totalRecovery = rentInfo.totalRent;
+          // Enhanced burn: Start with token account recovery, expand gradually
+          // Use just token account for now to ensure reliability
+          const tokenRecovery = rentInfo.rentBreakdown.tokenAccount || baseRentSOL;
+          totalRecovery = tokenRecovery;
           totalRentRecovered = totalRentRecovered - baseRentSOL + totalRecovery;
           
-          // Add 1% fee on total enhanced recovery
+          // Add 1% fee on token account recovery
           const enhancedFee = totalRecovery * 0.01;
           totalFee += enhancedFee;
           
