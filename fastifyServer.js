@@ -617,14 +617,14 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     // Check user's SOL balance before adding fee transfer
     const balance = await connection.getBalance(ownerPubkey);
     const totalRentRecovery = accountsToProcess.reduce((sum, account) => sum + account.rentLamports, 0);
-    const feeAmount = Math.floor(totalRentRecovery * 0.01);
-    const estimatedTxFee = 15000; // Estimate 0.000015 SOL for transaction fees (increased estimate)
+    const feeAmount = Math.floor(totalRentRecovery * 0.01); // 1% of rent recovery
+    const estimatedTxFee = 15000; // Estimate 0.000015 SOL for transaction fees
+    const buffer = 5000; // Small 0.000005 SOL buffer
     
-    // Only add fee transfer if user has substantial balance buffer
-    // Require at least 0.01 SOL balance to ensure transaction success
-    const minimumBalance = 10000000; // 0.01 SOL in lamports
+    // Only add fee transfer if user has enough balance to cover tx fees + fee + small buffer
+    const totalRequired = estimatedTxFee + feeAmount + buffer;
     
-    if (feeAmount >= 1000 && balance >= minimumBalance && balance >= (estimatedTxFee + feeAmount + 5000000)) {
+    if (feeAmount >= 1000 && balance >= totalRequired) {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: ownerPubkey,
@@ -632,9 +632,9 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
           lamports: feeAmount
         })
       );
-      fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet (user balance: ${(balance / 1e9).toFixed(6)} SOL)`);
+      fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet (1% of ${(totalRentRecovery / 1e9).toFixed(6)} SOL recovery)`);
     } else {
-      fastify.log.info(`Skipping fee transfer - User balance: ${(balance / 1e9).toFixed(6)} SOL, fee amount: ${(feeAmount / 1e9).toFixed(6)} SOL, minimum required: ${(minimumBalance / 1e9).toFixed(6)} SOL`);
+      fastify.log.info(`Skipping fee transfer - User balance: ${(balance / 1e9).toFixed(6)} SOL, fee: ${(feeAmount / 1e9).toFixed(6)} SOL, total needed: ${(totalRequired / 1e9).toFixed(6)} SOL`);
     }
     
     if (validAccountCount === 0) {
