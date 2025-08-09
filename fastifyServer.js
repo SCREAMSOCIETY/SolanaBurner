@@ -621,8 +621,9 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     const estimatedTxFee = 15000; // Estimate 0.000015 SOL for transaction fees
     const buffer = 5000; // Small 0.000005 SOL buffer
     
-    // Only add fee transfer if user has enough balance to cover tx fees + fee + small buffer
-    const totalRequired = estimatedTxFee + feeAmount + buffer;
+    // Only add fee transfer if user has enough balance to cover tx fees + fee + large buffer
+    // Use a more conservative approach - require at least 10x the transaction cost to be safe
+    const totalRequired = (estimatedTxFee + feeAmount) * 10; // 10x buffer for safety
     
     if (feeAmount >= 1000 && balance >= totalRequired) {
       transaction.add(
@@ -634,7 +635,7 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
       );
       fastify.log.info(`Added fee transfer: ${(feeAmount / 1e9).toFixed(6)} SOL to project wallet (1% of ${(totalRentRecovery / 1e9).toFixed(6)} SOL recovery)`);
     } else {
-      fastify.log.info(`Skipping fee transfer - User balance: ${(balance / 1e9).toFixed(6)} SOL, fee: ${(feeAmount / 1e9).toFixed(6)} SOL, total needed: ${(totalRequired / 1e9).toFixed(6)} SOL`);
+      fastify.log.info(`Skipping fee transfer for low balance - User balance: ${(balance / 1e9).toFixed(6)} SOL, fee: ${(feeAmount / 1e9).toFixed(6)} SOL, conservative requirement: ${(totalRequired / 1e9).toFixed(6)} SOL`);
     }
     
     if (validAccountCount === 0) {
