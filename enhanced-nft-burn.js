@@ -22,9 +22,11 @@ const {
     getAssociatedTokenAddress
 } = require('@solana/spl-token');
 const { 
-    createBurnNftInstruction,
-    PROGRAM_ID: METADATA_PROGRAM_ID
+    createBurnNftInstruction
 } = require('@metaplex-foundation/mpl-token-metadata');
+
+// Define the metadata program ID directly
+const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 /**
  * Calculate all recoverable accounts for an NFT
@@ -146,8 +148,7 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
             tokenAccount: accounts.tokenAccount,
             masterEditionAccount: accounts.masterEditionPda,
             splTokenProgram: TOKEN_PROGRAM_ID,
-            collectionMetadata: collectionMint ? 
-                (await getMetadataPda(new PublicKey(collectionMint)))[0] : undefined
+            sysvarInstructions: new PublicKey('Sysvar1nstructions1111111111111111111111111')
         });
         
         instructions.push(burnNftInstruction);
