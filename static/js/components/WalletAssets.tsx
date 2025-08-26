@@ -886,7 +886,24 @@ const WalletAssets: React.FC = () => {
       } else if (isWalletConnectionError) {
         setError('Wallet connection error. Please check your wallet and try again.');
       } else {
-        setError(`Error burning token: ${error.message}`);
+        // Properly format error messages to avoid "[object Object]"
+        let errorMessage = 'Unknown error occurred';
+        
+        if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error?.error) {
+          errorMessage = error.error;
+        } else if (error) {
+          try {
+            errorMessage = JSON.stringify(error);
+          } catch (e) {
+            errorMessage = String(error);
+          }
+        }
+        
+        setError(`Error burning token: ${errorMessage}`);
       }
     }
   };
@@ -1846,7 +1863,28 @@ const WalletAssets: React.FC = () => {
 
     } catch (error: any) {
       console.error('Error in batch burn operation:', error);
-      setError(`Error in batch burn operation: ${error.message}`);
+      
+      // Properly format error messages to avoid "[object Object]"
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (error) {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch (e) {
+          errorMessage = String(error);
+        }
+      }
+      
+      setError(`Error burning tokens: ${errorMessage}`);
+      
+      // Log the full error for debugging
+      console.error('Full error details:', error);
     } finally {
       setIsBurning(false);
     }
