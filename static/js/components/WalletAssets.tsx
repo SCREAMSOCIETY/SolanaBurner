@@ -809,7 +809,18 @@ const WalletAssets: React.FC = () => {
         
         if (confirmation.value.err) {
           console.error('Error confirming burn transaction:', confirmation.value.err);
-          setError(`Error burning token: ${confirmation.value.err}`);
+          
+          // Properly format the confirmation error
+          let confirmationError = 'Transaction failed';
+          if (confirmation.value.err) {
+            try {
+              confirmationError = JSON.stringify(confirmation.value.err);
+            } catch (e) {
+              confirmationError = String(confirmation.value.err);
+            }
+          }
+          
+          setError(`Error burning token: ${confirmationError}`);
         } else {
           console.log('Token burn successful with signature:', signature);
           
@@ -1043,7 +1054,18 @@ const WalletAssets: React.FC = () => {
       
         if (confirmation.value.err) {
           console.error('Error confirming NFT burn transaction:', confirmation.value.err);
-          setError(`Error burning NFT: ${confirmation.value.err}`);
+          
+          // Properly format the confirmation error
+          let confirmationError = 'Transaction failed';
+          if (confirmation.value.err) {
+            try {
+              confirmationError = JSON.stringify(confirmation.value.err);
+            } catch (e) {
+              confirmationError = String(confirmation.value.err);
+            }
+          }
+          
+          setError(`Error burning NFT: ${confirmationError}`);
         } else {
           console.log('NFT burn successful with signature:', signature);
           
@@ -1131,7 +1153,24 @@ const WalletAssets: React.FC = () => {
       } else if (isWalletConnectionError) {
         setError('Wallet connection error. Please check your wallet and try again.');
       } else {
-        setError(`Error burning NFT: ${error.message}`);
+        // Properly format error messages to avoid "[object Object]"
+        let errorMessage = 'Unknown error occurred';
+        
+        if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error?.error) {
+          errorMessage = error.error;
+        } else if (error) {
+          try {
+            errorMessage = JSON.stringify(error);
+          } catch (e) {
+            errorMessage = String(error);
+          }
+        }
+        
+        setError(`Error burning NFT: ${errorMessage}`);
       }
     }
   };
@@ -1690,7 +1729,18 @@ const WalletAssets: React.FC = () => {
         
         if (confirmation.value.err) {
           console.error('Error confirming bulk burn transaction:', confirmation.value.err);
-          setError(`Error burning tokens: ${confirmation.value.err}`);
+          
+          // Properly format the confirmation error
+          let confirmationError = 'Transaction failed';
+          if (confirmation.value.err) {
+            try {
+              confirmationError = JSON.stringify(confirmation.value.err);
+            } catch (e) {
+              confirmationError = String(confirmation.value.err);
+            }
+          }
+          
+          setError(`Error burning tokens: ${confirmationError}`);
         } else {
           console.log('Bulk token burn successful with signature:', signature);
           
@@ -1765,7 +1815,25 @@ const WalletAssets: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error in bulk burn operation:', error);
-      setError(`Error in bulk burn operation: ${error.message}`);
+      
+      // Properly format error messages to avoid "[object Object]"
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (error) {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch (e) {
+          errorMessage = String(error);
+        }
+      }
+      
+      setError(`Error in bulk burn operation: ${errorMessage}`);
     } finally {
       setIsBurning(false);
     }
