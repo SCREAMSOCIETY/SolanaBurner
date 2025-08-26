@@ -851,10 +851,11 @@ const WalletAssets: React.FC = () => {
         clearTimeout(timeoutId);
         
         // Check if the error is related to user cancellation
-        if (signingError.message.includes('timed out') || 
-            signingError.message.includes('cancelled') ||
-            signingError.message.includes('rejected') ||
-            signingError.message.includes('User rejected')) {
+        const signingErrorMessage = signingError?.message || '';
+        if (signingErrorMessage.includes('timed out') || 
+            signingErrorMessage.includes('cancelled') ||
+            signingErrorMessage.includes('rejected') ||
+            signingErrorMessage.includes('User rejected')) {
           console.log('Transaction was cancelled by the user or timed out');
           setError('Transaction was cancelled. Please try again if you want to burn this token.');
           return;
@@ -1094,10 +1095,11 @@ const WalletAssets: React.FC = () => {
         clearTimeout(timeoutId);
         
         // Check if the error is related to user cancellation
-        if (signingError.message.includes('timed out') || 
-            signingError.message.includes('cancelled') ||
-            signingError.message.includes('rejected') ||
-            signingError.message.includes('User rejected')) {
+        const signingErrorMessage = signingError?.message || '';
+        if (signingErrorMessage.includes('timed out') || 
+            signingErrorMessage.includes('cancelled') ||
+            signingErrorMessage.includes('rejected') ||
+            signingErrorMessage.includes('User rejected')) {
           console.log('Transaction was cancelled by the user or timed out');
           setError('Transaction was cancelled. Please try again if you want to burn this NFT.');
           return;
@@ -1749,10 +1751,11 @@ const WalletAssets: React.FC = () => {
         clearTimeout(timeoutId);
         
         // Check if the error is related to user cancellation
-        if (signingError.message.includes('timed out') || 
-            signingError.message.includes('cancelled') ||
-            signingError.message.includes('rejected') ||
-            signingError.message.includes('User rejected')) {
+        const signingErrorMessage = signingError?.message || '';
+        if (signingErrorMessage.includes('timed out') || 
+            signingErrorMessage.includes('cancelled') ||
+            signingErrorMessage.includes('rejected') ||
+            signingErrorMessage.includes('User rejected')) {
           console.log('Transaction was cancelled by the user or timed out');
           setError('Transaction was cancelled. No tokens were burned.');
         } else {
