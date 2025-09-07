@@ -749,20 +749,7 @@ const WalletAssets: React.FC = () => {
       );
       
       // The rent return happens automatically when closing the token account
-      const tokenRentPerAccount = 0.00204; // SOL per token account
-      
-      // Add an instruction to transfer a 1% fee based on rent returned
-      const feePercentage = 0.01; // 1% fee
-      const feeAmount = Math.floor(tokenRentPerAccount * feePercentage * 1e9); // Convert to lamports
-      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-      
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: feeRecipient,
-          lamports: feeAmount,
-        })
-      );
+      // No fee charged for token burning to prevent InsufficientFundsForRent errors
       
       // Get recent blockhash with lower fee priority
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
@@ -994,20 +981,7 @@ const WalletAssets: React.FC = () => {
       );
       
       // The rent return happens automatically when closing the NFT accounts
-      const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
-      
-      // 5. Add an instruction to transfer a 1% fee based on rent returned
-      const feePercentage = 0.01; // 1% fee
-      const feeAmount = Math.floor(nftRentPerAsset * feePercentage * 1e9); // Convert to lamports
-      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
-      
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: feeRecipient,
-          lamports: feeAmount,
-        })
-      );
+      // No fee charged for NFT burning to prevent InsufficientFundsForRent errors
       
       // Get recent blockhash with lower fee priority
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
@@ -1664,19 +1638,7 @@ const WalletAssets: React.FC = () => {
         return;
       }
       
-      // Add a single donation instruction based on 1% of total rent returned
-      const tokenRentPerAccount = 0.00204; // SOL per token account
-      const feePercentage = 0.01; // 1% fee
-      const totalRentReturned = processedTokens.length * tokenRentPerAccount;
-      const feeAmount = Math.floor(totalRentReturned * feePercentage * 1e9); // Convert to lamports
-      
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: feeRecipient,
-          lamports: feeAmount,
-        })
-      );
+      // No fee charged for bulk token burning to prevent InsufficientFundsForRent errors
       
       // Get recent blockhash with lower fee priority
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
