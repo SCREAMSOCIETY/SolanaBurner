@@ -255,21 +255,6 @@ const TokensTab: React.FC = () => {
       
       const transaction = new Transaction();
 
-      // Add compute budget instructions to avoid compute limit issues
-      const { ComputeBudgetProgram } = await import('@solana/web3.js');
-      
-      transaction.add(
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: 200000 // Sufficient compute units for token operations
-        })
-      );
-      
-      transaction.add(
-        ComputeBudgetProgram.setComputeUnitPrice({
-          microLamports: 1 // Minimal priority fee
-        })
-      );
-
       // Check if token balance is 0 - use close account instead of burn
       if (token.balance === 0) {
         console.log(`Token ${token.mint} has zero balance, using close account instruction`);
