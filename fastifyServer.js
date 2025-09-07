@@ -6,6 +6,12 @@ const fastify = require('fastify')({
   }
 });
 const fastifyStatic = require('@fastify/static');
+
+// Register compression plugin for better performance
+fastify.register(require('@fastify/compress'), {
+  global: true,
+  encodings: ['gzip', 'deflate', 'br']
+});
 const fs = require('fs');
 const axios = require('axios');
 const heliusApi = require('./helius-api');
@@ -52,7 +58,19 @@ fastify.get('/default-nft-image.svg', async (request, reply) => {
   }
 });
 
-// Register static files from static directory
+// Register static files from static directory with caching
+fastify.register(fastifyStatic, {
+  root: path.join(__dirname, 'static'),
+  prefix: '/static/',
+  setHeaders: (res, path) => {
+    // Cache static assets for 1 hour
+    if (path.includes('.js') || path.includes('.css') || path.includes('.png') || path.includes('.svg')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  }
+});
+
+// Override to register another static handler for dist files
 fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'static'),
   prefix: '/static/'
