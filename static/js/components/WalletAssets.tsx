@@ -12,6 +12,9 @@ import axios from 'axios';
 // Import the CNFTHandler class
 import { CNFTHandler } from '../cnft-handler';
 
+// Import the ActivityLogger
+import { ActivityLogger } from '../activity-logger';
+
 // Import the modal components
 import DirectTrashModal from './DirectTrashModal';
 import QueueTransferModal from './QueueTransferModal';
@@ -832,6 +835,9 @@ const WalletAssets: React.FC = () => {
           const shortSig = signature.substring(0, 8) + '...';
           setError(`Successfully burned ${token.name || token.symbol || 'token'}! Rent returned: ${tokenRentPerAccount.toFixed(4)} SOL | Signature: ${shortSig}`);
           
+          // Log activity to Recent Activity feed
+          ActivityLogger.logTokenBurn(token.name || token.symbol || 'Token', tokenRentPerAccount, signature);
+          
           // Add link to transaction
           setTimeout(() => {
             const txElem = document.createElement('div');
@@ -1073,6 +1079,9 @@ const WalletAssets: React.FC = () => {
           const txUrl = `https://solscan.io/tx/${signature}`;
           const shortSig = signature.substring(0, 8) + '...';
           setError(`Successfully burned NFT "${nft.name || 'NFT'}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
+          
+          // Log activity to Recent Activity feed
+          ActivityLogger.logNFTBurn(nft.name || 'NFT', nftRentPerAsset, signature);
           
           // Add link to transaction
           setTimeout(() => {
@@ -1738,6 +1747,9 @@ const WalletAssets: React.FC = () => {
           const shortSig = signature.substring(0, 8) + '...';
           
           setError(`Successfully burned ${processedTokens.length} tokens! Rent returned: ${totalRentReturned} SOL | Signature: ${shortSig}`);
+          
+          // Log activity to Recent Activity feed
+          ActivityLogger.logBatchBurn(processedTokens.length, 'token', totalRentReturned, signature);
           
           // Add link to transaction
           setTimeout(() => {
