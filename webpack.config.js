@@ -10,12 +10,10 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, 'static/dist'),
-    filename: '[name].[contenthash].js',
-    chunkFilename: '[name].[contenthash].js',
+    filename: '[name].js',
     library: '[name]',
     libraryTarget: 'window',
-    publicPath: '/static/dist/',
-    clean: true
+    publicPath: '/static/dist/'
   },
   module: {
     rules: [
