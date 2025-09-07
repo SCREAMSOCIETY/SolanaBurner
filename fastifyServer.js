@@ -70,19 +70,6 @@ fastify.register(fastifyStatic, {
   }
 });
 
-// Override to register another static handler for dist files
-fastify.register(fastifyStatic, {
-  root: path.join(__dirname, 'static'),
-  prefix: '/static/'
-});
-
-// Register static files from static/dist directory (webpack output)
-fastify.register(fastifyStatic, {
-  root: path.join(__dirname, 'static', 'dist'),
-  prefix: '/static/dist/',
-  decorateReply: false
-});
-
 // Serve index.html for root route
 fastify.get('/', async (request, reply) => {
   fastify.log.info('Serving index.html for root path');
