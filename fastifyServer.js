@@ -434,7 +434,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
     }
     
     // Calculate 1% fee on vacant accounts only  
-    const vacantAccountFee = vacantActualRent * 0.01;
+    const vacantAccountFee = vacantActualRent * 0.03;
     
     // Calculate total rent estimate using realistic actual values
     const totalRentEstimate = nftActualRent + tokenActualRent + vacantActualRent;
@@ -468,7 +468,7 @@ fastify.get('/api/rent-estimate/:walletAddress', async (request, reply) => {
           vacantRent: vacantActualRent / 1e9 // Actual vacant account rent
         },
         fees: {
-          vacantAccountBurningFee: vacantAccountFee / 1e9, // 1% fee on vacant account rent
+          vacantAccountBurningFee: vacantAccountFee / 1e9, // 3% fee on vacant account rent
           totalBurningFees: totalBurningFees / 1e9 // Total fees for all vacant accounts
         },
         actualBalances: {
@@ -1373,12 +1373,12 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     const recoverableRentLamports = totalRecoverableRent;
     const recoverableRentSOL = totalRecoverableRent / 1e9;
     
-    const feePercentage = 0.01;
+    const feePercentage = 0.03;
     const feeAmount = Math.floor(recoverableRentLamports * feePercentage);
 
     // Add memo instruction to show burn details in wallet
-    const userReceivesSOL = (recoverableRentSOL * 0.99);
-    const feeSOL = (recoverableRentSOL * 0.01);
+    const userReceivesSOL = (recoverableRentSOL * 0.97);
+    const feeSOL = (recoverableRentSOL * 0.03);
     const memoText = `🔥 Burn "${nftName}" | Rent Recovery: ${userReceivesSOL.toFixed(4)} SOL | Fee: ${feeSOL.toFixed(4)} SOL`;
     
     const memoInstruction = new TransactionInstruction({
@@ -1431,7 +1431,7 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       transaction.instructions[0] = new TransactionInstruction({
         keys: [],
         programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-        data: Buffer.from(`🔥 Burn "${nftName}" | Enhanced Recovery: ${(enhancedRecoverySOL * 0.99).toFixed(4)} SOL | Fee: ${(enhancedRecoverySOL * 0.01).toFixed(4)} SOL`, 'utf8')
+        data: Buffer.from(`🔥 Burn "${nftName}" | Enhanced Recovery: ${(enhancedRecoverySOL * 0.97).toFixed(4)} SOL | Fee: ${(enhancedRecoverySOL * 0.03).toFixed(4)} SOL`, 'utf8')
       });
       
       // Get enhanced burn instructions
@@ -1443,7 +1443,7 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       }
       
       // Update fee calculation based on enhanced recovery
-      const enhancedFeeAmount = Math.floor(enhancedRecoveryLamports * 0.01);
+      const enhancedFeeAmount = Math.floor(enhancedRecoveryLamports * 0.03);
       
       // Remove old fee instruction if present
       if (transaction.instructions.length > burnInstructions.length + 1) {
@@ -1462,8 +1462,8 @@ fastify.post('/api/burn-nft', async (request, reply) => {
       }
       
       // Update response values
-      userReceivesSOL = enhancedRecoverySOL * 0.99;
-      feeSOL = enhancedRecoverySOL * 0.01;
+      userReceivesSOL = enhancedRecoverySOL * 0.97;
+      feeSOL = enhancedRecoverySOL * 0.03;
       
     } catch (enhancedError) {
       console.log('Enhanced burn not available, using standard burn:', enhancedError.message);
@@ -1789,7 +1789,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           totalRentRecovered = totalRentRecovered - baseRentSOL + totalRecovery;
           
           // Add 1% fee on token account recovery
-          const enhancedFee = totalRecovery * 0.01;
+          const enhancedFee = totalRecovery * 0.03;
           totalFee += enhancedFee;
           
           // Add fee transfer instruction

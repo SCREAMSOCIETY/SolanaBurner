@@ -37,8 +37,8 @@ async function calculateActualNFTRent(connection, mintAddress, tokenAccount) {
         const accounts = await calculateNFTAccounts(connection, mintAddress, owner);
         const rentInfo = await calculateTotalRentRecovery(connection, accounts);
         
-        // Apply 1% fee
-        const feeSOL = rentInfo.totalRent * 0.01;
+        // Apply 3% fee
+        const feeSOL = rentInfo.totalRent * 0.03;
         const netRecoverySOL = rentInfo.totalRent - feeSOL;
         
         return {
@@ -62,7 +62,7 @@ async function calculateActualNFTRent(connection, mintAddress, tokenAccount) {
         
         // Fallback to enhanced estimate
         const fallbackRent = 0.0077; // Enhanced rent recovery (token + metadata + edition)
-        const fallbackFee = fallbackRent * 0.01;
+        const fallbackFee = fallbackRent * 0.03;
         
         return {
             success: false,
