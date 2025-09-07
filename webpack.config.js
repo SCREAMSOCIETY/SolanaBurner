@@ -6,34 +6,16 @@ module.exports = {
   entry: {
     'app': './static/js/App.tsx',
     'WalletProvider': './static/js/WalletProvider.tsx',
-    'cnft-handler': './static/js/cnft-handler.js',
-    'safe-transfer-cnft': './static/js/safe-transfer-cnft.js',
-    'fixed-cnft-handler': './static/js/fixed-cnft-handler.js',
-    'bubblegum-transfer': './static/js/bubblegum-transfer.js',
-    'metaplex-cnft-transfer': './static/js/metaplex-cnft-transfer.js',
-    'fixed-bubblegum-transfer': './static/js/fixed-bubblegum-transfer.js',
-    'self-contained-transfer': './static/js/self-contained-transfer.js',
-    'server-side-transfer': './static/js/server-side-transfer.js',
-    'direct-transfer': './static/js/direct-transfer.js',
-    'standalone-transfer': './static/js/standalone-transfer.js',
-    'solo-transfer': './static/js/solo-transfer.js',
-    'improved-server-transfer': './static/js/improved-server-transfer.js',
-    'working-transfer': './static/js/working-transfer.js',
-    'minimal-transfer': './static/js/minimal-transfer.js',
-    'debug-transfer': './static/js/debug-transfer.js',
-    'server-side-patch': './static/js/server-side-patch.js',
-    'self-contained-patch': './static/js/self-contained-patch.js',
-    'cnft-direct-patch': './static/js/cnft-direct-patch.js',
-    'basic-transfer': './static/js/basic-transfer.js',
-    'hidden-assets': './static/js/hidden-assets.js',
     'animations': './static/js/animations.js'
   },
   output: {
     path: path.resolve(__dirname, 'static/dist'),
-    filename: '[name].js',
+    filename: '[name].[contenthash].js',
+    chunkFilename: '[name].[contenthash].js',
     library: '[name]',
     libraryTarget: 'window',
-    publicPath: '/static/dist/'  // Update to match server static path
+    publicPath: '/static/dist/',
+    clean: true
   },
   module: {
     rules: [
@@ -91,6 +73,26 @@ module.exports = {
       }
     })
   ],
-  mode: 'development',
-  devtool: 'source-map'
+  mode: 'production',
+  devtool: false,
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          test: /[\/]node_modules[\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+        walletAdapters: {
+          test: /[\/]node_modules[\/](@solana\/wallet-adapter|@ledgerhq|@solflare)/,
+          name: 'wallet-adapters',
+          chunks: 'all',
+          priority: 10
+        }
+      }
+    },
+    usedExports: true,
+    sideEffects: false
+  }
 };
