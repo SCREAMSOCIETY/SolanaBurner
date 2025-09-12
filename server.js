@@ -1,9 +1,10 @@
 // Immediate logging to verify script execution
 console.log('[SERVER INIT] Script starting, environment:', {
-  env: process.env,
   argv: process.argv,
   cwd: process.cwd(),
-  version: process.version
+  version: process.version,
+  nodeEnv: process.env.NODE_ENV,
+  port: process.env.PORT
 });
 
 try {

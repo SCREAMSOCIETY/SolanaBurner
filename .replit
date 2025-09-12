@@ -71,8 +71,9 @@ args = "node fastifyServer.js"
 waitForPort = 5001
 
 [deployment]
-run = ["sh", "-c", "npm run build && node server.js"]
-deploymentTarget = "gce"
+run = ["node", "fastifyServer.js"]
+deploymentTarget = "autoscale"
+build = ["npm", "run", "build"]
 
 [[ports]]
 localPort = 3000
@@ -102,6 +103,10 @@ localPort = 8084
 
 [[ports]]
 localPort = 8085
+
+[[ports]]
+localPort = 42409
+externalPort = 3000
 
 [agent]
 expertMode = true
