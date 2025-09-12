@@ -82,6 +82,12 @@ fastify.get('/ping', async (request, reply) => {
   return { status: 'ok', time: new Date().toISOString() };
 });
 
+// Health check endpoint for deployment system
+fastify.get('/api', async (request, reply) => {
+  fastify.log.info('Health check endpoint hit');
+  return { status: 'ok', service: 'Solburnt API', time: new Date().toISOString() };
+});
+
 // API Config endpoint
 fastify.get('/api/config', async (request, reply) => {
   fastify.log.info('API config endpoint hit');
