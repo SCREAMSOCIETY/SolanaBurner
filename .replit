@@ -71,7 +71,9 @@ args = "node fastifyServer.js"
 waitForPort = 5001
 
 [deployment]
-run = ["sh", "-c", "npm run build && node server.js"]
+run = ["node", "fastifyServer.js"]
+deploymentTarget = "autoscale"
+build = ["npm", "install", "&&", "npx", "webpack", "--config", "webpack.config.js"]
 
 [[ports]]
 localPort = 3000
