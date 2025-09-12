@@ -36,11 +36,11 @@ const TREE_ADDRESS = process.env.TREE_ADDRESS;
 // If we have a tree authority key, we can do real transfers
 const isSimulationMode = !TREE_AUTHORITY_SECRET_KEY || !TREE_ADDRESS;
 
-// For testing purposes, let's set our own authority key
-// In a production environment, this would come from environment variables
+// Manual tree authority should be loaded from environment variables
+// For security reasons, we no longer hardcode secret keys in the source code
 const MANUAL_TREE_AUTHORITY = {
-  publicKey: "DwvMzYozC1eYJdETQ6kE19dPrCge2tj4t14vGvvprCd7",
-  secretKey: "4vJ9JU1bJJE96FbKVzrKaF9GPvS5ihPRgz1PkJdJxozHB1vQrAUdA5BZEGJyUa2MJMKpAaQJGmzCHLfiMFQCbSbY"
+  publicKey: process.env.MANUAL_TREE_AUTHORITY_PUBLIC_KEY || null,
+  secretKey: process.env.MANUAL_TREE_AUTHORITY_SECRET_KEY || null
 };
 
 // Message for UI display about transfer feature
@@ -95,7 +95,7 @@ async function processTransferRequest(ownerAddress, assetId, signedMessage, proo
         signature: simulatedSignature,
         explorerUrl: `https://explorer.solana.com/tx/${simulatedSignature}?cluster=devnet`,
         destinationAddress: destinationAddress || PROJECT_WALLET,
-        treeAuthority: MANUAL_TREE_AUTHORITY.publicKey
+        treeAuthority: MANUAL_TREE_AUTHORITY.publicKey || "Not configured"
       };
     }
     
@@ -116,7 +116,7 @@ async function processTransferRequest(ownerAddress, assetId, signedMessage, proo
           signature: simulatedSignature,
           explorerUrl: `https://explorer.solana.com/tx/${simulatedSignature}?cluster=devnet`,
           destinationAddress: destinationAddress || PROJECT_WALLET,
-          treeAuthority: MANUAL_TREE_AUTHORITY.publicKey
+          treeAuthority: MANUAL_TREE_AUTHORITY.publicKey || "Not configured"
         };
       }
       
