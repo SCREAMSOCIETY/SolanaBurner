@@ -102,5 +102,9 @@ localPort = 8084
 [[ports]]
 localPort = 8085
 
+[[ports]]
+localPort = 35207
+externalPort = 3000
+
 [agent]
 expertMode = true
