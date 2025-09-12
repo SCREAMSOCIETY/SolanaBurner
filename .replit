@@ -69,7 +69,7 @@ outputType = "webview"
 
 [deployment]
 run = ["node", "fastifyServer.js"]
-deploymentTarget = "autoscale"
+deploymentTarget = "gce"
 build = ["npm", "install"]
 
 [[ports]]
