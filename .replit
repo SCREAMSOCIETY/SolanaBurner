@@ -59,16 +59,13 @@ args = "npm install && npx webpack --config webpack.config.js"
 name = "FastifyServer"
 author = "agent"
 
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node fastifyServer.js"
-waitForPort = 5001
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [deployment]
 run = ["node", "fastifyServer.js"]
@@ -76,18 +73,15 @@ deploymentTarget = "autoscale"
 build = ["npm", "install"]
 
 [[ports]]
+localPort = 80
+externalPort = 3000
+
+[[ports]]
 localPort = 3000
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 5001
 externalPort = 80
-
-[[ports]]
-localPort = 8080
 
 [[ports]]
 localPort = 8081

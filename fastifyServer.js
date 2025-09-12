@@ -3666,8 +3666,9 @@ fastify.get('/api/rent-optimization/:walletAddress', async (request, reply) => {
   }
 });
 
-// Start the server - use port 5001 for Replit
-const port = process.env.PORT || 5001;
+// Start the server - use environment PORT or default based on environment
+// Production/Autoscale deployments should use port 80, development uses 5000
+const port = process.env.PORT || (process.env.NODE_ENV === 'production' ? 80 : 5000);
 const start = async () => {
   try {
     await fastify.listen({ port: port, host: '0.0.0.0' });
