@@ -73,7 +73,7 @@ waitForPort = 5001
 [deployment]
 run = ["node", "fastifyServer.js"]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["npm", "install"]
 
 [[ports]]
 localPort = 3000
@@ -103,6 +103,10 @@ localPort = 8084
 
 [[ports]]
 localPort = 8085
+
+[[ports]]
+localPort = 39323
+externalPort = 3000
 
 [agent]
 expertMode = true
