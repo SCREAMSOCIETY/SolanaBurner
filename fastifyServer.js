@@ -1606,6 +1606,7 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     let totalRentRecovered = 0;
     let totalFee = 0;
     const processedNFTs = [];
+    const invalidNFTs = []; // Track invalid NFTs with specific reasons
     
     // Maximum NFTs per batch transaction (limited by transaction size ~1232 bytes)
     // After optimization: reduced compute budget and memo instructions
@@ -1629,6 +1630,11 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
       
       if (!mint || !tokenAccount) {
         console.log(`Skipping NFT - missing data: mint=${mint}, tokenAccount=${tokenAccount}`);
+        invalidNFTs.push({
+          mint: mint || 'unknown',
+          tokenAccount: tokenAccount || 'unknown',
+          reason: 'Missing required data (mint address or token account address)'
+        });
         continue; // Skip invalid NFTs
       }
       
@@ -1643,6 +1649,11 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           tokenAccountInfo = await connection.getAccountInfo(tokenAccountPubkey);
           if (!tokenAccountInfo) {
             console.log(`Token account ${tokenAccount} not found for mint ${mint}, skipping`);
+            invalidNFTs.push({
+              mint,
+              tokenAccount,
+              reason: 'Token account not found - may have already been burned or transferred'
+            });
             continue; // Skip if account doesn't exist
           }
           
@@ -1666,6 +1677,11 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
           tokenBalance = await connection.getTokenAccountBalance(tokenAccountPubkey);
         } catch (balanceError) {
           console.log(`Token account ${tokenAccount} not found or invalid for mint ${mint}:`, balanceError.message);
+          invalidNFTs.push({
+            mint,
+            tokenAccount,
+            reason: `Token account invalid or inaccessible: ${balanceError.message}`
+          });
           continue; // Skip if token account doesn't exist
         }
         
@@ -1682,12 +1698,22 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         
         if (!tokenAccountExists) {
           console.log(`Token account ${tokenAccount} does not exist, skipping NFT ${mint}`);
+          invalidNFTs.push({
+            mint,
+            tokenAccount,
+            reason: 'Token account has been closed or never existed'
+          });
           continue;
         }
         
         // For Metaplex resized NFTs, be more flexible with balance validation
         if (!tokenBalance || !tokenBalance.value) {
           console.log(`Invalid token balance response for ${mint}:`, tokenBalance?.value);
+          invalidNFTs.push({
+            mint,
+            tokenAccount,
+            reason: 'Unable to read token balance - account may be corrupted or invalid'
+          });
           continue; // Skip if no balance data
         }
         
@@ -1735,6 +1761,11 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         
         if (!mintAccountExists) {
           console.log(`Mint account ${mint} does not exist, skipping NFT`);
+          invalidNFTs.push({
+            mint,
+            tokenAccount,
+            reason: 'NFT mint account no longer exists - NFT may have been burned or is invalid'
+          });
           continue;
         }
         
@@ -1855,15 +1886,54 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
         
       } catch (error) {
         console.error(`Error processing NFT ${mint}:`, error);
+        invalidNFTs.push({
+          mint,
+          tokenAccount,
+          reason: `Processing error: ${error.message}`
+        });
         continue; // Skip problematic NFTs
       }
     }
     
     if (processedNFTs.length === 0) {
       console.log('No processed NFTs found, returning error');
+      
+      // Create detailed error message based on invalid accounts
+      let errorMessage = 'Unable to burn any of the selected tokens. Here\'s what went wrong:\n\n';
+      const reasonCounts = {};
+      
+      // Count reasons for better error reporting (with sanitization)
+      invalidNFTs.forEach(nft => {
+        // Sanitize error messages for user-friendly display
+        let userFriendlyReason = nft.reason;
+        if (userFriendlyReason.includes('TokenAccountNotFoundError')) {
+          userFriendlyReason = 'Token account not found - likely already burned or transferred';
+        } else if (userFriendlyReason.includes('InvalidAccountOwner')) {
+          userFriendlyReason = 'Account owner mismatch - token may have been transferred';
+        } else if (userFriendlyReason.includes('AccountNotFound')) {
+          userFriendlyReason = 'Account no longer exists - may have been closed or burned';
+        }
+        
+        reasonCounts[userFriendlyReason] = (reasonCounts[userFriendlyReason] || 0) + 1;
+      });
+      
+      // Add specific reasons to error message
+      Object.entries(reasonCounts).forEach(([reason, count]) => {
+        if (count === 1) {
+          errorMessage += `• 1 token: ${reason}\n`;
+        } else {
+          errorMessage += `• ${count} tokens: ${reason}\n`;
+        }
+      });
+      
+      errorMessage += '\n💡 Try refreshing your wallet to see current assets, or check if these tokens were already burned or transferred.';
+      
       return reply.status(400).send({
         success: false,
-        error: 'No valid NFTs found to burn. The selected NFTs may have already been burned, transferred, or their accounts no longer exist. Please refresh your wallet to see current assets.'
+        error: errorMessage,
+        invalidAccounts: invalidNFTs,
+        totalAttempted: nfts.length,
+        totalInvalid: invalidNFTs.length
       });
     }
     
@@ -1936,13 +2006,42 @@ fastify.post('/api/batch-burn-nft', async (request, reply) => {
     const base64Transaction = serializedTransaction.toString('base64');
     console.log('Transaction serialized successfully');
     
+    // Create summary of invalid accounts for user feedback
+    const invalidSummary = {};
+    invalidNFTs.forEach(nft => {
+      // Sanitize error messages for user-friendly display
+      let userFriendlyReason = nft.reason;
+      if (userFriendlyReason.includes('TokenAccountNotFoundError')) {
+        userFriendlyReason = 'Token account not found - likely already burned or transferred';
+      } else if (userFriendlyReason.includes('InvalidAccountOwner')) {
+        userFriendlyReason = 'Account owner mismatch - token may have been transferred';
+      } else if (userFriendlyReason.includes('AccountNotFound')) {
+        userFriendlyReason = 'Account no longer exists - may have been closed or burned';
+      }
+      
+      invalidSummary[userFriendlyReason] = (invalidSummary[userFriendlyReason] || 0) + 1;
+    });
+
+    let message = `Prepared batch burn transaction for ${processedNFTs.length} NFTs`;
+    let warning = null;
+    
+    if (invalidNFTs.length > 0) {
+      warning = `${invalidNFTs.length} tokens were skipped and cannot be burned. Check the invalidAccounts details for specific reasons.`;
+    }
+
     reply.send({
       success: true,
       transaction: base64Transaction,
-      message: `Prepared batch burn transaction for ${processedNFTs.length} NFTs`,
+      message: message,
+      warning: warning,
       totalRentRecovered: totalRentRecovered.toFixed(4),
       totalFee: totalFee.toFixed(4),
       processedNFTs: processedNFTs,
+      invalidAccounts: invalidNFTs.slice(0, 50), // Cap at 50 to prevent payload bloat
+      invalidSummary: invalidSummary,
+      totalAttempted: nfts.length,
+      totalProcessed: processedNFTs.length,
+      totalInvalid: invalidNFTs.length,
       method: 'batch_burn'
     });
     
