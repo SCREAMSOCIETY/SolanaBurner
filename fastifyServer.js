@@ -1420,6 +1420,10 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     
     // Use enhanced burn method from enhanced-nft-burn.js for maximum rent recovery
     try {
+      // Clear Node.js require cache to ensure we get the latest version
+      const enhancedBurnPath = require.resolve('./enhanced-nft-burn');
+      delete require.cache[enhancedBurnPath];
+      
       const { createEnhancedBurnInstructions, calculateTotalRentRecovery, calculateNFTAccounts } = require('./enhanced-nft-burn');
       
       // Calculate all recoverable accounts
