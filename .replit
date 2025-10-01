@@ -74,3 +74,11 @@ build = ["npm", "install"]
 
 [agent]
 expertMode = true
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 44043
+externalPort = 3000

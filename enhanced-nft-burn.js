@@ -171,7 +171,7 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
         // Metadata account burning requires proper Metaplex library integration
         console.log('Enhanced burn: Using token account recovery only (reliable method)');
         
-        console.log(`Enhanced burn: Created ${instructions.length} instructions for enhanced recovery`);
+        console.log(`✅ ENHANCED BURN: Created EXACTLY ${instructions.length} instructions (should be 2: burn + close)`);
         
     } catch (error) {
         console.log('Using fallback burn method:', error.message);
