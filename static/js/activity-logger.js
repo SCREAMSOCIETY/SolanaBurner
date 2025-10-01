@@ -3,7 +3,7 @@
  * Records user activities like burns, transfers, etc. for display in Recent Activity Feed
  */
 
-export class ActivityLogger {
+class ActivityLogger {
   static STORAGE_KEY = 'solburnt-recent-activity';
   static MAX_ACTIVITIES = 50;
 
