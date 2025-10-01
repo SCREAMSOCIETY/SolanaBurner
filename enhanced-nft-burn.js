@@ -166,25 +166,10 @@ async function createEnhancedBurnInstructions(connection, mint, owner, collectio
         );
         instructions.push(closeTokenInstruction);
         
-        // 3. Try to close metadata account with proper instruction format
-        // Use the correct Metaplex instruction for burning metadata
-        try {
-            const closeMetadataInstruction = new TransactionInstruction({
-                keys: [
-                    { pubkey: accounts.metadataPda, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: true, isWritable: false },
-                    { pubkey: accounts.mint, isSigner: false, isWritable: false },
-                    { pubkey: accounts.tokenAccount, isSigner: false, isWritable: false }
-                ],
-                programId: METADATA_PROGRAM_ID,
-                data: Buffer.from([19]) // Close metadata account instruction (burn_nft)
-            });
-            instructions.push(closeMetadataInstruction);
-            console.log('Added metadata close instruction');
-        } catch (metaError) {
-            console.log('Skipping metadata close:', metaError.message);
-        }
+        // 3. Metadata burning is disabled due to instruction format incompatibilities
+        // The token burn + close account already recovers the primary rent (~0.002 SOL)
+        // Metadata account burning requires proper Metaplex library integration
+        console.log('Enhanced burn: Using token account recovery only (reliable method)');
         
         console.log(`Enhanced burn: Created ${instructions.length} instructions for enhanced recovery`);
         
