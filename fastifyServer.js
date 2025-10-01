@@ -58,13 +58,19 @@ fastify.get('/default-nft-image.svg', async (request, reply) => {
   }
 });
 
-// Register static files from static directory with caching
+// Register static files from static directory with NO caching for JS/CSS (always get fresh code)
 fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'static'),
   prefix: '/static/',
   setHeaders: (res, path) => {
-    // Cache static assets for 1 hour
-    if (path.includes('.js') || path.includes('.css') || path.includes('.png') || path.includes('.svg')) {
+    // NO CACHE for JS/CSS to always get fresh code after rebuilds
+    if (path.includes('.js') || path.includes('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+    // Cache images for 1 hour
+    else if (path.includes('.png') || path.includes('.svg')) {
       res.setHeader('Cache-Control', 'public, max-age=3600');
     }
   }
