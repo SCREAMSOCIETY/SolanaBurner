@@ -1525,6 +1525,14 @@ fastify.post('/api/burn-nft', async (request, reply) => {
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = ownerPubkey;
     
+    // Log transaction instructions for debugging
+    console.log('=== TRANSACTION INSTRUCTIONS DEBUG ===');
+    console.log(`Total instructions: ${transaction.instructions.length}`);
+    transaction.instructions.forEach((ix, index) => {
+      console.log(`Instruction ${index}: Program ${ix.programId.toBase58()}`);
+    });
+    console.log('=== END TRANSACTION DEBUG ===');
+    
     // Simulate transaction to catch errors before sending to client
     try {
       const simulation = await connection.simulateTransaction(transaction);

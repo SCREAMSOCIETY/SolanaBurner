@@ -72,35 +72,5 @@ run = ["node", "fastifyServer.js"]
 deploymentTarget = "gce"
 build = ["npm", "install"]
 
-[[ports]]
-localPort = 80
-externalPort = 3000
-
-[[ports]]
-localPort = 3000
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
-[[ports]]
-localPort = 8081
-
-[[ports]]
-localPort = 8082
-
-[[ports]]
-localPort = 8083
-
-[[ports]]
-localPort = 8084
-
-[[ports]]
-localPort = 8085
-
-[[ports]]
-localPort = 35139
-externalPort = 3001
-
 [agent]
 expertMode = true
