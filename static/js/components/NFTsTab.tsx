@@ -48,7 +48,6 @@ const NFTsTab: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [burning, setBurning] = useState(false);
-  const [selectedNfts, setSelectedNfts] = useState<Set<string>>(new Set());
 
   // Fun animation for loading - returns a different loading message each time
   const getLoadingMessage = () => {
@@ -125,16 +124,6 @@ const NFTsTab: React.FC = () => {
       setLoading(false);
     }
   }, [publicKey, connection]);
-  
-  const toggleNftSelection = (mint: string) => {
-    const newSelected = new Set(selectedNfts);
-    if (newSelected.has(mint)) {
-      newSelected.delete(mint);
-    } else {
-      newSelected.add(mint);
-    }
-    setSelectedNfts(newSelected);
-  };
   
   const handleBurnNft = async (mint: string) => {
     if (!publicKey || !signTransaction || !connection) {
@@ -329,130 +318,6 @@ const NFTsTab: React.FC = () => {
     }
   };
   
-  const handleBulkBurn = async () => {
-    if (!publicKey || selectedNfts.size === 0 || !signTransaction || !connection) {
-      setError('Wallet not properly connected. Please reconnect your wallet.');
-      return;
-    }
-    
-    try {
-      setBurning(true);
-      setError('Preparing batch burn transaction...');
-      
-      const selectedNftData = nfts.filter(nft => selectedNfts.has(nft.mint));
-      console.log(`[NFTsTab] Starting batch burn for ${selectedNftData.length} NFTs`);
-      
-      // Prepare NFT data for batch burn
-      const nftsToProcess = selectedNftData.map(nft => ({
-        mint: nft.mint,
-        tokenAccount: nft.tokenAddress,
-        name: nft.name || 'Unknown NFT'
-      })).filter(nft => nft.tokenAccount); // Only include NFTs with valid token accounts
-      
-      if (nftsToProcess.length === 0) {
-        throw new Error("No valid NFTs found to burn");
-      }
-      
-      setError(`Creating batch transaction for ${nftsToProcess.length} NFTs...`);
-      
-      // Call batch burn endpoint
-      const response = await fetch('/api/batch-burn-nft', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nfts: nftsToProcess,
-          owner: publicKey.toString()
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        // Check if it's a batch size limit error
-        if (result.maxBatchSize) {
-          throw new Error(`${result.error} Please select ${result.maxBatchSize} or fewer NFTs.`);
-        }
-        
-        // Check if it's an account validation error - suggest refresh
-        if (result.error && result.error.includes('accounts no longer exist')) {
-          throw new Error(`${result.error}\n\nPlease refresh your wallet to see current assets and try again.`);
-        }
-        
-        throw new Error(result.error || 'Failed to prepare batch transaction');
-      }
-      
-      setError(`Please approve the batch transaction in your wallet (${result.processedNFTs.length} NFTs)...`);
-      
-      // Get the prepared batch transaction
-      const { transaction: transactionBase64, totalRentRecovered, totalFee, processedNFTs } = result;
-      const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
-      
-      // Sign the batch transaction (single wallet confirmation)
-      const signedTransaction = await signTransaction(transaction);
-      
-      setError("Sending batch transaction...");
-      
-      const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-        preflightCommitment: 'processed'
-      });
-      
-      setError("Confirming batch transaction...");
-      
-      // Wait for confirmation
-      await connection.confirmTransaction(signature, 'processed');
-      
-      // Success! Show results
-      setError(`Successfully burned ${processedNFTs.length} NFTs! Total rent recovered: ${totalRentRecovered} SOL (Fee: ${totalFee} SOL)`);
-      
-      // Apply burn animations for successful burns
-      if (processedNFTs.length > 0 && window.BurnAnimations) {
-        // Animate NFT elements that were successfully burned
-        const burnedMints = processedNFTs.map((nft: any) => nft.mint);
-        const nftElements = Array.from(document.querySelectorAll('.nft-card')).filter(element => {
-          const mintAttribute = (element as HTMLElement).dataset.mint;
-          return mintAttribute && burnedMints.includes(mintAttribute);
-        }) as HTMLElement[];
-        
-        // Animate each NFT with a slight delay
-        nftElements.forEach((element, index) => {
-          setTimeout(() => {
-            window.BurnAnimations?.applyBurnAnimation(element);
-          }, index * 200);
-        });
-        
-        // Show confetti for successful bulk burn
-        window.BurnAnimations.createConfetti();
-        window.BurnAnimations.checkAchievements('nft', processedNFTs.length);
-        
-        if (processedNFTs.length >= 2) {
-          window.BurnAnimations.showAchievement(
-            "Bulk Burn Master!", 
-            `Successfully burned ${processedNFTs.length} NFTs! Rent recovered: ${totalRentRecovered} SOL`
-          );
-        }
-      }
-      
-      // Remove successfully burned NFTs from the list
-      const burnedMints = processedNFTs.map((nft: any) => nft.mint);
-      setNfts(nfts.filter(nft => !burnedMints.includes(nft.mint)));
-      setSelectedNfts(new Set());
-      
-    } catch (err: any) {
-      console.error('[NFTsTab] Error in batch burn process:', err);
-      setError(`Batch burn failed: ${err.message || 'Unknown error'}`);
-    } finally {
-      setBurning(false);
-    }
-  };
-  
   // Group NFTs by collection
   const groupedNfts = nfts.reduce((acc, nft) => {
     const collection = nft.collection || 'Uncategorized';
@@ -475,43 +340,6 @@ const NFTsTab: React.FC = () => {
   return (
     <div className="container">
       <h2>NFTs</h2>
-      {nfts.length > 0 && (
-        <div className="selection-help" style={{
-          backgroundColor: '#9945FF',
-          color: 'white',
-          padding: '15px',
-          borderRadius: '10px',
-          textAlign: 'center',
-          marginBottom: '20px',
-          fontSize: '16px',
-          fontWeight: 'bold'
-        }}>
-          <span className="help-text">
-            {selectedNfts.size === 0 
-              ? "🔥 Click the PURPLE BOXES on NFT cards to select them for bulk burning!" 
-              : `✅ ${selectedNfts.size} NFT${selectedNfts.size > 1 ? 's' : ''} selected - Ready to burn!`
-            }
-          </span>
-        </div>
-      )}
-      {selectedNfts.size > 0 && (
-        <div className="bulk-actions">
-          <button 
-            className="burn-button bulk-burn"
-            onClick={handleBulkBurn}
-            disabled={burning}
-          >
-            {burning ? 'Burning...' : `🔥 Burn Selected (${selectedNfts.size})`}
-          </button>
-          <button 
-            className="clear-selection-btn"
-            onClick={() => setSelectedNfts(new Set())}
-            disabled={burning}
-          >
-            Clear Selection
-          </button>
-        </div>
-      )}
       {loading ? (
         <div className="loading-message">
           <div className="loading-spinner"></div>
@@ -533,40 +361,9 @@ const NFTsTab: React.FC = () => {
                 {collectionNfts.map((nft) => (
                   <div 
                     key={nft.mint} 
-                    className={`asset-card nft-card ${selectedNfts.has(nft.mint) ? 'selected' : ''}`}
+                    className="asset-card nft-card"
                     data-mint={nft.mint}
                   >
-                    <div className="nft-header" style={{
-                      position: 'absolute',
-                      top: '5px',
-                      left: '5px',
-                      zIndex: 1000,
-                      backgroundColor: 'rgba(153, 69, 255, 0.9)',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: '2px solid #9945FF'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedNfts.has(nft.mint)}
-                        onChange={() => toggleNftSelection(nft.mint)}
-                        className="nft-select"
-                        title="Select this NFT for bulk burning"
-                        style={{
-                          width: '20px',
-                          height: '20px',
-                          cursor: 'pointer',
-                          accentColor: '#9945FF'
-                        }}
-                      />
-                      <span style={{
-                        color: 'white',
-                        fontSize: '12px',
-                        marginLeft: '5px'
-                      }}>
-                        Select
-                      </span>
-                    </div>
                     <div className="nft-image-wrapper">
                       <img 
                         src={nft.image} 
