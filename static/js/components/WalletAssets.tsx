@@ -1813,123 +1813,52 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk burn of NFTs - using batch burn for single transaction
+  // Handle bulk burn of NFTs - using simple individual burns (same as single burn)
   const handleBulkBurnNFTs = async () => {
     if (selectedNFTs.length === 0) return;
     
     setIsBurning(true);
-    setError("Preparing batch burn transaction...");
+    let successCount = 0;
+    let failCount = 0;
     
     try {
-      // Prepare NFT data for batch burn
-      const nftsToProcess = selectedNFTs.map(mint => {
-        const nft = nfts.find(n => n.mint === mint);
-        return {
-          mint,
-          tokenAccount: nft?.tokenAddress,
-          name: nft?.name || 'Unknown NFT'
-        };
-      }).filter(nft => nft.tokenAccount); // Only include NFTs with valid token accounts
+      const nftsToProcess = selectedNFTs.map(mint => nfts.find(n => n.mint === mint)).filter(Boolean) as NFTData[];
       
-      if (nftsToProcess.length === 0) {
-        throw new Error("No valid NFTs found to burn");
-      }
+      setError(`Burning ${nftsToProcess.length} NFTs one by one...`);
       
-      setError(`Creating batch transaction for ${nftsToProcess.length} NFTs...`);
-      
-      // Call batch burn endpoint
-      const response = await fetch('/api/batch-burn-nft', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nfts: nftsToProcess,
-          owner: publicKey.toString()
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        // Check if it's a batch size limit error
-        if (result.maxBatchSize) {
-          throw new Error(`${result.error} Please select ${result.maxBatchSize} or fewer NFTs.`);
+      // Burn each NFT individually using the same approach as single burn
+      for (let i = 0; i < nftsToProcess.length; i++) {
+        const nft = nftsToProcess[i];
+        
+        try {
+          setError(`Burning NFT ${i + 1}/${nftsToProcess.length}: ${nft.name}...`);
+          
+          // Use the exact same logic as handleBurnNFT
+          await handleBurnNFT(nft);
+          successCount++;
+          
+        } catch (err) {
+          console.error(`Failed to burn NFT ${nft.mint}:`, err);
+          failCount++;
         }
-        throw new Error(result.error || 'Failed to prepare batch transaction');
       }
       
-      setError(`Please approve the batch transaction in your wallet (${result.processedNFTs.length} NFTs)...`);
-      
-      // Get the prepared batch transaction
-      const { transaction: transactionBase64, totalRentRecovered, totalFee, processedNFTs } = result;
-      const transaction = Transaction.from(Buffer.from(transactionBase64, 'base64'));
-      
-      // Sign the batch transaction (single wallet confirmation)
-      const signedTransaction = await signTransaction(transaction);
-      
-      setError("Sending batch transaction...");
-      
-      const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-        preflightCommitment: 'processed'
-      });
-      
-      setError("Confirming batch transaction...");
-      
-      // Wait for confirmation
-      await connection.confirmTransaction(signature, 'processed');
-      
-      // Success! Show results
-      setError(`✅ Successfully burned ${processedNFTs.length} NFTs! Total rent recovered: ${totalRentRecovered} SOL (Fee: ${totalFee} SOL)`);
-      
-      // Remove successfully processed NFTs from the list
-      const processedMints = processedNFTs.map(nft => nft.mint);
-      setNfts(prev => prev.filter(n => !processedMints.includes(n.mint)));
-      setSelectedNFTs([]);
-      
-      // Apply burn animations to processed NFTs
-      processedMints.forEach(mint => {
-        const nftCard = document.querySelector(`[data-mint="${mint}"]`) as HTMLElement;
-        if (nftCard && window.BurnAnimations?.applyBurnAnimation) {
-          window.BurnAnimations.applyBurnAnimation(nftCard);
+      // Show final results
+      if (successCount > 0) {
+        setError(`✅ Successfully burned ${successCount} NFT${successCount > 1 ? 's' : ''}!${failCount > 0 ? ` (${failCount} failed)` : ''}`);
+        setSelectedNFTs([]);
+        
+        if (window.BurnAnimations) {
+          window.BurnAnimations.createConfetti();
+          window.BurnAnimations.checkAchievements('nft', successCount);
         }
-      });
-      
-      if (window.BurnAnimations) {
-        window.BurnAnimations.createConfetti();
-        window.BurnAnimations.checkAchievements('nft', processedNFTs.length);
+      } else {
+        setError(`❌ Failed to burn all ${failCount} NFTs. Please try again.`);
       }
 
     } catch (error: any) {
-      console.error('Error in batch burn operation:', error);
-      
-      // Properly format error messages to avoid "[object Object]"
-      let errorMessage = 'Unknown error occurred';
-      
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.error) {
-        errorMessage = error.error;
-      } else if (error) {
-        try {
-          errorMessage = JSON.stringify(error);
-        } catch (e) {
-          errorMessage = String(error);
-        }
-      }
-      
-      setError(`Error burning tokens: ${errorMessage}`);
-      
-      // Log the full error for debugging
-      console.error('Full error details:', error);
+      console.error('Error in bulk burn operation:', error);
+      setError(`Error during bulk burn: ${error?.message || 'Unknown error'}`);
     } finally {
       setIsBurning(false);
     }
