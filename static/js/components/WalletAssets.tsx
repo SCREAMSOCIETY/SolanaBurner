@@ -962,21 +962,7 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // 2. If we have the metadata account, close it to get SOL back
-      if (nft.metadataAddress) {
-        try {
-          // Create close account instruction for the metadata
-          const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
-          
-          // Add a deleteMetadataAccount instruction to remove the metadata account
-          // Note: This is a complex operation that might require custom instruction creation
-          // depending on the metadata program version, for now we're leaving it out
-        } catch (error) {
-          console.warn('Could not add metadata account closing instruction:', error);
-        }
-      }
-      
-      // 3. Close the token account to recover rent
+      // 2. Close the token account to recover rent
       transaction.add(
         createCloseAccountInstruction(
           new PublicKey(nft.tokenAddress), // token account to close
