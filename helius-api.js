@@ -69,39 +69,56 @@ async function fetchAllNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs for wallet: ${walletAddress}`);
     
-    // Direct API call to Helius RPC endpoint to avoid circular references
-    const rpcResponse = await axios.post(
-      HELIUS_RPC_URL,
-      {
-        jsonrpc: '2.0',
-        id: 'helius-wallet-assets',
-        method: 'getAssetsByOwner',
-        params: {
-          ownerAddress: walletAddress,
-          page: 1, 
-          limit: 1000,
-          displayOptions: {
-            showCollectionMetadata: true
+    let allAssets = [];
+    let page = 1;
+    let hasMorePages = true;
+    
+    // Fetch all pages until we have all assets
+    while (hasMorePages) {
+      const rpcResponse = await axios.post(
+        HELIUS_RPC_URL,
+        {
+          jsonrpc: '2.0',
+          id: `helius-wallet-assets-page-${page}`,
+          method: 'getAssetsByOwner',
+          params: {
+            ownerAddress: walletAddress,
+            page: page, 
+            limit: 1000,
+            displayOptions: {
+              showCollectionMetadata: true
+            }
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': HELIUS_API_KEY
           }
         }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': HELIUS_API_KEY
+      );
+      
+      // Safety check to make sure we have a valid response
+      if (rpcResponse?.data?.result?.items) {
+        const pageAssets = rpcResponse.data.result.items;
+        allAssets = allAssets.concat(pageAssets);
+        
+        console.log(`[Helius API] Page ${page}: Found ${pageAssets.length} assets (Total so far: ${allAssets.length})`);
+        
+        // If we got less than 1000 items, we've reached the last page
+        if (pageAssets.length < 1000) {
+          hasMorePages = false;
+        } else {
+          page++;
         }
+      } else {
+        console.warn(`[Helius API] No items found in page ${page} response`);
+        hasMorePages = false;
       }
-    );
-    
-    // Safety check to make sure we have a valid response
-    if (rpcResponse?.data?.result?.items) {
-      const assets = rpcResponse.data.result.items;
-      console.log(`[Helius API] Found ${assets.length} NFTs/assets`);
-      return assets;
-    } else {
-      console.warn('[Helius API] No items found in RPC response');
-      return [];
     }
+    
+    console.log(`[Helius API] Finished fetching all pages. Total assets: ${allAssets.length}`);
+    return allAssets;
   } catch (error) {
     console.error('[Helius API] Error fetching NFTs:', error.message);
     throw error;
