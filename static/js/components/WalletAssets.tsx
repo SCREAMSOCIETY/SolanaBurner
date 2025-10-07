@@ -1799,56 +1799,7 @@ const WalletAssets: React.FC = () => {
     }
   };
 
-  // Handle bulk burn of NFTs - using simple individual burns (same as single burn)
-  const handleBulkBurnNFTs = async () => {
-    if (selectedNFTs.length === 0) return;
-    
-    setIsBurning(true);
-    let successCount = 0;
-    let failCount = 0;
-    
-    try {
-      const nftsToProcess = selectedNFTs.map(mint => nfts.find(n => n.mint === mint)).filter(Boolean) as NFTData[];
-      
-      setError(`Burning ${nftsToProcess.length} NFTs one by one...`);
-      
-      // Burn each NFT individually using the same approach as single burn
-      for (let i = 0; i < nftsToProcess.length; i++) {
-        const nft = nftsToProcess[i];
-        
-        try {
-          setError(`Burning NFT ${i + 1}/${nftsToProcess.length}: ${nft.name}...`);
-          
-          // Use the exact same logic as handleBurnNFT
-          await handleBurnNFT(nft);
-          successCount++;
-          
-        } catch (err) {
-          console.error(`Failed to burn NFT ${nft.mint}:`, err);
-          failCount++;
-        }
-      }
-      
-      // Show final results
-      if (successCount > 0) {
-        setError(`✅ Successfully burned ${successCount} NFT${successCount > 1 ? 's' : ''}!${failCount > 0 ? ` (${failCount} failed)` : ''}`);
-        setSelectedNFTs([]);
-        
-        if (window.BurnAnimations) {
-          window.BurnAnimations.createConfetti();
-          window.BurnAnimations.checkAchievements('nft', successCount);
-        }
-      } else {
-        setError(`❌ Failed to burn all ${failCount} NFTs. Please try again.`);
-      }
-
-    } catch (error: any) {
-      console.error('Error in bulk burn operation:', error);
-      setError(`Error during bulk burn: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setIsBurning(false);
-    }
-  };
+  // Bulk burn NFTs removed - use individual burn buttons instead
 
   // Handle bulk transfer of cNFTs to project wallet
   const handleBulkBurnCNFTs = async () => {
@@ -2219,18 +2170,6 @@ const WalletAssets: React.FC = () => {
                   </div>
                 )}
                 
-                {selectedNFTs.length > 0 && (
-                  <div className="selection-group">
-                    <span>{selectedNFTs.length} NFTs selected</span>
-                    <button 
-                      className="bulk-burn-button"
-                      disabled={isBurning}
-                      onClick={handleBulkBurnNFTs}
-                    >
-                      Burn Selected NFTs
-                    </button>
-                  </div>
-                )}
                 
                 {selectedCNFTs.length > 0 && (
                   <div className="selection-group cnft-selection-group">
