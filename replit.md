@@ -3,6 +3,10 @@
 ## Overview
 Solburnt is a sophisticated web application designed for managing Solana blockchain assets. It offers advanced tools for debugging, transaction analysis, and interactive management of crypto assets, including both regular and compressed NFTs (cNFTs). The application enables users to burn, transfer, and estimate rent returns from token accounts, aiming to maximize SOL recovery from dormant or unwanted assets.
 
+## Recent Changes
+- **October 12, 2025**: Fixed vacant account burn success notifications and activity logging. Added `BurnAnimations.showNotification()` popup and 2-second delay before page reload to ensure activity log entries are visible to users.
+- **October 12, 2025**: Removed ALL bulk burn functionality from UI in favor of individual burn buttons for simpler, more reliable user experience.
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 

@@ -240,8 +240,18 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
           submitResult.signature
         );
         
-        // Refresh the page to show updated balances
-        window.location.reload();
+        // Show success notification
+        if (typeof window !== 'undefined' && (window as any).BurnAnimations?.showNotification) {
+          (window as any).BurnAnimations.showNotification(
+            '🎉 Vacant Accounts Burned!',
+            `Successfully burned ${submitResult.accountCount || result.accountCount} vacant accounts and recovered ${actualRecoveredSOL.toFixed(6)} SOL!`
+          );
+        }
+        
+        // Add a small delay before reloading to allow the activity to be displayed
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       } else {
         console.error('[RentEstimate] Transaction submission failed:', submitResult.error);
         alert(`Transaction failed: ${submitResult.error || 'Unknown error occurred'}`);
