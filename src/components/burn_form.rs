@@ -10,6 +10,7 @@ pub struct BurnForm {
     loading: bool,
 }
 
+//yooo
 pub enum Msg {
     UpdateAmount(String),
     Burn,
