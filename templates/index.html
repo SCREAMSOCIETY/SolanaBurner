@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/static/direct-trash-modal.css">
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app"></div>
     
     <script src="/static/dist/WalletProvider.js"></script>
     <script src="/static/dist/app.js"></script>
@@ -46,5 +46,12 @@
     <script src="/static/js/standalone-cnft-transfer.js"></script>
     <script src="/static/js/cnft-fix.js"></script>
     <script src="/static/js/cNFTStandaloneTransfer.js"></script>
+    
+    <script>
+        // Initialize React app after all scripts load
+        if (window.App && window.App.render) {
+            window.App.render();
+        }
+    </script>
 </body>
 </html>
