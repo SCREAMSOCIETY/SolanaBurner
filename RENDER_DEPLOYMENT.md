@@ -32,7 +32,7 @@ Render will auto-detect your `render.yaml` file. Verify these settings:
 - **Region:** Oregon (or closest to your users)
 - **Branch:** `main` (or `next` if you prefer)
 - **Build Command:** `npm install && npm run build`
-- **Start Command:** `npm start`
+- **Start Command:** `node fastifyServer.js`
 
 **Advanced Settings:**
 - **Health Check Path:** `/health`
@@ -105,17 +105,17 @@ Every time you push to GitHub `main` branch:
 
 ## 💰 Pricing
 
-**Free Tier:**
-- 750 hours/month free
-- App sleeps after 15 min of inactivity
-- ~30 second cold start when waking up
+**Starter Plan ($7/month):**
+- 512 MB RAM
+- Shared CPU
+- App stays running
+- Perfect for production
 
-**Paid Tier ($7/month):**
-- Always-on (no sleeping)
-- Instant response times
-- Better for production
+**Standard Plan ($25/month):**
+- More resources for high traffic
+- Dedicated CPU
 
-Start with free tier, upgrade if you get traffic!
+Start with Starter plan - it's reliable and affordable!
 
 ---
 

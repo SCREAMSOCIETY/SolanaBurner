@@ -57,9 +57,9 @@ Add these **3 API keys** in Render's dashboard:
 ### Step 5: Deploy!
 Click "Create Web Service" and Render will:
 1. Install dependencies (~3-4 minutes)
-2. Build the frontend
-3. Start the server
-4. Run health checks
+2. Build the frontend with webpack
+3. Start fastifyServer.js on dynamic PORT
+4. Run health checks at /health
 5. Go live! 🎉
 
 ---
@@ -84,10 +84,11 @@ Render gives you: `https://solburnt.onrender.com`
 
 ## 💡 Important Notes
 
-### Free Tier Behavior
-- App sleeps after 15 minutes of inactivity
-- ~30 second wake-up time on first request
-- Upgrade to $7/month for always-on service
+### Starter Plan ($7/month)
+- App stays running (no sleeping)
+- 512 MB RAM, shared CPU
+- Perfect for production use
+- Upgrade to Standard ($25/month) for high traffic
 
 ### Auto-Deploy
 Every push to GitHub `main` branch automatically deploys to Render in ~3-5 minutes.
