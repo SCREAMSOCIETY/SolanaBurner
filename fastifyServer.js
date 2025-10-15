@@ -608,8 +608,9 @@ fastify.post('/api/prepare-burn-transactions', async (request, reply) => {
     // Simplified approach - directly process accounts without complex validation
     let validAccountCount = 0;
     
-    // Process only first 3 accounts to avoid mobile wallet issues
-    const accountsToProcess = vacantAccounts.slice(0, 3);
+    // Process ALL vacant accounts in one transaction (up to 25 to stay within Solana transaction size limits)
+    const MAX_ACCOUNTS_PER_TX = 25;
+    const accountsToProcess = vacantAccounts.slice(0, Math.min(vacantAccounts.length, MAX_ACCOUNTS_PER_TX));
     
     for (const account of accountsToProcess) {
       try {

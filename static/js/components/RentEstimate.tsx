@@ -62,6 +62,51 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
     setProcessId(prev => prev + 1);
   }, []);
 
+  // Fetch rent estimate function (extracted so it can be called after burn)
+  const fetchRentEstimate = React.useCallback(async () => {
+    if (!publicKey) {
+      setRentData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setRentData(null); // Clear previous data immediately
+
+      // Add timeout to prevent long waits
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      // First try to get accurate rent estimates using the enhanced calculator
+      const response = await axios.get(`/api/rent-estimate/${publicKey.toString()}`, {
+        params: { useAccurateCalculator: true },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.data && response.data.success) {
+        setRentData(response.data.data);
+      } else {
+        setError('Failed to calculate rent estimate');
+      }
+    } catch (err: any) {
+      console.error('Error fetching rent estimate:', err);
+      if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
+        setError('Request timed out - please try again');
+      } else if (err.response?.status === 404) {
+        setError('Wallet address not found');
+      } else {
+        setError('Unable to fetch rent estimate');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey]);
+
   const handleBurnVacantAccounts = async () => {
     if (!publicKey || !signTransaction) {
       alert('Please connect your wallet first');
@@ -248,10 +293,8 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
           );
         }
         
-        // Add a small delay before reloading to allow the activity to be displayed
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+        // Refresh rent data to update UI and hide button if no vacant accounts remain
+        await fetchRentEstimate();
       } else {
         console.error('[RentEstimate] Transaction submission failed:', submitResult.error);
         alert(`Transaction failed: ${submitResult.error || 'Unknown error occurred'}`);
@@ -288,55 +331,11 @@ const RentEstimate: React.FC<RentEstimateProps> = ({
   };
 
   useEffect(() => {
-    const fetchRentEstimate = async () => {
-      if (!publicKey) {
-        setRentData(null);
-        setError(null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-        setRentData(null); // Clear previous data immediately
-
-        // Add timeout to prevent long waits
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-        // First try to get accurate rent estimates using the enhanced calculator
-        const response = await axios.get(`/api/rent-estimate/${publicKey.toString()}`, {
-          params: { useAccurateCalculator: true },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.data && response.data.success) {
-          setRentData(response.data.data);
-        } else {
-          setError('Failed to calculate rent estimate');
-        }
-      } catch (err: any) {
-        console.error('Error fetching rent estimate:', err);
-        if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
-          setError('Request timed out - please try again');
-        } else if (err.response?.status === 404) {
-          setError('Wallet address not found');
-        } else {
-          setError('Unable to fetch rent estimate');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
     // Add a small delay to prevent rapid-fire requests when switching wallets
     const timeoutId = setTimeout(fetchRentEstimate, 500);
     
     return () => clearTimeout(timeoutId);
-  }, [publicKey]);
+  }, [publicKey, fetchRentEstimate]);
 
   // Calculate live rent estimate based on selected assets
   // Note: cNFTs don't return rent because they don't have individual token accounts
