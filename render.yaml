@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: solburnt
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HELIUS_API_KEY
+        sync: false
+      - key: QUICKNODE_RPC_URL
+        sync: false
+      - key: SOLSCAN_API_KEY
+        sync: false
+    autoDeploy: true
