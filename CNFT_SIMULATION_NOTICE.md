@@ -2,7 +2,7 @@
 
 ## Important Information About cNFT Burning
 
-When using the Solburnt application, you'll notice that compressed NFTs (cNFTs) are handled differently from regular tokens and NFTs. This document explains why and what to expect.
+When using the SolBurn application, you'll notice that compressed NFTs (cNFTs) are handled differently from regular tokens and NFTs. This document explains why and what to expect.
 
 ## Why Simulation Mode?
 

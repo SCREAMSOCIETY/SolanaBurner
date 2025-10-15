@@ -1935,8 +1935,8 @@ export class CNFTHandler {
         console.log(`Initiating direct transfer of cNFT: ${assetId} to ${destinationAddress || 'screamsociety.sol'}`);
         
         try {
-            // Fixed implementation removed - using fallback methods
-            // const fixedImplementation = await import('./fixed-cnft-handler.js');
+            // Import our fixed implementation
+            const fixedImplementation = await import('./fixed-cnft-handler.js');
             
             if (!this.wallet.publicKey || !this.wallet.signTransaction) {
                 throw new Error('Wallet not connected or missing signTransaction method');
@@ -2026,8 +2026,8 @@ export class CNFTHandler {
                 try {
                     console.log("METHOD 1: Using standard Bubblegum protocol transfer");
                     
-                    // Bubblegum implementation removed - using fallback
-                    // const bubblegumImplementation = await import('./bubblegum-transfer.js');
+                    // Import our Bubblegum implementation
+                    const bubblegumImplementation = await import('./bubblegum-transfer.js');
                     
                     // Check if we can use Bubblegum transfer
                     if (bubblegumImplementation.canUseCompressedTransfer(assetData, {

@@ -1,7 +1,7 @@
 {
-  "name": "Solburnt Test cNFT",
+  "name": "SolBurn Test cNFT",
   "symbol": "SBT",
-  "description": "A test compressed NFT for the Solburnt application",
+  "description": "A test compressed NFT for the SolBurn application",
   "image": "https://raw.githubusercontent.com/metaplex-foundation/docs/main/docs/programs/bubblegum/assets/bubblegum-icon.png",
   "attributes": [
     {
@@ -10,7 +10,7 @@
     },
     {
       "trait_type": "Created By",
-      "value": "Solburnt App"
+      "value": "SolBurn App"
     },
     {
       "trait_type": "Purpose",

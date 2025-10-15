@@ -29,7 +29,7 @@ const rateLimitedAxios = {
 };
 
 /**
- * Fetches all NFTs (both regular and compressed) for a wallet address
+ * Fetches all NFTs (both regular and compressed) for a wallet address using Helius API's v0 endpoint
  * @param {string} walletAddress - The Solana wallet address
  * @returns {Promise<Array>} - Array of NFT data objects
  */
@@ -37,26 +37,27 @@ async function fetchAllWalletNFTs(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs (regular + compressed) for wallet: ${walletAddress}`);
     
-    // Use the RPC endpoint directly instead of the v0 REST API
-    const allNFTs = await fetchAllNFTsByOwner(walletAddress);
+    // Use the proxy API endpoint instead of direct Helius API access
+    const url = `/api/helius/wallet/nfts/${walletAddress}`;
+    const response = await axios.get(url);
     
-    // Filter assets by compression
-    const regularNfts = allNFTs.filter(nft => !nft.compression?.compressed)
-      .map(formatHeliusNFTData);
-    const compressedNfts = allNFTs.filter(nft => nft.compression?.compressed)
-      .map(formatHeliusNFTData);
+    if (response.data && response.data.success) {
+      const { regularNfts, compressedNfts } = response.data.data;
       
-    console.log(`[Helius API] Found ${regularNfts.length + compressedNfts.length} total NFTs (${regularNfts.length} regular, ${compressedNfts.length} compressed)`);
-    
-    return {
-      allNfts: [...regularNfts, ...compressedNfts],
-      regularNfts: regularNfts,
-      compressedNfts: compressedNfts
-    };
+      console.log(`[Helius API] Found ${regularNfts.length + compressedNfts.length} total NFTs (${regularNfts.length} regular, ${compressedNfts.length} compressed)`);
+      
+      return {
+        allNfts: [...regularNfts, ...compressedNfts],
+        regularNfts: regularNfts,
+        compressedNfts: compressedNfts
+      };
+    } else {
+      console.warn('[Helius API] Invalid response format:', response.data);
+      return { allNfts: [], regularNfts: [], compressedNfts: [] };
+    }
   } catch (error) {
     console.error('[Helius API] Error fetching wallet NFTs:', error.message);
-    // Return empty arrays rather than throwing
-    return { allNfts: [], regularNfts: [], compressedNfts: [] };
+    throw error;
   }
 }
 
@@ -69,56 +70,39 @@ async function fetchAllNFTsByOwner(walletAddress) {
   try {
     console.log(`[Helius API] Fetching all NFTs for wallet: ${walletAddress}`);
     
-    let allAssets = [];
-    let page = 1;
-    let hasMorePages = true;
-    
-    // Fetch all pages until we have all assets
-    while (hasMorePages) {
-      const rpcResponse = await axios.post(
-        HELIUS_RPC_URL,
-        {
-          jsonrpc: '2.0',
-          id: `helius-wallet-assets-page-${page}`,
-          method: 'getAssetsByOwner',
-          params: {
-            ownerAddress: walletAddress,
-            page: page, 
-            limit: 1000,
-            displayOptions: {
-              showCollectionMetadata: true
-            }
-          }
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': HELIUS_API_KEY
+    // Direct API call to Helius RPC endpoint to avoid circular references
+    const rpcResponse = await axios.post(
+      HELIUS_RPC_URL,
+      {
+        jsonrpc: '2.0',
+        id: 'helius-wallet-assets',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: walletAddress,
+          page: 1, 
+          limit: 1000,
+          displayOptions: {
+            showCollectionMetadata: true
           }
         }
-      );
-      
-      // Safety check to make sure we have a valid response
-      if (rpcResponse?.data?.result?.items) {
-        const pageAssets = rpcResponse.data.result.items;
-        allAssets = allAssets.concat(pageAssets);
-        
-        console.log(`[Helius API] Page ${page}: Found ${pageAssets.length} assets (Total so far: ${allAssets.length})`);
-        
-        // If we got less than 1000 items, we've reached the last page
-        if (pageAssets.length < 1000) {
-          hasMorePages = false;
-        } else {
-          page++;
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': HELIUS_API_KEY
         }
-      } else {
-        console.warn(`[Helius API] No items found in page ${page} response`);
-        hasMorePages = false;
       }
-    }
+    );
     
-    console.log(`[Helius API] Finished fetching all pages. Total assets: ${allAssets.length}`);
-    return allAssets;
+    // Safety check to make sure we have a valid response
+    if (rpcResponse?.data?.result?.items) {
+      const assets = rpcResponse.data.result.items;
+      console.log(`[Helius API] Found ${assets.length} NFTs/assets`);
+      return assets;
+    } else {
+      console.warn('[Helius API] No items found in RPC response');
+      return [];
+    }
   } catch (error) {
     console.error('[Helius API] Error fetching NFTs:', error.message);
     throw error;
@@ -454,56 +438,26 @@ async function fetchAssetProof(assetId, highPriority = false) {
  */
 function formatHeliusNFTData(heliusNFT) {
   try {
-    // Extract basic info - handle multiple possible data structures from Helius
+    // Extract basic info
     const content = heliusNFT.content || {};
-    const metadata = content.metadata || heliusNFT.metadata || {};
+    const metadata = heliusNFT.metadata || {};
     const compression = heliusNFT.compression || {};
     
-    // Get name from multiple possible locations - check all metadata structures
-    let nftName = metadata.name || 
-                  content.json_uri?.name || 
-                  heliusNFT.content?.metadata?.name ||
-                  heliusNFT.content?.json_uri?.name ||
-                  heliusNFT.name;
-    
-    // If still no name found, try to get it from the JSON metadata
-    if (!nftName && content.json_uri) {
-      try {
-        // Sometimes the metadata is nested deeper
-        nftName = content.json_uri.name || content.json_uri.metadata?.name;
-      } catch (e) {
-        // Ignore parsing errors
-      }
-    }
-    
-    // Last resort - use shortened ID
-    if (!nftName && heliusNFT.id) {
-      nftName = `NFT ${heliusNFT.id.slice(0, 8)}...`;
-    }
-    
-    // Get image from multiple possible locations
-    let nftImage = metadata.image || 
-                   content.json_uri?.image || 
-                   heliusNFT.content?.metadata?.image ||
-                   heliusNFT.content?.json_uri?.image ||
-                   content.links?.image || 
-                   content.files?.[0]?.uri ||
-                   content.files?.[0]?.cdn_uri ||
-                   '/default-nft-image.svg';
-    
     // Determine if this NFT can recover rent
+    // Standard NFTs can recover rent from token accounts when burned
+    // Compressed NFTs don't have token accounts, but use less storage
     const isCompressed = compression.compressed || false;
     const canRecoverRent = !isCompressed;
-    const estimatedRentLamports = canRecoverRent ? 2039280 : 0;
+    const estimatedRentLamports = canRecoverRent ? 2039280 : 0; // Approximate rent for a token account in lamports
     
-    const formattedNFT = {
+    return {
       mint: heliusNFT.id,
-      name: nftName,
+      name: metadata.name || `NFT ${heliusNFT.id.slice(0, 8)}...`,
       symbol: metadata.symbol || '',
-      image: nftImage,
-      collection: metadata.collection?.name || heliusNFT.grouping?.[0]?.group_value || '',
-      description: metadata.description || '',
-      attributes: metadata.attributes || [],
+      image: content.links?.image || content.json?.image || content.files?.[0]?.uri || '/default-nft-image.svg',
+      collection: metadata.collection?.name || '',
+      description: content.metadata?.description || metadata.description || '',
+      attributes: content.metadata?.attributes || [],
       compressed: isCompressed,
       tokenAddress: heliusNFT.token_info?.token_account || '',
       explorer_url: `https://solscan.io/token/${heliusNFT.id}`,
@@ -512,7 +466,7 @@ function formatHeliusNFTData(heliusNFT) {
       rentRecovery: {
         canRecoverRent,
         estimatedRentLamports,
-        estimatedRentSol: estimatedRentLamports / 1000000000
+        estimatedRentSol: estimatedRentLamports / 1000000000 // Convert lamports to SOL
       },
       // Include compression details for cNFTs
       ...(isCompressed && {
@@ -524,23 +478,8 @@ function formatHeliusNFTData(heliusNFT) {
         creator_hash: compression.creator_hash
       })
     };
-    
-    // Add debugging to see the raw data structure
-    if (!nftName || nftName.includes('NFT ')) {
-      console.log(`[Helius API] Debug - Raw NFT data for ${heliusNFT.id}:`, {
-        content: content,
-        metadata: metadata,
-        compression: compression,
-        rawNFT: heliusNFT
-      });
-    }
-    
-    console.log(`[Helius API] Formatted NFT: ${formattedNFT.name} (${formattedNFT.mint.slice(0, 8)}...) - Compressed: ${formattedNFT.compressed}`);
-    return formattedNFT;
-    
   } catch (error) {
     console.error('[Helius API] Error formatting NFT data:', error.message);
-    console.error('[Helius API] Raw NFT data:', JSON.stringify(heliusNFT, null, 2));
     // Return basic fallback data
     return {
       mint: heliusNFT.id || 'unknown',

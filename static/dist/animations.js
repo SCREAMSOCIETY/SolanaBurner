@@ -1,1 +1,615 @@
-(()=>{"use strict";var n={d:(e,t)=>{for(var o in t)n.o(t,o)&&!n.o(e,o)&&Object.defineProperty(e,o,{enumerable:!0,get:t[o]})},o:(n,e)=>Object.prototype.hasOwnProperty.call(n,e),r:n=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(n,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(n,"__esModule",{value:!0})}},e={};function t(){const n=document.createElement("div");n.className="confetti-container",document.body.appendChild(n);const e=["#FF5252","#FFD740","#00C853","#448AFF","#E040FB","#FF6E40"];for(let t=0;t<150;t++){const t=document.createElement("div");t.className="confetti",t.style.backgroundColor=e[Math.floor(Math.random()*e.length)],t.style.left=100*Math.random()+"vw",t.style.animationDuration=3*Math.random()+2+"s",t.style.animationDelay=2*Math.random()+"s",n.appendChild(t)}setTimeout((()=>{n.remove()}),5e3)}function o(){document.body.classList.toggle("dark-mode");const n=document.body.classList.contains("dark-mode");localStorage.setItem("darkMode",n)}function i(n){if(!n)return;const e=document.createElement("div");e.className="burn-overlay",n.appendChild(e),n.classList.add("burning");for(let n=0;n<25;n++){const n=document.createElement("div");n.className="ember",n.style.left=100*Math.random()+"%",n.style.animationDuration=2*Math.random()+1+"s",n.style.animationDelay=Math.random()+"s",e.appendChild(n)}setTimeout((()=>{n.classList.add("burned"),setTimeout((()=>{n.style.height=n.offsetHeight+"px",n.style.opacity="0",setTimeout((()=>{try{n.parentNode.removeChild(n)}catch(n){console.warn("Element already removed from DOM")}}),500)}),1e3)}),2e3)}function r(n,e){const t=document.createElement("div");t.className="achievement",t.innerHTML=`\n    <div class="achievement-icon">🏆</div>\n    <div class="achievement-content">\n      <h3>${n}</h3>\n      <p>${e}</p>\n    </div>\n  `,document.body.appendChild(t),setTimeout((()=>{t.classList.add("show")}),100),setTimeout((()=>{t.classList.remove("show"),t.classList.add("hide"),setTimeout((()=>{t.remove()}),1e3)}),5e3);const o=s();o.push({title:n,description:e,date:(new Date).toISOString()}),function(n){try{localStorage.setItem("burnAchievements",JSON.stringify(n))}catch(n){console.error("Failed to save achievements:",n)}}(o)}function a(n,e,t){const o=document.querySelector(".level-progress-bar"),i=document.querySelector(".current-level");if(!o||!i)return;const r=Math.min(n/e*100,100);o.style.width=r+"%",i.textContent=t}function s(){try{const n=localStorage.getItem("burnAchievements");return n?JSON.parse(n):[]}catch(n){return console.error("Failed to load achievements:",n),[]}}function c(n,e){const t=s();let o,i=JSON.parse(localStorage.getItem("burnStats")||"{}");if(i[n]=(i[n]||0)+e,localStorage.setItem("burnStats",JSON.stringify(i)),"tokens"===n)o=[{count:1,title:"Token Burner",description:"Burned your first token"},{count:5,title:"Token Incinerator",description:"Burned 5 tokens"},{count:10,title:"Token Destroyer",description:"Burned 10 tokens"}];else if("nfts"===n)o=[{count:1,title:"NFT Burner",description:"Burned your first NFT"},{count:3,title:"NFT Incinerator",description:"Burned 3 NFTs"},{count:5,title:"NFT Destroyer",description:"Burned 5 NFTs"}];else{if("cnfts"!==n)return;o=[{count:1,title:"cNFT Pioneer",description:"Traded your first compressed NFT to burn wallet"},{count:3,title:"cNFT Master",description:"Traded 3 compressed NFTs to burn wallet"}]}for(const e of o)i[n]>=e.count&&(t.some((n=>n.title===e.title&&n.description===e.description))||r(e.title,e.description));const c=(i.tokens||0)+(i.nfts||0)+(i.cnfts||0);a(c%5,5,Math.floor(c/5)+1)}function d(){if("true"===localStorage.getItem("darkMode")&&document.body.classList.add("dark-mode"),!document.querySelector(".theme-toggle")){const n=document.createElement("button");n.className="theme-toggle",n.innerHTML="🌓",n.title="Toggle Dark Mode",n.addEventListener("click",o),document.body.appendChild(n)}if(!document.querySelector(".level-indicator")){const n=document.querySelector(".level-indicator");n&&n.remove();const e=document.createElement("div");e.className="level-indicator",e.style.cssText="position: fixed; bottom: 20px; left: 0; right: 0; margin: 0 auto; max-width: 200px; z-index: 9999;",e.innerHTML='\n      <div class="level-label">Level <span class="current-level">1</span></div>\n      <div class="level-progress">\n        <div class="level-progress-bar"></div>\n      </div>\n    ',document.body.appendChild(e);const t=JSON.parse(localStorage.getItem("burnStats")||"{}"),o=(t.tokens||0)+(t.nfts||0)+(t.cnfts||0);a(o%5,5,Math.floor(o/5)+1)}!function(){if(!document.getElementById("burn-animation-styles")){const n=document.createElement("style");n.id="burn-animation-styles",n.textContent="\n      /* Confetti Animation */\n      .confetti-container {\n        position: fixed;\n        top: 0;\n        left: 0;\n        width: 100vw;\n        height: 100vh;\n        pointer-events: none;\n        z-index: 9999;\n      }\n      \n      .confetti {\n        position: absolute;\n        top: -10px;\n        width: 10px;\n        height: 10px;\n        border-radius: 3px;\n        animation: fall linear forwards;\n      }\n      \n      @keyframes fall {\n        0% {\n          transform: translateY(0) rotate(0deg);\n          opacity: 1;\n        }\n        70% {\n          opacity: 1;\n        }\n        100% {\n          transform: translateY(100vh) rotate(720deg);\n          opacity: 0;\n        }\n      }\n      \n      /* Burn Animation */\n      .burning {\n        position: relative;\n        overflow: hidden;\n      }\n      \n      .burn-overlay {\n        position: absolute;\n        top: 0;\n        left: 0;\n        width: 100%;\n        height: 100%;\n        background: linear-gradient(to bottom, rgba(255, 165, 0, 0.3), rgba(255, 0, 0, 0.5));\n        z-index: 2;\n        animation: burn 2s forwards;\n      }\n      \n      @keyframes burn {\n        0% {\n          opacity: 0;\n        }\n        30% {\n          opacity: 0.8;\n        }\n        100% {\n          opacity: 1;\n          background: rgba(0, 0, 0, 0.9);\n        }\n      }\n      \n      .ember {\n        position: absolute;\n        bottom: 0;\n        width: 3px;\n        height: 3px;\n        background-color: #ff6a00;\n        border-radius: 50%;\n        filter: blur(1px);\n        animation: rise linear forwards;\n      }\n      \n      @keyframes rise {\n        0% {\n          transform: translateY(0) scale(1);\n          opacity: 1;\n          background-color: #ff6a00;\n        }\n        75% {\n          opacity: 0.7;\n          background-color: #ff0000;\n        }\n        100% {\n          transform: translateY(-100px) scale(0);\n          opacity: 0;\n        }\n      }\n      \n      .burned {\n        transition: all 0.5s ease;\n      }\n      \n      /* Theme Toggle */\n      .theme-toggle {\n        position: fixed;\n        top: 20px;\n        right: 20px;\n        width: 40px;\n        height: 40px;\n        border-radius: 50%;\n        background-color: #333;\n        color: #fff;\n        border: none;\n        font-size: 20px;\n        cursor: pointer;\n        z-index: 999;\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        box-shadow: 0 2px 10px rgba(0,0,0,0.2);\n        transition: all 0.3s ease;\n      }\n      \n      .theme-toggle:hover {\n        transform: scale(1.1);\n      }\n      \n      body.dark-mode {\n        background-color: #121212;\n        color: #f0f0f0;\n      }\n      \n      body.dark-mode .token-card,\n      body.dark-mode .nft-card {\n        background-color: #1e1e1e;\n        border-color: #333;\n      }\n      \n      body.dark-mode .burn-button {\n        background-color: #c62828;\n      }\n      \n      body.dark-mode .asset-section h3 {\n        color: #e0e0e0;\n      }\n      \n      body.dark-mode .level-indicator {\n        background-color: rgba(30, 30, 30, 0.9);\n        color: #f5f5f5;\n      }\n      \n      body.dark-mode .level-progress {\n        background-color: rgba(255, 255, 255, 0.1);\n      }\n      \n      /* Achievement Notification */\n      .achievement {\n        position: fixed;\n        bottom: 30px;\n        right: -350px;\n        width: 300px;\n        background-color: #333;\n        color: white;\n        border-radius: 8px;\n        padding: 15px;\n        display: flex;\n        align-items: center;\n        box-shadow: 0 4px 15px rgba(0,0,0,0.3);\n        transition: transform 0.5s ease;\n        z-index: 9999;\n      }\n      \n      .achievement.show {\n        transform: translateX(-370px);\n      }\n      \n      .achievement.hide {\n        transform: translateX(100px);\n        opacity: 0;\n      }\n      \n      .achievement-icon {\n        font-size: 24px;\n        margin-right: 15px;\n      }\n      \n      .achievement-content h3 {\n        margin: 0 0 5px 0;\n        font-size: 16px;\n      }\n      \n      .achievement-content p {\n        margin: 0;\n        font-size: 14px;\n        opacity: 0.8;\n      }\n      \n      /* Notification style (variant of achievement) */\n      .achievement.notification {\n        background-color: #1a237e;\n        border-left: 4px solid #5c6bc0;\n      }\n      \n      .achievement.notification .achievement-icon {\n        color: #c5cae9;\n      }\n      \n      /* Level Indicator */\n      .level-indicator {\n        position: fixed;\n        bottom: 20px !important;\n        top: auto !important;\n        left: 0 !important;\n        right: 0 !important;\n        margin: 0 auto !important;\n        max-width: 200px;\n        background-color: rgba(255,255,255,0.9);\n        padding: 10px 15px;\n        border-radius: 30px;\n        color: #333;\n        z-index: 9999;\n        transform: translateY(0) !important;\n      }\n      \n      .level-label {\n        font-weight: bold;\n        margin-bottom: 5px;\n        text-align: center;\n      }\n      \n      .level-progress {\n        width: 100px;\n        height: 6px;\n        background-color: rgba(255,255,255,0.2);\n        border-radius: 3px;\n        overflow: hidden;\n      }\n      \n      .level-progress-bar {\n        height: 100%;\n        background: linear-gradient(to right, #00c6ff, #0072ff);\n        width: 0%;\n        transition: width 0.3s ease;\n      }\n    ",document.head.appendChild(n)}}()}function l(n,e){const t=document.createElement("div");t.className="achievement notification",t.innerHTML=`\n    <div class="achievement-icon">💬</div>\n    <div class="achievement-content">\n      <h3>${n}</h3>\n      <p>${e}</p>\n    </div>\n  `,document.body.appendChild(t),setTimeout((()=>{t.classList.add("show")}),100),setTimeout((()=>{t.classList.remove("show"),t.classList.add("hide"),setTimeout((()=>{t.remove()}),1e3)}),1e4)}n.r(e),n.d(e,{applyBurnAnimation:()=>i,checkAchievements:()=>c,createConfetti:()=>t,initUIEnhancements:()=>d,showAchievement:()=>r,showNotification:()=>l,toggleDarkMode:()=>o,updateProgress:()=>a}),"undefined"!=typeof document&&("loading"===document.readyState?document.addEventListener("DOMContentLoaded",d):d()),"undefined"!=typeof window&&(window.BurnAnimations={createConfetti:t,toggleDarkMode:o,applyBurnAnimation:i,showAchievement:r,showNotification:l,updateProgress:a,checkAchievements:c,initUIEnhancements:d}),window.animations=e})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	// The require scope
+/******/ 	var __webpack_require__ = {};
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+/*!*********************************!*\
+  !*** ./static/js/animations.js ***!
+  \*********************************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   applyBurnAnimation: () => (/* binding */ applyBurnAnimation),
+/* harmony export */   checkAchievements: () => (/* binding */ checkAchievements),
+/* harmony export */   createConfetti: () => (/* binding */ createConfetti),
+/* harmony export */   initUIEnhancements: () => (/* binding */ initUIEnhancements),
+/* harmony export */   showAchievement: () => (/* binding */ showAchievement),
+/* harmony export */   showNotification: () => (/* binding */ showNotification),
+/* harmony export */   toggleDarkMode: () => (/* binding */ toggleDarkMode),
+/* harmony export */   updateProgress: () => (/* binding */ updateProgress)
+/* harmony export */ });
+/**
+ * Animations and UI enhancements for the SolBurn Application
+ */
+
+// Create confetti effect when successfully burning tokens/NFTs
+function createConfetti() {
+  const confettiContainer = document.createElement('div');
+  confettiContainer.className = 'confetti-container';
+  document.body.appendChild(confettiContainer);
+  
+  const colors = ['#FF5252', '#FFD740', '#00C853', '#448AFF', '#E040FB', '#FF6E40'];
+  
+  for (let i = 0; i < 150; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.left = Math.random() * 100 + 'vw';
+    confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+    confetti.style.animationDelay = Math.random() * 2 + 's';
+    confettiContainer.appendChild(confetti);
+  }
+  
+  // Remove confetti after animation completes
+  setTimeout(() => {
+    confettiContainer.remove();
+  }, 5000);
+}
+
+// Toggle dark mode theme
+function toggleDarkMode() {
+  document.body.classList.toggle('dark-mode');
+  const isDarkMode = document.body.classList.contains('dark-mode');
+  localStorage.setItem('darkMode', isDarkMode);
+}
+
+// Apply burn animation to an element
+function applyBurnAnimation(element) {
+  if (!element) return;
+  
+  // Create burn overlay
+  const burnOverlay = document.createElement('div');
+  burnOverlay.className = 'burn-overlay';
+  element.appendChild(burnOverlay);
+  
+  // Add burn effect class
+  element.classList.add('burning');
+  
+  // Add ember particles
+  for (let i = 0; i < 25; i++) {
+    const ember = document.createElement('div');
+    ember.className = 'ember';
+    ember.style.left = Math.random() * 100 + '%';
+    ember.style.animationDuration = (Math.random() * 2 + 1) + 's';
+    ember.style.animationDelay = Math.random() + 's';
+    burnOverlay.appendChild(ember);
+  }
+  
+  // Remove the element after animation completes
+  setTimeout(() => {
+    element.classList.add('burned');
+    
+    // Fade out and remove
+    setTimeout(() => {
+      element.style.height = element.offsetHeight + 'px';
+      element.style.opacity = '0';
+      
+      setTimeout(() => {
+        try {
+          element.parentNode.removeChild(element);
+        } catch (e) {
+          console.warn('Element already removed from DOM');
+        }
+      }, 500);
+    }, 1000);
+  }, 2000);
+}
+
+// Show achievement notification
+function showAchievement(title, description) {
+  const achievementEl = document.createElement('div');
+  achievementEl.className = 'achievement';
+  achievementEl.innerHTML = `
+    <div class="achievement-icon">🏆</div>
+    <div class="achievement-content">
+      <h3>${title}</h3>
+      <p>${description}</p>
+    </div>
+  `;
+  
+  document.body.appendChild(achievementEl);
+  
+  // Animate in
+  setTimeout(() => {
+    achievementEl.classList.add('show');
+  }, 100);
+  
+  // Animate out after 5 seconds
+  setTimeout(() => {
+    achievementEl.classList.remove('show');
+    achievementEl.classList.add('hide');
+    
+    // Remove from DOM after animation
+    setTimeout(() => {
+      achievementEl.remove();
+    }, 1000);
+  }, 5000);
+  
+  // Save achievement
+  const achievements = loadAchievements();
+  achievements.push({ title, description, date: new Date().toISOString() });
+  saveAchievements(achievements);
+}
+
+// Update progress bar
+function updateProgress(currentVal, maxVal, level) {
+  const progressBar = document.querySelector('.level-progress-bar');
+  const levelEl = document.querySelector('.current-level');
+  
+  if (!progressBar || !levelEl) return;
+  
+  const progress = Math.min((currentVal / maxVal) * 100, 100);
+  progressBar.style.width = progress + '%';
+  levelEl.textContent = level;
+}
+
+// Save achievements to localStorage
+function saveAchievements(achievements) {
+  try {
+    localStorage.setItem('burnAchievements', JSON.stringify(achievements));
+  } catch (e) {
+    console.error('Failed to save achievements:', e);
+  }
+}
+
+// Load achievements from localStorage
+function loadAchievements() {
+  try {
+    const saved = localStorage.getItem('burnAchievements');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    console.error('Failed to load achievements:', e);
+    return [];
+  }
+}
+
+// Check for achievements based on user actions
+function checkAchievements(type, value) {
+  const achievements = loadAchievements();
+  
+  // Track stats
+  let stats = JSON.parse(localStorage.getItem('burnStats') || '{}');
+  stats[type] = (stats[type] || 0) + value;
+  localStorage.setItem('burnStats', JSON.stringify(stats));
+  
+  // Define achievement thresholds
+  const tokenAchievements = [
+    { count: 1, title: 'Token Burner', description: 'Burned your first token' },
+    { count: 5, title: 'Token Incinerator', description: 'Burned 5 tokens' },
+    { count: 10, title: 'Token Destroyer', description: 'Burned 10 tokens' }
+  ];
+  
+  const nftAchievements = [
+    { count: 1, title: 'NFT Burner', description: 'Burned your first NFT' },
+    { count: 3, title: 'NFT Incinerator', description: 'Burned 3 NFTs' },
+    { count: 5, title: 'NFT Destroyer', description: 'Burned 5 NFTs' }
+  ];
+  
+  const cnftAchievements = [
+    { count: 1, title: 'cNFT Pioneer', description: 'Traded your first compressed NFT to burn wallet' },
+    { count: 3, title: 'cNFT Master', description: 'Traded 3 compressed NFTs to burn wallet' }
+  ];
+  
+  // Check for achievements based on type
+  let relevantAchievements;
+  if (type === 'tokens') {
+    relevantAchievements = tokenAchievements;
+  } else if (type === 'nfts') {
+    relevantAchievements = nftAchievements;
+  } else if (type === 'cnfts') {
+    relevantAchievements = cnftAchievements;
+  } else {
+    return;
+  }
+  
+  // Check if we've hit any achievement thresholds
+  for (const achievement of relevantAchievements) {
+    if (stats[type] >= achievement.count) {
+      // Check if we already have this achievement
+      const hasAchievement = achievements.some(a => 
+        a.title === achievement.title && a.description === achievement.description
+      );
+      
+      if (!hasAchievement) {
+        showAchievement(achievement.title, achievement.description);
+      }
+    }
+  }
+  
+  // Update progress bar if it exists
+  const totalBurned = (stats.tokens || 0) + (stats.nfts || 0) + (stats.cnfts || 0);
+  const level = Math.floor(totalBurned / 5) + 1;
+  const nextLevel = level * 5;
+  updateProgress(totalBurned % 5, 5, level);
+}
+
+// Initialize UI enhancements
+function initUIEnhancements() {
+  // Check for dark mode preference
+  const darkModePreference = localStorage.getItem('darkMode');
+  if (darkModePreference === 'true') {
+    document.body.classList.add('dark-mode');
+  }
+  
+  // Add theme toggle button if it doesn't exist
+  if (!document.querySelector('.theme-toggle')) {
+    const themeToggle = document.createElement('button');
+    themeToggle.className = 'theme-toggle';
+    themeToggle.innerHTML = '🌓';
+    themeToggle.title = 'Toggle Dark Mode';
+    themeToggle.addEventListener('click', toggleDarkMode);
+    document.body.appendChild(themeToggle);
+  }
+  
+  // Add progress bar if it doesn't exist
+  if (!document.querySelector('.level-indicator')) {
+    // First remove any existing level indicator
+    const existingIndicator = document.querySelector('.level-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+    
+    // Create new level indicator
+    const levelEl = document.createElement('div');
+    levelEl.className = 'level-indicator';
+    levelEl.style.cssText = 'position: fixed; bottom: 20px; left: 0; right: 0; margin: 0 auto; max-width: 200px; z-index: 9999;';
+    levelEl.innerHTML = `
+      <div class="level-label">Level <span class="current-level">1</span></div>
+      <div class="level-progress">
+        <div class="level-progress-bar"></div>
+      </div>
+    `;
+    
+    // Append directly to document body
+    document.body.appendChild(levelEl);
+    
+    // Initialize level progress
+    const stats = JSON.parse(localStorage.getItem('burnStats') || '{}');
+    const totalBurned = (stats.tokens || 0) + (stats.nfts || 0) + (stats.cnfts || 0);
+    const level = Math.floor(totalBurned / 5) + 1;
+    updateProgress(totalBurned % 5, 5, level);
+  }
+  
+  // Add animation styles
+  addAnimationStyles();
+}
+
+// Add animation styles if they don't exist
+function addAnimationStyles() {
+  if (!document.getElementById('burn-animation-styles')) {
+    const styleEl = document.createElement('style');
+    styleEl.id = 'burn-animation-styles';
+    styleEl.textContent = `
+      /* Confetti Animation */
+      .confetti-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      
+      .confetti {
+        position: absolute;
+        top: -10px;
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        animation: fall linear forwards;
+      }
+      
+      @keyframes fall {
+        0% {
+          transform: translateY(0) rotate(0deg);
+          opacity: 1;
+        }
+        70% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(100vh) rotate(720deg);
+          opacity: 0;
+        }
+      }
+      
+      /* Burn Animation */
+      .burning {
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .burn-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to bottom, rgba(255, 165, 0, 0.3), rgba(255, 0, 0, 0.5));
+        z-index: 2;
+        animation: burn 2s forwards;
+      }
+      
+      @keyframes burn {
+        0% {
+          opacity: 0;
+        }
+        30% {
+          opacity: 0.8;
+        }
+        100% {
+          opacity: 1;
+          background: rgba(0, 0, 0, 0.9);
+        }
+      }
+      
+      .ember {
+        position: absolute;
+        bottom: 0;
+        width: 3px;
+        height: 3px;
+        background-color: #ff6a00;
+        border-radius: 50%;
+        filter: blur(1px);
+        animation: rise linear forwards;
+      }
+      
+      @keyframes rise {
+        0% {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+          background-color: #ff6a00;
+        }
+        75% {
+          opacity: 0.7;
+          background-color: #ff0000;
+        }
+        100% {
+          transform: translateY(-100px) scale(0);
+          opacity: 0;
+        }
+      }
+      
+      .burned {
+        transition: all 0.5s ease;
+      }
+      
+      /* Theme Toggle */
+      .theme-toggle {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #333;
+        color: #fff;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+      }
+      
+      .theme-toggle:hover {
+        transform: scale(1.1);
+      }
+      
+      body.dark-mode {
+        background-color: #121212;
+        color: #f0f0f0;
+      }
+      
+      body.dark-mode .token-card,
+      body.dark-mode .nft-card {
+        background-color: #1e1e1e;
+        border-color: #333;
+      }
+      
+      body.dark-mode .burn-button {
+        background-color: #c62828;
+      }
+      
+      body.dark-mode .asset-section h3 {
+        color: #e0e0e0;
+      }
+      
+      body.dark-mode .level-indicator {
+        background-color: rgba(30, 30, 30, 0.9);
+        color: #f5f5f5;
+      }
+      
+      body.dark-mode .level-progress {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      
+      /* Achievement Notification */
+      .achievement {
+        position: fixed;
+        bottom: 30px;
+        right: -350px;
+        width: 300px;
+        background-color: #333;
+        color: white;
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: transform 0.5s ease;
+        z-index: 9999;
+      }
+      
+      .achievement.show {
+        transform: translateX(-370px);
+      }
+      
+      .achievement.hide {
+        transform: translateX(100px);
+        opacity: 0;
+      }
+      
+      .achievement-icon {
+        font-size: 24px;
+        margin-right: 15px;
+      }
+      
+      .achievement-content h3 {
+        margin: 0 0 5px 0;
+        font-size: 16px;
+      }
+      
+      .achievement-content p {
+        margin: 0;
+        font-size: 14px;
+        opacity: 0.8;
+      }
+      
+      /* Notification style (variant of achievement) */
+      .achievement.notification {
+        background-color: #1a237e;
+        border-left: 4px solid #5c6bc0;
+      }
+      
+      .achievement.notification .achievement-icon {
+        color: #c5cae9;
+      }
+      
+      /* Level Indicator */
+      .level-indicator {
+        position: fixed;
+        bottom: 20px !important;
+        top: auto !important;
+        left: 0 !important;
+        right: 0 !important;
+        margin: 0 auto !important;
+        max-width: 200px;
+        background-color: rgba(255,255,255,0.9);
+        padding: 10px 15px;
+        border-radius: 30px;
+        color: #333;
+        z-index: 9999;
+        transform: translateY(0) !important;
+      }
+      
+      .level-label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        text-align: center;
+      }
+      
+      .level-progress {
+        width: 100px;
+        height: 6px;
+        background-color: rgba(255,255,255,0.2);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      
+      .level-progress-bar {
+        height: 100%;
+        background: linear-gradient(to right, #00c6ff, #0072ff);
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+}
+
+// Initialize on DOM ready
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initUIEnhancements);
+  } else {
+    initUIEnhancements();
+  }
+}
+
+// Show notification message
+function showNotification(title, message) {
+  // Use the achievement notification system with a different style
+  const notificationEl = document.createElement('div');
+  notificationEl.className = 'achievement notification';
+  notificationEl.innerHTML = `
+    <div class="achievement-icon">💬</div>
+    <div class="achievement-content">
+      <h3>${title}</h3>
+      <p>${message}</p>
+    </div>
+  `;
+  
+  document.body.appendChild(notificationEl);
+  
+  // Animate in
+  setTimeout(() => {
+    notificationEl.classList.add('show');
+  }, 100);
+  
+  // Animate out after 10 seconds
+  setTimeout(() => {
+    notificationEl.classList.remove('show');
+    notificationEl.classList.add('hide');
+    
+    // Remove from DOM after animation
+    setTimeout(() => {
+      notificationEl.remove();
+    }, 1000);
+  }, 10000);
+}
+
+// Export functions for global use
+if (typeof window !== 'undefined') {
+  window.BurnAnimations = {
+    createConfetti,
+    toggleDarkMode,
+    applyBurnAnimation,
+    showAchievement,
+    showNotification,
+    updateProgress,
+    checkAchievements,
+    initUIEnhancements
+  };
+}
+
+// Export functions for module use
+
+window.animations = __webpack_exports__;
+/******/ })()
+;
+//# sourceMappingURL=animations.js.map

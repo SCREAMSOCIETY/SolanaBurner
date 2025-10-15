@@ -1,5 +1,5 @@
 /**
- * Animations and UI enhancements for the Solburnt Application
+ * Animations and UI enhancements for the SolBurn Application
  */
 
 // Create confetti effect when successfully burning tokens/NFTs

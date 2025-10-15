@@ -11,10 +11,10 @@
  * - Configurable burst and rate parameters
  */
 
-// Token bucket configuration - optimized for wallet switching stability
-const MAX_TOKENS = 3;      // Restored to allow quick wallet switching
-const REFILL_RATE = 0.3;   // Moderate refill rate
-const MIN_REFILL_MS = 1500; // Balanced refill timing
+// Token bucket configuration
+const MAX_TOKENS = 2;      // Maximum tokens (for burst capacity) - reduced from 3
+const REFILL_RATE = 0.2;   // Tokens added per second - reduced from 0.5
+const MIN_REFILL_MS = 1000; // Minimum time between refills in milliseconds - increased from 500
 
 // Internal state
 let tokens = MAX_TOKENS;    // Current token count

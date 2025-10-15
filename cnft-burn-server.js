@@ -76,7 +76,7 @@ if (process.env.TREE_AUTHORITY_SECRET_KEY) {
 }
 
 /**
- * Process a burn request for a cNFT by transferring it to a burn address
+ * Process a burn request for a cNFT
  * @param {string} ownerAddress - The owner's public key as a string
  * @param {string} assetId - The asset ID (mint address) of the cNFT
  * @param {string} signedMessage - Base64-encoded signature for verification
@@ -85,13 +85,28 @@ if (process.env.TREE_AUTHORITY_SECRET_KEY) {
  * @returns {Promise<object>} - Result of the burn operation
  */
 async function processBurnRequest(ownerAddress, assetId, signedMessage, proofData, assetData) {
-  // Use the project wallet as burn address - this effectively removes cNFTs from user's wallet
-  const BURN_ADDRESS = process.env.PROJECT_WALLET || "EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK";
-  
-  console.log(`[SIMULATION MODE] Processing cNFT burn simulation for: ${assetId}`);
-  
-  // Return to simulation mode due to API compatibility issues
-  return await simulateBurn(ownerAddress, assetId, signedMessage, proofData, assetData);
+  // If we don't have a real tree authority, return simulated success
+  if (!hasTreeAuthority || !treeAuthorityKeypair) {
+    console.log(`[SIMULATION MODE] Processing simulated burn for cNFT: ${assetId}`);
+    
+    // Generate a unique simulation ID that looks like a transaction signature
+    const simulationId = `simulation-${Date.now()}-${assetId.slice(0,4)}`;
+    
+    return {
+      success: true,
+      isSimulated: true,
+      status: "completed",
+      signature: simulationId,
+      message: "This is a simulated burn operation. In a production environment, only the tree authority (usually the collection creator) can burn cNFTs. As a regular user, you would need to request the burn from the collection authority.",
+      explorerUrl: `https://solscan.io/token/${assetId}`,
+      simulationId: simulationId,
+      assetDetails: {
+        id: assetId,
+        name: assetData.content?.metadata?.name || "Compressed NFT",
+        collection: assetData.content?.metadata?.collection?.name || "Unknown Collection"
+      }
+    };
+  }
   
   try {
     const walletPubkey = new PublicKey(ownerAddress);
@@ -192,129 +207,8 @@ async function processBurnRequest(ownerAddress, assetId, signedMessage, proofDat
   }
 }
 
-/**
- * Simulate a cNFT burn for educational purposes
- * @param {string} ownerAddress - The owner's public key as a string
- * @param {string} assetId - The asset ID (mint address) of the cNFT
- * @param {string} signedMessage - Base64-encoded signature for verification
- * @param {object} proofData - The merkle proof data for the cNFT
- * @param {object} assetData - The asset data for the cNFT
- * @returns {Promise<object>} - Simulation result
- */
-async function simulateBurn(ownerAddress, assetId, signedMessage, proofData, assetData) {
-  try {
-    // Generate a fake simulation ID for educational purposes
-    const simulationId = `sim_${assetId.slice(0, 8)}_${Date.now()}`;
-    
-    return {
-      success: true,
-      isSimulated: true,
-      status: "simulated",
-      simulationId: simulationId,
-      message: "cNFT burn simulation completed successfully. This demonstrates what would happen with proper tree authority permissions.",
-      assetDetails: {
-        id: assetId,
-        name: assetData.content?.metadata?.name || "Compressed NFT",
-        collection: assetData.content?.metadata?.collection?.name || "Unknown Collection"
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: `Simulation failed: ${error.message}`,
-      status: "failed"
-    };
-  }
-}
-
-/**
- * Transfer a cNFT to a burn address (effectively "burning" it)
- * @param {string} ownerAddress - The current owner's public key
- * @param {string} assetId - The asset ID of the cNFT
- * @param {string} burnAddress - The destination burn address
- * @param {object} proofData - The merkle proof data
- * @param {object} assetData - The asset data
- * @returns {Promise<object>} - Result of the transfer operation
- */
-async function transferCNFTToBurnAddress(ownerAddress, assetId, burnAddress, proofData, assetData) {
-  try {
-    console.log(`[BURN TRANSFER] Transferring cNFT ${assetId} to burn address ${burnAddress}`);
-    
-    const ownerPubkey = new PublicKey(ownerAddress);
-    const newOwnerPubkey = new PublicKey(burnAddress);
-    
-    // Extract tree information
-    const treeId = proofData.tree_id;
-    const treeAddress = new PublicKey(treeId);
-    
-    // Create the tree authority address
-    const [treeAuthority] = PublicKey.findProgramAddressSync(
-      [treeAddress.toBuffer()],
-      BUBBLEGUM_PROGRAM_ID
-    );
-    
-    // Build the transfer instruction using mpl-bubblegum v4.4.0 API
-    const transferIx = mplBubblegum.transfer(
-      {
-        merkleTree: treeAddress,
-        treeAuthority: treeAuthority,
-        leafOwner: ownerPubkey,
-        leafDelegate: ownerPubkey,
-        newLeafOwner: newOwnerPubkey,
-        logWrapper: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-        compressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-        anchorRemainingAccounts: proofData.proof.map(p => ({
-          pubkey: new PublicKey(p),
-          isSigner: false,
-          isWritable: false
-        }))
-      },
-      {
-        root: [...Buffer.from(proofData.root, 'base64')],
-        dataHash: [...Buffer.from(assetData.compression.data_hash, 'base64')],
-        creatorHash: [...Buffer.from(assetData.compression.creator_hash, 'base64')],
-        nonce: assetData.compression.leaf_id,
-        index: assetData.compression.leaf_id
-      }
-    );
-    
-    // Create a transaction with compute budget
-    const transaction = new Transaction()
-      .add(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-        transferIx
-      );
-    
-    // This is a client-side transaction that needs to be signed by the owner
-    // Return the transaction for the client to sign and submit
-    const { blockhash } = await connection.getLatestBlockhash();
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = ownerPubkey;
-    
-    // Serialize transaction for client signing
-    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
-    
-    return {
-      success: true,
-      requiresClientSigning: true,  
-      transaction: serializedTransaction.toString('base64'),
-      message: "Transaction prepared for client signing"
-    };
-    
-  } catch (error) {
-    console.error(`Error creating burn transfer transaction for ${assetId}:`, error);
-    return {
-      success: false,
-      error: `Failed to create burn transfer: ${error.message}`
-    };
-  }
-}
-
 // Export the functionality
 module.exports = {
   processBurnRequest,
-  transferCNFTToBurnAddress,
-  simulateBurn,
   hasTreeAuthority
 };

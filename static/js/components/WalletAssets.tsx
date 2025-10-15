@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction, TransactionInstruction, SystemProgram } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import { 
   TOKEN_PROGRAM_ID, 
   createBurnCheckedInstruction, 
@@ -12,16 +12,10 @@ import axios from 'axios';
 // Import the CNFTHandler class
 import { CNFTHandler } from '../cnft-handler';
 
-// Import the ActivityLogger
-import { ActivityLogger } from '../activity-logger';
-
 // Import the modal components
 import DirectTrashModal from './DirectTrashModal';
 import QueueTransferModal from './QueueTransferModal';
 import DelegatedTransferModal from './DelegatedTransferModal';
-// CNFTBurnModal removed - cNFTs are view-only
-import RentEstimate from './RentEstimate';
-import RecentActivity from './RecentActivity';
 
 // Add global variable to global window object to access in console for debugging
 declare global {
@@ -134,11 +128,12 @@ interface CNFTData {
 
 const WalletAssets: React.FC = () => {
   const { connection } = useConnection();
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   
   // State variables for assets
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [nfts, setNfts] = useState<NFTData[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [cnfts, setCnfts] = useState<CNFTData[]>([]);
   
   // State variables for loading and errors
@@ -147,7 +142,7 @@ const WalletAssets: React.FC = () => {
   const [cnftsLoading, setCnftsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Bulk burn mode - disabled by default so users can see individual burn buttons
+  // Bulk burn mode - always enabled by default
   const [bulkBurnMode, setBulkBurnMode] = useState(true);
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]); 
   const [selectedNFTs, setSelectedNFTs] = useState<string[]>([]);
@@ -169,8 +164,6 @@ const WalletAssets: React.FC = () => {
   const [delegatedTransferModalOpen, setDelegatedTransferModalOpen] = useState<boolean>(false);
   const [selectedCnftForDelegatedTransfer, setSelectedCnftForDelegatedTransfer] = useState<{ id: string; name: string; image?: string } | null>(null);
   
-  // cNFT Burn Modal removed - cNFTs are view-only
-  
   // Fetch API key on component load
   useEffect(() => {
     // Fetch Solscan API key from our server endpoint
@@ -191,31 +184,16 @@ const WalletAssets: React.FC = () => {
     fetchApiKey();
   }, []);
 
-  // Handle wallet connection/disconnection
+  // Store wallet information in debug object when wallet connects
   useEffect(() => {
-    if (publicKey && connected) {
-      console.log('[WalletAssets] Wallet connected, storing debug info');
-      if (typeof window !== 'undefined' && window.debugInfo) {
-        window.debugInfo.walletInfo = {
-          publicKey: publicKey.toString(),
-          hasSignTransaction: !!signTransaction
-        };
-      }
-    } else if (!connected) {
-      // Clear all data when wallet disconnects
-      console.log('[WalletAssets] Wallet disconnected, clearing data');
-      setTokens([]);
-      setNfts([]);
-      setCnfts([]);
-      setSelectedTokens([]);
-      setSelectedNFTs([]);
-      setSelectedCNFTs([]);
-      setError(null);
-      setTokensLoading(false);
-      setNftsLoading(false);
-      setCnftsLoading(false);
+    if (publicKey && typeof window !== 'undefined' && window.debugInfo) {
+      window.debugInfo.walletInfo = {
+        publicKey: publicKey.toString(),
+        hasSignTransaction: !!signTransaction
+      };
+      console.log('[WalletAssets] Updated wallet debug info:', window.debugInfo.walletInfo);
     }
-  }, [publicKey, connected, signTransaction]);
+  }, [publicKey, signTransaction]);
 
   // Fetch tokens when wallet connects
   useEffect(() => {
@@ -228,73 +206,30 @@ const WalletAssets: React.FC = () => {
         hasSolscanKey
       });
       
-      if (!publicKey || !connected) return;
+      if (!publicKey) return;
       
       try {
         console.log('[WalletAssets] Starting token fetch');
         setTokensLoading(true);
         setError(null);
         
-        // Try Helius API first, fallback to direct RPC if needed
-        console.log('[WalletAssets] Fetching token accounts via Helius API');
-        let tokenData: TokenData[] = [];
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { programId: TOKEN_PROGRAM_ID }
+        );
         
-        try {
-          const heliusResponse = await fetch(`/api/wallet-tokens/${publicKey.toString()}`);
-          
-          if (heliusResponse.ok) {
-            const heliusData = await heliusResponse.json();
-            console.log('[WalletAssets] Helius token response:', heliusData);
-            
-            if (heliusData.success && heliusData.tokens) {
-              for (const token of heliusData.tokens) {
-                // Only include fungible tokens, exclude NFTs (amount=1, decimals=0)
-                if (token.amount > 0 && !(token.amount === 1 && token.decimals === 0)) {
-                  tokenData.push({
-                    mint: token.mint,
-                    balance: token.amount,
-                    decimals: token.decimals,
-                    account: token.tokenAccount
-                  });
-                }
-              }
-            }
-          } else if (heliusResponse.status === 503) {
-            console.warn('[WalletAssets] Helius API temporarily unavailable (503), using fallback');
-            throw new Error('API temporarily unavailable');
-          } else {
-            throw new Error(`Helius API returned ${heliusResponse.status}`);
-          }
-        } catch (heliusError) {
-          console.warn('[WalletAssets] Helius API failed, trying direct RPC:', heliusError);
-          
-          // Fallback to direct RPC for rent estimates
-          try {
-            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-              publicKey,
-              { programId: TOKEN_PROGRAM_ID }
-            );
-            
-            console.log('[WalletAssets] Fallback RPC found token accounts:', tokenAccounts.value.length);
-            
-            for (const account of tokenAccounts.value) {
-              const parsedInfo = account.account.data.parsed.info;
-              const amount = Number(parsedInfo.tokenAmount.amount);
-              const decimals = parsedInfo.tokenAmount.decimals;
-              
-              // Only include fungible tokens, exclude NFTs (amount=1, decimals=0)
-              if (amount > 0 && !(amount === 1 && decimals === 0)) {
-                tokenData.push({
-                  mint: parsedInfo.mint,
-                  balance: amount,
-                  decimals: decimals,
-                  account: account.pubkey.toBase58()
-                });
-              }
-            }
-          } catch (rpcError) {
-            console.warn('[WalletAssets] Both Helius and RPC failed:', rpcError);
-            // Still continue - rent estimates will be based on NFTs only
+        console.log('[WalletAssets] Found token accounts:', tokenAccounts.value.length);
+        
+        const tokenData: TokenData[] = [];
+        for (const account of tokenAccounts.value) {
+          const parsedInfo = account.account.data.parsed.info;
+          if (Number(parsedInfo.tokenAmount.amount) > 0) {
+            tokenData.push({
+              mint: parsedInfo.mint,
+              balance: Number(parsedInfo.tokenAmount.amount),
+              decimals: parsedInfo.tokenAmount.decimals,
+              account: account.pubkey.toBase58()
+            });
           }
         }
         
@@ -366,39 +301,23 @@ const WalletAssets: React.FC = () => {
                   const metadata = metadataResponse.data || {};
                   console.log(`[WalletAssets] Successfully enriched token ${token.mint} with metadata:`, metadata);
                   
-                  // Force correct decimals for known problematic tokens
-                  let correctedDecimals = token.decimals || metadata.decimals || 9;
-                  if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-                    correctedDecimals = 0;
-                    console.log(`Forcing decimals to 0 for DwLw token at WalletAssets enrichment stage`);
-                  }
-
                   return {
                     ...token,
                     symbol: metadata.symbol || token.mint.slice(0, 4),
                     name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
                     logoURI: metadata.icon || '/default-token-icon.svg',
-                    // Use corrected decimals
-                    decimals: correctedDecimals,
+                    // Ensure we have decimals for display
+                    decimals: token.decimals || metadata.decimals || 9,
                     // Store the metadata URI for potential future use
                     metadataUri: metadata.uri || null
                   };
                 } catch (error) {
                   console.warn(`[WalletAssets] Failed to fetch metadata for token ${token.mint}, using fallback data`);
-                  
-                  // Force correct decimals for known problematic tokens even in fallback
-                  let correctedDecimals = token.decimals;
-                  if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-                    correctedDecimals = 0;
-                    console.log(`Forcing decimals to 0 for DwLw token at WalletAssets fallback stage`);
-                  }
-                  
                   return {
                     ...token,
                     symbol: 'Unknown',
                     name: 'Unknown Token',
-                    logoURI: '/default-token-icon.svg',
-                    decimals: correctedDecimals
+                    logoURI: '/default-token-icon.svg'
                   };
                 }
               })
@@ -421,7 +340,7 @@ const WalletAssets: React.FC = () => {
     };
     
     fetchTokens();
-  }, [publicKey, connected, connection, solscanApiKey]);
+  }, [publicKey, connection, solscanApiKey]);
 
   // Fetch all NFTs (regular + compressed) when wallet connects using Helius v0 API
   useEffect(() => {
@@ -751,8 +670,18 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // The rent return happens automatically when closing the token account
-      // No fee charged for token burning to prevent InsufficientFundsForRent errors
+      // Add an instruction to transfer a small fee to the designated address
+      // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
+      const feeAmount = 40000; // 0.00004 SOL in lamports
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
       
       // Get recent blockhash with lower fee priority
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
@@ -799,18 +728,7 @@ const WalletAssets: React.FC = () => {
         
         if (confirmation.value.err) {
           console.error('Error confirming burn transaction:', confirmation.value.err);
-          
-          // Properly format the confirmation error
-          let confirmationError = 'Transaction failed';
-          if (confirmation.value.err) {
-            try {
-              confirmationError = JSON.stringify(confirmation.value.err);
-            } catch (e) {
-              confirmationError = String(confirmation.value.err);
-            }
-          }
-          
-          setError(`Error burning token: ${confirmationError}`);
+          setError(`Error burning token: ${confirmation.value.err}`);
         } else {
           console.log('Token burn successful with signature:', signature);
           
@@ -827,39 +745,19 @@ const WalletAssets: React.FC = () => {
             window.BurnAnimations.checkAchievements('tokens', 1);
           }
           
-          // Calculate rent returned from burned token
-          const tokenRentPerAccount = 0.00204; // SOL per token account
-          
-          // Show message with specific rent amount
-          const txUrl = `https://solscan.io/tx/${signature}`;
-          const shortSig = signature.substring(0, 8) + '...';
-          setError(`Successfully burned ${token.name || token.symbol || 'token'}! Rent returned: ${tokenRentPerAccount.toFixed(4)} SOL | Signature: ${shortSig}`);
-          
-          // Log activity to Recent Activity feed
-          ActivityLogger.logTokenBurn(token.name || token.symbol || 'Token', tokenRentPerAccount, signature);
-          
-          // Add link to transaction
-          setTimeout(() => {
-            const txElem = document.createElement('div');
-            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
-            
-            if (document.querySelector('.error-message')) {
-              document.querySelector('.error-message')?.appendChild(txElem);
-            }
-          }, 100);
-          
-          setTimeout(() => setError(null), 8000); // Clear message after 8 seconds
+          // Show message about rent recovery and fee
+          setError(`Successfully burned ${token.name || token.symbol || 'token'} and recovered rent to your wallet! A small donation has been sent to support the project.`);
+          setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
         }
       } catch (signingError: any) {
         // Clear timeout
         clearTimeout(timeoutId);
         
         // Check if the error is related to user cancellation
-        const signingErrorMessage = signingError?.message || '';
-        if (signingErrorMessage.includes('timed out') || 
-            signingErrorMessage.includes('cancelled') ||
-            signingErrorMessage.includes('rejected') ||
-            signingErrorMessage.includes('User rejected')) {
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
           console.log('Transaction was cancelled by the user or timed out');
           setError('Transaction was cancelled. Please try again if you want to burn this token.');
           return;
@@ -891,24 +789,7 @@ const WalletAssets: React.FC = () => {
       } else if (isWalletConnectionError) {
         setError('Wallet connection error. Please check your wallet and try again.');
       } else {
-        // Properly format error messages to avoid "[object Object]"
-        let errorMessage = 'Unknown error occurred';
-        
-        if (error?.message) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error?.error) {
-          errorMessage = error.error;
-        } else if (error) {
-          try {
-            errorMessage = JSON.stringify(error);
-          } catch (e) {
-            errorMessage = String(error);
-          }
-        }
-        
-        setError(`Error burning token: ${errorMessage}`);
+        setError(`Error burning token: ${error.message}`);
       }
     }
   };
@@ -962,7 +843,21 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // 2. Close the token account to recover rent
+      // 2. If we have the metadata account, close it to get SOL back
+      if (nft.metadataAddress) {
+        try {
+          // Create close account instruction for the metadata
+          const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+          
+          // Add a deleteMetadataAccount instruction to remove the metadata account
+          // Note: This is a complex operation that might require custom instruction creation
+          // depending on the metadata program version, for now we're leaving it out
+        } catch (error) {
+          console.warn('Could not add metadata account closing instruction:', error);
+        }
+      }
+      
+      // 3. Close the token account to recover rent
       transaction.add(
         createCloseAccountInstruction(
           new PublicKey(nft.tokenAddress), // token account to close
@@ -972,8 +867,18 @@ const WalletAssets: React.FC = () => {
         )
       );
       
-      // The rent return happens automatically when closing the NFT accounts
-      // No fee charged for NFT burning to prevent InsufficientFundsForRent errors
+      // 4. Add an instruction to transfer a small fee to the designated address
+      // This is a very small amount of SOL (0.00004 SOL = 40,000 lamports)
+      const feeAmount = 40000; // 0.00004 SOL in lamports
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
       
       // Get recent blockhash with lower fee priority
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
@@ -1020,18 +925,7 @@ const WalletAssets: React.FC = () => {
       
         if (confirmation.value.err) {
           console.error('Error confirming NFT burn transaction:', confirmation.value.err);
-          
-          // Properly format the confirmation error
-          let confirmationError = 'Transaction failed';
-          if (confirmation.value.err) {
-            try {
-              confirmationError = JSON.stringify(confirmation.value.err);
-            } catch (e) {
-              confirmationError = String(confirmation.value.err);
-            }
-          }
-          
-          setError(`Error burning NFT: ${confirmationError}`);
+          setError(`Error burning NFT: ${confirmation.value.err}`);
         } else {
           console.log('NFT burn successful with signature:', signature);
           
@@ -1058,39 +952,19 @@ const WalletAssets: React.FC = () => {
             }
           }
           
-          // Calculate rent returned from burned NFT (includes token + metadata + edition accounts)
-          const nftRentPerAsset = 0.0077; // SOL per NFT (all accounts combined)
-          
-          // Show message with specific rent amount
-          const txUrl = `https://solscan.io/tx/${signature}`;
-          const shortSig = signature.substring(0, 8) + '...';
-          setError(`Successfully burned NFT "${nft.name || 'NFT'}"! Rent returned: ${nftRentPerAsset.toFixed(4)} SOL | Signature: ${shortSig}`);
-          
-          // Log activity to Recent Activity feed
-          ActivityLogger.logNFTBurn(nft.name || 'NFT', nftRentPerAsset, signature);
-          
-          // Add link to transaction
-          setTimeout(() => {
-            const txElem = document.createElement('div');
-            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
-            
-            if (document.querySelector('.error-message')) {
-              document.querySelector('.error-message')?.appendChild(txElem);
-            }
-          }, 100);
-          
-          setTimeout(() => setError(null), 8000); // Clear message after 8 seconds
+          // Show message about rent recovery and donation
+          setError(`Successfully burned NFT "${nft.name || 'NFT'}" and recovered rent to your wallet! A small donation has been sent to support the project.`);
+          setTimeout(() => setError(null), 5000); // Clear message after 5 seconds
         }
       } catch (signingError: any) {
         // Clear timeout
         clearTimeout(timeoutId);
         
         // Check if the error is related to user cancellation
-        const signingErrorMessage = signingError?.message || '';
-        if (signingErrorMessage.includes('timed out') || 
-            signingErrorMessage.includes('cancelled') ||
-            signingErrorMessage.includes('rejected') ||
-            signingErrorMessage.includes('User rejected')) {
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
           console.log('Transaction was cancelled by the user or timed out');
           setError('Transaction was cancelled. Please try again if you want to burn this NFT.');
           return;
@@ -1122,24 +996,7 @@ const WalletAssets: React.FC = () => {
       } else if (isWalletConnectionError) {
         setError('Wallet connection error. Please check your wallet and try again.');
       } else {
-        // Properly format error messages to avoid "[object Object]"
-        let errorMessage = 'Unknown error occurred';
-        
-        if (error?.message) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error?.error) {
-          errorMessage = error.error;
-        } else if (error) {
-          try {
-            errorMessage = JSON.stringify(error);
-          } catch (e) {
-            errorMessage = String(error);
-          }
-        }
-        
-        setError(`Error burning NFT: ${errorMessage}`);
+        setError(`Error burning NFT: ${error.message}`);
       }
     }
   };
@@ -1242,7 +1099,7 @@ const WalletAssets: React.FC = () => {
     setSelectedCnftForTrash(null);
     
     // Show a success message
-    setError(`Successfully trashed compressed NFT "${selectedCnftForTrash.name}" via direct method! ${result.signature ? `Transaction: ${result.signature.substring(0, 8)}...` : ''}`);
+    setError(`Successfully trashed compressed NFT "${selectedCnftForTrash.name}" via direct method! Transaction: ${signature.substring(0, 8)}...`);
     setTimeout(() => setError(null), 8000);
   };
   
@@ -1455,9 +1312,10 @@ const WalletAssets: React.FC = () => {
   const refreshAllAssets = () => {
     if (publicKey) {
       console.log('[WalletAssets] Refreshing all wallet assets');
-      // Since cNFTs are view-only now, we just need to refetch tokens and NFTs
-      // The existing useEffect hooks will handle the data fetching
-      window.location.reload();
+      // Refetch all asset types
+      fetchTokens();
+      fetchAllNFTs();
+      fetchCNFTsWithHandler();
     }
   };
 
@@ -1482,31 +1340,6 @@ const WalletAssets: React.FC = () => {
     
     // Set burning state to false
     setIsBurning(false);
-  };
-
-  // Handle successful cNFT burn operation (view-only mode - no actual burning)
-  const handleCnftBurnSuccess = (result: any) => {
-    console.log('[WalletAssets] cNFT operation in view-only mode:', result);
-    
-    // cNFTs are view-only now, so no actual burning happens
-    if (window.BurnAnimations) {
-      window.BurnAnimations.showNotification(
-        'cNFT View-Only Mode',
-        'cNFTs are in view-only mode for your safety'
-      );
-    }
-  };
-
-  // Handle cNFT burn error
-  const handleCnftBurnError = (error: string) => {
-    console.error('[WalletAssets] cNFT burn operation failed:', error);
-    
-    if (window.BurnAnimations) {
-      window.BurnAnimations.showNotification(
-        'cNFT Burn Failed',
-        `Failed to burn cNFT: ${error}`
-      );
-    }
   };
   
   // Toggle bulk burn mode
@@ -1547,9 +1380,448 @@ const WalletAssets: React.FC = () => {
     );
   };
 
-  // Bulk burn tokens removed - use individual burn buttons instead
+  // Handle bulk burn of tokens - with batching in a single transaction
+  const handleBulkBurnTokens = async () => {
+    if (selectedTokens.length === 0) return;
+    
+    setIsBurning(true);
+    setError("Starting bulk burn operation for tokens in a single transaction...");
+    
+    try {
+      // Import necessary web3 modules
+      const { ComputeBudgetProgram } = require('@solana/web3.js');
+      
+      // Create a single transaction for all token burns
+      const transaction = new Transaction();
+      
+      // Add compute budget instructions to avoid insufficient SOL errors
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 200000 * Math.min(5, selectedTokens.size || 1) // Scale compute units based on number of tokens with a cap
+      });
+      
+      // Add a compute budget instruction to set a very low prioritization fee 
+      // Using same fee as single burns to keep costs consistent
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimum possible fee (consistent with single burn)
+      });
+      
+      // Add compute budget instructions to transaction
+      transaction.add(modifyComputeUnits, addPriorityFee);
+      
+      // Define fee recipient for donation
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      // Keep track of which tokens were successfully added to the transaction
+      const processedTokens = [];
+      const failedTokens = [];
+      
+      // Maximum number of tokens to process in a single transaction (to avoid size limits)
+      const MAX_TOKENS_PER_BATCH = 8;
+      const tokensToProcess = selectedTokens.slice(0, MAX_TOKENS_PER_BATCH);
+      
+      if (tokensToProcess.length < selectedTokens.length) {
+        setError(`Processing first ${MAX_TOKENS_PER_BATCH} tokens in this batch. Remaining tokens will need a separate transaction.`);
+      }
+      
+      // Add burn and close instructions for each token
+      for (const mint of tokensToProcess) {
+        const token = tokens.find(t => t.mint === mint);
+        if (token && token.account) {
+          try {
+            // Add burn instruction for this token
+            transaction.add(
+              createBurnCheckedInstruction(
+                new PublicKey(token.account), // token account
+                new PublicKey(token.mint), // mint
+                publicKey, // owner
+                token.balance, // amount to burn
+                token.decimals // decimals
+              )
+            );
+            
+            // Add close account instruction to recover rent
+            transaction.add(
+              createCloseAccountInstruction(
+                new PublicKey(token.account), // token account to close
+                publicKey, // destination for recovered SOL
+                publicKey, // authority
+                [] // multisig signers (empty in our case)
+              )
+            );
+            
+            processedTokens.push(token);
+          } catch (error) {
+            console.error(`Error adding token ${mint} to transaction:`, error);
+            failedTokens.push(token);
+          }
+        } else {
+          failedTokens.push({mint});
+        }
+      }
+      
+      // If no tokens were successfully added, exit
+      if (processedTokens.length === 0) {
+        setError("Could not add any tokens to the transaction. Please try again or burn individually.");
+        setIsBurning(false);
+        return;
+      }
+      
+      // Add a single donation instruction (instead of one per token)
+      // Scale the fee based on number of tokens, but with a reasonable cap
+      const feePerToken = 40000; // 0.00004 SOL in lamports
+      const maxFee = 100000; // Cap at 0.0001 SOL
+      const feeAmount = Math.min(feePerToken * processedTokens.length, maxFee);
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
+      
+      // Get recent blockhash with lower fee priority
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed' // Lower commitment level to reduce fees
+      });
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Create a timeoutPromise that rejects after 2 minutes
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<Transaction>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Transaction signing timed out or was cancelled'));
+        }, 120000); // 2 minute timeout
+      });
+      
+      // Update UI to show we're waiting for signature
+      setError(`Please approve the transaction in your wallet to burn ${processedTokens.length} tokens at once...`);
+      
+      try {
+        // Race between the signTransaction and the timeout
+        const signedTx = await Promise.race([
+          signTransaction(transaction),
+          timeoutPromise
+        ]);
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+        
+        // Update UI to show transaction is being processed
+        setError(`Sending transaction to burn ${processedTokens.length} tokens at once...`);
+        
+        // Send the transaction with skipPreflight to avoid client-side checks
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: true, // Skip preflight checks
+          maxRetries: 3, // Retry a few times if needed
+          preflightCommitment: 'processed' // Lower commitment level
+        });
+        
+        console.log('Bulk token burn transaction sent with signature:', signature);
+        
+        // Wait for confirmation with a custom strategy to avoid timeouts
+        const confirmation = await connection.confirmTransaction({
+          signature: signature,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight
+        }, 'processed'); // Use processed commitment level
+        
+        console.log('Bulk burn confirmation result:', confirmation);
+        
+        if (confirmation.value.err) {
+          console.error('Error confirming bulk burn transaction:', confirmation.value.err);
+          setError(`Error burning tokens: ${confirmation.value.err}`);
+        } else {
+          console.log('Bulk token burn successful with signature:', signature);
+          
+          // Update the tokens list by removing all burned tokens
+          const updatedTokens = tokens.filter(t => !processedTokens.some(p => p.mint === t.mint));
+          setTokens(updatedTokens);
+          
+          // Remove processed tokens from selected tokens
+          const remainingSelected = selectedTokens.filter(
+            mint => !processedTokens.some(p => p.mint === mint)
+          );
+          setSelectedTokens(remainingSelected);
+          
+          // Show animations and achievements
+          if (window.BurnAnimations) {
+            // Show confetti animation
+            if (window.BurnAnimations.createConfetti) {
+              window.BurnAnimations.createConfetti();
+            }
+            
+            // Track achievements - count multiple burns
+            if (window.BurnAnimations.checkAchievements) {
+              window.BurnAnimations.checkAchievements('tokens', processedTokens.length);
+            }
+          }
+          
+          // Show success message with transaction link
+          const txUrl = `https://solscan.io/tx/${signature}`;
+          const shortSig = signature.substring(0, 8) + '...';
+          
+          setError(`Successfully burned ${processedTokens.length} tokens in a single transaction! Signature: ${shortSig}`);
+          
+          // Add link to transaction
+          setTimeout(() => {
+            const txElem = document.createElement('div');
+            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+            
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+          
+          // If there are remaining tokens, show a message
+          if (remainingSelected.length > 0) {
+            setTimeout(() => {
+              setError(`${remainingSelected.length} tokens remain selected. Click "Burn Selected" again to process them.`);
+            }, 5000);
+          } else {
+            setTimeout(() => setError(null), 8000);
+          }
+        }
+      } catch (signingError: any) {
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Check if the error is related to user cancellation
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
+          console.log('Transaction was cancelled by the user or timed out');
+          setError('Transaction was cancelled. No tokens were burned.');
+        } else {
+          // For other signing errors
+          setError(`Error in transaction signing: ${signingError.message}`);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error in bulk burn operation:', error);
+      setError(`Error in bulk burn operation: ${error.message}`);
+    } finally {
+      setIsBurning(false);
+    }
+  };
 
-  // Bulk burn NFTs removed - use individual burn buttons instead
+  // Handle bulk burn of NFTs - with batching in a single transaction
+  const handleBulkBurnNFTs = async () => {
+    if (selectedNFTs.length === 0) return;
+    
+    setIsBurning(true);
+    setError("Starting bulk burn operation for NFTs in a single transaction...");
+    
+    try {
+      // Import necessary web3 modules
+      const { ComputeBudgetProgram } = require('@solana/web3.js');
+      
+      // Create a single transaction for all NFT burns
+      const transaction = new Transaction();
+      
+      // Add compute budget instructions to avoid insufficient SOL errors
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 200000 * Math.min(5, selectedNFTs.length || 1) // Scale compute units proportionally with a cap
+      });
+      
+      // Add a compute budget instruction to set a very low prioritization fee 
+      // Using same fee as single burns to keep costs consistent
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1 // Minimum possible fee (consistent with single burn)
+      });
+      
+      // Add compute budget instructions to transaction
+      transaction.add(modifyComputeUnits, addPriorityFee);
+      
+      // Define fee recipient for donation
+      const feeRecipient = new PublicKey('EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK');
+      
+      // Keep track of which NFTs were successfully added to the transaction
+      const processedNFTs = [];
+      const failedNFTs = [];
+      
+      // Maximum number of NFTs to process in a single transaction (to avoid size limits)
+      const MAX_NFTS_PER_BATCH = 5; // NFTs require more instructions than tokens
+      const nftsToProcess = selectedNFTs.slice(0, MAX_NFTS_PER_BATCH);
+      
+      if (nftsToProcess.length < selectedNFTs.length) {
+        setError(`Processing first ${MAX_NFTS_PER_BATCH} NFTs in this batch. Remaining NFTs will need a separate transaction.`);
+      }
+      
+      // Add burn and close instructions for each NFT
+      for (const mint of nftsToProcess) {
+        const nft = nfts.find(n => n.mint === mint);
+        if (nft && nft.tokenAddress) {
+          try {
+            // Add close token account instruction (effectively burns the NFT)
+            transaction.add(
+              createCloseAccountInstruction(
+                new PublicKey(nft.tokenAddress),  // token account to close
+                publicKey,                        // destination for recovered SOL
+                publicKey,                        // authority
+                []                                // multisig signers (empty in our case)
+              )
+            );
+            
+            processedNFTs.push(nft);
+          } catch (error) {
+            console.error(`Error adding NFT ${mint} to transaction:`, error);
+            failedNFTs.push(nft);
+          }
+        } else {
+          failedNFTs.push({mint});
+        }
+      }
+      
+      // If no NFTs were successfully added, exit
+      if (processedNFTs.length === 0) {
+        setError("Could not add any NFTs to the transaction. Please try again or burn individually.");
+        setIsBurning(false);
+        return;
+      }
+      
+      // Add a single donation instruction (instead of one per NFT)
+      // Scale the fee based on number of NFTs, but with a reasonable cap
+      const feePerNFT = 40000; // 0.00004 SOL in lamports
+      const maxFee = 100000; // Cap at 0.0001 SOL
+      const feeAmount = Math.min(feePerNFT * processedNFTs.length, maxFee);
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feeRecipient,
+          lamports: feeAmount,
+        })
+      );
+      
+      // Get recent blockhash with lower fee priority
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({
+        commitment: 'processed' // Lower commitment level to reduce fees
+      });
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Create a timeoutPromise that rejects after 2 minutes
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<Transaction>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Transaction signing timed out or was cancelled'));
+        }, 120000); // 2 minute timeout
+      });
+      
+      // Update UI to show we're waiting for signature
+      setError(`Please approve the transaction in your wallet to burn ${processedNFTs.length} NFTs at once...`);
+      
+      try {
+        // Race between the signTransaction and the timeout
+        const signedTx = await Promise.race([
+          signTransaction(transaction),
+          timeoutPromise
+        ]);
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+        
+        // Update UI to show transaction is being processed
+        setError(`Sending transaction to burn ${processedNFTs.length} NFTs at once...`);
+        
+        // Send the transaction with skipPreflight to avoid client-side checks
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: true, // Skip preflight checks
+          maxRetries: 3, // Retry a few times if needed
+          preflightCommitment: 'processed' // Lower commitment level
+        });
+        
+        console.log('Bulk NFT burn transaction sent with signature:', signature);
+        
+        // Wait for confirmation with a custom strategy to avoid timeouts
+        const confirmation = await connection.confirmTransaction({
+          signature: signature,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight
+        }, 'processed'); // Use processed commitment level
+        
+        console.log('Bulk burn confirmation result:', confirmation);
+        
+        if (confirmation.value.err) {
+          console.error('Error confirming bulk burn transaction:', confirmation.value.err);
+          setError(`Error burning NFTs: ${confirmation.value.err}`);
+        } else {
+          console.log('Bulk NFT burn successful with signature:', signature);
+          
+          // Update the NFTs list by removing all burned NFTs
+          const updatedNFTs = nfts.filter(n => !processedNFTs.some(p => p.mint === n.mint));
+          setNfts(updatedNFTs);
+          
+          // Remove processed NFTs from selected NFTs
+          const remainingSelected = selectedNFTs.filter(
+            mint => !processedNFTs.some(p => p.mint === mint)
+          );
+          setSelectedNFTs(remainingSelected);
+          
+          // Show animations and achievements
+          if (window.BurnAnimations) {
+            // Show confetti animation
+            if (window.BurnAnimations.createConfetti) {
+              window.BurnAnimations.createConfetti();
+            }
+            
+            // Track achievements - count multiple burns
+            if (window.BurnAnimations.checkAchievements) {
+              window.BurnAnimations.checkAchievements('nfts', processedNFTs.length);
+            }
+          }
+          
+          // Show success message with transaction link
+          const txUrl = `https://solscan.io/tx/${signature}`;
+          const shortSig = signature.substring(0, 8) + '...';
+          
+          setError(`Successfully burned ${processedNFTs.length} NFTs in a single transaction! Signature: ${shortSig}`);
+          
+          // Add link to transaction
+          setTimeout(() => {
+            const txElem = document.createElement('div');
+            txElem.innerHTML = `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" style="color: #4da6ff; text-decoration: underline;">View transaction</a>`;
+            
+            if (document.querySelector('.error-message')) {
+              document.querySelector('.error-message')?.appendChild(txElem);
+            }
+          }, 100);
+          
+          // If there are remaining NFTs, show a message
+          if (remainingSelected.length > 0) {
+            setTimeout(() => {
+              setError(`${remainingSelected.length} NFTs remain selected. Click "Burn Selected" again to process them.`);
+            }, 5000);
+          } else {
+            setTimeout(() => setError(null), 8000);
+          }
+        }
+      } catch (signingError: any) {
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Check if the error is related to user cancellation
+        if (signingError.message.includes('timed out') || 
+            signingError.message.includes('cancelled') ||
+            signingError.message.includes('rejected') ||
+            signingError.message.includes('User rejected')) {
+          console.log('Transaction was cancelled by the user or timed out');
+          setError('Transaction was cancelled. No NFTs were burned.');
+        } else {
+          // For other signing errors
+          setError(`Error in transaction signing: ${signingError.message}`);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error in bulk burn operation:', error);
+      setError(`Error in bulk burn operation: ${error.message}`);
+    } finally {
+      setIsBurning(false);
+    }
+  };
 
   // Handle bulk transfer of cNFTs to project wallet
   const handleBulkBurnCNFTs = async () => {
@@ -1825,77 +2097,57 @@ const WalletAssets: React.FC = () => {
 
   return (
     <div className="wallet-assets-container">
-      {!publicKey && (
-        <div className="wallet-connect-section">
-          <div className="app-header">
-            <img 
-              src="/static/solburnt-logo-pixel.png" 
-              alt="Solburnt" 
-              className="app-logo"
-              style={{
-                height: '80px',
-                marginBottom: '20px',
-                filter: 'drop-shadow(0 0 10px rgba(255, 100, 0, 0.3))',
-                imageRendering: 'pixelated'
-              }}
-            />
-          </div>
-          <h2>Connect Wallet to View Assets</h2>
-          <WalletMultiButton />
-        </div>
-      )}
+      <div className="wallet-connect-section">
+        <h2>Connect Wallet to View Assets</h2>
+        <WalletMultiButton />
+      </div>
 
       {publicKey && (
         <div className="assets-section">
           <div className="wallet-header">
-            <div className="header-left">
-              <img 
-                src="/static/solburnt-logo-pixel.png" 
-                alt="Solburnt" 
-                className="header-logo"
-                style={{
-                  height: '40px',
-                  marginRight: '15px',
-                  filter: 'drop-shadow(0 0 8px rgba(255, 100, 0, 0.3))',
-                  imageRendering: 'pixelated'
-                }}
-              />
-              <h2>Your Wallet Assets</h2>
-            </div>
-            <div className="header-right">
-              <button 
-                className={`bulk-mode-toggle ${bulkBurnMode ? 'active' : ''}`}
-                onClick={toggleBulkBurnMode}
-                style={{
-                  backgroundColor: bulkBurnMode ? '#9945FF' : 'transparent',
-                  color: bulkBurnMode ? 'white' : '#9945FF',
-                  border: '2px solid #9945FF',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  marginRight: '15px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {bulkBurnMode ? '✓ Bulk Mode ON' : 'Bulk Select Mode'}
-              </button>
-              <WalletMultiButton />
-            </div>
+            <h2>Your Wallet Assets</h2>
+            <button 
+              className="refresh-button" 
+              onClick={() => {
+                console.log("Manual refresh triggered");
+                // Create a timestamp to force cache-busting
+                const timestamp = Date.now();
+                if (publicKey) {
+                  // Add loading indicator
+                  setIsRefreshing(true);
+                  // Call the wallet-related APIs with the timestamp to bust cache
+                  axios.get(`/api/helius/wallet/nfts/${publicKey.toBase58()}?t=${timestamp}`)
+                    .then(response => {
+                      if (response.data && response.data.success) {
+                        const { regularNfts, compressedNfts } = response.data.data;
+                        setNfts(regularNfts);
+                        
+                        // Filter out hidden compressed NFTs if the HiddenAssets functionality is available
+                        let visibleCompressedNfts = compressedNfts;
+                        if (typeof window !== "undefined" && window.HiddenAssets) {
+                          visibleCompressedNfts = compressedNfts.filter((cnft) => 
+                            !window.HiddenAssets?.isAssetHidden(cnft.mint));
+                        }
+                        
+                        setCnfts(visibleCompressedNfts);
+                        console.log(`Refreshed: Found ${regularNfts.length} NFTs and ${visibleCompressedNfts.length} cNFTs`);
+                      }
+                    })
+                    .catch(error => {
+                      console.error("Error refreshing NFTs:", error);
+                      setError("Failed to refresh NFTs. Please try again.");
+                    })
+                    .finally(() => {
+                      setIsRefreshing(false);
+                    });
+                }
+              }}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? "Refreshing..." : "Refresh Assets"}
+            </button>
           </div>
           
-          <RentEstimate 
-            selectedTokens={selectedTokens}
-            selectedNFTs={selectedNFTs}
-            selectedCNFTs={selectedCNFTs}
-          />
-          
-          {/* Recent Activity */}
-          <RecentActivity />
-          
-
-
           {/* Bulk Burn Selection Panel - Always Visible */}
           {publicKey && (
             <div className="bulk-burn-section">
@@ -1907,11 +2159,52 @@ const WalletAssets: React.FC = () => {
                   </span>
                 </div>
                 
+                {selectedTokens.length > 0 && (
+                  <div className="selection-group">
+                    <span>{selectedTokens.length} tokens selected</span>
+                    <button 
+                      className="bulk-burn-button"
+                      disabled={isBurning} 
+                      onClick={handleBulkBurnTokens}
+                    >
+                      Burn Selected Tokens
+                    </button>
+                  </div>
+                )}
                 
+                {selectedNFTs.length > 0 && (
+                  <div className="selection-group">
+                    <span>{selectedNFTs.length} NFTs selected</span>
+                    <button 
+                      className="bulk-burn-button"
+                      disabled={isBurning}
+                      onClick={handleBulkBurnNFTs}
+                    >
+                      Burn Selected NFTs
+                    </button>
+                  </div>
+                )}
                 
                 {selectedCNFTs.length > 0 && (
                   <div className="selection-group cnft-selection-group">
-                    <span>{selectedCNFTs.length} cNFTs selected - View Only (Transfer disabled)</span>
+                    <span>{selectedCNFTs.length} cNFTs selected</span>
+                    <div className="button-group">
+                      <button 
+                        className="bulk-burn-button"
+                        disabled={isBurning}
+                        onClick={handleBulkBurnCNFTs}
+                      >
+                        Trash Selected
+                      </button>
+                      <button 
+                        className="queue-transfer-button"
+                        disabled={isBurning}
+                        onClick={openQueueTransferModal}
+                        title="Use the queue-based approach for better reliability"
+                      >
+                        Queue Trash
+                      </button>
+                    </div>
                   </div>
                 )}
                 
@@ -1992,41 +2285,6 @@ const WalletAssets: React.FC = () => {
                   data-mint={nft.mint}
                   onClick={bulkBurnMode ? () => handleNFTSelection(nft.mint) : undefined}
                 >
-                  {bulkBurnMode && (
-                    <div className="nft-header" style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      zIndex: 1000,
-                      backgroundColor: 'rgba(153, 69, 255, 0.9)',
-                      padding: '8px',
-                      borderRadius: '8px',
-                      border: '2px solid #9945FF',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedNFTs.includes(nft.mint)}
-                        onChange={() => handleNFTSelection(nft.mint)}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          cursor: 'pointer',
-                          accentColor: '#9945FF'
-                        }}
-                      />
-                      <span style={{
-                        color: 'white',
-                        fontSize: '11px',
-                        marginLeft: '4px',
-                        fontWeight: 'bold'
-                      }}>
-                        Select
-                      </span>
-                    </div>
-                  )}
                   <div className="nft-info">
                     <img 
                       src={nft.image || '/default-nft-image.svg'} 
@@ -2051,6 +2309,11 @@ const WalletAssets: React.FC = () => {
                     >
                       Burn
                     </button>
+                  )}
+                  {bulkBurnMode && (
+                    <div className="selection-indicator">
+                      {selectedNFTs.includes(nft.mint) ? '✓' : ''}
+                    </div>
                   )}
                 </div>
               ))}
@@ -2087,10 +2350,22 @@ const WalletAssets: React.FC = () => {
                       {cnft.collection && <div className="nft-collection">{cnft.collection}</div>}
                     </div>
                   </div>
-                  
                   {!bulkBurnMode && (
-                    <div className="cnft-info-badge" title="cNFTs are view-only - no burning functionality available">
-                      👁️ View Only
+                    <button 
+                      className="burn-button cnft-transfer-button"
+                      data-asset-id={cnft.mint}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBurnCNFT(cnft);
+                      }}
+                      title="Moves this cNFT to trash"
+                    >
+                      Trash
+                    </button>
+                  )}
+                  {bulkBurnMode && (
+                    <div className="selection-indicator">
+                      {selectedCNFTs.includes(cnft.mint) ? '✓' : ''}
                     </div>
                   )}
                 </div>
@@ -2138,8 +2413,6 @@ const WalletAssets: React.FC = () => {
           onSuccess={handleQueueTransferSuccess}
         />
       )}
-
-      {/* CNFTBurnModal removed - cNFTs are view-only */}
     </div>
   );
 };

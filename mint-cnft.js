@@ -145,7 +145,7 @@ async function mintCompressedNFT(recipientWalletAddress) {
       
       // Default metadata if file loading fails
       nftMetadata = {
-        name: "Solburnt Test cNFT",
+        name: "SolBurn Test cNFT",
         symbol: "SBT",
         uri: "https://raw.githubusercontent.com/metaplex-foundation/docs/main/docs/programs/bubblegum/assets/metadata.json",
         creators: [

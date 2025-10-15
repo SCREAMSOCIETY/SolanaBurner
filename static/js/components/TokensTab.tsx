@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
-import { 
-  TOKEN_PROGRAM_ID, 
-  createBurnInstruction, 
-  createBurnCheckedInstruction,
-  createCloseAccountInstruction,
-  getAssociatedTokenAddress 
-} from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, createBurnInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
 import axios from 'axios';
 
 // Define the window interface with our BurnAnimations object
@@ -94,28 +88,17 @@ const TokensTab: React.FC = () => {
         const tokenData: TokenData[] = [];
         for (const account of tokenAccounts.value) {
           const parsedInfo = account.account.data.parsed.info;
-          const amount = Number(parsedInfo.tokenAmount.amount);
-          const decimals = parsedInfo.tokenAmount.decimals;
-          
-          // Filter out NFTs - exclude anything with amount=1 and decimals=0 as these are NFTs
-          const isLikelyNFT = amount === 1 && decimals === 0;
-          console.log(`[TokensTab] Token ${parsedInfo.mint.slice(0, 8)}: amount=${amount}, decimals=${decimals}, isLikelyNFT=${isLikelyNFT}`);
-          
-          // Only include tokens that are NOT NFTs (skip amount=1 decimals=0 combinations)
-          if (amount > 0 && !isLikelyNFT) {
+          if (Number(parsedInfo.tokenAmount.amount) > 0) {
             tokenData.push({
               mint: parsedInfo.mint,
-              balance: amount,
-              decimals: decimals,
+              balance: Number(parsedInfo.tokenAmount.amount),
+              decimals: parsedInfo.tokenAmount.decimals,
               account: account.pubkey.toBase58()
             });
-          } else if (isLikelyNFT) {
-            console.log(`[TokensTab] Skipping NFT: ${parsedInfo.mint.slice(0, 8)}`);
           }
         }
 
         console.log('[TokensTab] Filtered token data:', tokenData.length);
-        console.log('[TokensTab] Found', tokenData.length, 'actual tokens after filtering out NFTs');
         setTokens(tokenData);
 
         // Helper function for rate-limited API calls
@@ -184,20 +167,13 @@ const TokensTab: React.FC = () => {
                   const metadata = metadataResponse.data || {};
                   console.log(`[TokensTab] Successfully enriched token ${token.mint} with metadata:`, metadata);
 
-                  // Force correct decimals for known problematic tokens
-                  let correctedDecimals = token.decimals || metadata.decimals || 9;
-                  if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-                    correctedDecimals = 0;
-                    console.log(`Forcing decimals to 0 for DwLw token at data enrichment stage`);
-                  }
-
                   return {
                     ...token,
                     symbol: metadata.symbol || token.mint.slice(0, 4),
                     name: metadata.name || `Token ${token.mint.slice(0, 8)}...`,
                     logoURI: metadata.icon || '/default-token-icon.svg',
-                    // Use corrected decimals
-                    decimals: correctedDecimals,
+                    // Ensure we have decimals for display
+                    decimals: token.decimals || metadata.decimals || 9,
                     // Store the metadata URI for potential future use
                     metadataUri: metadata.uri || null
                   };
@@ -255,85 +231,23 @@ const TokensTab: React.FC = () => {
       
       const transaction = new Transaction();
 
-      // Check if token balance is 0 - use close account instead of burn
-      if (token.balance === 0) {
-        console.log(`Token ${token.mint} has zero balance, using close account instruction`);
-        
-        const closeInstruction = createCloseAccountInstruction(
-          new PublicKey(token.account),
-          publicKey, // Destination for rent recovery
-          publicKey  // Owner
-        );
-        
-        transaction.add(closeInstruction);
-      } else {
-        console.log(`Token ${token.mint} has balance ${token.balance}, using burn + close instructions`);
-        
-        // Get the actual mint info to ensure we have the correct decimals
-        let actualDecimals = token.decimals;
-        console.log(`Token ${token.mint} stored decimals: ${token.decimals}`);
-        
-        try {
-          const mintInfo = await connection.getParsedAccountInfo(new PublicKey(token.mint));
-          if (mintInfo.value?.data && 'parsed' in mintInfo.value.data) {
-            actualDecimals = mintInfo.value.data.parsed.info.decimals;
-            console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}, was stored as: ${token.decimals}`);
-          } else {
-            console.warn(`No mint data found for ${token.mint}, using stored decimals`);
-          }
-        } catch (error) {
-          console.error(`Failed to fetch mint info for ${token.mint}:`, error);
-          console.warn(`Using stored decimals: ${token.decimals}`);
-        }
-        
-        // Force correct decimals for known problematic token
-        if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-          actualDecimals = 0;
-          console.log(`Forcing decimals to 0 for DwLw token`);
-        }
-        
-        // First burn the token balance
-        // Apply final decimal validation at instruction level
-        let instructionDecimals = actualDecimals;
-        if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-          instructionDecimals = 0;
-          console.log(`Final decimal override at instruction level: using 0 for DwLw token`);
-        }
-        
-        const burnInstruction = createBurnCheckedInstruction(
-          new PublicKey(token.account), // Token account
-          new PublicKey(token.mint),    // Mint
-          publicKey,                    // Owner
-          token.balance,                // Amount
-          instructionDecimals           // Final validated decimals
-        );
-        
-        transaction.add(burnInstruction);
-        
-        // Then close the account to recover rent
-        const closeInstruction = createCloseAccountInstruction(
-          new PublicKey(token.account),
-          publicKey, // Destination for rent recovery
-          publicKey  // Owner
-        );
-        
-        transaction.add(closeInstruction);
-      }
+      const burnInstruction = createBurnInstruction(
+        new PublicKey(token.account),
+        new PublicKey(token.mint),
+        publicKey,
+        token.balance
+      );
+
+      transaction.add(burnInstruction);
 
       const signature = await sendTransaction(transaction, connection);
-      console.log(`Token burn transaction sent with signature:`, signature);
       
       // Apply burn animation if element exists
       if (tokenElement && window.BurnAnimations) {
         window.BurnAnimations.applyBurnAnimation(tokenElement);
       }
       
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-      console.log(`Token burn confirmation result:`, confirmation);
-      
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
+      await connection.confirmTransaction(signature, 'confirmed');
 
       // Show confetti and trigger achievements if window.BurnAnimations is available
       if (window.BurnAnimations) {
@@ -349,17 +263,9 @@ const TokensTab: React.FC = () => {
 
       // Remove the burned token from the list
       setTokens(tokens.filter(t => t.mint !== token.mint));
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error burning token:', err);
-      
-      // Provide specific error messages
-      if (err?.message?.includes('InstructionError')) {
-        setError('Token burning failed - the token may have already been processed or the account state has changed.');
-      } else if (err?.message?.includes('insufficient')) {
-        setError('Insufficient SOL balance to pay for transaction fees.');
-      } else {
-        setError('Failed to burn token. Please try again.');
-      }
+      setError('Failed to burn token. Please try again.');
     } finally {
       setBurning(false);
     }
@@ -371,21 +277,6 @@ const TokensTab: React.FC = () => {
     try {
       setBurning(true);
       const transaction = new Transaction();
-
-      // Add compute budget instructions for bulk operations
-      const { ComputeBudgetProgram } = await import('@solana/web3.js');
-      
-      transaction.add(
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: 400000 // Higher compute limit for bulk operations
-        })
-      );
-      
-      transaction.add(
-        ComputeBudgetProgram.setComputeUnitPrice({
-          microLamports: 1 // Minimal priority fee
-        })
-      );
 
       // Get all token elements for animation
       const tokenElements: HTMLElement[] = [];
@@ -405,80 +296,20 @@ const TokensTab: React.FC = () => {
         }
       });
 
-      // Add burn/close instructions for all selected tokens
+      // Add burn instructions for all selected tokens
       for (const token of tokens) {
         if (selectedTokens.has(token.mint) && token.account) {
-          console.log(`Processing token ${token.mint} with balance ${token.balance}`);
-          
-          // Check if token balance is 0 - use close account instead of burn
-          if (token.balance === 0) {
-            console.log(`Token ${token.mint} has zero balance, using close account instruction`);
-            
-            const closeInstruction = createCloseAccountInstruction(
-              new PublicKey(token.account),
-              publicKey, // Destination for rent recovery
-              publicKey  // Owner
-            );
-            
-            transaction.add(closeInstruction);
-          } else {
-            console.log(`Token ${token.mint} has balance ${token.balance}, using burn + close instructions`);
-            
-            // Get the actual mint info to ensure we have the correct decimals
-            let actualDecimals = token.decimals;
-            console.log(`Token ${token.mint} stored decimals: ${token.decimals}`);
-            
-            try {
-              const mintInfo = await connection.getParsedAccountInfo(new PublicKey(token.mint));
-              if (mintInfo.value?.data && 'parsed' in mintInfo.value.data) {
-                actualDecimals = mintInfo.value.data.parsed.info.decimals;
-                console.log(`Token ${token.mint} actual decimals from mint: ${actualDecimals}, was stored as: ${token.decimals}`);
-              } else {
-                console.warn(`No mint data found for ${token.mint}, using stored decimals`);
-              }
-            } catch (error) {
-              console.error(`Failed to fetch mint info for ${token.mint}:`, error);
-              console.warn(`Using stored decimals: ${token.decimals}`);
-            }
-            
-            // Force correct decimals for known problematic token
-            if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-              actualDecimals = 0;
-              console.log(`Forcing decimals to 0 for DwLw token`);
-            }
-            
-            // First burn the token balance
-            // Apply final decimal validation at instruction level
-            let instructionDecimals = actualDecimals;
-            if (token.mint === 'DwLwu4FaSn39zkoCtozTMcmJLvMFNxgrbHoFxm9fzYFt') {
-              instructionDecimals = 0;
-              console.log(`Final decimal override at bulk instruction level: using 0 for DwLw token`);
-            }
-            
-            const burnInstruction = createBurnCheckedInstruction(
-              new PublicKey(token.account), // Token account
-              new PublicKey(token.mint),    // Mint
-              publicKey,                    // Owner
-              token.balance,                // Amount
-              instructionDecimals           // Final validated decimals
-            );
-            
-            transaction.add(burnInstruction);
-            
-            // Then close the account to recover rent
-            const closeInstruction = createCloseAccountInstruction(
-              new PublicKey(token.account),
-              publicKey, // Destination for rent recovery
-              publicKey  // Owner
-            );
-            
-            transaction.add(closeInstruction);
-          }
+          const burnInstruction = createBurnInstruction(
+            new PublicKey(token.account),
+            new PublicKey(token.mint),
+            publicKey,
+            token.balance
+          );
+          transaction.add(burnInstruction);
         }
       }
 
       const signature = await sendTransaction(transaction, connection);
-      console.log(`Bulk token burn transaction sent with signature:`, signature);
       
       // Apply burn animations in sequence
       if (window.BurnAnimations && tokenElements.length > 0) {
@@ -490,12 +321,7 @@ const TokensTab: React.FC = () => {
         });
       }
       
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-      console.log(`Bulk burn confirmation result:`, confirmation);
-      
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
+      await connection.confirmTransaction(signature, 'confirmed');
 
       // Show mega confetti for bulk burn!
       if (window.BurnAnimations) {
@@ -523,17 +349,9 @@ const TokensTab: React.FC = () => {
       // Remove all burned tokens from the list
       setTokens(tokens.filter(token => !selectedTokens.has(token.mint)));
       setSelectedTokens(new Set());
-    } catch (err: any) {
-      console.error('Error confirming bulk burn transaction:', err);
-      
-      // Provide specific error messages
-      if (err?.message?.includes('InstructionError')) {
-        setError('Bulk token burning failed - one or more tokens may have already been processed or their account states have changed.');
-      } else if (err?.message?.includes('insufficient')) {
-        setError('Insufficient SOL balance to pay for transaction fees.');
-      } else {
-        setError('Failed to burn tokens. Please try again.');
-      }
+    } catch (err) {
+      console.error('Error burning tokens:', err);
+      setError('Failed to burn tokens. Please try again.');
     } finally {
       setBurning(false);
     }
@@ -561,16 +379,6 @@ const TokensTab: React.FC = () => {
   return (
     <div className="container">
       <h2>Tokens</h2>
-      {tokens.length > 0 && (
-        <div className="selection-help">
-          <span className="help-text">
-            {selectedTokens.size === 0 
-              ? "Click the checkboxes to select tokens for bulk burning" 
-              : `${selectedTokens.size} token${selectedTokens.size > 1 ? 's' : ''} selected`
-            }
-          </span>
-        </div>
-      )}
       {selectedTokens.size > 0 && (
         <div className="bulk-actions">
           <button 
@@ -578,14 +386,7 @@ const TokensTab: React.FC = () => {
             onClick={handleBulkBurn}
             disabled={burning}
           >
-            {burning ? 'Burning...' : `🔥 Burn Selected (${selectedTokens.size})`}
-          </button>
-          <button 
-            className="clear-selection-btn"
-            onClick={() => setSelectedTokens(new Set())}
-            disabled={burning}
-          >
-            Clear Selection
+            {burning ? 'Burning...' : `Burn Selected (${selectedTokens.size})`}
           </button>
         </div>
       )}
@@ -601,18 +402,13 @@ const TokensTab: React.FC = () => {
       ) : (
         <div className="assets-grid">
           {tokens.map((token) => (
-            <div 
-              key={token.mint} 
-              className={`asset-card token-card ${selectedTokens.has(token.mint) ? 'selected' : ''}`}
-              data-mint={token.mint}
-            >
+            <div key={token.mint} className="asset-card token-card" data-mint={token.mint}>
               <div className="token-header">
                 <input
                   type="checkbox"
                   checked={selectedTokens.has(token.mint)}
                   onChange={() => toggleTokenSelection(token.mint)}
                   className="token-select"
-                  title="Select this token for bulk burning"
                 />
                 <div className="token-icon-wrapper">
                   <img 
