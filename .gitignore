@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+target/
+
+# Build outputs
+static/dist/
+*.wasm
+
+# Environment variables
+.env
+.env.local
+.env.production.local
+
+# Development files
+*.log
+npm-debug.log*
+diagnostic.json
+cnft_data.json
+cnft_sample.json
+metadata.json
+
+# Test files (development only)
+test-*.js
+demo-*.js
+temp.js
+*-test.js
+pure-*.html
+pure-*.js
+direct-*.html
+direct-*.js
+standalone.html
+ultra-minimal.html
+working-*.html
+working-*.js
+server-side-transfer.html
+
+# Legacy/unused files
+vercel.json
+cli-*.js
+debugTransactionInstruction.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+
+# Rust (if any)
+Cargo.lock
+
+# Keep important config files
+!webpack.config.js
+!tsconfig.json
+!render.yaml
+!package.json
+!package-lock.json

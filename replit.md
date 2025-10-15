@@ -88,3 +88,40 @@ Preferred communication style: Simple, everyday language.
 **Configuration Management**: Centralized in `config.js` with environment variable validation. Supports both development and production modes with appropriate fallbacks.
 
 **Asset Transfer Destination**: All transfers default to project wallet `EYjsLzE9VDy3WBd2beeCHA1eVYJxPKVf6NoKKDwq7ujK`
+
+## Deployment Configuration
+
+**Platform**: Render.com (switched from Vercel due to 250 MB serverless function size limit)
+
+**Why Render?**: Solana dependencies (~500+ MB) exceed Vercel's limits. Render supports full Node.js servers without size restrictions.
+
+**Deployment Files**:
+- `render.yaml`: Render service configuration with health checks, auto-deploy, and environment variables
+- `RENDER_DEPLOYMENT.md`: Complete step-by-step deployment guide
+
+**Environment Variables Required**:
+- `HELIUS_API_KEY`: Helius API key for NFT/cNFT data
+- `QUICKNODE_RPC_URL`: QuickNode RPC endpoint
+- `SOLSCAN_API_KEY`: Solscan API key (optional)
+- `NODE_ENV`: Set to "production" (auto-configured in render.yaml)
+- `PORT`: Dynamically assigned by Render (typically 10000)
+
+**Deployment Flow**:
+1. Push to GitHub main branch
+2. Render auto-detects changes
+3. Runs: `npm install && npm run build`
+4. Starts: `npm start` (fastifyServer.js on PORT)
+5. Health check: `/health` endpoint confirms server running
+6. Live at: `https://solburnt.onrender.com`
+
+**Port Configuration**:
+- Development (Replit): Port 5001
+- Production (Render): Dynamic PORT from environment (usually 10000)
+- Server binds to `0.0.0.0` to accept all connections
+
+**Recent Deployment Updates (October 2025)**:
+- Moved all build dependencies to `dependencies` (Render needs them during build)
+- Configured health check endpoint at `/health`
+- Removed hardcoded PORT from render.yaml (Render provides dynamically)
+- Increased vacant account capacity from 3 to 25 per transaction
+- Smart data refresh replaces full page reload after burns
