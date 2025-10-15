@@ -3790,14 +3790,46 @@ fastify.get('/api/rent-optimization/:walletAddress', async (request, reply) => {
   }
 });
 
-// Start the server - use environment PORT or default based on environment
-// Production/Autoscale deployments should use port 80, development uses 5000
-const port = process.env.PORT || (process.env.NODE_ENV === 'production' ? 80 : 5000);
+// Health check endpoint for deployment monitoring
+fastify.get('/health', async (request, reply) => {
+  return { 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  };
+});
+
+// Start the server - ALWAYS use port 5000 (deployment forwards to external port 80)
+// The deployment infrastructure expects internal port 5000
+const port = process.env.PORT || 5000;
+
 const start = async () => {
   try {
+    console.log('[FASTIFY SERVER] Initializing server startup...');
+    console.log('[FASTIFY SERVER] Target port:', port);
+    console.log('[FASTIFY SERVER] Environment:', process.env.NODE_ENV || 'development');
+    
+    // Add startup timeout to catch initialization issues earlier
+    const startupTimeout = setTimeout(() => {
+      console.error('[FASTIFY SERVER] ERROR: Server initialization timeout (4 minutes)');
+      console.error('[FASTIFY SERVER] The server failed to start within the expected timeframe');
+      process.exit(1);
+    }, 240000); // 4 minute timeout to match deployment timeout
+    
     await fastify.listen({ port: port, host: '0.0.0.0' });
+    
+    clearTimeout(startupTimeout);
+    
+    console.log('[FASTIFY SERVER] ✅ Server successfully started');
+    console.log('[FASTIFY SERVER] Listening on: http://0.0.0.0:' + port);
+    console.log('[FASTIFY SERVER] Health check: http://0.0.0.0:' + port + '/health');
+    console.log('[FASTIFY SERVER] Ready to accept requests');
+    
     fastify.log.info(`Server running at http://0.0.0.0:${port}`);
   } catch (err) {
+    console.error('[FASTIFY SERVER] ERROR: Failed to start server');
+    console.error('[FASTIFY SERVER] Error details:', err);
     fastify.log.error(`Error starting server: ${err}`);
     process.exit(1);
   }
