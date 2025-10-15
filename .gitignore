@@ -66,3 +66,6 @@ Cargo.lock
 !render.yaml
 !package.json
 !package-lock.json
+# Keep templates directory with index.html
+!templates/
+!templates/index.html
